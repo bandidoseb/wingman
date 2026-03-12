@@ -1,0 +1,105 @@
+import type { Profile, Outcome, VaultObjection, VaultSignal } from "@/types";
+
+interface RepProfileInput {
+  profile: Profile;
+  offerName: string | null;
+  offerPrice: string | null;
+  recentCalls: Array<{ outcome: Outcome | null }>;
+  objections: VaultObjection[];
+  signals: VaultSignal[];
+}
+
+/**
+ * Builds a compressed ~700 token rep intelligence summary.
+ * Sent on every poll as part of the flat payload.
+ */
+export function buildRepProfile(input: RepProfileInput): string {
+  const { profile, offerName, offerPrice, recentCalls, objections, signals } =
+    input;
+
+  // ── Basic profile ──────────────────────────────────────────────────────────
+  const role = profile.role ?? "closer";
+  const style = profile.sales_style ?? "direct";
+  const callLength = profile.call_length ?? "60 min";
+
+  // ── Offer ──────────────────────────────────────────────────────────────────
+  const offer = [offerName, offerPrice].filter(Boolean).join(" · ") || "Not set";
+
+  // ── Call stats from last 30 calls ─────────────────────────────────────────
+  const calls = recentCalls.slice(0, 30);
+  const total = calls.length;
+  const closed = calls.filter((c) => c.outcome === "Closed").length;
+  const lost = calls.filter((c) => c.outcome === "Lost").length;
+  const dq = calls.filter((c) => c.outcome === "DQ").length;
+  const followUp = calls.filter((c) => c.outcome === "Follow Up").length;
+
+  const closeRate =
+    total > 0 ? Math.round((closed / Math.max(total - dq, 1)) * 100) : 0;
+
+  // ── Most common objections hit (by frequency) ─────────────────────────────
+  const topObjections = [...objections]
+    .sort((a, b) => b.frequency - a.frequency)
+    .slice(0, 3)
+    .map((o) => o.objection)
+    .join(", ");
+
+  // ── Active signal count by stage ──────────────────────────────────────────
+  const activeSignals = signals.filter((s) => s.is_enabled);
+  const signalStages = [
+    ...new Set(activeSignals.map((s) => s.stage)),
+  ].join(", ");
+
+  // ── Pattern summary from recent calls ────────────────────────────────────
+  const lostReasons: string[] = [];
+  if (lost > 0 && total > 0) {
+    const lostRate = Math.round((lost / total) * 100);
+    if (lostRate > 40) lostReasons.push("high loss rate — price or press issues likely");
+    if (followUp > closed) lostReasons.push("more follow-ups than closes — urgency issue");
+  }
+  const patternNote =
+    lostReasons.length > 0
+      ? `Pattern flags: ${lostReasons.join("; ")}.`
+      : "No major pattern flags from recent calls.";
+
+  // ── Assemble ───────────────────────────────────────────────────────────────
+  return `REP PROFILE:
+Role: ${role} | Style: ${style} | Avg call length: ${callLength}
+Offer: ${offer}
+Stats (last ${total} calls): ${closed} closed / ${lost} lost / ${dq} DQ / ${followUp} follow-up | Close rate: ${closeRate}%
+Top objections faced: ${topObjections || "none yet"}
+Active signals covering: ${signalStages || "all stages"}
+${patternNote}`.trim();
+}
+
+/**
+ * Builds a compact signal vault string for the poll payload.
+ * Only includes enabled signals.
+ */
+export function buildSignalVaultSummary(signals: VaultSignal[]): string {
+  const active = signals.filter((s) => s.is_enabled);
+  if (active.length === 0) return "SIGNAL VAULT: (empty)";
+
+  const lines = active
+    .slice(0, 30) // cap at 30 to control tokens
+    .map((s) => `[${s.stage}] ${s.header}${s.trigger ? ` — trigger: "${s.trigger}"` : ""}${s.text ? ` | text: "${s.text}"` : ""}`)
+    .join("\n");
+
+  return `SIGNAL VAULT (${active.length} active signals):\n${lines}`;
+}
+
+/**
+ * Builds a compact objection vault string for the poll payload.
+ */
+export function buildObjectionVaultSummary(objections: VaultObjection[]): string {
+  if (objections.length === 0) return "OBJECTION VAULT: (empty)";
+
+  const lines = objections
+    .slice(0, 20)
+    .map((o) => {
+      const handle = o.handle1 || o.handle2 || "(no handle set)";
+      return `"${o.objection}" → ${handle}`;
+    })
+    .join("\n");
+
+  return `OBJECTION VAULT (${objections.length} objections):\n${lines}`;
+}

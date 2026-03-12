@@ -1,0 +1,891 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Wingman HUD</title>
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'unsafe-inline'; script-src 'unsafe-inline';" />
+  <style>
+    /* ── Reset ─────────────────────────────────────────────────────────────── */
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    html, body {
+      width: 100vw;
+      height: 100vh;
+      background: transparent;        /* HUD window is fully see-through */
+      overflow: hidden;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      -webkit-user-select: none;
+      user-select: none;
+      pointer-events: none;           /* default: all mouse events pass through */
+    }
+
+    /* ══════════════════════════════════════════════════════════════════════
+       COMPONENT 1 — STAGE BAR
+       Centered at top of the transparent window, always visible when HUD open
+    ══════════════════════════════════════════════════════════════════════ */
+    #stageBar {
+      position: absolute;
+      top: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 100;
+      display: flex;
+      align-items: center;
+
+      background: rgba(255, 255, 255, 0.95);
+      backdrop-filter: blur(24px);
+      -webkit-backdrop-filter: blur(24px);
+      border: 1px solid rgba(0, 0, 0, 0.06);
+      border-radius: 12px;
+      padding: 8px 12px;
+      box-shadow: 0 2px 12px rgba(0, 0, 0, 0.2);
+
+      white-space: nowrap;
+    }
+
+    /* Live indicator dot — left side of stage bar */
+    #liveDot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      margin-right: 10px;
+      flex-shrink: 0;
+      background: #d1d1d6;           /* idle = gray */
+      transition: background 0.3s, box-shadow 0.3s;
+    }
+    #liveDot.live {
+      background: #34c759;
+      box-shadow: 0 0 8px rgba(52, 199, 89, 0.6);
+    }
+
+    /* Stage pills container */
+    #stagePills {
+      display: flex;
+      align-items: center;
+      gap: 0;
+    }
+
+    .stage-divider {
+      width: 1px;
+      height: 12px;
+      background: #e5e5ea;
+      flex-shrink: 0;
+      margin: 0 4px;
+    }
+
+    .stage-pill {
+      padding: 4px 11px;
+      border-radius: 7px;
+      font-size: 11px;
+      letter-spacing: -0.01em;
+    }
+    .stage-pill.done    { background: transparent; color: #8e8e93; font-weight: 500; }
+    .stage-pill.current { background: #000000;     color: #ffffff; font-weight: 600; }
+    .stage-pill.future  { background: transparent; color: #8e8e93; font-weight: 500; }
+
+    /* Call timer — appears after last stage pill when live */
+    #timerSection {
+      display: none;
+      align-items: center;
+      gap: 6px;
+      margin-left: 4px;
+    }
+    #timerSection.visible { display: flex; }
+
+    #timerDot {
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: #ff3b30;
+      flex-shrink: 0;
+      animation: blinkRed 1.2s infinite;
+    }
+
+    #timerText {
+      font-size: 11px;
+      color: #8e8e93;
+      font-variant-numeric: tabular-nums;
+      min-width: 32px;
+    }
+
+    /* ── Stage bar glow animations ──────────────────────────────────────── */
+    @keyframes glowBlue {
+      0%, 100% { box-shadow: 0 2px 12px rgba(0,0,0,0.2), 0 0 0 0 rgba(0,122,255,0); }
+      50%       { box-shadow: 0 2px 12px rgba(0,0,0,0.2), 0 0 20px 4px rgba(0,122,255,0.25); }
+    }
+    @keyframes glowRed {
+      0%, 100% { box-shadow: 0 2px 12px rgba(0,0,0,0.2), 0 0 0 0 rgba(255,59,48,0); }
+      50%       { box-shadow: 0 2px 12px rgba(0,0,0,0.2), 0 0 20px 6px rgba(255,59,48,0.35); }
+    }
+    #stageBar.glow-blue  { animation: glowBlue 2.5s ease-in-out infinite; }
+    #stageBar.glow-red   { animation: glowRed  1.8s ease-in-out infinite; }
+
+    @keyframes blinkRed {
+      0%, 100% { opacity: 1; }
+      50%       { opacity: 0.2; }
+    }
+
+    /* ══════════════════════════════════════════════════════════════════════
+       COMPONENT 2 — SUGGESTION BUBBLE
+       Bottom-right corner, appears only when a signal fires
+    ══════════════════════════════════════════════════════════════════════ */
+    #signalBubble {
+      position: absolute;
+      bottom: 80px;
+      right: 32px;
+      width: 296px;
+      z-index: 100;
+      display: none;
+      flex-direction: column;
+      border-radius: 14px;
+      padding: 14px 16px;
+      pointer-events: auto;          /* bubble IS interactive — click passes through */
+    }
+
+    #signalBubble.visible {
+      display: flex;
+      animation: fadeUp 0.3s ease forwards;
+    }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(10px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Per-type colors — Alert / Ready / Topic / Suggest */
+    #signalBubble.alert {
+      background: #fff0f0;
+      border: 1.5px solid rgba(192, 57, 43, 0.3);
+      box-shadow: 0 4px 28px rgba(192,57,43,0.2), 0 0 0 1px rgba(192,57,43,0.3);
+    }
+    #signalBubble.ready {
+      background: #f0faf4;
+      border: 1.5px solid rgba(52, 199, 89, 0.3);
+      box-shadow: 0 4px 28px rgba(52,199,89,0.2), 0 0 0 1px rgba(52,199,89,0.3);
+    }
+    #signalBubble.topic {
+      background: #fff8ee;
+      border: 1.5px solid rgba(255, 159, 10, 0.3);
+      box-shadow: 0 4px 28px rgba(255,159,10,0.2), 0 0 0 1px rgba(255,159,10,0.3);
+    }
+    #signalBubble.suggest {
+      background: #eef5ff;
+      border: 1.5px solid rgba(0, 122, 255, 0.3);
+      box-shadow: 0 4px 28px rgba(0,122,255,0.2), 0 0 0 1px rgba(0,122,255,0.3);
+    }
+
+    /* Signal type tag pill */
+    #signalTag {
+      display: inline-block;
+      align-self: flex-start;
+      font-size: 9.5px;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      background: rgba(255, 255, 255, 0.6);
+      padding: 3px 9px;
+      border-radius: 5px;
+      margin-bottom: 7px;
+    }
+    #signalBubble.alert  #signalTag { color: #ff3b30; border: 1px solid rgba(192,57,43,0.3); }
+    #signalBubble.ready  #signalTag { color: #34c759; border: 1px solid rgba(52,199,89,0.3); }
+    #signalBubble.topic  #signalTag { color: #ff9f0a; border: 1px solid rgba(255,159,10,0.3); }
+    #signalBubble.suggest #signalTag { color: #4a90d9; border: 1px solid rgba(0,122,255,0.3); }
+
+    /* Signal text */
+    #signalText {
+      font-size: 13.5px;
+      font-weight: 500;
+      line-height: 1.5;
+      letter-spacing: -0.01em;
+      margin-bottom: 12px;
+    }
+    #signalBubble.alert   #signalText { color: #ff3b30; }
+    #signalBubble.ready   #signalText { color: #34c759; }
+    #signalBubble.topic   #signalText { color: #ff9f0a; }
+    #signalBubble.suggest #signalText { color: #4a90d9; }
+
+    /* "got it" dismiss button */
+    #gotItBtn {
+      width: 100%;
+      padding: 7px;
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.5);
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      font-family: inherit;
+      transition: background 0.15s;
+    }
+    #gotItBtn:hover { background: rgba(255,255,255,0.8); }
+    #signalBubble.alert   #gotItBtn { color: #ff3b30; border: 1px solid rgba(192,57,43,0.3); }
+    #signalBubble.ready   #gotItBtn { color: #34c759; border: 1px solid rgba(52,199,89,0.3); }
+    #signalBubble.topic   #gotItBtn { color: #ff9f0a; border: 1px solid rgba(255,159,10,0.3); }
+    #signalBubble.suggest #gotItBtn { color: #4a90d9; border: 1px solid rgba(0,122,255,0.3); }
+
+    /* ── "Listening…" — shown when live but no signal ───────────────────── */
+    #listeningText {
+      position: absolute;
+      bottom: 80px;
+      right: 32px;
+      font-size: 11px;
+      color: rgba(255, 255, 255, 0.2);
+      font-style: italic;
+      display: none;
+      pointer-events: none;
+    }
+    #listeningText.visible { display: block; }
+
+    /* ══════════════════════════════════════════════════════════════════════
+       SHARED TOAST BASE — Detection + Manual Trigger share most styles
+    ══════════════════════════════════════════════════════════════════════ */
+    .wingman-toast {
+      position: absolute;
+      top: 24px;
+      right: 24px;
+      z-index: 200;
+      display: none;
+      flex-direction: column;
+      gap: 10px;
+      min-width: 300px;
+      pointer-events: auto;
+
+      background: rgba(16, 16, 18, 0.92);
+      backdrop-filter: blur(28px);
+      -webkit-backdrop-filter: blur(28px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 16px;
+      padding: 16px 20px;
+      box-shadow: 0 8px 40px rgba(0, 0, 0, 0.5), 0 0 0 0.5px rgba(255,255,255,0.06);
+    }
+
+    .wingman-toast.visible {
+      display: flex;
+      animation: slideDown 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+
+    @keyframes slideDown {
+      from { opacity: 0; transform: translateY(-8px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Toast header row */
+    .toast-header {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+    }
+
+    .toast-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: #ffffff;
+      letter-spacing: -0.01em;
+    }
+
+    /* Toast action row */
+    .toast-actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    /* Primary deploy button */
+    .toast-deploy-btn {
+      flex: 1;
+      padding: 8px 0;
+      border-radius: 9px;
+      background: #ffffff;
+      border: none;
+      color: #1c1c1e;
+      font-size: 13px;
+      font-weight: 700;
+      font-family: inherit;
+      cursor: pointer;
+      transition: opacity 0.15s;
+      letter-spacing: -0.01em;
+    }
+    .toast-deploy-btn:hover { opacity: 0.88; }
+
+    /* Secondary dismiss/cancel button */
+    .toast-dismiss-btn {
+      padding: 8px 16px;
+      border-radius: 9px;
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      color: rgba(255, 255, 255, 0.45);
+      font-size: 12px;
+      font-weight: 500;
+      font-family: inherit;
+      cursor: pointer;
+      transition: background 0.15s, color 0.15s;
+    }
+    .toast-dismiss-btn:hover {
+      background: rgba(255, 255, 255, 0.14);
+      color: rgba(255, 255, 255, 0.7);
+    }
+
+    /* ══════════════════════════════════════════════════════════════════════
+       COMPONENT 3A — CALL DETECTION TOAST
+       Appears when Recall AI detects a meeting window (Zoom/Teams/Meet).
+    ══════════════════════════════════════════════════════════════════════ */
+    #detectionPulse {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #34c759;
+      box-shadow: 0 0 10px rgba(52, 199, 89, 0.7);
+      flex-shrink: 0;
+      animation: pulseGreen 1.6s ease-in-out infinite;
+    }
+
+    @keyframes pulseGreen {
+      0%, 100% { box-shadow: 0 0 6px rgba(52, 199, 89, 0.5); }
+      50%       { box-shadow: 0 0 14px rgba(52, 199, 89, 0.9); }
+    }
+
+    /* ══════════════════════════════════════════════════════════════════════
+       COMPONENT 3B — MANUAL TRIGGER TOAST
+       Appears when user presses Ctrl+Shift+W without a detected call.
+    ══════════════════════════════════════════════════════════════════════ */
+    #manualIcon {
+      width: 20px;
+      height: 20px;
+      border-radius: 6px;
+      background: #000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      overflow: hidden;
+    }
+    #manualIcon img {
+      width: 72%;
+      height: 72%;
+      object-fit: contain;
+      display: block;
+    }
+
+    /* ══════════════════════════════════════════════════════════════════════
+       COMPONENT 3C — END CALL CONFIRMATION TOAST
+       Appears when Ctrl+Shift+W is pressed during an active call.
+       Destructive action — red button to confirm, secondary to keep going.
+    ══════════════════════════════════════════════════════════════════════ */
+    #endCallIcon {
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: rgba(255, 59, 48, 0.2);
+      border: 1px solid rgba(255, 59, 48, 0.35);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      font-size: 10px;
+      color: #ff3b30;
+    }
+
+    /* Destructive red primary button — used for End Call */
+    .toast-end-btn {
+      flex: 1;
+      padding: 8px 0;
+      border-radius: 9px;
+      background: #ff3b30;
+      border: none;
+      color: #ffffff;
+      font-size: 13px;
+      font-weight: 700;
+      font-family: inherit;
+      cursor: pointer;
+      transition: opacity 0.15s;
+      letter-spacing: -0.01em;
+    }
+    .toast-end-btn:hover { opacity: 0.88; }
+
+    /* ══════════════════════════════════════════════════════════════════════
+       COMPONENT 3D — AUTO-STOP NOTIFICATION TOAST
+       Informational only — no buttons. Auto-dismisses after 4 seconds.
+       Appears when Wingman stops automatically (inactivity, cap, or call ended).
+    ══════════════════════════════════════════════════════════════════════ */
+    #autoStopIcon {
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: rgba(255, 159, 10, 0.2);
+      border: 1px solid rgba(255, 159, 10, 0.35);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      font-size: 11px;
+      color: #ff9f0a;
+    }
+
+    #autoStopMessage {
+      font-size: 13px;
+      color: rgba(255, 255, 255, 0.65);
+      line-height: 1.4;
+    }
+
+    /* ══════════════════════════════════════════════════════════════════════
+       COMPONENT 3E — APPROACHING LIMIT WARNING TOAST
+       Appears 10 minutes before the 2-hour hard cap. Amber warning style.
+       Auto-dismisses after 8 seconds — no action required.
+    ══════════════════════════════════════════════════════════════════════ */
+    #approachingLimitIcon {
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: rgba(255, 159, 10, 0.25);
+      border: 1px solid rgba(255, 159, 10, 0.5);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      font-size: 12px;
+      font-weight: 700;
+      color: #ff9f0a;
+    }
+
+    #approachingLimitSub {
+      font-size: 12px;
+      color: rgba(255, 255, 255, 0.45);
+      padding-left: 29px;
+      margin-top: -4px;
+      line-height: 1.4;
+    }
+
+    /* Stage bar hidden until call actually starts */
+    #stageBar { display: none; }
+    #stageBar.active { display: flex; }
+  </style>
+</head>
+<body>
+
+  <!-- COMPONENT 1: Stage Bar -->
+  <div id="stageBar">
+    <div id="liveDot"></div>
+    <div id="stagePills">
+      <!-- Populated by JS -->
+      <div class="stage-pill future">—</div>
+    </div>
+    <div id="timerSection">
+      <div class="stage-divider" style="margin-left:4px;"></div>
+      <div id="timerDot"></div>
+      <span id="timerText">0:00</span>
+    </div>
+  </div>
+
+  <!-- "Listening…" indicator (live, no active signal) -->
+  <div id="listeningText">Listening…</div>
+
+  <!-- COMPONENT 3A: Call Detection Toast -->
+  <div id="detectionToast" class="wingman-toast">
+    <div class="toast-header">
+      <div id="detectionPulse"></div>
+      <span class="toast-title">Wingman detected a call</span>
+    </div>
+    <div class="toast-actions">
+      <button id="detectionDeployBtn" class="toast-deploy-btn">Deploy Wingman</button>
+      <button id="detectionDismissBtn" class="toast-dismiss-btn">Dismiss</button>
+    </div>
+  </div>
+
+  <!-- COMPONENT 3B: Manual Trigger Toast (Ctrl+Shift+W before detection) -->
+  <div id="manualTriggerToast" class="wingman-toast">
+    <div class="toast-header">
+      <div id="manualIcon"><img src="/Wingman.png" alt="Wingman" /></div>
+      <span class="toast-title">Ready to deploy Wingman?</span>
+    </div>
+    <div class="toast-actions">
+      <button id="manualConfirmBtn" class="toast-deploy-btn">Deploy Wingman</button>
+      <button id="manualCancelBtn" class="toast-dismiss-btn">Cancel</button>
+    </div>
+  </div>
+
+  <!-- COMPONENT 3C: End Call Confirmation Toast (Ctrl+Shift+W during active call) -->
+  <div id="endCallToast" class="wingman-toast">
+    <div class="toast-header">
+      <div id="endCallIcon">■</div>
+      <span class="toast-title">End this call?</span>
+    </div>
+    <div class="toast-actions">
+      <button id="endCallConfirmBtn" class="toast-end-btn">End Call</button>
+      <button id="endCallCancelBtn" class="toast-dismiss-btn">Keep Going</button>
+    </div>
+  </div>
+
+  <!-- COMPONENT 3D: Auto-Stop Notification Toast (informational, no buttons) -->
+  <div id="autoStopToast" class="wingman-toast">
+    <div class="toast-header">
+      <div id="autoStopIcon">!</div>
+      <span id="autoStopMessage">Wingman stopped.</span>
+    </div>
+  </div>
+
+  <!-- COMPONENT 3E: Approaching Limit Warning Toast (10 min before 2h cap) -->
+  <div id="approachingLimitToast" class="wingman-toast">
+    <div class="toast-header">
+      <div id="approachingLimitIcon">⚠</div>
+      <span class="toast-title">Wingman stops in 10 minutes</span>
+    </div>
+    <div id="approachingLimitSub">2 hour session limit — wrap up or restart after</div>
+  </div>
+
+  <!-- COMPONENT 2: Suggestion Bubble -->
+  <div id="signalBubble">
+    <div id="signalTag">ALERT</div>
+    <div id="signalText">Signal text goes here</div>
+    <button id="gotItBtn">got it</button>
+  </div>
+
+  <script>
+    // ── Signal type → CSS class + display name ─────────────────────────────
+    const TYPE_MAP = {
+      'Alert':   { cls: 'alert',   label: 'Alert'   },
+      'Ready':   { cls: 'ready',   label: 'Ready'   },
+      'Nudge':   { cls: 'suggest', label: 'Suggest' },
+      'Handle':  { cls: 'suggest', label: 'Suggest' },
+      'Topic':   { cls: 'topic',   label: 'Topic'   },
+      'Suggest': { cls: 'suggest', label: 'Suggest' },
+    };
+
+    // ── State ─────────────────────────────────────────────────────────────
+    let isLive            = false;
+    let signalActive      = false;
+    let currentSignalType = null;
+    let timerInterval     = null;
+    let timerSeconds      = 0;
+    let allStages         = [];
+    let completedStages   = [];
+    let currentStage      = null;
+
+    // ── Element refs ──────────────────────────────────────────────────────
+    const stageBar             = document.getElementById('stageBar');
+    const liveDot              = document.getElementById('liveDot');
+    const stagePills           = document.getElementById('stagePills');
+    const timerSection         = document.getElementById('timerSection');
+    const timerText            = document.getElementById('timerText');
+    const signalBubble         = document.getElementById('signalBubble');
+    const signalTag            = document.getElementById('signalTag');
+    const signalTextEl         = document.getElementById('signalText');
+    const gotItBtn             = document.getElementById('gotItBtn');
+    const listeningText        = document.getElementById('listeningText');
+    const detectionToast       = document.getElementById('detectionToast');
+    const detectionDeployBtn   = document.getElementById('detectionDeployBtn');
+    const detectionDismissBtn  = document.getElementById('detectionDismissBtn');
+    const manualTriggerToast   = document.getElementById('manualTriggerToast');
+    const manualConfirmBtn     = document.getElementById('manualConfirmBtn');
+    const manualCancelBtn      = document.getElementById('manualCancelBtn');
+    const endCallToast         = document.getElementById('endCallToast');
+    const endCallConfirmBtn    = document.getElementById('endCallConfirmBtn');
+    const endCallCancelBtn     = document.getElementById('endCallCancelBtn');
+    const autoStopToast           = document.getElementById('autoStopToast');
+    const autoStopMessage         = document.getElementById('autoStopMessage');
+    const approachingLimitToast   = document.getElementById('approachingLimitToast');
+
+    // ── Detection toast ───────────────────────────────────────────────────
+    let detectionTimeout = null;
+
+    function showDetectionToast() {
+      hideManualTriggerToast(false); // can't show both
+      detectionToast.classList.add('visible');
+      if (window.hud) window.hud.setMouseIgnore(false);
+
+      // Auto-dismiss after 12 seconds
+      clearTimeout(detectionTimeout);
+      detectionTimeout = setTimeout(() => hideDetectionToast(true), 12000);
+    }
+
+    function hideDetectionToast(dismiss) {
+      detectionToast.classList.remove('visible');
+      clearTimeout(detectionTimeout);
+      if (!manualTriggerToast.classList.contains('visible') && !signalActive) {
+        if (window.hud) window.hud.setMouseIgnore(true);
+      }
+      if (dismiss && window.hud) window.hud.dismissDetection();
+    }
+
+    detectionDeployBtn.addEventListener('click', () => {
+      hideDetectionToast(false);
+      if (window.hud) window.hud.deployCall();
+    });
+
+    detectionDismissBtn.addEventListener('click', () => hideDetectionToast(true));
+
+    // ── Manual trigger toast ──────────────────────────────────────────────
+    let manualTimeout = null;
+
+    function showManualTriggerToast() {
+      hideDetectionToast(false); // can't show both
+      manualTriggerToast.classList.add('visible');
+      if (window.hud) window.hud.setMouseIgnore(false);
+
+      // Auto-dismiss after 10 seconds if user doesn't act
+      clearTimeout(manualTimeout);
+      manualTimeout = setTimeout(() => hideManualTriggerToast(true), 10000);
+    }
+
+    function hideManualTriggerToast(hideHud) {
+      manualTriggerToast.classList.remove('visible');
+      clearTimeout(manualTimeout);
+      if (!detectionToast.classList.contains('visible') && !signalActive) {
+        if (window.hud) window.hud.setMouseIgnore(true);
+      }
+      if (hideHud && window.hud) window.hud.dismissDetection(); // hide HUD if no call
+    }
+
+    manualConfirmBtn.addEventListener('click', () => {
+      hideManualTriggerToast(false);
+      if (window.hud) window.hud.deployCall();
+    });
+
+    manualCancelBtn.addEventListener('click', () => hideManualTriggerToast(true));
+
+    // ── End call confirmation toast ───────────────────────────────────────
+    let endCallTimeout = null;
+
+    function showEndCallConfirmToast() {
+      endCallToast.classList.add('visible');
+      if (window.hud) window.hud.setMouseIgnore(false);
+
+      // Auto-dismiss after 8 seconds — just cancels the action, doesn't end the call
+      clearTimeout(endCallTimeout);
+      endCallTimeout = setTimeout(() => hideEndCallConfirmToast(), 8000);
+    }
+
+    function hideEndCallConfirmToast() {
+      endCallToast.classList.remove('visible');
+      clearTimeout(endCallTimeout);
+      if (!signalActive) {
+        if (window.hud) window.hud.setMouseIgnore(true);
+      }
+    }
+
+    endCallConfirmBtn.addEventListener('click', () => {
+      hideEndCallConfirmToast();
+      if (window.hud) window.hud.confirmEndCall();
+    });
+
+    endCallCancelBtn.addEventListener('click', () => hideEndCallConfirmToast());
+
+    // ── Auto-stop notification toast ──────────────────────────────────────
+    const AUTO_STOP_MESSAGES = {
+      inactivity:    'No activity for 20 minutes — Wingman stopped.',
+      max_duration:  '2 hour limit reached — Wingman stopped.',
+      meeting_lost:  'Call ended — Wingman stopped.',
+    };
+
+    let autoStopDismissTimer = null;
+
+    function showAutoStopToast(reason) {
+      autoStopMessage.textContent = AUTO_STOP_MESSAGES[reason] || 'Wingman stopped.';
+      autoStopToast.classList.add('visible');
+      if (window.hud) window.hud.setMouseIgnore(true); // informational only — pass through
+
+      clearTimeout(autoStopDismissTimer);
+      autoStopDismissTimer = setTimeout(() => {
+        autoStopToast.classList.remove('visible');
+      }, 4000);
+    }
+
+    // ── Approaching limit warning toast ──────────────────────────────────
+    let approachingLimitTimer = null;
+
+    function showApproachingLimitToast() {
+      approachingLimitToast.classList.add('visible');
+      // Informational — keep mouse pass-through
+      clearTimeout(approachingLimitTimer);
+      approachingLimitTimer = setTimeout(() => {
+        approachingLimitToast.classList.remove('visible');
+      }, 8000);
+    }
+
+    // ── Timer ─────────────────────────────────────────────────────────────
+    function startTimer() {
+      timerSeconds = 0;
+      clearInterval(timerInterval);
+      timerInterval = setInterval(() => {
+        timerSeconds++;
+        const m = Math.floor(timerSeconds / 60);
+        const s = timerSeconds % 60;
+        timerText.textContent = m + ':' + String(s).padStart(2, '0');
+      }, 1000);
+      timerSection.classList.add('visible');
+    }
+
+    function stopTimer() {
+      clearInterval(timerInterval);
+      timerSection.classList.remove('visible');
+      timerSeconds = 0;
+      timerText.textContent = '0:00';
+    }
+
+    // ── Go Live / Go Idle ─────────────────────────────────────────────────
+    function setLive(live) {
+      isLive = live;
+      if (live) {
+        // Hide both toasts — call is now active
+        hideDetectionToast(false);
+        hideManualTriggerToast(false);
+        // Show stage bar
+        stageBar.classList.add('active');
+
+        liveDot.classList.add('live');
+        startTimer();
+        stageBar.classList.remove('glow-red');
+        stageBar.classList.add('glow-blue');
+        if (!signalActive) listeningText.classList.add('visible');
+      } else {
+        liveDot.classList.remove('live');
+        stopTimer();
+        stageBar.classList.remove('glow-blue', 'glow-red', 'active');
+        listeningText.classList.remove('visible');
+      }
+    }
+
+    // ── Stage bar render ──────────────────────────────────────────────────
+    function renderStagePills() {
+      stagePills.innerHTML = '';
+      if (allStages.length === 0) {
+        const pill = document.createElement('div');
+        pill.className = 'stage-pill future';
+        pill.textContent = currentStage || '—';
+        stagePills.appendChild(pill);
+        return;
+      }
+
+      allStages.forEach((s, i) => {
+        if (i > 0) {
+          const div = document.createElement('div');
+          div.className = 'stage-divider';
+          stagePills.appendChild(div);
+        }
+
+        const pill = document.createElement('div');
+        const isDone    = completedStages.includes(s);
+        const isCurrent = s === currentStage;
+
+        if (isDone) {
+          pill.className = 'stage-pill done';
+          pill.textContent = '✓';
+          pill.title = s;
+        } else if (isCurrent) {
+          pill.className = 'stage-pill current';
+          pill.textContent = s;
+        } else {
+          pill.className = 'stage-pill future';
+          pill.textContent = s;
+        }
+
+        stagePills.appendChild(pill);
+      });
+    }
+
+    // ── Show a signal bubble ──────────────────────────────────────────────
+    function showSignal(signal) {
+      const typeInfo = TYPE_MAP[signal.type] || TYPE_MAP['Nudge'];
+      currentSignalType = typeInfo.cls;
+
+      const displayText = signal.header && signal.text
+        ? signal.header + ' — ' + signal.text
+        : signal.header || signal.text || '';
+
+      signalBubble.className = 'signal-card visible ' + typeInfo.cls;
+      signalTag.textContent   = typeInfo.label.toUpperCase();
+      signalTextEl.textContent = displayText;
+
+      signalBubble.classList.add('visible');
+      signalActive = true;
+      listeningText.classList.remove('visible');
+
+      stageBar.classList.remove('glow-blue', 'glow-red');
+      if (typeInfo.cls === 'alert') {
+        stageBar.classList.add('glow-red');
+      } else if (isLive) {
+        stageBar.classList.add('glow-blue');
+      }
+
+      if (window.hud) window.hud.setMouseIgnore(false);
+    }
+
+    function hideSignal() {
+      signalBubble.className = 'signal-card';
+      signalActive = false;
+      currentSignalType = null;
+
+      stageBar.classList.remove('glow-red');
+      if (isLive) {
+        stageBar.classList.add('glow-blue');
+        listeningText.classList.add('visible');
+      }
+
+      if (window.hud) window.hud.setMouseIgnore(true);
+    }
+
+    // ── Dismiss button ────────────────────────────────────────────────────
+    gotItBtn.addEventListener('click', () => {
+      hideSignal();
+      if (window.hud) window.hud.dismissSignal();
+    });
+
+    // ── Mouse hover tracking ──────────────────────────────────────────────
+    signalBubble.addEventListener('mouseenter', () => {
+      if (window.hud) window.hud.setMouseIgnore(false);
+    });
+    signalBubble.addEventListener('mouseleave', () => {
+      if (signalActive && window.hud) window.hud.setMouseIgnore(false);
+      else if (window.hud) window.hud.setMouseIgnore(true);
+    });
+
+    // ── IPC listeners (Electron → HUD) ───────────────────────────────────
+    if (window.hud) {
+      // Signal fired
+      window.hud.onSignal(signal => showSignal(signal));
+
+      // Stage + all stages + completed stages
+      window.hud.onStage(data => {
+        if (typeof data === 'string') {
+          currentStage = data;
+        } else {
+          currentStage    = data.current    || null;
+          allStages       = data.all        || [];
+          completedStages = data.completed  || [];
+        }
+        renderStagePills();
+      });
+
+      // Call detected (meeting window found — show detection toast)
+      window.hud.onCallDetected(() => showDetectionToast());
+
+      // Manual trigger (Ctrl+Shift+W pressed, no active call — show confirmation)
+      window.hud.onManualTrigger(() => showManualTriggerToast());
+
+      // End call confirmation (Ctrl+Shift+W pressed during active call)
+      window.hud.onEndCallConfirm(() => showEndCallConfirmToast());
+
+      // Call started — transition to live mode
+      window.hud.onCallStart(() => setLive(true));
+
+      // Call ended
+      window.hud.onCallEnd(() => {
+        setLive(false);
+        hideSignal();
+        hideEndCallConfirmToast();
+      });
+
+      // Dismiss from main window
+      window.hud.onSignalDismiss(() => hideSignal());
+
+      // Auto-stopped (inactivity, 2h cap, or meeting window closed)
+      window.hud.onAutoStopped(reason => showAutoStopToast(reason));
+
+      // 10-minute warning before 2h hard cap
+      window.hud.onCapWarning(() => showApproachingLimitToast());
+    }
+
+    // ── Initial render ────────────────────────────────────────────────────
+    renderStagePills();
+  </script>
+</body>
+</html>

@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Wingman</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
+      background: transparent;
+      overflow: hidden;
+      -webkit-app-region: no-drag;
+      user-select: none;
+    }
+
+    /* ── Outer shell — provides shadow clearance ────────────────────────── */
+    .shell {
+      margin: 6px;
+      border-radius: 14px;
+      background: rgba(22, 22, 24, 0.94);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      box-shadow:
+        0 8px 32px rgba(0, 0, 0, 0.55),
+        0 2px 8px  rgba(0, 0, 0, 0.35);
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    /* ── Header row ─────────────────────────────────────────────────────── */
+    .header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+    }
+
+    .logo {
+      width: 20px;
+      height: 20px;
+      border-radius: 5px;
+      background: #000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      flex-shrink: 0;
+    }
+    .logo img {
+      width: 72%;
+      height: 72%;
+      object-fit: contain;
+      display: block;
+    }
+
+    .app-name {
+      font-size: 13px;
+      font-weight: 600;
+      color: rgba(255, 255, 255, 0.88);
+      letter-spacing: -0.01em;
+    }
+
+    /* Live pulse dot next to app name when call is active */
+    .live-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #34c759;
+      box-shadow: 0 0 5px rgba(52, 199, 89, 0.7);
+      margin-left: auto;
+      display: none;
+      animation: pulse 2s ease-in-out infinite;
+    }
+    .live-dot.visible { display: block; }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50%       { opacity: 0.5; }
+    }
+
+    /* ── Buttons ────────────────────────────────────────────────────────── */
+    .btn {
+      width: 100%;
+      padding: 8px 12px;
+      border: none;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      font-family: inherit;
+      cursor: pointer;
+      text-align: center;
+      transition: opacity 0.1s, transform 0.08s;
+    }
+    .btn:active { opacity: 0.8; transform: scale(0.98); }
+
+    .btn-deploy {
+      background: #ffffff;
+      color: #1c1c1e;
+    }
+    .btn-deploy:hover { background: #f0f0f0; }
+
+    /* ── Live state ─────────────────────────────────────────────────────── */
+    .live-badge {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      padding: 7px 10px;
+      background: rgba(52, 199, 89, 0.1);
+      border: 1px solid rgba(52, 199, 89, 0.2);
+      border-radius: 8px;
+      color: #34c759;
+      font-size: 13px;
+      font-weight: 600;
+    }
+    .live-badge-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #34c759;
+      flex-shrink: 0;
+      animation: pulse 2s ease-in-out infinite;
+    }
+
+    .btn-end {
+      background: #ff3b30;
+      color: #fff;
+      border: none;
+      font-weight: 600;
+    }
+    .btn-end:hover { background: #e0352b; }
+
+    /* ── Dashboard button (always visible) ─────────────────────────────── */
+    .btn-dashboard {
+      background: transparent;
+      color: rgba(255, 255, 255, 0.35);
+      font-weight: 500;
+      font-size: 12px;
+      border: none;
+      padding: 5px 12px;
+    }
+    .btn-dashboard:hover { color: rgba(255, 255, 255, 0.6); }
+
+    /* ── State visibility ───────────────────────────────────────────────── */
+    #idleState { display: flex; flex-direction: column; gap: 0; }
+    #liveState  { display: none;  flex-direction: column; gap: 6px; }
+  </style>
+</head>
+<body>
+  <div class="shell">
+
+    <!-- Header -->
+    <div class="header">
+      <div class="logo">
+        <img src="../../public/Wingman.png" alt="W" />
+      </div>
+      <span class="app-name">Wingman</span>
+      <div class="live-dot" id="liveDot"></div>
+    </div>
+
+    <!-- Idle: no call active -->
+    <div id="idleState">
+      <button class="btn btn-deploy" id="deployBtn">Deploy Wingman</button>
+    </div>
+
+    <!-- Live: call is active -->
+    <div id="liveState">
+      <div class="live-badge">
+        <div class="live-badge-dot"></div>
+        Wingman is live
+      </div>
+      <button class="btn btn-end" id="endBtn">End Call</button>
+    </div>
+
+    <!-- Always visible -->
+    <button class="btn btn-dashboard" id="dashboardBtn">Open Dashboard</button>
+
+  </div>
+
+  <script>
+    // nodeIntegration is enabled for this local-only window
+    const { ipcRenderer } = require('electron'); // eslint-disable-line
+
+    let callActive = false;
+
+    function updateUI() {
+      const idle  = document.getElementById('idleState');
+      const live  = document.getElementById('liveState');
+      const dot   = document.getElementById('liveDot');
+
+      if (callActive) {
+        idle.style.display = 'none';
+        live.style.display = 'flex';
+        dot.classList.add('visible');
+        ipcRenderer.invoke('tray:resize', 190);
+      } else {
+        idle.style.display = 'flex';
+        live.style.display = 'none';
+        dot.classList.remove('visible');
+        ipcRenderer.invoke('tray:resize', 150);
+      }
+    }
+
+    // Receive call state from main process
+    ipcRenderer.on('tray:call-state', (_event, isActive) => {
+      callActive = isActive;
+      updateUI();
+    });
+
+    document.getElementById('deployBtn').addEventListener('click', () => {
+      ipcRenderer.invoke('tray:deploy');
+    });
+
+    document.getElementById('endBtn').addEventListener('click', () => {
+      ipcRenderer.invoke('tray:end-call');
+    });
+
+    document.getElementById('dashboardBtn').addEventListener('click', () => {
+      ipcRenderer.invoke('tray:open-dashboard');
+    });
+  </script>
+</body>
+</html>

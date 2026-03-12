@@ -1,0 +1,62 @@
+# electron-builder.yml
+# This file tells electron-builder how to package Wingman into a .dmg installer.
+# Run:  npm run electron:dist  →  creates dist/ folder with Wingman.dmg
+
+appId: ai.meetwingman.app
+productName: Wingman
+copyright: Copyright © 2025 Wingman AI
+
+directories:
+  output: dist            # The final .dmg goes here
+  buildResources: build   # Icons and other build assets go here
+
+# What files to bundle inside the app
+files:
+  - electron-dist/**/*    # Compiled Electron TypeScript (main.js, preload.js, etc.)
+  - electron/hud/**/*     # The HUD overlay HTML file
+  - public/**/*           # Icons and images
+  - "!node_modules/.cache/**/*"  # Exclude only cache, electron-builder handles prod deps automatically
+
+# Extra files to bundle (these go in the app's Resources folder)
+extraResources:
+  - from: public/
+    to: public/
+    filter:
+      - "**/*"
+
+# macOS-specific settings
+mac:
+  category: public.app-category.business
+  icon: build/icon.icns          # macOS requires .icns format (create from Wingman.png)
+  hardenedRuntime: true          # Required for notarization
+  gatekeeperAssess: false        # We handle our own signing
+  entitlements: build/entitlements.mac.plist
+  entitlementsInherit: build/entitlements.mac.plist
+  target:
+    - target: dmg
+      arch:
+        - x64             # Intel Macs
+        - arm64            # Apple Silicon (M1/M2/M3)
+
+# What the DMG installer looks like
+dmg:
+  title: "Install Wingman"
+  contents:
+    - x: 130
+      y: 220
+      type: file
+    - x: 410
+      y: 220
+      type: link
+      path: /Applications
+
+# Auto-update: publishes to GitHub Releases
+# When you run electron:dist, it creates the files and uploads to GitHub
+publish:
+  provider: github
+  owner: bandidoseb
+  repo: wingman
+
+# macOS code signing (required for users to install without warnings)
+# This runs AFTER signing to notarize with Apple
+# afterSign: scripts/notarize.js   # ← Uncomment when you have your Apple Developer account
