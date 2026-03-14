@@ -98,8 +98,6 @@ export default function SimulatorTab({ objections, onLimitReached, triggerToggle
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
           call_id: callId,
-          outcome: "Follow Up",
-          summary: `Simulator session. Stages covered: ${completedStages.join(", ") || "N/A"}.`,
           stages: completedStages.map((s, idx) => ({
             name: s,
             status: "complete",

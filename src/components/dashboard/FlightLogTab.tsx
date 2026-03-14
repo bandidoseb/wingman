@@ -13,9 +13,79 @@ interface Props {
   userId: string;
 }
 
+// Outcome options shown in the inline picker
+const OUTCOMES = [
+  { label: "Closed",     color: "#34c759", text: "#fff" },
+  { label: "Follow Up",  color: "#007aff", text: "#fff" },
+  { label: "DQ",         color: "#8e8e93", text: "#fff" },
+  { label: "No Show",    color: "#ff9500", text: "#fff" },
+] as const;
+
+function OutcomePicker({
+  callId,
+  onSaved,
+}: {
+  callId: string;
+  onSaved: (callId: string, outcome: string) => void;
+}) {
+  const [saving, setSaving] = useState<string | null>(null);
+
+  const pick = async (e: React.MouseEvent, outcome: string) => {
+    e.stopPropagation(); // don't open the call detail
+    setSaving(outcome);
+    try {
+      await fetch("/api/wingman/outcome", {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ call_id: callId, outcome }),
+      });
+      onSaved(callId, outcome);
+    } catch {
+      // fail silently — user can try again
+    }
+    setSaving(null);
+  };
+
+  return (
+    <div style={{ display: "flex", gap: 5, marginTop: 7, flexWrap: "wrap" }}>
+      {OUTCOMES.map((o) => (
+        <button
+          key={o.label}
+          onClick={(e) => pick(e, o.label)}
+          disabled={saving !== null}
+          style={{
+            fontSize: 10.5,
+            fontWeight: 600,
+            padding: "3px 9px",
+            borderRadius: 5,
+            border: "none",
+            background: saving === o.label ? o.color : `${o.color}22`,
+            color: saving === o.label ? o.text : o.color,
+            cursor: saving ? "default" : "pointer",
+            fontFamily: "inherit",
+            transition: "all 0.15s",
+            opacity: saving && saving !== o.label ? 0.45 : 1,
+          }}
+        >
+          {saving === o.label ? "Saving…" : o.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 export default function FlightLogTab({ calls, initialCall, onInitialCallConsumed, userId }: Props) {
   const [selectedCall, setSelectedCall] = useState<Call | null>(initialCall);
   const [activeDetailTab, setActiveDetailTab] = useState<"debrief" | "transcript">("debrief");
+  // Tracks outcomes set inline (without a full page reload)
+  const [localOutcomes, setLocalOutcomes] = useState<Record<string, string>>({});
+
+  const handleOutcomeSaved = (callId: string, outcome: string) => {
+    setLocalOutcomes((prev) => ({ ...prev, [callId]: outcome }));
+  };
+
+  // Helper: effective outcome for a call (local override wins)
+  const effectiveOutcome = (call: Call) => localOutcomes[call.id] ?? call.outcome;
   const [chatMessages, setChatMessages] = useState<Array<{ role: "user" | "assistant"; text: string }>>([]);
   const [chatInput, setChatInput] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
@@ -101,7 +171,10 @@ export default function FlightLogTab({ calls, initialCall, onInitialCallConsumed
               {new Date(call.call_date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })} · {call.duration}
             </div>
           </div>
-          {call.outcome && <OutcomeBadge outcome={call.outcome} />}
+          {effectiveOutcome(call)
+            ? <OutcomeBadge outcome={effectiveOutcome(call)!} />
+            : <OutcomePicker callId={call.id} onSaved={handleOutcomeSaved} />
+          }
         </div>
 
         {call.summary && (
@@ -264,11 +337,14 @@ export default function FlightLogTab({ calls, initialCall, onInitialCallConsumed
                   </div>
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  {call.outcome && <OutcomeBadge outcome={call.outcome} />}
+                  {effectiveOutcome(call) && <OutcomeBadge outcome={effectiveOutcome(call)!} />}
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M9 18l6-6-6-6" stroke="#8e8e93" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
                 </div>
               </div>
               {call.summary && <div style={{ fontSize: 12, color: "#8e8e93", lineHeight: 1.4 }}>{call.summary}</div>}
+              {!effectiveOutcome(call) && (
+                <OutcomePicker callId={call.id} onSaved={handleOutcomeSaved} />
+              )}
             </div>
           ))
         )}
