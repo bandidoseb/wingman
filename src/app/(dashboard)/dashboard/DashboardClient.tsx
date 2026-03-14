@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import type { Profile, Call, VaultObjection, VaultSignal } from "@/types";
 import Sidebar from "@/components/dashboard/Sidebar";
 import HomeTab from "@/components/dashboard/HomeTab";
@@ -47,6 +47,21 @@ export default function DashboardClient({
     signals:    initialSignals.filter((s) => s.is_new).length,
   });
   const [pendingCall, setPendingCall] = useState<Call | null>(null);
+  // Incremented each time a toggle-call IPC arrives so SimulatorTab can react
+  // regardless of which dashboard tab is currently active.
+  const [triggerToggle, setTriggerToggle] = useState(0);
+
+  // Listen for shortcut:toggle-call at the dashboard level so it works even
+  // when the user is on a different tab (SimulatorTab not yet mounted).
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.wingman) return;
+    window.wingman.onToggleCall(() => {
+      setTab("simulator");
+      setTriggerToggle((n) => n + 1);
+    });
+    return () => { window.wingman?.offToggleCall(); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // ── Paywall state ─────────────────────────────────────────────────────────
   // Initialized from profile.calls_used on load.
@@ -151,6 +166,7 @@ export default function DashboardClient({
             <SimulatorTab
               objections={initialObjections}
               onLimitReached={handleLimitReached}
+              triggerToggle={triggerToggle}
             />
           )}
           {tab === "settings" && (

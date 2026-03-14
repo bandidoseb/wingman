@@ -166,34 +166,52 @@ function createTrayPopover(): void {
 
 // ─── Menu Bar / Tray ─────────────────────────────────────────────────────────
 function createTray(): void {
+  // WingmanTray.png — transparent white W (no black background), template image
+  // so macOS inverts it automatically for light/dark menu bars.
   const iconPath = !app.isPackaged
-    ? path.join(__dirname, "../public/Wingman.png")
-    : path.join(process.resourcesPath, "public/Wingman.png");
+    ? path.join(__dirname, "../public/WingmanTray.png")
+    : path.join(process.resourcesPath, "public/WingmanTray.png");
 
-  const icon = nativeImage.createFromPath(iconPath).resize({ width: 16, height: 16 });
-  tray       = new Tray(icon);
+  const icon = nativeImage.createFromPath(iconPath);
+  icon.setTemplateImage(true);   // enables macOS auto dark/light inversion
+  tray = new Tray(icon);
 
   tray.setToolTip("Wingman — AI Sales Copilot");
 
-  // Right-click: dynamic context menu — always includes call action as fallback
-  // in case the left-click popover has issues on a particular macOS version.
+  // Track when the right-click context menu is open so mouse-down doesn't interfere.
+  let contextMenuOpen = false;
+
+  // Right-click: dynamic context menu.
+  // "Open Wingman" recreates the window if it was closed (mainWindow can be null).
   tray.on("right-click", () => {
+    contextMenuOpen = true;
     const menu = Menu.buildFromTemplate([
-      { label: "Open Wingman", click: () => { mainWindow?.show(); mainWindow?.focus(); } },
-      { type:  "separator" },
+      {
+        label: "Open Wingman",
+        click: () => {
+          if (!mainWindow) createMainWindow();
+          else { mainWindow.show(); mainWindow.focus(); }
+        },
+      },
+      { type: "separator" },
       callActive
-        ? { label: "End Call",        click: () => { mainWindow?.webContents.send("shortcut:toggle-call"); } }
-        : { label: "Deploy Wingman",  click: () => { mainWindow?.webContents.send("shortcut:toggle-call"); } },
+        ? { label: "End Call",       click: () => { mainWindow?.webContents.send("shortcut:toggle-call"); } }
+        : { label: "Deploy Wingman", click: () => { mainWindow?.webContents.send("shortcut:toggle-call"); } },
       { type: "separator" },
       { label: "Quit Wingman", click: () => app.quit() },
     ]);
+    // Reset flag after menu closes so mouse-down works again
+    menu.once("menu-will-close", () => { setTimeout(() => { contextMenuOpen = false; }, 100); });
     tray!.popUpContextMenu(menu);
   });
 
   // Left-click: show the custom popover directly below the tray icon.
-  // Uses bounds from the click event (more reliable than tray.getBounds() on macOS).
-  // setBounds is called AFTER showInactive() — macOS ignores setPosition on hidden windows.
-  tray.on("click", (_event, iconBounds) => {
+  // Uses mouse-down (fires before "click" and is more reliable on macOS Sequoia).
+  // Guard against right-click menu being open — otherwise showInactive() steals
+  // focus from the native menu and causes items to vanish before the click lands.
+  // Note: mouse-down passes a Point (no width/height) so we use tray.getBounds() for sizing.
+  tray.on("mouse-down", () => {
+    if (contextMenuOpen) return;
     if (!trayPopover || trayPopover.isDestroyed()) return;
 
     if (trayPopover.isVisible()) {
@@ -201,13 +219,14 @@ function createTray(): void {
       return;
     }
 
+    const iconBounds = tray!.getBounds();
     const popW = 240;
     const popX = Math.round(iconBounds.x + iconBounds.width  / 2 - popW / 2);
     const popY = Math.round(iconBounds.y + iconBounds.height);
 
     trayPopover.webContents.send("tray:call-state", callActive);
     trayPopover.showInactive();
-    // Position after show so macOS actually places it correctly
+    // Position after show — macOS ignores setPosition on hidden windows
     trayPopover.setBounds({ x: popX, y: popY, width: popW, height: trayPopover.getBounds().height });
   });
 }
@@ -225,6 +244,20 @@ function handleDeepLink(url: string): void {
     mainWindow?.focus();
   } catch (e) {
     console.error("[DeepLink] Failed to parse URL:", url, e);
+  }
+}
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+// Sends a message to the main window, creating it first if it was closed.
+// Does NOT force-show the window — the HUD handles the visible feedback.
+function sendToMainWindow(channel: string): void {
+  if (!mainWindow) {
+    createMainWindow();
+    mainWindow!.webContents.once("did-finish-load", () => {
+      mainWindow?.webContents.send(channel);
+    });
+  } else {
+    mainWindow.webContents.send(channel);
   }
 }
 
@@ -260,7 +293,7 @@ function setupIPC(): void {
   // ── HUD Deploy button → start call via web app toggle ──────────────────────
   ipcMain.handle("hud:deploy-call", () => {
     console.log("[IPC] hud:deploy-call");
-    mainWindow?.webContents.send("shortcut:toggle-call");
+    sendToMainWindow("shortcut:toggle-call");
   });
 
   // ── HUD End Call confirmed → end call via web app toggle ───────────────────
@@ -305,7 +338,7 @@ function setupIPC(): void {
   // ── Tray popover actions ────────────────────────────────────────────────────
   ipcMain.handle("tray:deploy", () => {
     trayPopover?.hide();
-    mainWindow?.webContents.send("shortcut:toggle-call");
+    sendToMainWindow("shortcut:toggle-call");
   });
 
   ipcMain.handle("tray:end-call", () => {
@@ -348,6 +381,11 @@ function setupShortcuts(): void {
 app.whenReady().then(() => {
   if (app.isPackaged) {
     app.setAsDefaultProtocolClient("wingman");
+  }
+
+  // Wingman is a full app — keep the Dock icon visible at all times
+  if (process.platform === "darwin" && app.dock) {
+    app.dock.show();
   }
 
   createMainWindow();

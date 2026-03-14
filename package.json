@@ -7,15 +7,16 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "electron:compile": "tsc -p tsconfig.electron.json",
+    "electron:compile": "tsc -p tsconfig.electron.json && cp -r electron/hud electron-dist/ && cp -r electron/tray-popover electron-dist/",
     "electron:launch": "electron electron-dist/main.js",
     "electron:dev": "concurrently --kill-others \"npm run dev\" \"npm run electron:wait\"",
     "electron:wait": "node scripts/wait-and-launch.js",
     "electron:pack": "npm run electron:compile && electron-builder --dir",
-    "electron:dist": "npm run build && npm run electron:compile && electron-builder"
+    "electron:dist": "npm run build && npm run electron:compile && electron-builder && codesign --force --deep --sign - dist/mac-arm64/Wingman.app 2>/dev/null || true"
   },
   "main": "electron-dist/main.js",
   "dependencies": {
+    "@react-three/fiber": "^9.5.0",
     "@recallai/desktop-sdk": "^2.0.7",
     "@stripe/stripe-js": "^4.0.0",
     "@supabase/ssr": "^0.5.0",
@@ -34,6 +35,7 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@types/three": "^0.183.1",
     "electron": "^40.8.0",
     "electron-builder": "^26.8.1",
     "eslint": "^8",

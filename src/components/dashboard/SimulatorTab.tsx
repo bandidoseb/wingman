@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import type { CallStageLabel, VaultObjection } from "@/types";
 import { getStagesForRole, getDefaultStage } from "@/lib/wingman/poll-intervals";
@@ -13,9 +13,11 @@ interface Props {
   objections: VaultObjection[];
   /** Called when the API returns trial_ended — triggers the full-screen paywall */
   onLimitReached: () => void;
+  /** Incremented by DashboardClient each time a toggle-call IPC arrives */
+  triggerToggle?: number;
 }
 
-export default function SimulatorTab({ objections, onLimitReached }: Props) {
+export default function SimulatorTab({ objections, onLimitReached, triggerToggle = 0 }: Props) {
   const router = useRouter();
   const stages = getStagesForRole();
   const defaultStage = getDefaultStage();
@@ -70,13 +72,24 @@ export default function SimulatorTab({ objections, onLimitReached }: Props) {
       if (!data.call_id) throw new Error("Failed to start");
       setCallId(data.call_id);
       setIsActive(true);
+
+      // In Electron: kick off Recall AI audio capture + show HUD
+      if (typeof window !== "undefined" && window.wingman) {
+        await window.wingman.startCall();
+      }
     } catch (err) {
       setStartError(err instanceof Error ? err.message : "Failed to start call");
     }
-  }, []);
+  }, [onLimitReached]);
 
   const handleEndCall = useCallback(async () => {
     setIsActive(false);
+
+    // In Electron: stop Recall AI audio capture + hide HUD
+    if (typeof window !== "undefined" && window.wingman) {
+      window.wingman.endCall();
+    }
+
     if (!callId) return;
 
     try {
@@ -130,19 +143,21 @@ export default function SimulatorTab({ objections, onLimitReached }: Props) {
     window.wingman?.sendScorecard(scorecard as unknown as Record<string, unknown>);
   }, [scorecard, isElectron]);
 
-  // ── F5 shortcut: toggle call start/stop (Electron only) ─────────────────────
+  // ── Toggle call via triggerToggle prop (from tray, keyboard shortcut, HUD) ──
+  // DashboardClient owns the IPC listener and passes a counter here so this
+  // fires whether or not SimulatorTab was mounted when the shortcut arrived.
+  // We use a ref to read the latest isActive without it being a dependency
+  // (adding isActive would re-run the effect on every state change, not just
+  // on a new toggle signal).
+  const isActiveRef = useRef(isActive);
+  useEffect(() => { isActiveRef.current = isActive; }, [isActive]);
+
   useEffect(() => {
-    if (!isElectron) return;
-    const toggle = () => {
-      if (isActive) {
-        handleEndCall();
-      } else {
-        handleStartCall("Live Call");
-      }
-    };
-    window.wingman?.onToggleCall(toggle);
-    return () => { window.wingman?.offToggleCall(); };
-  }, [isElectron, isActive, handleEndCall, handleStartCall]);
+    if (!triggerToggle) return;
+    if (isActiveRef.current) handleEndCall();
+    else handleStartCall("Live Call");
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [triggerToggle]);
 
   // ── Dismiss from HUD syncs back to web app state ─────────────────────────────
   useEffect(() => {

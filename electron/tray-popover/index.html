@@ -15,15 +15,12 @@
       user-select: none;
     }
 
-    /* ── Outer shell — provides shadow clearance ────────────────────────── */
+    /* ── Outer shell ─────────────────────────────────────────────────────── */
     .shell {
       margin: 6px;
       border-radius: 14px;
       background: rgba(22, 22, 24, 0.94);
       border: 1px solid rgba(255, 255, 255, 0.08);
-      box-shadow:
-        0 8px 32px rgba(0, 0, 0, 0.55),
-        0 2px 8px  rgba(0, 0, 0, 0.35);
       padding: 12px;
       display: flex;
       flex-direction: column;
@@ -37,24 +34,6 @@
       gap: 8px;
       padding-bottom: 10px;
       border-bottom: 1px solid rgba(255, 255, 255, 0.07);
-    }
-
-    .logo {
-      width: 20px;
-      height: 20px;
-      border-radius: 5px;
-      background: #000;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      overflow: hidden;
-      flex-shrink: 0;
-    }
-    .logo img {
-      width: 72%;
-      height: 72%;
-      object-fit: contain;
-      display: block;
     }
 
     .app-name {
@@ -154,9 +133,8 @@
 
     <!-- Header -->
     <div class="header">
-      <div class="logo">
-        <img src="../../public/Wingman.png" alt="W" />
-      </div>
+      <!-- Actual Wingman logo — inlined as base64, no file path dependency -->
+      <img width="16" height="16" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABQAAAAUCAYAAACNiR0NAAABcUlEQVR4nNWUzWpUQRBGT81MDIgYxI34BnHhIiK4FbJWcGMewFfxcXwDSRQ3SpwIIgjJNkpUkiAoZpJMjpRTF67jIHdAAhZc+nb9fvVVd8N5iNpT+3+x99PnXMD8JmrUeku90+gKUb9lv6sut2P+kArMb6B+Uo/Ui9MB6nUn8rr2vbZ90PxEZC57EXGqrgOXgaMKWgW+Ay+BfWAIbDShdEC4o35WLxTKlI/ld00dqc/mQfgGWALOgBPgKfArIXAIvAe2ZiEctBFOFlO3kgkzedluA3vlegW4AXxtQumAMKsvqvcq4AVwUMUy0Ttgcx4Ot9WDmvSP4nC3/C6pJ+rzThwCY+BtqY+B1D1JvfoI+FJTHnbiEMgrdxO4WvtvEbGmLlQB6wgdd+KQCcJmguPisvF7kFwCj4FX83C4p46Lq311sXXtlorTYRcOo6b8sFrJc7gQEaOmWFIA3Ac+zGr5n0vMUk6/hRGRXE7bs53s4D+Tn6RRYLqcM7NcAAAAAElFTkSuQmCC" alt="" />
       <span class="app-name">Wingman</span>
       <div class="live-dot" id="liveDot"></div>
     </div>
