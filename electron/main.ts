@@ -154,7 +154,10 @@ function createTrayPopover(): void {
   });
 
   trayPopover.loadFile(path.join(__dirname, "tray-popover/index.html"));
-  trayPopover.setVisibleOnAllWorkspaces(true);
+  trayPopover.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+  // "pop-up-menu" is the correct macOS window level for menu bar popovers —
+  // ensures it appears above the menu bar itself.
+  trayPopover.setAlwaysOnTop(true, "pop-up-menu");
 
   // Note: no blur auto-hide — we use showInactive() so focus never transfers,
   // meaning blur never fires. Popover closes on the next tray icon click instead.
@@ -170,20 +173,27 @@ function createTray(): void {
   const icon = nativeImage.createFromPath(iconPath).resize({ width: 16, height: 16 });
   tray       = new Tray(icon);
 
-  // Right-click: minimal context menu (uses popUpContextMenu so macOS left-click
-  // is NOT hijacked — setContextMenu on macOS overrides left-click behaviour).
-  const contextMenu = Menu.buildFromTemplate([
-    { label: "Open Wingman", click: () => { mainWindow?.show(); mainWindow?.focus(); } },
-    { type:  "separator" },
-    { label: "Quit Wingman", click: () => app.quit() },
-  ]);
-
   tray.setToolTip("Wingman — AI Sales Copilot");
 
-  tray.on("right-click", () => { tray!.popUpContextMenu(contextMenu); });
+  // Right-click: dynamic context menu — always includes call action as fallback
+  // in case the left-click popover has issues on a particular macOS version.
+  tray.on("right-click", () => {
+    const menu = Menu.buildFromTemplate([
+      { label: "Open Wingman", click: () => { mainWindow?.show(); mainWindow?.focus(); } },
+      { type:  "separator" },
+      callActive
+        ? { label: "End Call",        click: () => { mainWindow?.webContents.send("shortcut:toggle-call"); } }
+        : { label: "Deploy Wingman",  click: () => { mainWindow?.webContents.send("shortcut:toggle-call"); } },
+      { type: "separator" },
+      { label: "Quit Wingman", click: () => app.quit() },
+    ]);
+    tray!.popUpContextMenu(menu);
+  });
 
-  // Left-click: toggle the popover directly below the tray icon
-  tray.on("click", () => {
+  // Left-click: show the custom popover directly below the tray icon.
+  // Uses bounds from the click event (more reliable than tray.getBounds() on macOS).
+  // setBounds is called AFTER showInactive() — macOS ignores setPosition on hidden windows.
+  tray.on("click", (_event, iconBounds) => {
     if (!trayPopover || trayPopover.isDestroyed()) return;
 
     if (trayPopover.isVisible()) {
@@ -191,16 +201,14 @@ function createTray(): void {
       return;
     }
 
-    const iconBounds      = tray!.getBounds();
-    const [popW]          = trayPopover.getSize();
-    const popX            = Math.round(iconBounds.x + iconBounds.width / 2 - popW / 2);
-    const popY            = Math.round(iconBounds.y + iconBounds.height + 4);
+    const popW = 240;
+    const popX = Math.round(iconBounds.x + iconBounds.width  / 2 - popW / 2);
+    const popY = Math.round(iconBounds.y + iconBounds.height);
 
-    trayPopover.setPosition(popX, popY);
     trayPopover.webContents.send("tray:call-state", callActive);
-    // showInactive: displays the window without stealing focus from the active app.
-    // This prevents macOS from firing blur immediately and hiding the popover.
     trayPopover.showInactive();
+    // Position after show so macOS actually places it correctly
+    trayPopover.setBounds({ x: popX, y: popY, width: popW, height: trayPopover.getBounds().height });
   });
 }
 
