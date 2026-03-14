@@ -221,6 +221,11 @@ export interface WingmanBridge {
   onSignalDismiss:  (callback: () => void) => void;
   offSignalDismiss: () => void;
 
+  // Recall AI auto-stopped the call (meeting ended, inactivity, 2h cap).
+  // Web app patches the session WITHOUT calling endCall() again (avoids double-stop).
+  onAutoEnded:  (callback: () => void) => void;
+  offAutoEnded: () => void;
+
   // true when running inside Electron desktop app, undefined in browser
   isElectron: true;
 }

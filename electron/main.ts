@@ -40,8 +40,9 @@ function autoStopCall(reason: AutoStopReason): void {
   hudWindow?.webContents.send("call:ended");
   hudWindow?.webContents.send("hud:auto-stopped", reason);
   trayPopover?.webContents.send("tray:call-state", false);
-  // Tell web app to update its call state (mirrors the shortcut:toggle-call path)
-  mainWindow?.webContents.send("shortcut:toggle-call");
+  // Tell web app the call ended automatically — uses dedicated channel so the
+  // web app can patch the session WITHOUT calling endCall() again (avoids double-stop).
+  mainWindow?.webContents.send("call:auto-ended");
   // Give the HUD 4 seconds to show the reason toast before hiding
   setTimeout(() => hudWindow?.hide(), 4000);
 }

@@ -463,6 +463,31 @@
       line-height: 1.4;
     }
 
+    /* ── Stop button (right side of stage bar, hover to reveal) ────────── */
+    #stopBtn {
+      display: none;
+      margin-left: 8px;
+      padding: 3px 7px;
+      border-radius: 5px;
+      background: rgba(255, 59, 48, 0.1);
+      border: 1px solid rgba(255, 59, 48, 0.2);
+      color: rgba(255, 59, 48, 0.5);
+      font-size: 9px;
+      cursor: pointer;
+      pointer-events: auto;
+      font-family: inherit;
+      transition: background 0.15s, border-color 0.15s, color 0.15s;
+      flex-shrink: 0;
+      align-items: center;
+      line-height: 1;
+    }
+    #stopBtn.visible { display: inline-flex; }
+    #stopBtn:hover {
+      background: rgba(255, 59, 48, 0.2);
+      border-color: rgba(255, 59, 48, 0.45);
+      color: #ff3b30;
+    }
+
     /* Stage bar hidden until call actually starts */
     #stageBar { display: none; }
     #stageBar.active { display: flex; }
@@ -482,6 +507,7 @@
       <div id="timerDot"></div>
       <span id="timerText">0:00</span>
     </div>
+    <button id="stopBtn" title="End call">■</button>
   </div>
 
   <!-- "Listening…" indicator (live, no active signal) -->
@@ -570,6 +596,7 @@
     let currentStage      = null;
 
     // ── Element refs ──────────────────────────────────────────────────────
+    const stopBtn              = document.getElementById('stopBtn');
     const stageBar             = document.getElementById('stageBar');
     const liveDot              = document.getElementById('liveDot');
     const stagePills           = document.getElementById('stagePills');
@@ -745,11 +772,13 @@
         stageBar.classList.remove('glow-red');
         stageBar.classList.add('glow-blue');
         if (!signalActive) listeningText.classList.add('visible');
+        stopBtn.classList.add('visible');
       } else {
         liveDot.classList.remove('live');
         stopTimer();
         stageBar.classList.remove('glow-blue', 'glow-red', 'active');
         listeningText.classList.remove('visible');
+        stopBtn.classList.remove('visible');
       }
     }
 
@@ -838,7 +867,22 @@
       if (window.hud) window.hud.dismissSignal();
     });
 
+    // ── Stop button — end call directly ──────────────────────────────────
+    stopBtn.addEventListener('click', () => {
+      if (window.hud) window.hud.confirmEndCall();
+    });
+
     // ── Mouse hover tracking ──────────────────────────────────────────────
+    // Stage bar: enable mouse events on hover so the stop button is clickable
+    stageBar.addEventListener('mouseenter', () => {
+      if (window.hud) window.hud.setMouseIgnore(false);
+    });
+    stageBar.addEventListener('mouseleave', () => {
+      if (!signalActive) {
+        if (window.hud) window.hud.setMouseIgnore(true);
+      }
+    });
+
     signalBubble.addEventListener('mouseenter', () => {
       if (window.hud) window.hud.setMouseIgnore(false);
     });

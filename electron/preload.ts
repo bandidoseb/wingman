@@ -13,6 +13,31 @@
 
 import { contextBridge, ipcRenderer } from "electron";
 
+// ── Toggle-call event buffering ───────────────────────────────────────────────
+// Race condition fix: IPC events can arrive before React mounts and registers
+// its listener via onToggleCall(). We listen immediately (preload runs before
+// the page) and buffer any early event so it replays the moment the web app
+// calls onToggleCall(callback).
+let _toggleCallback: (() => void) | null = null;
+let _pendingToggle = false;
+
+ipcRenderer.on("shortcut:toggle-call", () => {
+  if (_toggleCallback) _toggleCallback();
+  else _pendingToggle = true; // buffer until web app registers
+});
+
+// ── Auto-ended event buffering ────────────────────────────────────────────────
+// Fired by main.ts when Recall AI stops the call (meeting ended, inactivity,
+// 2h cap). Distinct from shortcut:toggle-call so the web app can patch the
+// session WITHOUT calling window.wingman.endCall() again (avoids double-stop).
+let _autoEndedCallback: (() => void) | null = null;
+
+ipcRenderer.on("call:auto-ended", () => {
+  if (_autoEndedCallback) _autoEndedCallback();
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 // Expose the wingman API to the web app
 contextBridge.exposeInMainWorld("wingman", {
   // ── Call lifecycle ──────────────────────────────────────────────────────
@@ -45,7 +70,6 @@ contextBridge.exposeInMainWorld("wingman", {
   /**
    * Listen for transcript chunks coming from Recall AI (audio → text).
    * These arrive automatically — no manual pasting needed.
-   * The web app registers a callback here; Electron calls it with each chunk.
    */
   onTranscriptChunk: (callback: (chunk: string) => void) => {
     ipcRenderer.on("transcript:chunk", (_event, chunk) => callback(chunk));
@@ -56,25 +80,38 @@ contextBridge.exposeInMainWorld("wingman", {
     ipcRenderer.removeAllListeners("transcript:chunk");
   },
 
-  // ── Keyboard shortcut events ─────────────────────────────────────────────
+  // ── Keyboard shortcut / tray / HUD toggle ────────────────────────────────
   /**
-   * Listen for F5/F6/F7 keypress (the "activation key").
-   * User presses F5 → Electron fires this → web app starts/ends call.
+   * Listen for the toggle-call signal (Ctrl+Shift+W, tray button, or HUD button).
+   * Buffered: if the signal arrived before this is called, it fires immediately.
    */
   onToggleCall: (callback: () => void) => {
-    ipcRenderer.on("shortcut:toggle-call", () => callback());
+    _toggleCallback = callback;
+    if (_pendingToggle) {
+      _pendingToggle = false;
+      callback(); // replay the event that arrived before the page was ready
+    }
   },
 
   offToggleCall: () => {
-    ipcRenderer.removeAllListeners("shortcut:toggle-call");
+    _toggleCallback = null;
+  },
+
+  // ── Auto-stop from Recall AI ─────────────────────────────────────────────
+  /**
+   * Fired when Recall AI ends the call automatically (meeting ended, inactivity,
+   * 2h cap). The web app should patch the session WITHOUT calling endCall() again,
+   * because Electron already stopped Recall AI in this path.
+   */
+  onAutoEnded: (callback: () => void) => {
+    _autoEndedCallback = callback;
+  },
+
+  offAutoEnded: () => {
+    _autoEndedCallback = null;
   },
 
   // ── Signal dismiss (initiated from HUD window) ───────────────────────────
-  /**
-   * The HUD can dismiss signals. When the user hits Dismiss in the HUD,
-   * main.ts fires "signal:dismiss" to the main window so the web app
-   * state stays in sync.
-   */
   onSignalDismiss: (callback: () => void) => {
     ipcRenderer.on("signal:dismiss", () => callback());
   },
@@ -119,83 +156,41 @@ contextBridge.exposeInMainWorld("hud", {
   moveWindow: (x: number, y: number) => ipcRenderer.invoke("hud:move", x, y),
 
   // ── Mouse interaction toggle ─────────────────────────────────────────────
-  /**
-   * Called by the HUD when the suggestion bubble appears or disappears.
-   * ignore=true  → mouse clicks pass through (default, so the user can click Zoom etc.)
-   * ignore=false → "Got it" button becomes clickable
-   */
   setMouseIgnore: (ignore: boolean) =>
     ipcRenderer.invoke("hud:set-mouse-ignore", ignore),
 
   // ── Call lifecycle events from main process → HUD ───────────────────────
-  /**
-   * Fires when a call starts (call:started sent from main.ts).
-   * HUD uses this to start its timer and show the live dot.
-   */
   onCallStart: (callback: () => void) => {
     ipcRenderer.on("call:started", () => callback());
   },
 
-  /**
-   * Fires when a call ends (call:ended sent from main.ts).
-   * HUD uses this to stop its timer and fade out.
-   */
   onCallEnd: (callback: () => void) => {
     ipcRenderer.on("call:ended", () => callback());
   },
 
   // ── Detection toast ──────────────────────────────────────────────────────
-  /**
-   * Fires when Recall AI detects a meeting window (before the call starts).
-   * HUD shows a branded "Wingman detected a call" toast.
-   */
   onCallDetected: (callback: () => void) => {
     ipcRenderer.on("call:detected", () => callback());
   },
 
-  /** User dismissed the detection toast without starting a call — hide HUD */
   dismissDetection: () => ipcRenderer.invoke("hud:dismiss-detection"),
 
-  /**
-   * Deploy button clicked in either the detection toast or manual trigger toast.
-   * Tells main process to start the call via the web app's toggle handler.
-   */
   deployCall: () => ipcRenderer.invoke("hud:deploy-call"),
 
-  /**
-   * Fires when Ctrl+Shift+W is pressed and no call is active.
-   * HUD shows a "Ready to deploy Wingman?" confirmation toast.
-   */
   onManualTrigger: (callback: () => void) => {
     ipcRenderer.on("hud:manual-trigger", () => callback());
   },
 
-  /**
-   * Fires when Ctrl+Shift+W is pressed during an active call.
-   * HUD shows "End this call?" confirmation toast.
-   */
   onEndCallConfirm: (callback: () => void) => {
     ipcRenderer.on("hud:end-call-confirm", () => callback());
   },
 
-  /**
-   * User clicked "End Call" in the confirmation toast.
-   * Tells main process to end the call via the web app's toggle handler.
-   */
   confirmEndCall: () => ipcRenderer.invoke("hud:confirm-end-call"),
 
-  /**
-   * Fires when Wingman auto-stops (inactivity, 2h cap, or meeting window closed).
-   * HUD shows an informational toast explaining why it stopped.
-   */
   onAutoStopped: (callback: (reason: string) => void) => {
     ipcRenderer.on("hud:auto-stopped", (_event, reason) => callback(reason));
   },
 
-  /**
-   * Fires 10 minutes before the 2-hour hard cap (at 1h 50m).
-   * HUD shows a heads-up warning so the user isn't caught off guard.
-   */
   onCapWarning: (callback: () => void) => {
     ipcRenderer.on("hud:cap-warning", () => callback());
   },

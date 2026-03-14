@@ -161,11 +161,45 @@ export default function DashboardClient({
     setStage(defaultStage);
   }, [callId, completedStages, defaultStage, router]);
 
+  // ── Auto-ended by Recall AI (meeting lost, inactivity, 2h cap) ────────────
+  // Patches the session WITHOUT calling window.wingman.endCall() — Electron
+  // already stopped Recall AI on this path, so calling it again would double-stop.
+  const handleAutoEnd = useCallback(async () => {
+    setIsActive(false);
+
+    if (!callId) return;
+
+    try {
+      await fetch("/api/wingman/session", {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          call_id: callId,
+          stages: completedStages.map((s, idx) => ({
+            name: s,
+            status: "complete",
+            display_order: idx,
+          })),
+        }),
+      });
+      setSavedMessage("Saved to Flight Log ✓");
+      setTimeout(() => setSavedMessage(null), 4000);
+      router.refresh();
+    } catch {
+      // fail silently — call record is already saved in DB
+    }
+
+    setCallId(null);
+    setStage(defaultStage);
+  }, [callId, completedStages, defaultStage, router]);
+
   // Stable refs so the IPC listener (registered once) always calls latest handlers
   const handleStartCallRef = useRef(handleStartCall);
   const handleEndCallRef   = useRef(handleEndCall);
+  const handleAutoEndRef   = useRef(handleAutoEnd);
   useEffect(() => { handleStartCallRef.current = handleStartCall; }, [handleStartCall]);
   useEffect(() => { handleEndCallRef.current   = handleEndCall;   }, [handleEndCall]);
+  useEffect(() => { handleAutoEndRef.current   = handleAutoEnd;   }, [handleAutoEnd]);
 
   // ── IPC: tray / keyboard shortcut toggle ──────────────────────────────────
   // Registered once — uses refs so it never goes stale.
@@ -177,6 +211,18 @@ export default function DashboardClient({
       else handleStartCallRef.current();
     });
     return () => { window.wingman?.offToggleCall(); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // ── IPC: Recall AI auto-stopped the call ──────────────────────────────────
+  // Uses dedicated channel (call:auto-ended) so we patch the session
+  // WITHOUT calling window.wingman.endCall() — Electron already stopped Recall.
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.wingman) return;
+    window.wingman.onAutoEnded(() => {
+      handleAutoEndRef.current();
+    });
+    return () => { window.wingman?.offAutoEnded(); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

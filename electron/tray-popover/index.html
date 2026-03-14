@@ -123,8 +123,18 @@
     }
     .btn-dashboard:hover { color: rgba(255, 255, 255, 0.6); }
 
+    /* ── Deploy warning ─────────────────────────────────────────────────── */
+    .deploy-warning {
+      font-size: 11px;
+      color: rgba(255, 255, 255, 0.3);
+      text-align: center;
+      line-height: 1.4;
+      padding: 0 4px;
+      margin-top: 2px;
+    }
+
     /* ── State visibility ───────────────────────────────────────────────── */
-    #idleState { display: flex; flex-direction: column; gap: 0; }
+    #idleState { display: flex; flex-direction: column; gap: 6px; }
     #liveState  { display: none;  flex-direction: column; gap: 6px; }
   </style>
 </head>
@@ -142,6 +152,7 @@
     <!-- Idle: no call active -->
     <div id="idleState">
       <button class="btn btn-deploy" id="deployBtn">Deploy Wingman</button>
+      <div class="deploy-warning">Only deploy once your prospect has joined the call</div>
     </div>
 
     <!-- Live: call is active -->
