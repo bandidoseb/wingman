@@ -108,13 +108,6 @@ const SIDEBAR_STYLES = `
     to   { transform: scaleY(1); }
   }
 
-  /* ── Simulator: checkmark draws itself in ── */
-  .sb-check {
-    stroke-dasharray: 10;
-  }
-  button[data-tab="simulator"]:hover .sb-check {
-    animation: sbCheckDraw 0.36s ease-out forwards;
-  }
   @keyframes sbCheckDraw {
     from { stroke-dashoffset: 10; }
     to   { stroke-dashoffset: 0;  }
@@ -219,27 +212,6 @@ const NAV_ITEMS: Array<{ id: DashboardTab; label: string; icon: (active: boolean
           fill={active ? "#1c1c1e" : "none"} stroke={active ? "#1c1c1e" : "#8e8e93"} strokeWidth="1.6" />
         <rect className="sb-bar3" x="17" y="3" width="4" height="18" rx="1"
           fill={active ? "#1c1c1e" : "none"} stroke={active ? "#1c1c1e" : "#8e8e93"} strokeWidth="1.6" />
-      </svg>
-    ),
-  },
-  {
-    id: "simulator", label: "Simulator",
-    icon: (active) => (
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-        <rect x="2" y="4" width="20" height="14" rx="2"
-          stroke={active ? "#1c1c1e" : "#8e8e93"} strokeWidth="1.6" />
-        <path d="M8 20h8M12 18v2"
-          stroke={active ? "#1c1c1e" : "#8e8e93"} strokeWidth="1.6" strokeLinecap="round" />
-        {/* Checkmark draws itself in on hover */}
-        <path
-          className="sb-check"
-          d="M9 10l2 2 4-4"
-          pathLength="10"
-          stroke={active ? "#1c1c1e" : "#8e8e93"}
-          strokeWidth="1.6"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
       </svg>
     ),
   },

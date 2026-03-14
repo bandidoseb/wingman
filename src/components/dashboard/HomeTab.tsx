@@ -11,6 +11,10 @@ interface Props {
   profile: Profile;
   calls: Call[];
   onDebrief: (call: Call) => void;
+  isActive: boolean;
+  savedMessage: string | null;
+  onDeploy: () => void;
+  onEndCall: () => void;
 }
 
 function MissionsCard({ calls, onDebrief }: { calls: Call[]; onDebrief: (call: Call) => void }) {
@@ -107,7 +111,7 @@ function MissionsCard({ calls, onDebrief }: { calls: Call[]; onDebrief: (call: C
   );
 }
 
-export default function HomeTab({ profile, calls, onDebrief }: Props) {
+export default function HomeTab({ profile, calls, onDebrief, isActive, savedMessage, onDeploy, onEndCall }: Props) {
   const { greeting, sub } = getGreeting();
 
   const thisWeekCalls = calls.filter((c) => {
@@ -134,28 +138,59 @@ export default function HomeTab({ profile, calls, onDebrief }: Props) {
       <Card style={{ marginBottom: 12, padding: "28px 28px" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16 }}>
           <div>
-            <div style={{ fontSize: 18, fontWeight: 700, color: "#1c1c1e", letterSpacing: "-0.02em", marginBottom: 5 }}>Wingman is standing by.</div>
-            <div style={{ fontSize: 13, color: "#8e8e93", lineHeight: 1.5 }}>Wingman listens live and guides you through every stage.</div>
-            <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 10 }}>
-              {["⌃", "⇧", "W"].map((k) => (
-                <span key={k} style={{
-                  display: "inline-flex", alignItems: "center", justifyContent: "center",
-                  background: "#f2f2f7", border: "1px solid rgba(0,0,0,0.12)",
-                  borderRadius: 5, fontSize: 11, fontWeight: 600, color: "#3c3c43",
-                  width: 22, height: 20, fontFamily: "inherit",
-                  boxShadow: "0 1px 0 rgba(0,0,0,0.14)",
-                }}>{k}</span>
-              ))}
-              <span style={{ fontSize: 11, color: "#aeaeb2", marginLeft: 4 }}>to deploy instantly</span>
-            </div>
+            {isActive ? (
+              <>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 5 }}>
+                  <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#34c759", animation: "livePulse 2s ease-in-out infinite" }} />
+                  <div style={{ fontSize: 18, fontWeight: 700, color: "#1c1c1e", letterSpacing: "-0.02em" }}>Wingman is live.</div>
+                </div>
+                <div style={{ fontSize: 13, color: "#8e8e93", lineHeight: 1.5 }}>Recording and coaching in real time.</div>
+                {savedMessage && (
+                  <div style={{ fontSize: 12, fontWeight: 600, color: "#34c759", marginTop: 8 }}>{savedMessage}</div>
+                )}
+              </>
+            ) : (
+              <>
+                <div style={{ fontSize: 18, fontWeight: 700, color: "#1c1c1e", letterSpacing: "-0.02em", marginBottom: 5 }}>Wingman is standing by.</div>
+                <div style={{ fontSize: 13, color: "#8e8e93", lineHeight: 1.5 }}>Wingman listens live and guides you through every stage.</div>
+                <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 10 }}>
+                  {["⌃", "⇧", "W"].map((k) => (
+                    <span key={k} style={{
+                      display: "inline-flex", alignItems: "center", justifyContent: "center",
+                      background: "#f2f2f7", border: "1px solid rgba(0,0,0,0.12)",
+                      borderRadius: 5, fontSize: 11, fontWeight: 600, color: "#3c3c43",
+                      width: 22, height: 20, fontFamily: "inherit",
+                      boxShadow: "0 1px 0 rgba(0,0,0,0.14)",
+                    }}>{k}</span>
+                  ))}
+                  <span style={{ fontSize: 11, color: "#aeaeb2", marginLeft: 4 }}>to deploy instantly</span>
+                </div>
+              </>
+            )}
           </div>
-          <button style={{
-            flexShrink: 0, padding: "12px 28px", background: "#000", color: "#fff", border: "none",
-            borderRadius: 12, fontSize: 14, fontWeight: 600, fontFamily: "inherit", cursor: "pointer",
-            boxShadow: "0 4px 16px rgba(0,0,0,0.15)",
-          }}>
-            Deploy Wingman
-          </button>
+          {isActive ? (
+            <button
+              onClick={onEndCall}
+              style={{
+                flexShrink: 0, padding: "12px 28px", background: "#ff3b30", color: "#fff", border: "none",
+                borderRadius: 12, fontSize: 14, fontWeight: 600, fontFamily: "inherit", cursor: "pointer",
+                boxShadow: "0 4px 16px rgba(255,59,48,0.3)",
+              }}
+            >
+              End Call
+            </button>
+          ) : (
+            <button
+              onClick={onDeploy}
+              style={{
+                flexShrink: 0, padding: "12px 28px", background: "#000", color: "#fff", border: "none",
+                borderRadius: 12, fontSize: 14, fontWeight: 600, fontFamily: "inherit", cursor: "pointer",
+                boxShadow: "0 4px 16px rgba(0,0,0,0.15)",
+              }}
+            >
+              Deploy Wingman
+            </button>
+          )}
         </div>
       </Card>
 
