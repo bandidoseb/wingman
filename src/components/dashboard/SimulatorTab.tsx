@@ -10,16 +10,15 @@ import TranscriptInput from "@/components/wingman/TranscriptInput";
 import LiveCallView from "@/components/wingman/LiveCallView";
 
 interface Props {
-  role: "closer" | "setter";
   objections: VaultObjection[];
   /** Called when the API returns trial_ended — triggers the full-screen paywall */
   onLimitReached: () => void;
 }
 
-export default function SimulatorTab({ role, objections, onLimitReached }: Props) {
+export default function SimulatorTab({ objections, onLimitReached }: Props) {
   const router = useRouter();
-  const stages = getStagesForRole(role);
-  const defaultStage = getDefaultStage(role);
+  const stages = getStagesForRole();
+  const defaultStage = getDefaultStage();
 
   const [callId, setCallId] = useState<string | null>(null);
   const [isActive, setIsActive] = useState(false);

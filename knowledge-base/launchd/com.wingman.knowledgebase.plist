@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+
+  <!-- Unique identifier for this launchd job -->
+  <key>Label</key>
+  <string>com.wingman.knowledgebase</string>
+
+  <!-- The script to run — handles nvm/node path resolution -->
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/bash</string>
+    <string>/Users/sebastianperez/Desktop/Wingman CC/knowledge-base/start.sh</string>
+  </array>
+
+  <!-- Working directory -->
+  <key>WorkingDirectory</key>
+  <string>/Users/sebastianperez/Desktop/Wingman CC/knowledge-base</string>
+
+  <!-- Start immediately when loaded and on every boot -->
+  <key>RunAtLoad</key>
+  <true/>
+
+  <!-- Restart automatically if the process crashes -->
+  <key>KeepAlive</key>
+  <true/>
+
+  <!-- Throttle restarts — wait 10 seconds before restarting after a crash -->
+  <key>ThrottleInterval</key>
+  <integer>10</integer>
+
+  <!-- Log stdout to /tmp/wingman-kb.log -->
+  <key>StandardOutPath</key>
+  <string>/tmp/wingman-kb.log</string>
+
+  <!-- Log stderr to /tmp/wingman-kb-error.log -->
+  <key>StandardErrorPath</key>
+  <string>/tmp/wingman-kb-error.log</string>
+
+</dict>
+</plist>
+
+<!--
+TO INSTALL (run once):
+  cp "/Users/sebastianperez/Desktop/Wingman CC/knowledge-base/launchd/com.wingman.knowledgebase.plist" \
+     ~/Library/LaunchAgents/com.wingman.knowledgebase.plist
+
+  launchctl load ~/Library/LaunchAgents/com.wingman.knowledgebase.plist
+
+TO VERIFY:
+  launchctl list | grep wingman
+  open http://localhost:3333/
+
+TO VIEW LOGS:
+  tail -f /tmp/wingman-kb.log
+  tail -f /tmp/wingman-kb-error.log
+
+TO STOP:
+  launchctl unload ~/Library/LaunchAgents/com.wingman.knowledgebase.plist
+
+TO RESTART:
+  launchctl stop com.wingman.knowledgebase
+-->

@@ -122,10 +122,7 @@ export interface Call {
 // ─── Wingman Phase 2 Types ───────────────────────────────────────────────────
 
 export type CallStageLabel =
-  // Closer
-  | "Rapport" | "Discovery" | "Press" | "Confirm" | "Pitch" | "Close"
-  // Setter
-  | "Connect" | "Qualify" | "Commit" | "Book";
+  "Rapport" | "Discovery" | "Press" | "Confirm" | "Pitch" | "Close";
 
 export type SignalType = "Alert" | "Nudge" | "Ready" | "Handle";
 export type AiModelPreference = "smart" | "fast";
@@ -141,6 +138,10 @@ export interface LiveScorecard {
   objection_risk: ObjectionRisk;
   gold_moment: string;
   predicted_next_objection: string | null;
+  // Accumulated emotional anchors from this prospect — short bullet string.
+  // Sonnet adds to this across polls. Haiku uses it to personalise signal cards.
+  // Example: "• Been struggling for 10 years\n• Promised their kids\n• Spent $5k already"
+  prospect_anchors: string;
 }
 
 export interface WingmanSignal {
@@ -173,6 +174,7 @@ export interface WingmanPollResponse {
     objection_risk: ObjectionRisk;
     gold_moment: string;
     predicted_next_objection: string | null;
+    prospect_anchors: string;
   };
 }
 
@@ -186,6 +188,7 @@ export const DEFAULT_SCORECARD: LiveScorecard = {
   objection_risk: "low",
   gold_moment: "",
   predicted_next_objection: null,
+  prospect_anchors: "",
 };
 
 // ─── End Wingman Types ────────────────────────────────────────────────────────

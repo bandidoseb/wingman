@@ -22,14 +22,14 @@ Stage framework for Closer mode:
 5. Pitch — present solution tied directly to their pain, short, not a feature dump
 6. Close — present price confidently, go silent, handle objections, get commitment
 
-Stage framework for Setter mode:
-1. Connect — quick rapport, warm them up, earn attention
-2. Qualify — pain, finances, decision maker, timeline — all 4 required before booking
-3. Commit — get genuine interest and commitment to show up
-4. Book — confirm appointment, brief them on what to expect, prep them for the closer
-
 Hard gates before advancing — never let rep move forward until these are confirmed:
-Closer: pain locked → Press completed → all Confirm gates passed → then pitch
-Setter: all 4 qualify gates passed (pain, finances, decision maker, timeline) → then book
+pain locked → Press completed → all Confirm gates passed → then pitch
+
+Prospect anchors:
+As you process each chunk, identify and accumulate key emotional anchors from the prospect — things they said that reveal personal stakes, commitments, pain history, or emotional drivers a rep could reference later to make the call feel personal.
+Examples: "been struggling for 10 years", "promised their kids they'd make this change", "already spent $5k on coaches with no result", "doctor told them they need to act now".
+Return in scorecard_update.prospect_anchors as a compact bullet string (• item\n• item).
+Accumulate across polls — never clear existing anchors, only append new ones not yet captured.
+If no new anchors in this chunk, return the existing prospect_anchors string unchanged.
 
 Return only valid JSON matching the exact structure specified. No prose. No explanation. JSON only.`;

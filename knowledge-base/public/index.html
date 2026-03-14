@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Wingman — Knowledge Base</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:       #0a0a0c;
+      --surface:  #141416;
+      --surface2: #1c1c1f;
+      --border:   #27272a;
+      --text:     #e4e4e7;
+      --muted:    #71717a;
+      --accent:   #3b82f6;
+      --green:    #22c55e;
+      --red:      #ef4444;
+      --yellow:   #f59e0b;
+      --radius:   12px;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
+      font-size: 14px;
+      line-height: 1.5;
+      padding: 48px 40px;
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+
+    /* ── Header ────────────────────────────────────────────────────────── */
+    .header { margin-bottom: 40px; }
+    .header h1 {
+      font-size: 20px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      margin-bottom: 4px;
+    }
+    .header p { color: var(--muted); font-size: 13px; }
+
+    /* ── Stats ─────────────────────────────────────────────────────────── */
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 14px;
+      margin-bottom: 28px;
+    }
+    .stat {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px;
+    }
+    .stat-val {
+      font-size: 26px;
+      font-weight: 800;
+      letter-spacing: -0.04em;
+      color: var(--text);
+      margin-bottom: 5px;
+    }
+    .stat-label {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      color: var(--muted);
+    }
+
+    /* ── Cards ─────────────────────────────────────────────────────────── */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 24px;
+      margin-bottom: 20px;
+    }
+    .card-title {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      color: var(--muted);
+      margin-bottom: 18px;
+    }
+
+    /* ── Input row ─────────────────────────────────────────────────────── */
+    .input-row { display: flex; gap: 10px; }
+    input[type="text"] {
+      flex: 1;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 14px;
+      color: var(--text);
+      font-size: 14px;
+      font-family: inherit;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    input[type="text"]:focus { border-color: var(--accent); }
+    input[type="text"]::placeholder { color: var(--muted); }
+
+    button.primary {
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      padding: 10px 22px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      font-family: inherit;
+      white-space: nowrap;
+      transition: background 0.15s;
+    }
+    button.primary:hover:not(:disabled) { background: #2563eb; }
+    button.primary:disabled { opacity: 0.45; cursor: default; }
+
+    /* ── Status feed ───────────────────────────────────────────────────── */
+    #feed {
+      min-height: 52px;
+      max-height: 280px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    #feed:empty::after {
+      content: "No activity yet.";
+      color: var(--muted);
+      font-size: 13px;
+    }
+    .feed-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 9px;
+      padding: 9px 12px;
+      border-radius: 7px;
+      font-size: 13px;
+      line-height: 1.45;
+    }
+    .feed-item.progress  { background: rgba(59,130,246,0.08);  color: #93c5fd; }
+    .feed-item.complete  { background: rgba(34,197,94,0.08);   color: #86efac; }
+    .feed-item.error     { background: rgba(239,68,68,0.08);   color: #fca5a5; }
+    .feed-item.duplicate { background: rgba(245,158,11,0.08);  color: #fcd34d; }
+    .feed-item.queued    { background: rgba(113,113,122,0.08); color: var(--muted); }
+
+    .feed-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      flex-shrink: 0;
+      margin-top: 4px;
+    }
+    .feed-item.progress  .feed-dot { background: var(--accent); animation: blink 1.3s infinite; }
+    .feed-item.complete  .feed-dot { background: var(--green); }
+    .feed-item.error     .feed-dot { background: var(--red); }
+    .feed-item.duplicate .feed-dot { background: var(--yellow); }
+    .feed-item.queued    .feed-dot { background: var(--muted); }
+
+    @keyframes blink { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
+
+    /* ── Videos table ──────────────────────────────────────────────────── */
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+
+    thead th {
+      text-align: left;
+      padding: 0 14px 12px;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      color: var(--muted);
+      white-space: nowrap;
+    }
+    tbody tr { border-top: 1px solid var(--border); }
+    tbody tr:hover { background: rgba(255,255,255,0.02); }
+    td { padding: 13px 14px; vertical-align: middle; }
+    td.muted { color: var(--muted); }
+    td.title-cell {
+      max-width: 300px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 3px 9px;
+      border-radius: 5px;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .badge.complete   { background: rgba(34,197,94,0.12);  color: #86efac; }
+    .badge.processing { background: rgba(59,130,246,0.12); color: #93c5fd; }
+    .badge.failed     { background: rgba(239,68,68,0.12);  color: #fca5a5; }
+    .badge-dot {
+      width: 5px; height: 5px; border-radius: 50%;
+    }
+    .badge.complete .badge-dot   { background: var(--green); }
+    .badge.processing .badge-dot { background: var(--accent); animation: blink 1.3s infinite; }
+    .badge.failed .badge-dot     { background: var(--red); }
+
+    td.empty-state { text-align: center; padding: 32px; color: var(--muted); }
+  </style>
+</head>
+<body>
+
+  <div class="header">
+    <h1>Wingman Knowledge Base</h1>
+    <p>Internal ingestion tool — build the coaching library from YouTube sales training content</p>
+  </div>
+
+  <!-- Stats dashboard -->
+  <div class="stats">
+    <div class="stat">
+      <div class="stat-val" id="stat-videos">—</div>
+      <div class="stat-label">Videos Processed</div>
+    </div>
+    <div class="stat">
+      <div class="stat-val" id="stat-hours">—</div>
+      <div class="stat-label">Hours of Content</div>
+    </div>
+    <div class="stat">
+      <div class="stat-val" id="stat-entries">—</div>
+      <div class="stat-label">Knowledge Entries</div>
+    </div>
+    <div class="stat">
+      <div class="stat-val" id="stat-cost">—</div>
+      <div class="stat-label">Knowledge Base Build Cost</div>
+    </div>
+  </div>
+
+  <!-- Ingest form -->
+  <div class="card">
+    <div class="card-title">Add to Knowledge Base</div>
+    <div class="input-row">
+      <input
+        type="text"
+        id="url-input"
+        placeholder="https://www.youtube.com/watch?v=..."
+        autocomplete="off"
+        spellcheck="false"
+      />
+      <button class="primary" id="submit-btn">Add to Knowledge Base</button>
+    </div>
+  </div>
+
+  <!-- Real-time status feed -->
+  <div class="card">
+    <div class="card-title">Pipeline Status</div>
+    <div id="feed"></div>
+  </div>
+
+  <!-- Processed videos table -->
+  <div class="card">
+    <div class="card-title">Processed Videos</div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Title</th>
+            <th>Coach</th>
+            <th>Duration</th>
+            <th>Entries</th>
+            <th>Cost</th>
+            <th>Status</th>
+            <th>Processed</th>
+          </tr>
+        </thead>
+        <tbody id="videos-tbody">
+          <tr><td colspan="7" class="empty-state">Loading...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <script>
+    // ── Utils ───────────────────────────────────────────────────────────────
+    function esc(s) {
+      if (!s) return '';
+      return String(s)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    function fmtDuration(secs) {
+      if (!secs) return '—';
+      const h = Math.floor(secs / 3600);
+      const m = Math.floor((secs % 3600) / 60);
+      return h > 0 ? `${h}h ${m}m` : `${m}m`;
+    }
+
+    function fmtDate(ts) {
+      if (!ts) return '—';
+      return new Date(ts).toLocaleDateString(undefined, {
+        month: 'short', day: 'numeric', year: 'numeric',
+      });
+    }
+
+    // ── Stats ───────────────────────────────────────────────────────────────
+    async function loadStats() {
+      try {
+        const r = await fetch('/api/stats');
+        const d = await r.json();
+        document.getElementById('stat-videos').textContent  = Number(d.totalVideos).toLocaleString();
+        document.getElementById('stat-hours').textContent   = d.totalHours + 'h';
+        document.getElementById('stat-entries').textContent = Number(d.totalEntries).toLocaleString();
+        document.getElementById('stat-cost').textContent    = '$' + d.totalCost;
+      } catch { /* silently ignore */ }
+    }
+
+    // ── Videos table ───────────────────────────────────────────────────────
+    async function loadVideos() {
+      try {
+        const r    = await fetch('/api/videos');
+        const rows = await r.json();
+        const tbody = document.getElementById('videos-tbody');
+
+        if (!rows.length) {
+          tbody.innerHTML = '<tr><td colspan="7" class="empty-state">No videos yet. Add one above.</td></tr>';
+          return;
+        }
+
+        tbody.innerHTML = rows.map(v => `
+          <tr>
+            <td class="title-cell" title="${esc(v.video_title)}">${esc(v.video_title) || '—'}</td>
+            <td class="muted">${esc(v.coach_name) || '—'}</td>
+            <td class="muted">${fmtDuration(v.duration_seconds)}</td>
+            <td>${v.entry_count != null ? v.entry_count.toLocaleString() : '—'}</td>
+            <td class="muted">${v.processing_cost ? '$' + Number(v.processing_cost).toFixed(3) : '—'}</td>
+            <td>
+              <span class="badge ${esc(v.status)}">
+                <span class="badge-dot"></span>${esc(v.status)}
+              </span>
+            </td>
+            <td class="muted">${fmtDate(v.processed_at)}</td>
+          </tr>
+        `).join('');
+      } catch (e) {
+        document.getElementById('videos-tbody').innerHTML =
+          `<tr><td colspan="7" style="color:var(--red);padding:24px">${esc(e.message)}</td></tr>`;
+      }
+    }
+
+    // ── Status feed ─────────────────────────────────────────────────────────
+    function addFeedItem(text, type) {
+      const feedEl = document.getElementById('feed');
+      const item   = document.createElement('div');
+      item.className = `feed-item ${type}`;
+      item.innerHTML = `<div class="feed-dot"></div><span>${esc(text)}</span>`;
+      feedEl.insertBefore(item, feedEl.firstChild);
+    }
+
+    // ── Submit ──────────────────────────────────────────────────────────────
+    const urlInput  = document.getElementById('url-input');
+    const submitBtn = document.getElementById('submit-btn');
+
+    async function submitUrl() {
+      const url = urlInput.value.trim();
+      if (!url) return;
+
+      urlInput.value      = '';
+      submitBtn.disabled  = true;
+      addFeedItem(`Queued: ${url}`, 'queued');
+
+      let resp;
+      try {
+        resp = await fetch('/api/ingest', {
+          method:  'POST',
+          headers: { 'content-type': 'application/json' },
+          body:    JSON.stringify({ url }),
+        });
+      } catch (e) {
+        addFeedItem('Network error: ' + e.message, 'error');
+        submitBtn.disabled = false;
+        return;
+      }
+
+      submitBtn.disabled = false;
+      const { jobId, error } = await resp.json();
+
+      if (error || !jobId) {
+        addFeedItem(error || 'Unknown submission error', 'error');
+        return;
+      }
+
+      // Subscribe to SSE stream for real-time progress
+      const evtSource = new EventSource(`/api/ingest/stream/${jobId}`);
+
+      evtSource.onmessage = (e) => {
+        const d = JSON.parse(e.data);
+        addFeedItem(d.message, d.type);
+
+        if (d.type === 'complete' || d.type === 'error' || d.type === 'duplicate') {
+          evtSource.close();
+          if (d.type === 'complete') {
+            loadStats();
+            loadVideos();
+          }
+        }
+      };
+
+      evtSource.onerror = () => evtSource.close();
+    }
+
+    submitBtn.addEventListener('click', submitUrl);
+    urlInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') submitUrl(); });
+
+    // ── Init ────────────────────────────────────────────────────────────────
+    loadStats();
+    loadVideos();
+  </script>
+</body>
+</html>

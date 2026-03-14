@@ -187,6 +187,21 @@ export async function PATCH(req: NextRequest) {
       }
     }
 
+    // ── Fire post-call analysis job (fire-and-forget — does not block response) ─
+    // Runs async: transcript → Sonnet → objection upsert → debrief written to DB.
+    // Failures are non-fatal — call record is already saved above.
+    fetch(
+      `${req.nextUrl.origin}/api/wingman/post-call`,
+      {
+        method:  "POST",
+        headers: {
+          "content-type": "application/json",
+          cookie:          req.headers.get("cookie") ?? "",
+        },
+        body: JSON.stringify({ call_id }),
+      }
+    ).catch((err) => console.error("[session] post-call fire-and-forget failed:", err));
+
     return NextResponse.json({ call });
   } catch (err) {
     console.error("Session end error:", err);

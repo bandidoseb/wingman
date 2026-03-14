@@ -149,7 +149,6 @@ export default function DashboardClient({
           {tab === "intel"     && <IntelTab calls={initialCalls} />}
           {tab === "simulator" && (
             <SimulatorTab
-              role={profile.role || "closer"}
               objections={initialObjections}
               onLimitReached={handleLimitReached}
             />

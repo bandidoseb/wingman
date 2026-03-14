@@ -23,6 +23,13 @@ export default function LoginPage() {
     });
   };
 
+  const handleAppleSignIn = async () => {
+    await supabase.auth.signInWithOAuth({
+      provider: "apple",
+      options: { redirectTo: `${window.location.origin}/auth/callback` },
+    });
+  };
+
   const inputStyle: React.CSSProperties = {
     width: "100%",
     background: "#f2f2f7",

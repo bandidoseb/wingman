@@ -193,7 +193,7 @@ export async function initRecallAI(options: RecallOptions): Promise<void> {
         body: JSON.stringify({
           recording_config: {
             transcript: {
-              provider: { assembly_ai_v3_streaming: {} },
+              provider: { deepgram: { model: "nova-2-general" } },
             },
             realtime_endpoints: [
               {

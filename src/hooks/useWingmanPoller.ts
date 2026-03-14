@@ -59,6 +59,9 @@ export function useWingmanPoller({
   const stageRef = useRef<CallStageLabel>(stage);
   const callIdRef = useRef<string | null>(callId);
   const isPollingRef = useRef(false);
+  // Minimum gap between background KB scans (keyword hits bypass this cooldown)
+  const lastKBCheckRef = useRef<number>(0);
+  const KB_CHECK_COOLDOWN_MS = 10_000; // 10 seconds between background scans
 
   // Keep refs in sync
   useEffect(() => { stageRef.current = stage; }, [stage]);
@@ -96,13 +99,39 @@ export function useWingmanPoller({
     lastNonAlertSignalTimeRef.current = Date.now();
   }, []);
 
-  /** Run keyword trigger check on new chunk */
-  const runKeywordCheck = useCallback(
+  /**
+   * RAG-powered KB signal check — fires in parallel with keyword check.
+   * Calls /api/wingman/kb-signal which runs searchKnowledge → generateSignalCard.
+   * Does NOT block addChunk — fire and forget, card appears when ready (~480ms).
+   * Only fires when keyword triggers also fire, to avoid over-triggering.
+   * Passes a scorecard snapshot so Haiku can tailor the card to this specific call.
+   */
+  const runKBCheck = useCallback(
     (chunk: string) => {
-      const triggered = checkKeywordTriggers(chunk, objections);
-      if (triggered) fireSignal(triggered);
+      const { pain_detail, gold_moment, predicted_next_objection, objection_risk, prospect_anchors } =
+        scorecardRef.current;
+      fetch("/api/wingman/kb-signal", {
+        method:  "POST",
+        headers: { "content-type": "application/json" },
+        body:    JSON.stringify({
+          transcript_chunk: chunk,
+          scorecard_snapshot: { pain_detail, gold_moment, predicted_next_objection, objection_risk, prospect_anchors },
+        }),
+      })
+        .then((res) => res.ok ? res.json() : null)
+        .then((data) => {
+          if (!data?.signal_text) return;
+          fireSignal({
+            type:    data.signal_type ?? "Handle",
+            header:  data.signal_header ?? "KB",
+            text:    data.signal_text,
+            firedAt: Date.now(),
+            source:  "keyword", // treated as instant-path for cooldown purposes
+          });
+        })
+        .catch(() => { /* KB search failures are non-fatal */ });
     },
-    [objections, fireSignal]
+    [fireSignal]
   );
 
   /** Send current buffer to the poll API */
@@ -155,6 +184,7 @@ export function useWingmanPoller({
         objection_risk: data.scorecard_update.objection_risk,
         gold_moment: data.scorecard_update.gold_moment,
         predicted_next_objection: data.scorecard_update.predicted_next_objection,
+        prospect_anchors: data.scorecard_update.prospect_anchors ?? scorecardRef.current.prospect_anchors,
       };
       scorecardRef.current = newScorecard;
       setScorecard(newScorecard);
@@ -186,13 +216,23 @@ export function useWingmanPoller({
     }
   }, [fireSignal]);
 
-  /** Add transcript text to buffer + run keyword check immediately */
+  /** Add transcript text to buffer + run KB check */
   const addChunk = useCallback(
     (chunk: string) => {
       chunkBufferRef.current += (chunkBufferRef.current ? "\n" : "") + chunk;
-      runKeywordCheck(chunk);
+
+      const now = Date.now();
+      // Keyword match → fire KB check immediately (known important moment, no cooldown)
+      // No keyword match → fire KB check if 10s have passed since last background scan
+      const keywordHit = checkKeywordTriggers(chunk, objections);
+      const backgroundDue = now - lastKBCheckRef.current > KB_CHECK_COOLDOWN_MS;
+
+      if (keywordHit || backgroundDue) {
+        lastKBCheckRef.current = now;
+        runKBCheck(chunk);
+      }
     },
-    [runKeywordCheck]
+    [objections, runKBCheck]
   );
 
   /** Manually trigger a poll right now (used by simulator Send Chunk button) */
