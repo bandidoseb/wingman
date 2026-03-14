@@ -156,8 +156,8 @@ function createTrayPopover(): void {
   trayPopover.loadFile(path.join(__dirname, "tray-popover/index.html"));
   trayPopover.setVisibleOnAllWorkspaces(true);
 
-  // Auto-hide when focus leaves the popover
-  trayPopover.on("blur",   () => trayPopover?.hide());
+  // Note: no blur auto-hide — we use showInactive() so focus never transfers,
+  // meaning blur never fires. Popover closes on the next tray icon click instead.
   trayPopover.on("closed", () => { trayPopover = null; });
 }
 
@@ -198,8 +198,9 @@ function createTray(): void {
 
     trayPopover.setPosition(popX, popY);
     trayPopover.webContents.send("tray:call-state", callActive);
-    trayPopover.show();
-    trayPopover.focus();
+    // showInactive: displays the window without stealing focus from the active app.
+    // This prevents macOS from firing blur immediately and hiding the popover.
+    trayPopover.showInactive();
   });
 }
 
