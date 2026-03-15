@@ -58,5 +58,6 @@ publish:
   repo: wingman
 
 # macOS code signing (required for users to install without warnings)
-# This runs AFTER signing to notarize with Apple
-# afterSign: scripts/notarize.js   # ← Uncomment when you have your Apple Developer account
+# Runs AFTER electron-builder signs the app — submits to Apple notarization
+# so users don't see a Gatekeeper "unidentified developer" warning.
+afterSign: scripts/notarize.js

@@ -1,0 +1,68 @@
+# .github/workflows/release.yml
+#
+# Automated Wingman release pipeline
+#
+# Trigger: push a version tag (e.g. v1.2.3)
+#   npm version patch   ← bumps package.json + creates git tag
+#   git push && git push --tags   ← this file runs automatically
+#
+# What it does:
+#   1. Builds Next.js web app
+#   2. Compiles Electron TypeScript
+#   3. Signs the .app with your Apple Developer ID cert
+#   4. Notarizes with Apple (no Gatekeeper warnings)
+#   5. Packages as .dmg for Intel + Apple Silicon
+#   6. Publishes to GitHub Releases
+#   7. electron-updater in running apps auto-downloads + installs silently
+
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"   # triggers on v1.0.0, v1.2.3, v2.0.0-beta.1, etc.
+
+jobs:
+  release:
+    runs-on: macos-latest   # must be macOS — required for signing + notarization
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build and publish
+        env:
+          # ── GitHub publish token ──────────────────────────────────────────
+          # Personal Access Token with "repo" scope.
+          # Add at: github.com/bandidoseb/wingman → Settings → Secrets → Actions
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+
+          # ── Apple Developer code signing ──────────────────────────────────
+          # CSC_LINK: base64-encoded .p12 certificate exported from Keychain.
+          #   Export steps:
+          #     1. Keychain Access → find "Developer ID Application: ..." cert
+          #     2. Right-click → Export → save as Certificates.p12 (set a password)
+          #     3. base64 -i Certificates.p12 | pbcopy
+          #     4. Paste as the CSC_LINK secret value
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+
+          # ── Apple notarization ────────────────────────────────────────────
+          # APPLE_ID: your Apple ID email (same one used for developer.apple.com)
+          # APPLE_APP_SPECIFIC_PASSWORD: generate at appleid.apple.com
+          #   Sign in → App-Specific Passwords → Generate Password → "Wingman CI"
+          # APPLE_TEAM_ID: 10-char ID at developer.apple.com → Account → Membership
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+
+        run: npm run electron:release

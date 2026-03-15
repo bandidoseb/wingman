@@ -12,7 +12,8 @@
     "electron:dev": "concurrently --kill-others \"npm run dev\" \"npm run electron:wait\"",
     "electron:wait": "node scripts/wait-and-launch.js",
     "electron:pack": "npm run electron:compile && electron-builder --dir",
-    "electron:dist": "npm run build && npm run electron:compile && electron-builder && codesign --force --deep --sign - dist/mac-arm64/Wingman.app 2>/dev/null || true"
+    "electron:dist": "npm run build && npm run electron:compile && electron-builder && codesign --force --deep --sign - dist/mac-arm64/Wingman.app 2>/dev/null || true",
+    "electron:release": "npm run build && npm run electron:compile && electron-builder --publish always"
   },
   "main": "electron-dist/main.js",
   "dependencies": {
