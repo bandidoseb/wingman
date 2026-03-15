@@ -320,6 +320,11 @@ function setupIPC(): void {
     hudWindow?.webContents.send("hud:update-stage", data);
   });
 
+  // ── Scorecard → HUD (live scoring state — forwarded for future HUD use) ─────
+  ipcMain.handle("hud:scorecard", (_event, scorecard: Record<string, unknown>) => {
+    hudWindow?.webContents.send("hud:update-scorecard", scorecard);
+  });
+
   // ── HUD dismiss → main window ───────────────────────────────────────────────
   ipcMain.handle("hud:dismiss", () => {
     mainWindow?.webContents.send("signal:dismiss");
