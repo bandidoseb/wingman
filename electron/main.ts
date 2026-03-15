@@ -29,6 +29,13 @@ let tray:         Tray | null = null;
 // "Ready to deploy?" confirmation toast or end the current call.
 let callActive = false;
 
+// ─── Quit guard ───────────────────────────────────────────────────────────────
+// We hide the main window instead of destroying it so users can reopen it from
+// the tray or dock without relaunching. But app.quit() must still work — this
+// flag lets the "close" handler know when a real quit is in progress so it
+// skips the hide and lets Electron destroy the window normally.
+let isQuitting = false;
+
 // ─── Auto-stop handler ────────────────────────────────────────────────────────
 // Called by recall.ts when any of the three safeguards fire (meeting-lost,
 // inactivity timeout, or hard cap). Ends the call, notifies both windows,
@@ -77,6 +84,17 @@ function createMainWindow(): void {
       return { action: "deny" };
     }
     return { action: "allow" };
+  });
+
+  // Hide instead of destroy when the user clicks the red X.
+  // This lets them reopen the dashboard from the tray or dock without a full
+  // reload. The isQuitting flag ensures app.quit() (tray → Quit Wingman) still
+  // closes the window for real so the app can exit cleanly.
+  mainWindow.on("close", (event) => {
+    if (!isQuitting) {
+      event.preventDefault();
+      mainWindow?.hide();
+    }
   });
 
   mainWindow.on("closed", () => { mainWindow = null; });
@@ -354,8 +372,8 @@ function setupIPC(): void {
 
   ipcMain.handle("tray:open-dashboard", () => {
     trayPopover?.hide();
-    mainWindow?.show();
-    mainWindow?.focus();
+    if (!mainWindow || mainWindow.isDestroyed()) createMainWindow();
+    else { mainWindow.show(); mainWindow.focus(); }
   });
 
   // Resize the tray popover to fit idle (150px) or live (190px) content
@@ -406,9 +424,12 @@ app.whenReady().then(() => {
     hudWindow?.webContents.send("call:detected");
   });
 
+  // Dock icon click on macOS — show the window if it's hidden.
+  // Can't use getAllWindows().length === 0 here because a hidden window is still
+  // in the list; we check mainWindow directly instead.
   app.on("activate", () => {
-    if (BrowserWindow.getAllWindows().length === 0) createMainWindow();
-    else mainWindow?.show();
+    if (!mainWindow || mainWindow.isDestroyed()) createMainWindow();
+    else { mainWindow.show(); mainWindow.focus(); }
   });
 
   if (app.isPackaged) {
@@ -431,6 +452,10 @@ app.on("second-instance", (_event, commandLine) => {
   mainWindow?.show();
   mainWindow?.focus();
 });
+
+// Set the quit flag BEFORE windows are asked to close so the "close" handler
+// in createMainWindow() knows to skip the hide and let Electron exit cleanly.
+app.on("before-quit", () => { isQuitting = true; });
 
 app.on("will-quit", () => {
   globalShortcut.unregisterAll();
