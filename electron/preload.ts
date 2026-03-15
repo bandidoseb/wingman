@@ -152,9 +152,6 @@ contextBridge.exposeInMainWorld("hud", {
   /** User clicked Dismiss inside the HUD — tell main process */
   dismissSignal: () => ipcRenderer.invoke("hud:dismiss"),
 
-  /** User is dragging the HUD — tell main process to move the window */
-  moveWindow: (x: number, y: number) => ipcRenderer.invoke("hud:move", x, y),
-
   // ── Mouse interaction toggle ─────────────────────────────────────────────
   setMouseIgnore: (ignore: boolean) =>
     ipcRenderer.invoke("hud:set-mouse-ignore", ignore),
