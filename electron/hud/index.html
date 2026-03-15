@@ -42,6 +42,11 @@
       box-shadow: 0 2px 12px rgba(0, 0, 0, 0.2);
 
       white-space: nowrap;
+
+      /* Drag support: enable pointer events so the bar is hoverable/draggable */
+      pointer-events: auto;
+      cursor: grab;
+      user-select: none;
     }
 
     /* Live indicator dot — left side of stage bar */
@@ -867,6 +872,71 @@
       if (window.hud) window.hud.dismissSignal();
     });
 
+    // ── Stage bar drag-to-reposition ──────────────────────────────────────
+    // The stage bar lives inside a full-screen transparent canvas, so "moving"
+    // it means repositioning the element via CSS — no window move needed.
+    // Position persists across sessions via localStorage.
+    let isDragging   = false;
+    let dragOffsetX  = 0;
+    let dragOffsetY  = 0;
+
+    // Restore saved position from previous session
+    (function restoreBarPosition() {
+      try {
+        const saved = localStorage.getItem('hud-bar-pos');
+        if (saved) {
+          const { left, top } = JSON.parse(saved);
+          stageBar.style.left      = left + 'px';
+          stageBar.style.top       = top  + 'px';
+          stageBar.style.transform = 'none';
+        }
+      } catch (_) { /* ignore corrupt storage */ }
+    })();
+
+    stageBar.addEventListener('mousedown', (e) => {
+      // Don't start a drag from the stop button
+      if (stopBtn.contains(e.target)) return;
+
+      isDragging = true;
+      const rect  = stageBar.getBoundingClientRect();
+      dragOffsetX = e.clientX - rect.left;
+      dragOffsetY = e.clientY - rect.top;
+
+      stageBar.style.cursor = 'grabbing';
+      e.preventDefault(); // prevent text selection during drag
+    });
+
+    document.addEventListener('mousemove', (e) => {
+      if (!isDragging) return;
+
+      const barW   = stageBar.offsetWidth;
+      const barH   = stageBar.offsetHeight;
+      const newLeft = Math.max(0, Math.min(window.innerWidth  - barW,     e.clientX - dragOffsetX));
+      const newTop  = Math.max(8, Math.min(window.innerHeight - barH - 8, e.clientY - dragOffsetY));
+
+      stageBar.style.left      = newLeft + 'px';
+      stageBar.style.top       = newTop  + 'px';
+      stageBar.style.transform = 'none'; // remove the default translateX(-50%)
+    });
+
+    document.addEventListener('mouseup', () => {
+      if (!isDragging) return;
+      isDragging = false;
+      stageBar.style.cursor = ''; // revert to CSS grab cursor
+
+      // Persist position for next session
+      try {
+        const rect = stageBar.getBoundingClientRect();
+        localStorage.setItem('hud-bar-pos', JSON.stringify({
+          left: Math.round(rect.left),
+          top:  Math.round(rect.top),
+        }));
+      } catch (_) {}
+
+      // Restore mouse pass-through once drag ends and mouse is no longer on bar
+      if (!signalActive && window.hud) window.hud.setMouseIgnore(true);
+    });
+
     // ── Stop button — end call directly ──────────────────────────────────
     // Re-enable mouse pass-through immediately so the underlying app isn't
     // blocked during the ~600ms HUD fade-out after the call ends.
@@ -878,12 +948,13 @@
     });
 
     // ── Mouse hover tracking ──────────────────────────────────────────────
-    // Stage bar: enable mouse events on hover so the stop button is clickable
+    // Stage bar: enable mouse capture on hover so drag + stop button work.
+    // Guard isDragging so a fast mouseleave mid-drag doesn't re-enable pass-through.
     stageBar.addEventListener('mouseenter', () => {
       if (window.hud) window.hud.setMouseIgnore(false);
     });
     stageBar.addEventListener('mouseleave', () => {
-      if (!signalActive) {
+      if (!isDragging && !signalActive) {
         if (window.hud) window.hud.setMouseIgnore(true);
       }
     });
