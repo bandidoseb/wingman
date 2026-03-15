@@ -226,10 +226,10 @@ export default function DashboardClient({
   // WITHOUT calling window.wingman.endCall() — Electron already stopped Recall.
   useEffect(() => {
     if (typeof window === "undefined" || !window.wingman) return;
-    window.wingman.onAutoEnded(() => {
+    window.wingman.onAutoEnded?.(() => {
       handleAutoEndRef.current();
     });
-    return () => { window.wingman?.offAutoEnded(); };
+    return () => { window.wingman?.offAutoEnded?.(); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
