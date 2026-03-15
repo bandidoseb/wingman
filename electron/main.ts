@@ -139,7 +139,7 @@ function createHudWindow(): void {
 function createTrayPopover(): void {
   trayPopover = new BrowserWindow({
     width:      240,
-    height:     150,          // resized dynamically (150 idle / 190 live)
+    height:     180,          // resized dynamically (180 idle / 190 live)
     show:       false,
     frame:      false,
     resizable:  false,
@@ -344,7 +344,7 @@ function setupIPC(): void {
 
   ipcMain.handle("tray:end-call", () => {
     trayPopover?.hide();
-    mainWindow?.webContents.send("shortcut:toggle-call");
+    sendToMainWindow("shortcut:toggle-call"); // uses createMainWindow fallback like tray:deploy
   });
 
   ipcMain.handle("tray:open-dashboard", () => {

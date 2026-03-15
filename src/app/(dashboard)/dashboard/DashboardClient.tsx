@@ -117,9 +117,16 @@ export default function DashboardClient({
       setCallId(data.call_id);
       setIsActive(true);
 
-      // Tell Electron to start Recall AI audio capture and show the HUD
+      // Tell Electron to start Recall AI audio capture and show the HUD.
+      // If this IPC call fails, revert UI state so we're not stuck showing "live".
       if (typeof window !== "undefined" && window.wingman) {
-        await window.wingman.startCall();
+        try {
+          await window.wingman.startCall();
+        } catch (electronErr) {
+          setIsActive(false);
+          setCallId(null);
+          setStartError("Failed to start audio capture. Please try again.");
+        }
       }
     } catch (err) {
       setStartError(err instanceof Error ? err.message : "Failed to start call");

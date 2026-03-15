@@ -868,8 +868,13 @@
     });
 
     // ── Stop button — end call directly ──────────────────────────────────
+    // Re-enable mouse pass-through immediately so the underlying app isn't
+    // blocked during the ~600ms HUD fade-out after the call ends.
     stopBtn.addEventListener('click', () => {
-      if (window.hud) window.hud.confirmEndCall();
+      if (window.hud) {
+        window.hud.setMouseIgnore(true);
+        window.hud.confirmEndCall();
+      }
     });
 
     // ── Mouse hover tracking ──────────────────────────────────────────────
