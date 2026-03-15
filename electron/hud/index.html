@@ -863,7 +863,9 @@
         listeningText.classList.add('visible');
       }
 
-      if (window.hud) window.hud.setMouseIgnore(true);
+      // Don't re-enable pass-through if user is mid-drag — the mouseup/mouseleave
+      // handlers will restore it once the drag ends or the mouse leaves the bar.
+      if (!isDragging && window.hud) window.hud.setMouseIgnore(true);
     }
 
     // ── Dismiss button ────────────────────────────────────────────────────
@@ -880,14 +882,20 @@
     let dragOffsetX  = 0;
     let dragOffsetY  = 0;
 
-    // Restore saved position from previous session
+    // Restore saved position from previous session.
+    // Clamp to current screen bounds so the bar is never off-screen on a
+    // smaller display than the one it was last dragged on.
     (function restoreBarPosition() {
       try {
         const saved = localStorage.getItem('hud-bar-pos');
         if (saved) {
           const { left, top } = JSON.parse(saved);
-          stageBar.style.left      = left + 'px';
-          stageBar.style.top       = top  + 'px';
+          // Bar width is unknown at this point (element is hidden), so use a
+          // conservative estimate of 200px to keep the right edge on screen.
+          const clampedLeft = Math.max(0, Math.min(window.innerWidth  - 200, left));
+          const clampedTop  = Math.max(8, Math.min(window.innerHeight - 40,  top));
+          stageBar.style.left      = clampedLeft + 'px';
+          stageBar.style.top       = clampedTop  + 'px';
           stageBar.style.transform = 'none';
         }
       } catch (_) { /* ignore corrupt storage */ }
@@ -919,7 +927,7 @@
       stageBar.style.transform = 'none'; // remove the default translateX(-50%)
     });
 
-    document.addEventListener('mouseup', () => {
+    document.addEventListener('mouseup', (e) => {
       if (!isDragging) return;
       isDragging = false;
       stageBar.style.cursor = ''; // revert to CSS grab cursor
@@ -931,10 +939,21 @@
           left: Math.round(rect.left),
           top:  Math.round(rect.top),
         }));
-      } catch (_) {}
 
-      // Restore mouse pass-through once drag ends and mouse is no longer on bar
-      if (!signalActive && window.hud) window.hud.setMouseIgnore(true);
+        // If the mouse was released OUTSIDE the bar (fast drag), restore
+        // pass-through now — mouseleave already fired mid-drag and was
+        // suppressed by the isDragging guard, so it won't fire again.
+        // If the mouse is still OVER the bar, keep events active so the
+        // stop button stays clickable; mouseleave will restore pass-through.
+        const isOverBar = e.clientX >= rect.left && e.clientX <= rect.right &&
+                          e.clientY >= rect.top  && e.clientY <= rect.bottom;
+        if (!isOverBar && !signalActive && window.hud) {
+          window.hud.setMouseIgnore(true);
+        }
+      } catch (_) {
+        // If getBoundingClientRect fails, fall back to restoring pass-through
+        if (!signalActive && window.hud) window.hud.setMouseIgnore(true);
+      }
     });
 
     // ── Stop button — end call directly ──────────────────────────────────
