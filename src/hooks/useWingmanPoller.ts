@@ -30,7 +30,6 @@ interface UseWingmanPollerReturn {
   pollError: string | null;
   completedStages: CallStageLabel[];
   addChunk: (chunk: string) => void;
-  triggerPollNow: () => void;
   dismissSignal: () => void;
 }
 
@@ -235,11 +234,6 @@ export function useWingmanPoller({
     [objections, runKBCheck]
   );
 
-  /** Manually trigger a poll right now (used by simulator Send Chunk button) */
-  const triggerPollNow = useCallback(() => {
-    executePoll();
-  }, [executePoll]);
-
   // ── Auto-poll timer — restarts whenever stage or isActive changes ─────────
   useEffect(() => {
     if (intervalRef.current) {
@@ -273,7 +267,6 @@ export function useWingmanPoller({
     pollError,
     completedStages,
     addChunk,
-    triggerPollNow,
     dismissSignal,
   };
 }

@@ -15,7 +15,7 @@
  *
  * ─── In the browser (non-Electron) ──────────────────────────────────────────
  * window.wingman doesn't exist, so this hook does nothing.
- * The simulator manual-paste mode is used instead.
+ * Recall AI audio capture only works inside the Electron desktop app.
  *
  * ─── Usage ───────────────────────────────────────────────────────────────────
  * const isElectron = useRecallTranscript({ isActive, addChunk });

@@ -80,7 +80,7 @@ export async function POST(req: NextRequest) {
       .from("calls")
       .insert({
         user_id:       user.id,
-        prospect_name: prospect_name || "Simulator Session",
+        prospect_name: prospect_name || "Live Call",
         outcome:       null,
         call_date:     new Date().toISOString(),
         missed_topics: [],
