@@ -25,6 +25,8 @@ on:
 jobs:
   release:
     runs-on: macos-latest   # must be macOS — required for signing + notarization
+    permissions:
+      contents: write       # required to upload release assets
 
     steps:
       - name: Checkout
@@ -42,9 +44,8 @@ jobs:
       - name: Build and publish
         env:
           # ── GitHub publish token ──────────────────────────────────────────
-          # Personal Access Token with "repo" scope.
-          # Add at: github.com/bandidoseb/wingman → Settings → Secrets → Actions
-          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+          # Uses GitHub's built-in token — no manual secret needed
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
           # ── Apple Developer code signing ──────────────────────────────────
           # CSC_LINK: base64-encoded .p12 certificate exported from Keychain.
