@@ -28,8 +28,9 @@ extraResources:
 mac:
   category: public.app-category.business
   icon: build/icon.icns          # macOS requires .icns format (create from Wingman.png)
-  hardenedRuntime: true          # Required for notarization
-  gatekeeperAssess: false        # We handle our own signing
+  hardenedRuntime: true
+  gatekeeperAssess: false
+  notarize: false                # Disabled for beta — re-enable before public launch
   entitlements: build/entitlements.mac.plist
   entitlementsInherit: build/entitlements.mac.plist
   target:
