@@ -13,7 +13,6 @@ node_modules/
 # Next.js build output
 .next/
 out/
-build/
 
 # Vercel
 .vercel
@@ -41,6 +40,5 @@ next-env.d.ts
 electron-dist/
 dist/
 
-# Electron build resources (icons auto-generated from Wingman.png)
-build/icon.icns
+# Electron build output only — build/ resources folder IS committed
 build/icon.ico
