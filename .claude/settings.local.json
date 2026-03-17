@@ -73,7 +73,10 @@
       "Bash(npm ls @react-three/fiber)",
       "Bash(ls -la \"/Users/sebastianperez/Desktop/Wingman CC/src/app/\\(dashboard\\)/\")",
       "Bash(find \"/Users/sebastianperez/Desktop/Wingman CC/src/app/\\(dashboard\\)\" -type f -name \"*.tsx\")",
-      "Bash(gh run list --limit 5)"
+      "Bash(gh run list --limit 5)",
+      "Bash(gh run:*)",
+      "Bash(brew list:*)",
+      "Bash(npx tsc:*)"
     ]
   }
 }
