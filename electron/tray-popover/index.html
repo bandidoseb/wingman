@@ -133,6 +133,20 @@
       margin-top: 2px;
     }
 
+    /* ── No meeting detected warning ────────────────────────────────────── */
+    .no-meeting-warning {
+      display: none;
+      font-size: 11px;
+      color: #ff9f0a;
+      background: rgba(255, 159, 10, 0.1);
+      border: 1px solid rgba(255, 159, 10, 0.25);
+      border-radius: 6px;
+      padding: 6px 8px;
+      text-align: center;
+      line-height: 1.4;
+    }
+    .no-meeting-warning.visible { display: block; }
+
     /* ── State visibility ───────────────────────────────────────────────── */
     #idleState { display: flex; flex-direction: column; gap: 6px; }
     #liveState  { display: none;  flex-direction: column; gap: 6px; }
@@ -152,6 +166,7 @@
     <!-- Idle: no call active -->
     <div id="idleState">
       <button class="btn btn-deploy" id="deployBtn">Deploy Wingman</button>
+      <div class="no-meeting-warning" id="noMeetingWarning">No call detected. Open Zoom or Google Meet first.</div>
       <div class="deploy-warning">Only deploy once your prospect has joined the call</div>
     </div>
 
@@ -197,6 +212,13 @@
     ipcRenderer.on('tray:call-state', (_event, isActive) => {
       callActive = isActive;
       updateUI();
+    });
+
+    // No meeting detected — show warning briefly
+    ipcRenderer.on('tray:no-meeting', () => {
+      const warning = document.getElementById('noMeetingWarning');
+      warning.classList.add('visible');
+      setTimeout(() => warning.classList.remove('visible'), 3000);
     });
 
     document.getElementById('deployBtn').addEventListener('click', () => {

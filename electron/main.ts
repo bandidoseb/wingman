@@ -11,7 +11,7 @@ import {
 } from "electron";
 import * as path from "path";
 import { autoUpdater } from "electron-updater";
-import { initRecallAI, stopRecallAI, setupRecallAI, AutoStopReason } from "./recall";
+import { initRecallAI, stopRecallAI, setupRecallAI, hasMeetingDetected, AutoStopReason } from "./recall";
 
 // ─── App URLs ────────────────────────────────────────────────────────────────
 const PROD_URL = "https://app.meetwingman.ai";
@@ -361,6 +361,10 @@ function setupIPC(): void {
 
   // ── Tray popover actions ────────────────────────────────────────────────────
   ipcMain.handle("tray:deploy", () => {
+    if (!hasMeetingDetected()) {
+      trayPopover?.webContents.send("tray:no-meeting");
+      return;
+    }
     trayPopover?.hide();
     sendToMainWindow("shortcut:toggle-call");
   });
@@ -394,7 +398,12 @@ function setupShortcuts(): void {
       // Call is running — show "End this call?" confirmation in the HUD
       hudWindow?.webContents.send("hud:end-call-confirm");
     } else {
-      // No call active — show "Ready to deploy Wingman?" confirmation in the HUD
+      // No call active — check meeting is detected before showing deploy confirmation
+      if (!hasMeetingDetected()) {
+        hudWindow?.show();
+        hudWindow?.webContents.send("hud:no-meeting");
+        return;
+      }
       hudWindow?.show();
       hudWindow?.webContents.send("hud:manual-trigger");
     }

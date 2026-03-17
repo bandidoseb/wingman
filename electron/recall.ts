@@ -113,6 +113,11 @@ export function setupRecallAI(onMeetingDetected?: () => void): void {
 
 // ─── Public API ───────────────────────────────────────────────────────────────
 
+/** Returns true if a meeting window (Zoom/Meet/Teams) has been detected */
+export function hasMeetingDetected(): boolean {
+  return detectedWindowId !== null;
+}
+
 /**
  * Start audio capture when the user begins a call.
  * Records the detected meeting window via Recall AI.
