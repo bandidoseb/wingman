@@ -214,11 +214,16 @@
       updateUI();
     });
 
-    // No meeting detected — show warning briefly
+    // No meeting detected — show warning briefly (cancel any pending hide first)
+    const noMeetingWarning = document.getElementById('noMeetingWarning');
+    let noMeetingTimeout = null;
     ipcRenderer.on('tray:no-meeting', () => {
-      const warning = document.getElementById('noMeetingWarning');
-      warning.classList.add('visible');
-      setTimeout(() => warning.classList.remove('visible'), 3000);
+      if (noMeetingTimeout !== null) clearTimeout(noMeetingTimeout);
+      noMeetingWarning.classList.add('visible');
+      noMeetingTimeout = setTimeout(() => {
+        noMeetingWarning.classList.remove('visible');
+        noMeetingTimeout = null;
+      }, 3000);
     });
 
     document.getElementById('deployBtn').addEventListener('click', () => {

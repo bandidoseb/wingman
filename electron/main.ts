@@ -398,14 +398,9 @@ function setupShortcuts(): void {
       // Call is running — show "End this call?" confirmation in the HUD
       hudWindow?.webContents.send("hud:end-call-confirm");
     } else {
-      // No call active — check meeting is detected before showing deploy confirmation
-      if (!hasMeetingDetected()) {
-        hudWindow?.show();
-        hudWindow?.webContents.send("hud:no-meeting");
-        return;
-      }
+      // No call active — show HUD, then route based on whether a meeting is detected
       hudWindow?.show();
-      hudWindow?.webContents.send("hud:manual-trigger");
+      hudWindow?.webContents.send(hasMeetingDetected() ? "hud:manual-trigger" : "hud:no-meeting");
     }
   });
 }
