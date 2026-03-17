@@ -160,7 +160,7 @@ export async function initRecallAI(options: RecallOptions): Promise<void> {
         headers: {
           accept: "application/json",
           "content-type": "application/json",
-          Authorization: apiKey,
+          Authorization: `Token ${apiKey}`,
         },
         body: JSON.stringify({
           recording_config: {
