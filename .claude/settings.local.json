@@ -53,7 +53,27 @@
       "Bash(find \"/Users/sebastianperez/Desktop/Wingman CC/src/app/\\(dashboard\\)\" -type f -name \"*.tsx\" -o -name \"*.ts\")",
       "Bash(ls -la \"/Users/sebastianperez/Desktop/Wingman CC/src/app/\\(dashboard\\)/dashboard/\")",
       "WebFetch(domain:raw.githubusercontent.com)",
-      "Bash(npm run electron:dist)"
+      "Bash(npm run electron:dist)",
+      "Bash(npm i --save-dev @types/three)",
+      "Bash(npm i @react-three/fiber)",
+      "Bash(pkill -f \"Wingman.app/Contents/MacOS/Wingman\")",
+      "Bash(open \"/Users/sebastianperez/Desktop/Wingman CC/dist/mac-arm64/Wingman.app\")",
+      "Bash(codesign --force --deep --sign - \"/Users/sebastianperez/Desktop/Wingman CC/dist/mac-arm64/Wingman.app\")",
+      "Bash(codesign --verify --deep --strict \"/Users/sebastianperez/Desktop/Wingman CC/dist/mac-arm64/Wingman.app\")",
+      "Bash(pgrep -la Wingman)",
+      "Bash(npx asar list \"/Users/sebastianperez/Desktop/Wingman CC/dist/mac-arm64/Wingman.app/Contents/Resources/app.asar\")",
+      "Bash(convert --version)",
+      "Bash(python3 -c \"from PIL import Image; print\\(''pillow ok''\\)\")",
+      "Bash(python3:*)",
+      "Bash(pkill -f \"Wingman\")",
+      "Bash(node -e \"require\\(''docx''\\)\")",
+      "Bash(npm install -g docx)",
+      "Bash(npm run build)",
+      "Bash(npm ls three)",
+      "Bash(npm ls @react-three/fiber)",
+      "Bash(ls -la \"/Users/sebastianperez/Desktop/Wingman CC/src/app/\\(dashboard\\)/\")",
+      "Bash(find \"/Users/sebastianperez/Desktop/Wingman CC/src/app/\\(dashboard\\)\" -type f -name \"*.tsx\")",
+      "Bash(gh run list --limit 5)"
     ]
   }
 }
