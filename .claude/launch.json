@@ -13,5 +13,11 @@
       "runtimeArgs": ["node_modules/.bin/serve", "electron/hud", "-p", "3001", "--no-clipboard"],
       "port": 3001
     }
+  ,{
+      "name": "Wingman Tray Preview",
+      "runtimeExecutable": "/Users/sebastianperez/.nvm/versions/node/v24.14.0/bin/node",
+      "runtimeArgs": ["node_modules/.bin/serve", "electron/tray-popover", "-p", "3002", "--no-clipboard"],
+      "port": 3002
+    }
   ]
 }
