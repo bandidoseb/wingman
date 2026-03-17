@@ -472,7 +472,7 @@ autoUpdater.on("update-available", () => {
 });
 autoUpdater.on("update-downloaded", () => {
   console.log("[Updater] Update downloaded — prompting user to restart");
-  const { response } = dialog.showMessageBoxSync({
+  const response = dialog.showMessageBoxSync({
     type:      "info",
     title:     "Update Ready",
     message:   "Wingman has been updated.",
