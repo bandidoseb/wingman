@@ -287,6 +287,9 @@ function setupIPC(): void {
   // ── Call lifecycle ──────────────────────────────────────────────────────────
   ipcMain.handle("call:start", async () => {
     console.log("[IPC] call:start");
+    if (!hasMeetingDetected()) {
+      return { success: false, error: "no_meeting" };
+    }
     callActive = true;
     hudWindow?.show();
     hudWindow?.webContents.send("call:started");

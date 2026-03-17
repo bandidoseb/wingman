@@ -95,6 +95,20 @@ export default function DashboardClient({
   const handleStartCall = useCallback(async () => {
     setStartError(null);
     try {
+      // Check meeting detection BEFORE creating a session record.
+      // If no Zoom/Meet window is open, bail immediately — no DB entry created.
+      if (typeof window !== "undefined" && window.wingman) {
+        const result = await window.wingman.startCall() as { success: boolean; error?: string } | undefined;
+        if (result && !result.success) {
+          if (result.error === "no_meeting") {
+            setStartError("No call detected. Open Zoom or Google Meet first.");
+          } else {
+            setStartError("Failed to start audio capture. Please try again.");
+          }
+          return;
+        }
+      }
+
       const res = await fetch("/api/wingman/session", {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -103,6 +117,8 @@ export default function DashboardClient({
       const data = await res.json();
 
       if (!res.ok) {
+        // Session creation failed after Electron already started — stop Electron too
+        if (typeof window !== "undefined" && window.wingman) window.wingman.endCall();
         if (data.error === "trial_ended") {
           handleLimitReached();
         } else if (data.error === "call_limit_reached") {
@@ -116,18 +132,6 @@ export default function DashboardClient({
       if (!data.call_id) throw new Error("Failed to start");
       setCallId(data.call_id);
       setIsActive(true);
-
-      // Tell Electron to start Recall AI audio capture and show the HUD.
-      // If this IPC call fails, revert UI state so we're not stuck showing "live".
-      if (typeof window !== "undefined" && window.wingman) {
-        try {
-          await window.wingman.startCall();
-        } catch (electronErr) {
-          setIsActive(false);
-          setCallId(null);
-          setStartError("Failed to start audio capture. Please try again.");
-        }
-      }
     } catch (err) {
       setStartError(err instanceof Error ? err.message : "Failed to start call");
     }

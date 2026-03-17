@@ -220,8 +220,10 @@
     ipcRenderer.on('tray:no-meeting', () => {
       if (noMeetingTimeout !== null) clearTimeout(noMeetingTimeout);
       noMeetingWarning.classList.add('visible');
+      ipcRenderer.invoke('tray:resize', 220);
       noMeetingTimeout = setTimeout(() => {
         noMeetingWarning.classList.remove('visible');
+        ipcRenderer.invoke('tray:resize', 180);
         noMeetingTimeout = null;
       }, 3000);
     });
