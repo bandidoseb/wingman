@@ -8,6 +8,7 @@ import {
   shell,
   globalShortcut,
   screen,
+  dialog,
 } from "electron";
 import * as path from "path";
 import { autoUpdater } from "electron-updater";
@@ -470,5 +471,14 @@ autoUpdater.on("update-available", () => {
   console.log("[Updater] Update available — downloading");
 });
 autoUpdater.on("update-downloaded", () => {
-  console.log("[Updater] Update downloaded — installs on next launch");
+  console.log("[Updater] Update downloaded — prompting user to restart");
+  const { response } = dialog.showMessageBoxSync({
+    type:      "info",
+    title:     "Update Ready",
+    message:   "Wingman has been updated.",
+    detail:    "Restart now to install the latest version.",
+    buttons:   ["Restart Now", "Later"],
+    defaultId: 0,
+  });
+  if (response === 0) autoUpdater.quitAndInstall();
 });
