@@ -14,8 +14,8 @@
  * ─── Auto-stop safeguards ─────────────────────────────────────────────────────
  * Three layers prevent Wingman from running up API costs accidentally:
  *
- * Layer 1 — meeting-lost event: If the Zoom/Teams/Meet window closes while
- *   a call is active, the SDK fires "meeting-lost" and we stop automatically.
+ * Layer 1 — meeting-closed event: If the Zoom/Teams/Meet window closes while
+ *   a call is active, the SDK fires "meeting-closed" and we stop automatically.
  *
  * Layer 2 — Inactivity timeout: If no transcript chunks arrive for 20 minutes
  *   during an active call, we assume the call ended and stop automatically.
@@ -46,9 +46,12 @@ const MAX_DURATION_MS        =   2 * 60 * 60 * 1000; // 2 hours — hard session
 // ─── Module state ─────────────────────────────────────────────────────────────
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-let sdk: any                             = null;
-let isRunning                            = false;
-let detectedWindowId: number | null      = null;
+let sdk: any                              = null;
+let isRunning                             = false;
+let detectedWindowId: string | null       = null;
+// Saved at recording start so stopRecording always has the right windowId
+// even if detectedWindowId is cleared by a meeting-closed event mid-call.
+let recordingWindowId: string | null      = null;
 
 // Auto-stop safeguard timers
 let hardCapTimer:          ReturnType<typeof setTimeout>  | null = null;
@@ -56,7 +59,7 @@ let approachingLimitTimer: ReturnType<typeof setTimeout>  | null = null;
 let inactivityTimer:       ReturnType<typeof setInterval> | null = null;
 let lastChunkAt            = 0;
 
-// Stored so the meeting-lost event handler (set up in setupRecallAI) can
+// Stored so the meeting-closed event handler (set up in setupRecallAI) can
 // reach the callback even though it's registered before initRecallAI runs.
 let autoStopFn: ((reason: AutoStopReason) => void) | null = null;
 
@@ -67,13 +70,11 @@ let autoStopFn: ((reason: AutoStopReason) => void) | null = null;
  * Passively watches for meeting windows so a windowId is ready when the
  * user clicks "Start Call".
  *
- * Also wires up the "meeting-lost" event (Layer 1 auto-stop): if the meeting
- * window closes while a call is active, Wingman stops automatically.
- *
- * Note: The exact event name for meeting end may vary by SDK version.
- * "meeting-lost" is the expected event; verify against Recall AI docs if needed.
+ * IMPORTANT: sdk.init() returns a Promise — we must await it before registering
+ * event listeners. Registering listeners before init resolves means the SDK
+ * isn't ready yet and meeting-detected events are never received.
  */
-export function setupRecallAI(onMeetingDetected?: () => void): void {
+export async function setupRecallAI(onMeetingDetected?: () => void): Promise<void> {
   const apiKey = process.env.RECALL_AI_API_KEY;
 
   if (!apiKey) {
@@ -84,19 +85,22 @@ export function setupRecallAI(onMeetingDetected?: () => void): void {
   try {
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     sdk = require("@recallai/desktop-sdk");
-    sdk.init({ apiUrl: "https://us-east-1.recall.ai" });
 
-    // Meeting started — store window ID, notify main process
-    sdk.addEventListener("meeting-detected", (evt: { window: { id: number } }) => {
+    // Must await init() before addEventListener — SDK is not ready until resolved
+    await sdk.init({ apiUrl: "https://us-east-1.recall.ai" });
+
+    // Meeting started — store window ID (string), notify main process
+    sdk.addEventListener("meeting-detected", (evt: { window: { id: string } }) => {
       detectedWindowId = evt.window.id;
       console.log("[Recall AI] Meeting detected — window ID:", detectedWindowId);
       onMeetingDetected?.();
     });
 
     // Layer 1 — Meeting window closed while call is active → auto-stop
-    sdk.addEventListener("meeting-lost", () => {
-      detectedWindowId = null;
-      console.log("[Recall AI] Meeting window lost");
+    // Correct event name per SDK type definitions: "meeting-closed" (not "meeting-lost")
+    sdk.addEventListener("meeting-closed", (evt: { window: { id: string } }) => {
+      console.log("[Recall AI] Meeting window closed — ID:", evt.window.id);
+      if (detectedWindowId === evt.window.id) detectedWindowId = null;
       if (isRunning && autoStopFn) {
         console.log("[Recall AI] Auto-stopping — meeting window closed");
         autoStopFn("meeting_lost");
@@ -194,6 +198,10 @@ export async function initRecallAI(options: RecallOptions): Promise<void> {
         );
       }
 
+      // Save windowId for use in stopRecordingAI — detectedWindowId may be
+      // cleared by meeting-closed while a call is still being wrapped up.
+      recordingWindowId = detectedWindowId;
+
       // 2. Listen for real-time transcript events — update lastChunkAt for inactivity tracking
       // Event shape per Recall.ai docs:
       //   evt.event          — string, e.g. "transcript.data"
@@ -212,7 +220,7 @@ export async function initRecallAI(options: RecallOptions): Promise<void> {
 
       // 3. Start recording the detected meeting window
       await sdk.startRecording({
-        windowId:    detectedWindowId,
+        windowId:    recordingWindowId,
         uploadToken: data.upload_token,
       });
 
@@ -243,13 +251,15 @@ export function stopRecallAI(): void {
   if (approachingLimitTimer) { clearTimeout(approachingLimitTimer); approachingLimitTimer = null; }
   if (inactivityTimer)       { clearInterval(inactivityTimer);      inactivityTimer       = null; }
 
-  if (sdk) {
+  if (sdk && recordingWindowId) {
     try {
-      sdk.stopRecording?.();
+      // stopRecording requires { windowId } — passing no args is a SDK error
+      sdk.stopRecording({ windowId: recordingWindowId });
     } catch (err) {
       console.error("[Recall AI] Error stopping recording:", err);
     }
   }
 
+  recordingWindowId = null;
   console.log("[Recall AI] Stopped");
 }
