@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
 import Card from "@/components/ui/Card";
 import SectionLabel from "@/components/ui/SectionLabel";
@@ -24,12 +24,6 @@ const inputStyle: React.CSSProperties = {
   width: "100%",
 };
 
-const STYLE_OPTIONS = [
-  "Challenger", "Consultative", "Solution-Based", "Relationship-Based",
-  "SPIN", "Sandler", "Inbound", "Other",
-];
-const LENGTH_OPTIONS = ["< 30 min", "30–45 min", "45–60 min", "60–90 min", "90+ min"];
-
 function SaveButton({ saving, saved, onClick }: { saving: boolean; saved: boolean; onClick: () => void }) {
   return (
     <button
@@ -52,57 +46,6 @@ function SaveButton({ saving, saved, onClick }: { saving: boolean; saved: boolea
     >
       {saving ? "Saving…" : saved ? "Saved ✓" : "Save Changes"}
     </button>
-  );
-}
-
-// ── Sales Style Section ────────────────────────────────────────────────────────
-function StyleSection({ profile }: { profile: Profile }) {
-  const [style, setStyle]   = useState(profile.sales_style || "");
-  const [length, setLength] = useState(profile.call_length || "");
-  const [saving, setSaving] = useState(false);
-  const [saved, setSaved]   = useState(false);
-
-  const handleSave = async () => {
-    setSaving(true);
-    await fetch("/api/profile/update", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ updates: { sales_style: style, call_length: length } }),
-    });
-    setSaving(false);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 3000);
-  };
-
-  return (
-    <Card style={{ marginBottom: 12 }}>
-      <SectionLabel>Sales Style</SectionLabel>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 4 }}>
-        <div>
-          <div style={{ fontSize: 11, color: "#8e8e93", fontWeight: 500, marginBottom: 6 }}>Approach</div>
-          <select
-            value={style}
-            onChange={(e) => { setStyle(e.target.value); setSaved(false); }}
-            style={{ ...inputStyle }}
-          >
-            <option value="">Select style…</option>
-            {STYLE_OPTIONS.map((s) => <option key={s} value={s}>{s}</option>)}
-          </select>
-        </div>
-        <div>
-          <div style={{ fontSize: 11, color: "#8e8e93", fontWeight: 500, marginBottom: 6 }}>Typical Call Length</div>
-          <select
-            value={length}
-            onChange={(e) => { setLength(e.target.value); setSaved(false); }}
-            style={{ ...inputStyle }}
-          >
-            <option value="">Select length…</option>
-            {LENGTH_OPTIONS.map((l) => <option key={l} value={l}>{l}</option>)}
-          </select>
-        </div>
-      </div>
-      <SaveButton saving={saving} saved={saved} onClick={handleSave} />
-    </Card>
   );
 }
 
@@ -226,117 +169,88 @@ function OfferSection({ userId }: { userId: string }) {
   );
 }
 
-// ── Objections Section ─────────────────────────────────────────────────────────
-function ObjectionsSection({ userId }: { userId: string }) {
-  const supabase = createClient();
-  const [objections, setObjections] = useState<string[]>([]);
-  const [exitLine, setExitLine]     = useState("");
-  const [input, setInput]           = useState("");
-  const [saving, setSaving]         = useState(false);
-  const [saved, setSaved]           = useState(false);
-  const [loaded, setLoaded]         = useState(false);
+const LEAD_SOURCE_OPTIONS = [
+  { value: "vsl_webinar", label: "VSL / Webinar" },
+  { value: "referral", label: "Referral" },
+  { value: "organic_content", label: "Organic Content" },
+  { value: "paid_ads", label: "Paid Ads" },
+  { value: "cold_outreach", label: "Cold Outreach" },
+  { value: "other", label: "Other" },
+];
 
-  useEffect(() => {
-    supabase
-      .from("user_onboarding_data")
-      .select("objections, exit_line")
-      .eq("user_id", userId)
-      .maybeSingle()
-      .then(({ data }) => {
-        if (data) {
-          setObjections(data.objections ?? []);
-          setExitLine(data.exit_line ?? "");
-        }
-        setLoaded(true);
-      });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userId]);
+// ── Offer Crawl Section ────────────────────────────────────────────────────────
+function OfferCrawlSection({ profile, userId }: { profile: Profile; userId: string }) {
+  // URL state
+  const [url, setUrl] = useState(profile.offer_url ?? "");
 
-  const addObjection = () => {
-    if (!input.trim()) return;
-    setSaved(false);
-    setObjections((prev) => [...prev, input.trim()]);
-    setInput("");
-  };
+  // Crawl state
+  const [crawling, setCrawling] = useState(false);
+  const [crawlError, setCrawlError] = useState("");
 
-  const removeObjection = (i: number) => {
-    setSaved(false);
-    setObjections((prev) => prev.filter((_, j) => j !== i));
-  };
+  // Editable fields — always visible
+  const [idealClient, setIdealClient]       = useState(profile.ideal_client ?? "");
+  const [differentiator, setDifferentiator] = useState(profile.unique_differentiator ?? "");
+  const [guarantee, setGuarantee]           = useState(profile.guarantee ?? "");
 
-  const handleSave = useCallback(async () => {
-    setSaving(true);
-    await supabase
-      .from("user_onboarding_data")
-      .upsert({ user_id: userId, objections, exit_line: exitLine }, { onConflict: "user_id" });
-    setSaving(false);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 3000);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userId, objections, exitLine]);
+  // Multi-select lead sources — stored as JSON array string in DB
+  const [leadSources, setLeadSources]         = useState<string[]>(() => {
+    try { return JSON.parse(profile.lead_source ?? "[]"); } catch { return []; }
+  });
+  const [leadSourceOther, setLeadSourceOther] = useState("");
 
-  if (!loaded) return <Card style={{ marginBottom: 12 }}><div style={{ fontSize: 13, color: "#8e8e93" }}>Loading…</div></Card>;
-
-  return (
-    <Card style={{ marginBottom: 12 }}>
-      <SectionLabel>Common Objections</SectionLabel>
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 7, marginBottom: 10, minHeight: 28 }}>
-        {objections.map((o, i) => (
-          <div key={i} style={{ display: "inline-flex", alignItems: "center", gap: 5, background: "rgba(26,74,122,0.08)", border: "1px solid rgba(26,74,122,0.18)", borderRadius: 20, padding: "5px 10px 5px 12px", fontSize: 12, color: "#1a4a7a", fontWeight: 500 }}>
-            {o}
-            <button onClick={() => removeObjection(i)} style={{ background: "none", border: "none", color: "#1a4a7a", fontSize: 14, cursor: "pointer", padding: 0, lineHeight: 1, opacity: 0.6 }}>×</button>
-          </div>
-        ))}
-      </div>
-      <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
-        <input
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && addObjection()}
-          placeholder="Add an objection…"
-          style={inputStyle}
-        />
-        <button onClick={addObjection} style={{ background: input.trim() ? "#1c1c1e" : "#e5e5ea", color: input.trim() ? "#fff" : "#8e8e93", border: "none", borderRadius: 10, padding: "0 16px", fontSize: 13, fontWeight: 600, fontFamily: "inherit", cursor: "pointer", flexShrink: 0 }}>
-          Add
-        </button>
-      </div>
-
-      <div style={{ fontSize: 11, color: "#8e8e93", fontWeight: 500, marginBottom: 6 }}>Exit line (DQ'd calls)</div>
-      <textarea
-        value={exitLine}
-        onChange={(e) => { setExitLine(e.target.value); setSaved(false); }}
-        placeholder="How do you wrap up a call that's not moving forward?"
-        rows={3}
-        style={{ ...inputStyle, resize: "none", lineHeight: 1.6 }}
-      />
-
-      <SaveButton saving={saving} saved={saved} onClick={handleSave} />
-    </Card>
-  );
-}
-
-// ── Website URL Section ────────────────────────────────────────────────────────
-function UrlSection({ userId }: { userId: string }) {
-  const supabase = createClient();
-  const [url, setUrl]       = useState("");
   const [saving, setSaving] = useState(false);
   const [saved, setSaved]   = useState(false);
 
-  useEffect(() => {
-    supabase
-      .from("user_onboarding_data")
-      .select("offer_url")
-      .eq("user_id", userId)
-      .maybeSingle()
-      .then(({ data }) => { if (data?.offer_url) setUrl(data.offer_url); });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userId]);
+  const toggleLeadSource = (value: string) => {
+    setSaved(false);
+    setLeadSources((prev) =>
+      prev.includes(value) ? prev.filter((v) => v !== value) : [...prev, value]
+    );
+  };
+
+  const handleCrawl = async () => {
+    if (!url.trim()) return;
+    setCrawling(true);
+    setCrawlError("");
+    try {
+      const res = await fetch("/api/wingman/crawl-offer", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: url.trim(), userId }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Crawl failed");
+      if (data.ideal_client)          setIdealClient(data.ideal_client);
+      if (data.unique_differentiator) setDifferentiator(data.unique_differentiator);
+      if (data.guarantee)             setGuarantee(data.guarantee);
+      setSaved(false);
+    } catch (e: unknown) {
+      setCrawlError(e instanceof Error ? e.message : "Something went wrong");
+    } finally {
+      setCrawling(false);
+    }
+  };
 
   const handleSave = async () => {
     setSaving(true);
-    await supabase
-      .from("user_onboarding_data")
-      .upsert({ user_id: userId, offer_url: url }, { onConflict: "user_id" });
+    // Merge "other" custom text into the array
+    const finalSources = leadSources.includes("other") && leadSourceOther.trim()
+      ? [...leadSources.filter((v) => v !== "other"), `other:${leadSourceOther.trim()}`]
+      : leadSources;
+
+    await fetch("/api/profile/update", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        updates: {
+          offer_url:             url.trim() || null,
+          ideal_client:          idealClient.trim() || null,
+          unique_differentiator: differentiator.trim() || null,
+          guarantee:             guarantee.trim() || null,
+          lead_source:           finalSources.length > 0 ? JSON.stringify(finalSources) : null,
+        },
+      }),
+    });
     setSaving(false);
     setSaved(true);
     setTimeout(() => setSaved(false), 3000);
@@ -344,16 +258,115 @@ function UrlSection({ userId }: { userId: string }) {
 
   return (
     <Card style={{ marginBottom: 12 }}>
-      <SectionLabel>Website URL</SectionLabel>
-      <div style={{ fontSize: 12, color: "#8e8e93", marginBottom: 10, lineHeight: 1.5 }}>
-        Wingman will learn from this page to give sharper advice about your offer.
+      <SectionLabel>Offer Intelligence</SectionLabel>
+      <div style={{ fontSize: 12, color: "#8e8e93", marginBottom: 12, lineHeight: 1.5 }}>
+        Paste your offer page URL and Wingman will auto-fill what it learns. Edit anything before saving.
       </div>
-      <input
-        value={url}
-        onChange={(e) => { setUrl(e.target.value); setSaved(false); }}
-        placeholder="https://yoursite.com"
-        style={inputStyle}
+
+      {/* URL + crawl button */}
+      <div style={{ display: "flex", gap: 8, marginBottom: crawlError ? 8 : 20 }}>
+        <input
+          value={url}
+          onChange={(e) => { setUrl(e.target.value); setSaved(false); }}
+          placeholder="https://yoursite.com/offer"
+          style={{ ...inputStyle, flex: 1 }}
+        />
+        <button
+          onClick={handleCrawl}
+          disabled={crawling || !url.trim()}
+          style={{
+            background: crawling || !url.trim() ? "#e5e5ea" : "#1c1c1e",
+            color: crawling || !url.trim() ? "#8e8e93" : "#fff",
+            border: "none",
+            borderRadius: 10,
+            padding: "0 16px",
+            fontSize: 13,
+            fontWeight: 600,
+            fontFamily: "inherit",
+            cursor: crawling || !url.trim() ? "not-allowed" : "pointer",
+            flexShrink: 0,
+            whiteSpace: "nowrap",
+          }}
+        >
+          {crawling ? "Reading…" : "Auto-fill ↑"}
+        </button>
+      </div>
+
+      {crawlError && (
+        <div style={{ fontSize: 12, color: "#c0392b", marginBottom: 12 }}>
+          ⚠ {crawlError}
+        </div>
+      )}
+
+      <div style={{ height: 1, background: "rgba(0,0,0,0.06)", marginBottom: 16 }} />
+
+      {/* Who you sell to */}
+      <div style={{ fontSize: 11, color: "#8e8e93", fontWeight: 500, marginBottom: 6 }}>Who you sell to</div>
+      <textarea
+        value={idealClient}
+        onChange={(e) => { setIdealClient(e.target.value); setSaved(false); }}
+        placeholder="e.g. Online coaches doing $5–20k/month who want to scale without burning out"
+        rows={2}
+        style={{ ...inputStyle, resize: "none", lineHeight: 1.6, marginBottom: 12 }}
       />
+
+      {/* Differentiator */}
+      <div style={{ fontSize: 11, color: "#8e8e93", fontWeight: 500, marginBottom: 6 }}>What makes your offer different</div>
+      <textarea
+        value={differentiator}
+        onChange={(e) => { setDifferentiator(e.target.value); setSaved(false); }}
+        placeholder="e.g. The only program with a guaranteed signed client in 30 days or you don't pay"
+        rows={2}
+        style={{ ...inputStyle, resize: "none", lineHeight: 1.6, marginBottom: 12 }}
+      />
+
+      {/* Guarantee */}
+      <div style={{ fontSize: 11, color: "#8e8e93", fontWeight: 500, marginBottom: 6 }}>Your guarantee (if any)</div>
+      <input
+        value={guarantee}
+        onChange={(e) => { setGuarantee(e.target.value); setSaved(false); }}
+        placeholder="e.g. Full refund if you don't get results in 90 days"
+        style={{ ...inputStyle, marginBottom: 16 }}
+      />
+
+      {/* Lead source — multi-select */}
+      <div style={{ fontSize: 11, color: "#8e8e93", fontWeight: 500, marginBottom: 10 }}>
+        Where do your leads come from? <span style={{ fontWeight: 400 }}>(select all that apply)</span>
+      </div>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: leadSources.includes("other") ? 8 : 4 }}>
+        {LEAD_SOURCE_OPTIONS.map((opt) => {
+          const active = leadSources.includes(opt.value);
+          return (
+            <button
+              key={opt.value}
+              onClick={() => toggleLeadSource(opt.value)}
+              style={{
+                padding: "7px 14px",
+                borderRadius: 20,
+                border: active ? "1.5px solid #1c1c1e" : "1.5px solid rgba(0,0,0,0.12)",
+                background: active ? "#1c1c1e" : "transparent",
+                color: active ? "#fff" : "#3a3a3c",
+                fontSize: 12,
+                fontWeight: 500,
+                fontFamily: "inherit",
+                cursor: "pointer",
+                transition: "all 0.15s ease",
+              }}
+            >
+              {opt.label}
+            </button>
+          );
+        })}
+      </div>
+      {leadSources.includes("other") && (
+        <input
+          value={leadSourceOther}
+          onChange={(e) => { setLeadSourceOther(e.target.value); setSaved(false); }}
+          placeholder="Describe your lead source…"
+          style={{ ...inputStyle, marginTop: 4, marginBottom: 4 }}
+        />
+      )}
+
       <SaveButton saving={saving} saved={saved} onClick={handleSave} />
     </Card>
   );
@@ -368,10 +381,8 @@ export default function PersonalizeTab({ profile, userId }: Props) {
         <div style={{ fontSize: 14, color: "#8e8e93", marginTop: 3 }}>The more it knows, the sharper it gets.</div>
       </div>
 
-      <StyleSection profile={profile} />
       <OfferSection userId={userId} />
-      <ObjectionsSection userId={userId} />
-      <UrlSection userId={userId} />
+      <OfferCrawlSection profile={profile} userId={userId} />
     </div>
   );
 }

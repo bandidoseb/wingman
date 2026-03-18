@@ -35,6 +35,11 @@ export interface Profile {
   ai_model_preference: AiModelPreference;
   calls_used: number;
   extra_calls_remaining: number;
+  offer_url?: string | null;
+  ideal_client?: string | null;
+  unique_differentiator?: string | null;
+  guarantee?: string | null;
+  lead_source?: string | null;
   created_at: string;
   updated_at: string;
 }

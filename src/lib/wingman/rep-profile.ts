@@ -17,11 +17,6 @@ export function buildRepProfile(input: RepProfileInput): string {
   const { profile, offerName, offerPrice, recentCalls, objections, signals } =
     input;
 
-  // ── Basic profile ──────────────────────────────────────────────────────────
-  const role = profile.role ?? "closer";
-  const style = profile.sales_style ?? "direct";
-  const callLength = profile.call_length ?? "60 min";
-
   // ── Offer ──────────────────────────────────────────────────────────────────
   const offer = [offerName, offerPrice].filter(Boolean).join(" · ") || "Not set";
 
@@ -61,10 +56,29 @@ export function buildRepProfile(input: RepProfileInput): string {
       ? `Pattern flags: ${lostReasons.join("; ")}.`
       : "No major pattern flags from recent calls.";
 
+  // ── New personalisation fields ────────────────────────────────────────────
+  const idealClient     = profile.ideal_client?.trim();
+  const differentiator  = profile.unique_differentiator?.trim();
+  const guarantee       = profile.guarantee?.trim();
+  // lead_source is stored as JSON array: '["vsl_webinar","other:Book funnel"]'
+  let leadSource = "";
+  try {
+    const parsed: string[] = JSON.parse(profile.lead_source ?? "[]");
+    leadSource = parsed
+      .map((v) => v.startsWith("other:") ? v.replace("other:", "") : v.replace(/_/g, " "))
+      .join(", ");
+  } catch { /* ignore malformed */ }
+
+  const extraLines = [
+    idealClient    ? `Ideal client: ${idealClient}`        : null,
+    differentiator ? `Offer edge: ${differentiator}`       : null,
+    guarantee      ? `Guarantee: ${guarantee}`             : null,
+    leadSource     ? `Lead source: ${leadSource}`          : null,
+  ].filter(Boolean).join("\n");
+
   // ── Assemble ───────────────────────────────────────────────────────────────
   return `REP PROFILE:
-Role: ${role} | Style: ${style} | Avg call length: ${callLength}
-Offer: ${offer}
+Offer: ${offer}${extraLines ? `\n${extraLines}` : ""}
 Stats (last ${total} calls): ${closed} closed / ${lost} lost / ${dq} DQ / ${followUp} follow-up | Close rate: ${closeRate}%
 Top objections faced: ${topObjections || "none yet"}
 Active signals covering: ${signalStages || "all stages"}

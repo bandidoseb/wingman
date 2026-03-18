@@ -68,7 +68,7 @@
     #stagePills {
       display: flex;
       align-items: center;
-      gap: 0;
+      gap: 6px;
     }
 
     .stage-divider {
@@ -80,14 +80,15 @@
     }
 
     .stage-pill {
-      padding: 4px 11px;
-      border-radius: 7px;
-      font-size: 11px;
-      letter-spacing: -0.01em;
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      padding: 0;
+      flex-shrink: 0;
     }
-    .stage-pill.done    { background: transparent; color: #8e8e93; font-weight: 500; }
-    .stage-pill.current { background: #000000;     color: #ffffff; font-weight: 600; }
-    .stage-pill.future  { background: transparent; color: #8e8e93; font-weight: 500; }
+    .stage-pill.done    { background: #c7c7cc; }
+    .stage-pill.current { background: #1c1c1e; width: 9px; height: 9px; }
+    .stage-pill.future  { background: transparent; border: 1.5px solid #c7c7cc; }
 
     /* Call timer — appears after last stage pill when live */
     #timerSection {
@@ -505,7 +506,7 @@
     <div id="liveDot"></div>
     <div id="stagePills">
       <!-- Populated by JS -->
-      <div class="stage-pill future">—</div>
+      <div class="stage-pill future"></div>
     </div>
     <div id="timerSection">
       <div class="stage-divider" style="margin-left:4px;"></div>
@@ -793,34 +794,25 @@
       if (allStages.length === 0) {
         const pill = document.createElement('div');
         pill.className = 'stage-pill future';
-        pill.textContent = currentStage || '—';
+        pill.title = currentStage || '';
         stagePills.appendChild(pill);
         return;
       }
 
-      allStages.forEach((s, i) => {
-        if (i > 0) {
-          const div = document.createElement('div');
-          div.className = 'stage-divider';
-          stagePills.appendChild(div);
-        }
-
+      allStages.forEach((s) => {
         const pill = document.createElement('div');
         const isDone    = completedStages.includes(s);
         const isCurrent = s === currentStage;
 
         if (isDone) {
           pill.className = 'stage-pill done';
-          pill.textContent = '✓';
-          pill.title = s;
         } else if (isCurrent) {
           pill.className = 'stage-pill current';
-          pill.textContent = s;
         } else {
           pill.className = 'stage-pill future';
-          pill.textContent = s;
         }
 
+        pill.title = s; // stage name visible on hover for debugging
         stagePills.appendChild(pill);
       });
     }
