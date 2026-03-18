@@ -76,7 +76,15 @@
       "Bash(gh run list --limit 5)",
       "Bash(gh run:*)",
       "Bash(brew list:*)",
-      "Bash(npx tsc:*)"
+      "Bash(npx tsc:*)",
+      "Bash(identify \"/Users/sebastianperez/Desktop/Wingman CC/public/Wingman.png\")",
+      "Bash(ls -lah \"/Users/sebastianperez/Desktop/Wingman CC/public/\"WingmanTray*)",
+      "Bash(npm install:*)",
+      "Bash(node scripts/recolor-icon.js)",
+      "Bash(node -e \"const j = require\\(''''jimp''''\\); console.log\\(Object.keys\\(j\\).join\\('''', ''''\\)\\)\")",
+      "Bash(node -e \"const { Jimp } = require\\(''jimp''\\); console.log\\(typeof Jimp, Object.getOwnPropertyNames\\(Jimp\\).slice\\(0,20\\).join\\('', ''\\)\\)\")",
+      "Bash(bash scripts/make-icon.sh)",
+      "Bash(npm uninstall:*)"
     ]
   }
 }

@@ -30,7 +30,7 @@ export default function VaultNudge({ onNext }: { onNext: () => void }) {
         </div>
       </div>
 
-      <button onClick={onNext} style={{ width: "100%", padding: 14, borderRadius: 12, border: "none", background: "#000", color: "#fff", fontSize: 15, fontWeight: 600, fontFamily: "inherit", cursor: "pointer" }}>
+      <button onClick={onNext} style={{ width: "100%", padding: 14, borderRadius: 12, border: "none", background: "#1c1c1e", color: "#fff", fontSize: 15, fontWeight: 600, fontFamily: "inherit", cursor: "pointer" }}>
         Got it — let's fly
       </button>
     </div>

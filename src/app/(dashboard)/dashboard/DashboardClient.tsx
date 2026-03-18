@@ -10,13 +10,14 @@ import ObjectionVaultTab from "@/components/dashboard/ObjectionVaultTab";
 import SignalVaultTab from "@/components/dashboard/SignalVaultTab";
 import IntelTab from "@/components/dashboard/IntelTab";
 import SettingsTab from "@/components/dashboard/SettingsTab";
+import PersonalizeTab from "@/components/dashboard/PersonalizeTab";
 import PaywallModal from "@/components/ui/PaywallModal";
 import { FREE_CALL_LIMIT } from "@/lib/constants";
 import { getStagesForRole, getDefaultStage } from "@/lib/wingman/poll-intervals";
 import { useWingmanPoller } from "@/hooks/useWingmanPoller";
 import { useRecallTranscript } from "@/hooks/useRecallTranscript";
 
-export type DashboardTab = "home" | "library" | "objections" | "signals" | "intel" | "settings";
+export type DashboardTab = "home" | "library" | "objections" | "signals" | "intel" | "settings" | "personalize";
 
 interface Props {
   profile: Profile;
@@ -285,7 +286,7 @@ export default function DashboardClient({
     <div
       style={{
         minHeight:  "100vh",
-        background: "#f2f2f7",
+        background: "#f7f5f2",
         fontFamily: "-apple-system, 'SF Pro Display', BlinkMacSystemFont, sans-serif",
       }}
     >
@@ -326,15 +327,17 @@ export default function DashboardClient({
           salesStyle={profile.sales_style || ""}
           subscriptionStatus={profile.subscription_status || "trialing"}
           userId={userId}
+          callsUsed={profile.calls_used ?? 0}
+          callLimit={FREE_CALL_LIMIT}
         />
 
         <div
           style={{
             marginLeft: sidebarWidth,
             flex:       1,
-            padding:    "28px 32px",
+            padding:    "48px 32px",
             minHeight:  "100vh",
-            background: "#f2f2f7",
+            background: "#f7f5f2",
             transition: "margin-left 0.28s cubic-bezier(0.22,1,0.36,1)",
           }}
         >
@@ -347,6 +350,7 @@ export default function DashboardClient({
               savedMessage={savedMessage}
               onDeploy={handleStartCall}
               onEndCall={handleEndCall}
+              onPersonalize={() => setTab("personalize")}
             />
           )}
           {tab === "library" && (
@@ -376,6 +380,12 @@ export default function DashboardClient({
             <SettingsTab
               profile={profile}
               calls={initialCalls}
+            />
+          )}
+          {tab === "personalize" && (
+            <PersonalizeTab
+              profile={profile}
+              userId={userId}
             />
           )}
         </div>

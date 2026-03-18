@@ -138,7 +138,7 @@ export default function ObjectionVaultTab({ initialObjections, userId }: Props) 
             style={{ width: "100%", background: "#e5e5ea", border: "1.5px solid rgba(0,0,0,0.06)", borderRadius: 8, padding: "10px 12px", fontSize: 13, color: "#1c1c1e", fontFamily: "inherit", outline: "none", marginBottom: 10 }}
           />
           <div style={{ display: "flex", gap: 8 }}>
-            <button onClick={addObjection} disabled={saving} style={{ background: "#000", color: "#fff", border: "none", borderRadius: 8, padding: "9px 16px", fontSize: 13, fontWeight: 600, fontFamily: "inherit", cursor: "pointer" }}>
+            <button onClick={addObjection} disabled={saving} style={{ background: "#1c1c1e", color: "#fff", border: "none", borderRadius: 8, padding: "9px 16px", fontSize: 13, fontWeight: 600, fontFamily: "inherit", cursor: "pointer" }}>
               {saving ? "Adding…" : "Add"}
             </button>
             <button onClick={() => { setAdding(false); setNewObjText(""); }} style={{ background: "#e5e5ea", color: "#8e8e93", border: "none", borderRadius: 8, padding: "9px 16px", fontSize: 13, fontFamily: "inherit", cursor: "pointer" }}>Cancel</button>

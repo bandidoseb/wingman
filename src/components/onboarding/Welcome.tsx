@@ -19,7 +19,7 @@ export default function Welcome({ onNext }: { onNext: () => void }) {
         onClick={onNext}
         style={{
           width: "100%", padding: 15, borderRadius: 12, border: "none",
-          background: "#000", color: "#fff", fontSize: 15, fontWeight: 600,
+          background: "#1c1c1e", color: "#fff", fontSize: 15, fontWeight: 600,
           fontFamily: "inherit", cursor: "pointer",
         }}
       >

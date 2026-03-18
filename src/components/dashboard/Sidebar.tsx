@@ -13,6 +13,8 @@ interface SidebarProps {
   salesStyle: string;
   subscriptionStatus: string;
   userId: string;
+  callsUsed: number;
+  callLimit: number;
 }
 
 /* ─────────────────────────────────────────────────────────────
@@ -124,6 +126,19 @@ const SIDEBAR_STYLES = `
   @keyframes sbGearSpin {
     to { transform: rotate(180deg); }
   }
+
+  /* ── Personalize: sparkle star scales in ── */
+  .sb-sparkle {
+    transform-box: view-box;
+    transform-origin: 12px 12px;
+  }
+  button[data-tab="personalize"]:hover .sb-sparkle {
+    animation: sbSparklePop 0.36s cubic-bezier(0.34,1.56,0.64,1) forwards;
+  }
+  @keyframes sbSparklePop {
+    0%   { transform: scale(0.6) rotate(-15deg); opacity: 0.4; }
+    100% { transform: scale(1)   rotate(0deg);   opacity: 1;   }
+  }
 `;
 
 const NAV_ITEMS: Array<{ id: DashboardTab; label: string; icon: (active: boolean) => React.ReactNode }> = [
@@ -131,7 +146,6 @@ const NAV_ITEMS: Array<{ id: DashboardTab; label: string; icon: (active: boolean
     id: "home", label: "Home",
     icon: (active) => (
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-        {/* House outline — drawn first so rects layer on top */}
         <path
           d="M3 9.5L12 3l9 6.5V20a1 1 0 01-1 1H15v-5h-6v5H4a1 1 0 01-1-1V9.5z"
           fill={active ? "#1c1c1e" : "none"}
@@ -139,15 +153,30 @@ const NAV_ITEMS: Array<{ id: DashboardTab; label: string; icon: (active: boolean
           strokeWidth="1.6"
           strokeLinejoin="round"
         />
-        {/* Warm amber light revealed as door swings open */}
         <rect className="sb-door-light" x="9" y="16" width="6" height="5" fill="#FFB347" />
-        {/* Door panel — swings open from left hinge on hover */}
         <rect
           className="sb-door"
           x="9" y="16" width="6" height="5"
           fill={active ? "#ffffff" : "#8e8e93"}
           opacity={active ? 0.18 : 0.72}
         />
+      </svg>
+    ),
+  },
+  {
+    id: "personalize", label: "Personalize",
+    icon: (active) => (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+        <g className="sb-sparkle">
+          {/* 4-pointed star / sparkle */}
+          <path
+            d="M12 2l2.4 7.6L22 12l-7.6 2.4L12 22l-2.4-7.6L2 12l7.6-2.4L12 2z"
+            fill={active ? "#1c1c1e" : "none"}
+            stroke={active ? "#1c1c1e" : "#8e8e93"}
+            strokeWidth="1.6"
+            strokeLinejoin="round"
+          />
+        </g>
       </svg>
     ),
   },
@@ -174,7 +203,6 @@ const NAV_ITEMS: Array<{ id: DashboardTab; label: string; icon: (active: boolean
           d="M12 22C6.477 22 2 17.523 2 12S6.477 2 12 2s10 4.477 10 10-4.477 10-10 10z"
           stroke={active ? "#1c1c1e" : "#8e8e93"} strokeWidth="1.6"
         />
-        {/* Exclamation mark — pops in on hover */}
         <path
           className="sb-exclaim"
           d="M12 8v4M12 16h.01"
@@ -189,7 +217,6 @@ const NAV_ITEMS: Array<{ id: DashboardTab; label: string; icon: (active: boolean
     id: "signals", label: "Signal Vault",
     icon: (active) => (
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-        {/* Lightning bolt — jolts on hover */}
         <path
           className="sb-bolt"
           d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"
@@ -205,7 +232,6 @@ const NAV_ITEMS: Array<{ id: DashboardTab; label: string; icon: (active: boolean
     id: "intel", label: "Intel",
     icon: (active) => (
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-        {/* Three bars rise from bottom, staggered, on hover */}
         <rect className="sb-bar1" x="3" y="12" width="4" height="9" rx="1"
           fill={active ? "#1c1c1e" : "none"} stroke={active ? "#1c1c1e" : "#8e8e93"} strokeWidth="1.6" />
         <rect className="sb-bar2" x="10" y="7" width="4" height="14" rx="1"
@@ -219,7 +245,6 @@ const NAV_ITEMS: Array<{ id: DashboardTab; label: string; icon: (active: boolean
     id: "settings", label: "Settings",
     icon: (active) => (
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-        {/* Wrap entire gear in a group that spins on hover */}
         <g className="sb-gear-group">
           <circle cx="12" cy="12" r="3"
             stroke={active ? "#1c1c1e" : "#8e8e93"} strokeWidth="1.6" />
@@ -234,7 +259,7 @@ const NAV_ITEMS: Array<{ id: DashboardTab; label: string; icon: (active: boolean
 ];
 
 export default function Sidebar({
-  tab, onTabClick, collapsed, onToggleCollapse, badges, role, salesStyle, subscriptionStatus, userId,
+  tab, onTabClick, collapsed, onToggleCollapse, badges, role, salesStyle, subscriptionStatus, userId, callsUsed, callLimit,
 }: SidebarProps) {
   const handleSignOut = async () => {
     const supabase = createClient();
@@ -247,18 +272,23 @@ export default function Sidebar({
     signals: badges.signals,
   };
 
+  const callsPct       = Math.min((callsUsed / callLimit) * 100, 100);
+  const barColor       = callsPct >= 70 ? "#ff9f0a" : "#34c759";
+  const isNotPro       = subscriptionStatus !== "active";
+  const checkoutHref   = `/api/stripe/create-checkout?plan=${role === "setter" ? "setter" : "closer"}`;
+
   return (
     <div
       style={{
         width: collapsed ? 56 : 220,
         flexShrink: 0,
-        background: "rgba(255,255,255,0.65)",
+        background: "rgba(247,245,242,0.85)",
         backdropFilter: "blur(20px)",
         WebkitBackdropFilter: "blur(20px)",
         borderRight: "1px solid rgba(0,0,0,0.06)",
         display: "flex",
         flexDirection: "column",
-        padding: collapsed ? "28px 8px 20px" : "28px 12px 20px",
+        padding: collapsed ? "48px 8px 20px" : "48px 12px 20px",
         position: "fixed",
         top: 0,
         left: 0,
@@ -326,7 +356,7 @@ export default function Sidebar({
               <div style={{ width: 20, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, position: "relative" }}>
                 {item.icon(isActive)}
                 {badge > 0 && !isActive && (
-                  <div style={{ position: "absolute", top: -4, right: -4, width: 14, height: 14, borderRadius: "50%", background: "#ff3b30", display: "flex", alignItems: "center", justifyContent: "center", border: "2px solid #f2f2f7" }}>
+                  <div style={{ position: "absolute", top: -4, right: -4, width: 14, height: 14, borderRadius: "50%", background: "#ff3b30", display: "flex", alignItems: "center", justifyContent: "center", border: "2px solid #f7f5f2" }}>
                     <span style={{ fontSize: 8, fontWeight: 700, color: "#fff", lineHeight: 1 }}>{badge}</span>
                   </div>
                 )}
@@ -349,13 +379,51 @@ export default function Sidebar({
       {/* Footer */}
       {!collapsed && (
         <div style={{ borderTop: "1px solid rgba(0,0,0,0.06)", paddingTop: 14, paddingLeft: 8 }}>
+          {/* Calls-used indicator — only for non-pro users */}
+          {isNotPro && (
+            <div style={{ marginBottom: 12 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 5 }}>
+                <span style={{ fontSize: 11, color: "#8e8e93", fontWeight: 500 }}>
+                  {callsUsed} of {callLimit} calls used
+                </span>
+                <span style={{ fontSize: 10, color: callsPct >= 70 ? "#ff9f0a" : "#aeaeb2", fontWeight: 600 }}>
+                  {callLimit - callsUsed} left
+                </span>
+              </div>
+              <div style={{ height: 4, borderRadius: 2, background: "rgba(0,0,0,0.07)", overflow: "hidden" }}>
+                <div style={{
+                  height: "100%",
+                  width: `${callsPct}%`,
+                  borderRadius: 2,
+                  background: barColor,
+                  transition: "width 0.4s ease",
+                }} />
+              </div>
+              <a
+                href={checkoutHref}
+                style={{
+                  display: "block",
+                  marginTop: 8,
+                  padding: "7px 0",
+                  background: "#1c1c1e",
+                  color: "#fff",
+                  borderRadius: 8,
+                  fontSize: 12,
+                  fontWeight: 600,
+                  textAlign: "center",
+                  textDecoration: "none",
+                  letterSpacing: "-0.01em",
+                }}
+              >
+                Upgrade to Pro
+              </a>
+            </div>
+          )}
+
           <div style={{ fontSize: 11, color: "#aeaeb2", fontWeight: 500 }}>
             {role === "closer" ? "Closer" : "Setter"} · {salesStyle || ""}
           </div>
-          <div style={{ fontSize: 11, color: "#aeaeb2", marginTop: 2, textTransform: "capitalize" }}>
-            {subscriptionStatus}
-          </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 3, marginTop: 12, marginBottom: 2 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 3, marginTop: 10, marginBottom: 2 }}>
             {["⌃", "⇧", "W"].map((k) => (
               <span key={k} style={{
                 display: "inline-flex", alignItems: "center", justifyContent: "center",

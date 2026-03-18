@@ -271,7 +271,7 @@ export default function FlightLogTab({ calls, initialCall, onInitialCallConsumed
           )}
           <div style={{ display: "flex", gap: 8 }}>
             <input value={chatInput} onChange={(e) => setChatInput(e.target.value)} onKeyDown={(e) => e.key === "Enter" && sendCallMessage(chatInput, call)} placeholder="Ask anything about this call…" style={{ flex: 1, background: "#e5e5ea", border: "none", borderRadius: 9, padding: "11px 14px", color: "#1c1c1e", fontSize: 13, fontFamily: "inherit", outline: "none" }} />
-            <button onClick={() => sendCallMessage(chatInput, call)} style={{ padding: "11px 18px", background: "#000", borderRadius: 9, color: "#fff", fontSize: 12, fontFamily: "inherit", fontWeight: 600, border: "none", cursor: "pointer" }}>Ask</button>
+            <button onClick={() => sendCallMessage(chatInput, call)} style={{ padding: "11px 18px", background: "#1c1c1e", borderRadius: 9, color: "#fff", fontSize: 12, fontFamily: "inherit", fontWeight: 600, border: "none", cursor: "pointer" }}>Ask</button>
           </div>
         </Card>
       </div>
@@ -308,7 +308,7 @@ export default function FlightLogTab({ calls, initialCall, onInitialCallConsumed
         </div>
         <div style={{ display: "flex", gap: 8 }}>
           <input value={globalInput} onChange={(e) => setGlobalInput(e.target.value)} onKeyDown={(e) => e.key === "Enter" && sendGlobalMessage(globalInput)} placeholder="Ask anything about your calls…" style={{ flex: 1, background: "#e5e5ea", border: "none", borderRadius: 9, padding: "11px 14px", color: "#1c1c1e", fontSize: 13, fontFamily: "inherit", outline: "none" }} />
-          <button onClick={() => sendGlobalMessage(globalInput)} style={{ padding: "11px 18px", background: "#000", borderRadius: 9, color: "#fff", fontSize: 12, fontFamily: "inherit", fontWeight: 600, border: "none", cursor: "pointer" }}>Ask</button>
+          <button onClick={() => sendGlobalMessage(globalInput)} style={{ padding: "11px 18px", background: "#1c1c1e", borderRadius: 9, color: "#fff", fontSize: 12, fontFamily: "inherit", fontWeight: 600, border: "none", cursor: "pointer" }}>Ask</button>
         </div>
       </Card>
 

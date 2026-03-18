@@ -3,27 +3,20 @@
 import { useState, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
 import type { OnboardingData, OnboardingStep } from "@/types";
-import WIcon from "@/components/ui/WIcon";
-
 // Onboarding screen components
 import Welcome from "@/components/onboarding/Welcome";
 import SalesStyle from "@/components/onboarding/SalesStyle";
 import YourOffer from "@/components/onboarding/YourOffer";
-import OfferCrawl from "@/components/onboarding/OfferCrawl";
-import Qualification from "@/components/onboarding/Qualification";
 import ObjectionsExit from "@/components/onboarding/ObjectionsExit";
-import ActivationKey from "@/components/onboarding/ActivationKey";
 import Tutorial from "@/components/onboarding/Tutorial";
 import VaultNudge from "@/components/onboarding/VaultNudge";
 import Building from "@/components/onboarding/Building";
 
 const ONBOARDING_ORDER: OnboardingStep[] = [
-  "welcome", "style", "offer", "crawl",
-  "qualification", "objections", "activation", "tutorial", "vaultnudge", "building",
+  "welcome", "style", "offer", "objections", "tutorial", "vaultnudge", "building",
 ];
 const DOT_SCREENS: OnboardingStep[] = [
-  "welcome", "style", "offer", "crawl",
-  "qualification", "objections", "activation", "tutorial",
+  "welcome", "style", "offer", "objections", "tutorial",
 ];
 
 interface Props {
@@ -33,30 +26,24 @@ interface Props {
 
 export default function OnboardingClient({ initialProfile, userId }: Props) {
   // Forward legacy step values that no longer exist in the flow
-  // "phone" was removed in favour of vaultnudge; "role" was removed when we
-  // went closer-only — anyone stuck there should start at "style".
-  const rawStep = initialProfile?.onboarding_step as OnboardingStep | "phone" | "role" | undefined;
+  const rawStep = initialProfile?.onboarding_step as OnboardingStep | "crawl" | "qualification" | "activation" | "phone" | "role" | undefined;
   const resolvedStep: OnboardingStep =
-    rawStep === "phone" ? "vaultnudge" :
-    rawStep === "role"  ? "style"      :
+    rawStep === "crawl"          ? "objections" :
+    rawStep === "qualification"  ? "objections" :
+    rawStep === "activation"     ? "tutorial"   :
+    rawStep === "phone"          ? "vaultnudge" :
+    rawStep === "role"           ? "style"      :
     (rawStep ?? "welcome");
 
   const [screen, setScreen] = useState<OnboardingStep>(resolvedStep);
-  const [data, setData] = useState<OnboardingData>({
+  const [, setData] = useState<OnboardingData>({
     salesStyle: (initialProfile?.sales_style as string) || undefined,
     callLength: (initialProfile?.call_length as string) || undefined,
   });
 
   const supabase = createClient();
 
-  // All profile writes go through the server-side API route, NOT the browser
-  // Supabase client.  The browser client's `.update()` silently does nothing
-  // when the profile row doesn't exist (0 rows updated, no error), which was
-  // the root cause of the onboarding loop.  The server route uses the service
-  // role, making every write unconditionally reliable.
   const updateProfile = useCallback(async (updates: Record<string, unknown>) => {
-    // Strip undefined values — JSON.stringify drops them silently which would
-    // produce an empty body {}  and cause a confusing 400/500 on the server.
     const clean = Object.fromEntries(
       Object.entries(updates).filter(([, v]) => v !== undefined)
     );
@@ -105,28 +92,6 @@ export default function OnboardingClient({ initialProfile, userId }: Props) {
       await supabase.from("offers").insert(offersToInsert);
     }
 
-    await updateProfile({ onboarding_step: "crawl" });
-    setScreen("crawl");
-  }, [supabase, userId, updateProfile]);
-
-  const handleCrawl = useCallback(async (url?: string) => {
-    if (url) {
-      await supabase.from("user_onboarding_data").upsert({ user_id: userId, offer_url: url }, { onConflict: "user_id" });
-    }
-    await updateProfile({ onboarding_step: "qualification" });
-    setScreen("qualification");
-  }, [supabase, userId, updateProfile]);
-
-  const handleQualification = useCallback(async (greenFlags: string[], dqSignals: string[]) => {
-    setData((d) => ({ ...d, greenFlags, dqSignals }));
-
-    await supabase.from("qualification_criteria").delete().eq("user_id", userId);
-    const toInsert = [
-      ...greenFlags.map((text, i) => ({ user_id: userId, type: "green_flag" as const, text, display_order: i })),
-      ...dqSignals.map((text, i) => ({ user_id: userId, type: "dq_signal" as const, text, display_order: i })),
-    ];
-    if (toInsert.length > 0) await supabase.from("qualification_criteria").insert(toInsert);
-
     await updateProfile({ onboarding_step: "objections" });
     setScreen("objections");
   }, [supabase, userId, updateProfile]);
@@ -137,16 +102,9 @@ export default function OnboardingClient({ initialProfile, userId }: Props) {
       { user_id: userId, objections, exit_line: exitLine },
       { onConflict: "user_id" }
     );
-    await updateProfile({ onboarding_step: "activation" });
-    setScreen("activation");
-  }, [supabase, userId, updateProfile]);
-
-  // Activation now goes to tutorial (how Wingman works), then vaultnudge
-  const handleActivation = useCallback(async (key: string | null) => {
-    setData((d) => ({ ...d, activationKey: key || undefined }));
-    await updateProfile({ activation_key: key, onboarding_step: "tutorial" });
+    await updateProfile({ onboarding_step: "tutorial" });
     setScreen("tutorial");
-  }, [updateProfile]);
+  }, [supabase, userId, updateProfile]);
 
   const handleTutorial = useCallback(async () => {
     await updateProfile({ onboarding_step: "vaultnudge" });
@@ -159,11 +117,6 @@ export default function OnboardingClient({ initialProfile, userId }: Props) {
   }, [updateProfile]);
 
   const handleBuilding = useCallback(async () => {
-    // ── Mark onboarding complete via server-side API (service role) ──────────
-    // We deliberately avoid the browser anon client here — any RLS or session
-    // issue would silently fail and trap the user in the loop.  The API route
-    // uses the service role key which bypasses all RLS and is guaranteed to
-    // write regardless of the user's client-side auth state.
     try {
       const res = await fetch("/api/onboarding/complete", { method: "POST" });
       if (!res.ok) {
@@ -174,14 +127,13 @@ export default function OnboardingClient({ initialProfile, userId }: Props) {
       console.error("[Wingman] /api/onboarding/complete network error:", err);
     }
 
-    // ── Seed vault data in the background ───────────────────────────────────
+    // Seed vault data in the background
     try {
       const { DEFAULT_CLOSER_SIGNALS, DEFAULT_VAULT_OBJECTIONS } = await import("@/lib/utils");
       const signals = DEFAULT_CLOSER_SIGNALS;
 
       await supabase.from("vault_signals").delete().eq("user_id", userId);
       await supabase.from("vault_signals").insert(
-        // Map camelCase stageColor → snake_case stage_color to match DB column
         signals.map(({ stageColor, ...s }) => ({
           ...s,
           stage_color: stageColor,
@@ -196,7 +148,6 @@ export default function OnboardingClient({ initialProfile, userId }: Props) {
         DEFAULT_VAULT_OBJECTIONS.map((o) => ({ ...o, user_id: userId, is_new: false }))
       );
     } catch (err) {
-      // Vault seeding failed — not fatal, user can set up vault in Settings
       console.error("Vault seeding error (non-fatal):", err);
     }
 
@@ -204,16 +155,13 @@ export default function OnboardingClient({ initialProfile, userId }: Props) {
   }, [supabase, userId]);
 
   const screens: Partial<Record<OnboardingStep, React.ReactNode>> = {
-    welcome:       <Welcome onNext={() => goTo("style", { role: "closer" })} />,
-    style:         <SalesStyle onNext={handleStyle} />,
-    offer:         <YourOffer onNext={handleOffer} />,
-    crawl:         <OfferCrawl onNext={handleCrawl} />,
-    qualification: <Qualification onNext={handleQualification} />,
-    objections:    <ObjectionsExit onNext={handleObjections} />,
-    activation:    <ActivationKey onNext={handleActivation} />,
-    tutorial:      <Tutorial onNext={handleTutorial} />,
-    vaultnudge:    <VaultNudge onNext={handleVaultNudge} />,
-    building:      <Building onNext={handleBuilding} />,
+    welcome:    <Welcome onNext={() => goTo("style", { role: "closer" })} />,
+    style:      <SalesStyle onNext={handleStyle} />,
+    offer:      <YourOffer onNext={handleOffer} />,
+    objections: <ObjectionsExit onNext={handleObjections} />,
+    tutorial:   <Tutorial onNext={handleTutorial} />,
+    vaultnudge: <VaultNudge onNext={handleVaultNudge} />,
+    building:   <Building onNext={handleBuilding} />,
   };
 
   return (
@@ -246,11 +194,11 @@ export default function OnboardingClient({ initialProfile, userId }: Props) {
             <div
               key={s}
               style={{
-                width:      screen === s ? 22 : 6,
-                height:     6,
+                width:        screen === s ? 22 : 6,
+                height:       6,
                 borderRadius: 3,
-                background: screen === s ? "#000" : "#e5e5ea",
-                transition: "all 0.3s cubic-bezier(0.22,1,0.36,1)",
+                background:   screen === s ? "#000" : "#e5e5ea",
+                transition:   "all 0.3s cubic-bezier(0.22,1,0.36,1)",
               }}
             />
           ))}

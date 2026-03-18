@@ -64,7 +64,7 @@ function createMainWindow(): void {
     minHeight:       600,
     titleBarStyle:   "hiddenInset",
     vibrancy:        "sidebar",
-    trafficLightPosition: { x: 18, y: 18 },
+    trafficLightPosition: { x: 18, y: 22 },
     backgroundColor: "#f5f5f7",
     show:            false,
     webPreferences: {
