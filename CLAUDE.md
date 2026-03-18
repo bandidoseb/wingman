@@ -312,3 +312,15 @@ Required keys (confirm these exist before debugging API issues):
 - The "Deploy Wingman" button in the tray popover triggers `electron/recall.ts` which connects to Recall.ai. **This is currently broken as of v1.7.**
 - Railway hosts the Next.js app. The Electron app talks to the Railway URL in production.
 - Knowledge base ingestion runs **locally** from the `/knowledge-base` folder — it's a separate Node.js process, not part of the main app.
+
+---
+
+## UI Library: ShadCN
+
+All UI is built with ShadCN (Nova preset, Radix). Components live in `src/components/ui/`.
+
+Rules:
+- Always use ShadCN components instead of raw HTML elements
+- Import from `@/components/ui/[component-name]`
+- Do not install other UI libraries
+- When a component is needed that isn't installed yet, output the exact `npx shadcn@latest add [name]` command for me to run first
