@@ -40,6 +40,10 @@ export interface Profile {
   unique_differentiator?: string | null;
   guarantee?: string | null;
   lead_source?: string | null;
+  call_weakness?: string | null;
+  deal_loss_stage?: string | null;
+  chat_messages_today?: number;
+  chat_reset_date?: string | null;
   created_at: string;
   updated_at: string;
 }

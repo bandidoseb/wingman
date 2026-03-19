@@ -92,8 +92,13 @@ export default function FlightLogTab({ calls, initialCall, onInitialCallConsumed
   const [globalMessages, setGlobalMessages] = useState<Array<{ role: "user" | "assistant"; text: string }>>([]);
   const [globalInput, setGlobalInput] = useState("");
   const [globalLoading, setGlobalLoading] = useState(false);
-  const chatEndRef = useRef<HTMLDivElement>(null);
-  const globalEndRef = useRef<HTMLDivElement>(null);
+  const chatEndRef        = useRef<HTMLDivElement>(null);
+  const globalEndRef      = useRef<HTMLDivElement>(null);
+  const modalEndRef       = useRef<HTMLDivElement>(null);
+  const modalInputRef     = useRef<HTMLInputElement>(null);
+  const globalInFlightRef = useRef(false); // prevents double-sends during the 3s reading delay
+  const callInFlightRef   = useRef(false);
+  const [modalOpen, setModalOpen] = useState(false);
 
   useEffect(() => {
     if (initialCall) {
@@ -105,51 +110,135 @@ export default function FlightLogTab({ calls, initialCall, onInitialCallConsumed
   }, [initialCall, onInitialCallConsumed]);
 
   useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    chatEndRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
   }, [chatMessages, chatLoading]);
 
   useEffect(() => {
-    globalEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    globalEndRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
   }, [globalMessages, globalLoading]);
 
+  // Auto-focus modal input when it opens
+  useEffect(() => {
+    if (modalOpen) setTimeout(() => modalInputRef.current?.focus(), 50);
+  }, [modalOpen]);
+
+  // Scroll modal to bottom when messages update
+  useEffect(() => {
+    if (modalOpen) modalEndRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }, [globalMessages, globalLoading, modalOpen]);
+
+  // ESC closes modal
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => { if (e.key === "Escape") setModalOpen(false); };
+    if (modalOpen) document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, [modalOpen]);
+
   const sendGlobalMessage = async (text: string) => {
-    if (!text.trim()) return;
-    setGlobalMessages((prev) => [...prev, { role: "user", text }]);
+    if (!text.trim() || globalInFlightRef.current) return;
+    globalInFlightRef.current = true;
+    const newMessage = { role: "user" as const, text };
+    setGlobalMessages((prev) => [...prev, newMessage]);
     setGlobalInput("");
+
+    // Strip transcript data — payload would be too large for global context
+    const callSummaries = calls.map((c) => ({
+      prospect_name: c.prospect_name,
+      outcome:       c.outcome,
+      call_date:     c.call_date,
+      duration:      c.duration,
+      summary:       c.summary,
+      missed_topics: c.missed_topics,
+    }));
+
+    // Last 9 existing turns + the new one → API receives up to 10 turns total
+    const messages = [...globalMessages.slice(-9), newMessage].map((m) => ({
+      role:    m.role,
+      content: m.text,
+    }));
+
+    // Kick off API immediately so Wingman starts processing — but hold the typing
+    // indicator for 3 seconds so it looks like Wingman is reading first
+    const fetchPromise = fetch("/api/ai/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ mode: "global", messages, callSummaries }),
+    });
+
+    await new Promise<void>(resolve => setTimeout(resolve, 3000));
     setGlobalLoading(true);
 
     try {
-      const res = await fetch("/api/ai/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: text, context: "calls", calls }),
-      });
+      const res = await fetchPromise;
       const data = await res.json();
-      setGlobalMessages((prev) => [...prev, { role: "assistant", text: data.reply || "Couldn't get a response." }]);
+      if (data.limitReached) {
+        setGlobalMessages((prev) => [...prev, { role: "assistant", text: "You've hit today's coaching limit. Come back tomorrow — or upgrade to Pro for unlimited sessions." }]);
+      } else {
+        const reply  = data.reply || "Couldn't get a response.";
+        const chunks = reply.split("\n\n").filter(Boolean);
+        if (chunks.length <= 1) {
+          setGlobalMessages((prev) => [...prev, { role: "assistant", text: reply }]);
+        } else {
+          // Stagger bubbles: first lands immediately, each subsequent after 1.4s
+          // Typing indicator stays on until the last bubble is added
+          for (let i = 0; i < chunks.length; i++) {
+            if (i > 0) await new Promise<void>(resolve => setTimeout(resolve, 3000));
+            setGlobalMessages((prev) => [...prev, { role: "assistant", text: chunks[i] }]);
+          }
+        }
+      }
     } catch {
       setGlobalMessages((prev) => [...prev, { role: "assistant", text: "Connection error. Try again." }]);
     }
     setGlobalLoading(false);
+    globalInFlightRef.current = false;
   };
 
   const sendCallMessage = async (text: string, call: Call) => {
-    if (!text.trim()) return;
-    setChatMessages((prev) => [...prev, { role: "user", text }]);
+    if (!text.trim() || callInFlightRef.current) return;
+    callInFlightRef.current = true;
+    const newMessage = { role: "user" as const, text };
+    setChatMessages((prev) => [...prev, newMessage]);
     setChatInput("");
+
+    // Last 9 existing turns + the new one → API receives up to 10 turns total
+    const messages = [...chatMessages.slice(-9), newMessage].map((m) => ({
+      role:    m.role,
+      content: m.text,
+    }));
+
+    // Kick off API immediately — hold typing indicator 3s so it looks like Wingman is reading
+    const fetchPromise = fetch("/api/ai/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ mode: "single_call", messages, call }),
+    });
+
+    await new Promise<void>(resolve => setTimeout(resolve, 3000));
     setChatLoading(true);
 
     try {
-      const res = await fetch("/api/ai/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: text, context: "single_call", call }),
-      });
+      const res = await fetchPromise;
       const data = await res.json();
-      setChatMessages((prev) => [...prev, { role: "assistant", text: data.reply || "Couldn't get a response." }]);
+      if (data.limitReached) {
+        setChatMessages((prev) => [...prev, { role: "assistant", text: "You've hit today's coaching limit. Come back tomorrow — or upgrade to Pro for unlimited sessions." }]);
+      } else {
+        const reply  = data.reply || "Couldn't get a response.";
+        const chunks = reply.split("\n\n").filter(Boolean);
+        if (chunks.length <= 1) {
+          setChatMessages((prev) => [...prev, { role: "assistant", text: reply }]);
+        } else {
+          for (let i = 0; i < chunks.length; i++) {
+            if (i > 0) await new Promise<void>(resolve => setTimeout(resolve, 3000));
+            setChatMessages((prev) => [...prev, { role: "assistant", text: chunks[i] }]);
+          }
+        }
+      }
     } catch {
       setChatMessages((prev) => [...prev, { role: "assistant", text: "Connection error. Try again." }]);
     }
     setChatLoading(false);
+    callInFlightRef.current = false;
   };
 
   if (selectedCall) {
@@ -262,9 +351,13 @@ export default function FlightLogTab({ calls, initialCall, onInitialCallConsumed
           )}
           {chatMessages.length > 0 && (
             <div style={{ maxHeight: 300, overflowY: "auto", marginBottom: 12, display: "flex", flexDirection: "column", gap: 10 }}>
-              {chatMessages.map((m, i) => (
-                <div key={i} style={{ alignSelf: m.role === "user" ? "flex-end" : "flex-start", maxWidth: "88%", background: m.role === "user" ? "#000" : "#e5e5ea", color: m.role === "user" ? "#fff" : "#1c1c1e", borderRadius: m.role === "user" ? "12px 12px 3px 12px" : "12px 12px 12px 3px", padding: "9px 13px", fontSize: 13, lineHeight: 1.5 }}>{m.text}</div>
-              ))}
+              {chatMessages.map((m, i) =>
+                m.role === "assistant"
+                  ? m.text.split("\n\n").filter(Boolean).map((chunk, ci) => (
+                      <div key={`${i}-${ci}`} style={{ alignSelf: "flex-start", maxWidth: "88%", background: "#e5e5ea", color: "#1c1c1e", borderRadius: "12px 12px 12px 3px", padding: "9px 13px", fontSize: 13, lineHeight: 1.5 }}>{chunk}</div>
+                    ))
+                  : <div key={i} style={{ alignSelf: "flex-end", maxWidth: "88%", background: "#1c1c1e", color: "#fff", borderRadius: "12px 12px 3px 12px", padding: "9px 13px", fontSize: 13, lineHeight: 1.5 }}>{m.text}</div>
+              )}
               {chatLoading && <div style={{ alignSelf: "flex-start", background: "#e5e5ea", borderRadius: "12px 12px 12px 3px", padding: "11px 14px", display: "flex", gap: 5, alignItems: "center" }}><span className="typing-dot" /><span className="typing-dot" /><span className="typing-dot" /></div>}
               <div ref={chatEndRef} />
             </div>
@@ -289,26 +382,24 @@ export default function FlightLogTab({ calls, initialCall, onInitialCallConsumed
         <div style={{ fontSize: 14, color: "#8e8e93", marginTop: 3 }}>Every call. Every transcript. All yours.</div>
       </div>
 
-      {/* Mission Intel Chat */}
+      {/* Mission Intel — entry point, opens modal */}
       <Card style={{ marginBottom: 14 }}>
-        <SectionLabel>Mission Intel — Ask Your Wingman</SectionLabel>
-        {globalMessages.length > 0 && (
-          <div style={{ maxHeight: 220, overflowY: "auto", marginBottom: 12, display: "flex", flexDirection: "column", gap: 10 }}>
-            {globalMessages.map((m, i) => (
-              <div key={i} style={{ alignSelf: m.role === "user" ? "flex-end" : "flex-start", maxWidth: "85%", background: m.role === "user" ? "#000" : "#e5e5ea", color: m.role === "user" ? "#fff" : "#1c1c1e", borderRadius: m.role === "user" ? "12px 12px 3px 12px" : "12px 12px 12px 3px", padding: "9px 13px", fontSize: 13, lineHeight: 1.45 }}>{m.text}</div>
-            ))}
-            {globalLoading && <div style={{ alignSelf: "flex-start", background: "#e5e5ea", borderRadius: "12px 12px 12px 3px", padding: "11px 14px", display: "flex", gap: 5, alignItems: "center" }}><span className="typing-dot" /><span className="typing-dot" /><span className="typing-dot" /></div>}
-            <div ref={globalEndRef} />
-          </div>
-        )}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+          <SectionLabel className="!mb-0">Mission Intel — Ask Your Wingman</SectionLabel>
+          {globalMessages.length > 0 && (
+            <button onClick={() => setModalOpen(true)} style={{ fontSize: 11.5, color: "#007aff", background: "none", border: "none", fontFamily: "inherit", fontWeight: 600, cursor: "pointer", padding: 0 }}>
+              Continue →
+            </button>
+          )}
+        </div>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 10 }}>
           {["Where do I lose most deals?", "What's my top objection?", "What works on wins?"].map((q) => (
-            <button key={q} onClick={() => sendGlobalMessage(q)} style={{ fontSize: 11.5, color: "#1c1c1e", background: "#e5e5ea", border: "none", borderRadius: 7, padding: "6px 11px", fontFamily: "inherit", fontWeight: 500, cursor: "pointer" }}>{q}</button>
+            <button key={q} onClick={() => { setModalOpen(true); sendGlobalMessage(q); }} style={{ fontSize: 11.5, color: "#1c1c1e", background: "#e5e5ea", border: "none", borderRadius: 7, padding: "6px 11px", fontFamily: "inherit", fontWeight: 500, cursor: "pointer" }}>{q}</button>
           ))}
         </div>
         <div style={{ display: "flex", gap: 8 }}>
-          <input value={globalInput} onChange={(e) => setGlobalInput(e.target.value)} onKeyDown={(e) => e.key === "Enter" && sendGlobalMessage(globalInput)} placeholder="Ask anything about your calls…" style={{ flex: 1, background: "#e5e5ea", border: "none", borderRadius: 9, padding: "11px 14px", color: "#1c1c1e", fontSize: 13, fontFamily: "inherit", outline: "none" }} />
-          <button onClick={() => sendGlobalMessage(globalInput)} style={{ padding: "11px 18px", background: "#1c1c1e", borderRadius: 9, color: "#fff", fontSize: 12, fontFamily: "inherit", fontWeight: 600, border: "none", cursor: "pointer" }}>Ask</button>
+          <input readOnly onClick={() => setModalOpen(true)} placeholder="Ask anything about your calls…" style={{ flex: 1, background: "#e5e5ea", border: "none", borderRadius: 9, padding: "11px 14px", color: "#8e8e93", fontSize: 13, fontFamily: "inherit", outline: "none", cursor: "pointer" }} />
+          <button onClick={() => setModalOpen(true)} style={{ padding: "11px 18px", background: "#1c1c1e", borderRadius: 9, color: "#fff", fontSize: 12, fontFamily: "inherit", fontWeight: 600, border: "none", cursor: "pointer" }}>Ask</button>
         </div>
       </Card>
 
@@ -349,6 +440,70 @@ export default function FlightLogTab({ calls, initialCall, onInitialCallConsumed
           ))
         )}
       </Card>
+
+      {/* ── Mission Intel Chat Modal ─────────────────────────────────────────── */}
+      {modalOpen && (
+        <div
+          onClick={() => setModalOpen(false)}
+          style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(0,0,0,0.45)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{ background: "#fff", borderRadius: 18, width: 520, maxWidth: "100%", maxHeight: "82vh", display: "flex", flexDirection: "column", boxShadow: "0 24px 64px rgba(0,0,0,0.18)", overflow: "hidden" }}
+          >
+            {/* Header */}
+            <div style={{ padding: "16px 20px", borderBottom: "1px solid rgba(0,0,0,0.07)", display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <div style={{ width: 7, height: 7, borderRadius: "50%", background: "#34c759", boxShadow: "0 0 6px rgba(52,199,89,0.5)", flexShrink: 0 }} />
+                <div style={{ fontSize: 13, fontWeight: 700, color: "#1c1c1e", letterSpacing: "-0.01em" }}>Mission Intel — Ask Your Wingman</div>
+              </div>
+              <button onClick={() => setModalOpen(false)} style={{ background: "#e5e5ea", border: "none", borderRadius: "50%", width: 28, height: 28, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", fontSize: 13, color: "#8e8e93", fontFamily: "inherit", flexShrink: 0 }}>✕</button>
+            </div>
+
+            {/* Messages */}
+            <div style={{ flex: 1, overflowY: "auto", padding: "16px 20px", display: "flex", flexDirection: "column", gap: 10 }}>
+              {globalMessages.length === 0 && (
+                <div style={{ textAlign: "center", padding: "32px 0" }}>
+                  <div style={{ fontSize: 13, color: "#8e8e93", lineHeight: 1.6, marginBottom: 16 }}>
+                    Ask Wingman anything about your calls — patterns, wins, what to fix next.
+                  </div>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6, justifyContent: "center" }}>
+                    {["Where do I lose most deals?", "What's my top objection?", "What works on wins?"].map((q) => (
+                      <button key={q} onClick={() => sendGlobalMessage(q)} style={{ fontSize: 11.5, color: "#1c1c1e", background: "#e5e5ea", border: "none", borderRadius: 7, padding: "6px 11px", fontFamily: "inherit", fontWeight: 500, cursor: "pointer" }}>{q}</button>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {globalMessages.map((m, i) =>
+                m.role === "assistant"
+                  ? m.text.split("\n\n").filter(Boolean).map((chunk, ci) => (
+                      <div key={`${i}-${ci}`} style={{ alignSelf: "flex-start", maxWidth: "85%", background: "#e5e5ea", color: "#1c1c1e", borderRadius: "12px 12px 12px 3px", padding: "9px 13px", fontSize: 13, lineHeight: 1.5 }}>{chunk}</div>
+                    ))
+                  : <div key={i} style={{ alignSelf: "flex-end", maxWidth: "85%", background: "#1c1c1e", color: "#fff", borderRadius: "12px 12px 3px 12px", padding: "9px 13px", fontSize: 13, lineHeight: 1.5 }}>{m.text}</div>
+              )}
+              {globalLoading && (
+                <div style={{ alignSelf: "flex-start", background: "#e5e5ea", borderRadius: "12px 12px 12px 3px", padding: "11px 14px", display: "flex", gap: 5, alignItems: "center" }}>
+                  <span className="typing-dot" /><span className="typing-dot" /><span className="typing-dot" />
+                </div>
+              )}
+              <div ref={modalEndRef} />
+            </div>
+
+            {/* Input */}
+            <div style={{ padding: "14px 20px", borderTop: "1px solid rgba(0,0,0,0.07)", display: "flex", gap: 8, flexShrink: 0 }}>
+              <input
+                ref={modalInputRef}
+                value={globalInput}
+                onChange={(e) => setGlobalInput(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && sendGlobalMessage(globalInput)}
+                placeholder="Ask anything about your calls…"
+                style={{ flex: 1, background: "#e5e5ea", border: "none", borderRadius: 9, padding: "11px 14px", color: "#1c1c1e", fontSize: 13, fontFamily: "inherit", outline: "none" }}
+              />
+              <button onClick={() => sendGlobalMessage(globalInput)} style={{ padding: "11px 18px", background: "#1c1c1e", borderRadius: 9, color: "#fff", fontSize: 12, fontFamily: "inherit", fontWeight: 600, border: "none", cursor: "pointer" }}>Ask</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
