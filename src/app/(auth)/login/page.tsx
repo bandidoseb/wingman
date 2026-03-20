@@ -92,7 +92,7 @@ export default function LoginPage() {
     <div
       style={{
         minHeight: "100vh",
-        background: "#f2f2f7",
+        background: "#f7f5f2",
         display: "flex",
         flexDirection: "column",
         alignItems: "center",

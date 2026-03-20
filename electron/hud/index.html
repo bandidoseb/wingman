@@ -497,6 +497,109 @@
     /* Stage bar hidden until call actually starts */
     #stageBar { display: none; }
     #stageBar.active { display: flex; }
+
+    /* ══════════════════════════════════════════════════════════════════════
+       COMPONENT 4 — POST-CALL OUTCOME CARD
+       Appears after call ends if a callId is present. Centered on screen.
+       User picks an outcome → "Saved ✓" confirmation → card fades out.
+    ══════════════════════════════════════════════════════════════════════ */
+    #outcomeCard {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 300;
+      display: none;
+      flex-direction: column;
+      gap: 14px;
+      width: 320px;
+      pointer-events: auto;
+
+      background: rgba(16, 16, 18, 0.95);
+      backdrop-filter: blur(28px);
+      -webkit-backdrop-filter: blur(28px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 18px;
+      padding: 20px 20px 18px;
+      box-shadow: 0 12px 48px rgba(0, 0, 0, 0.6), 0 0 0 0.5px rgba(255,255,255,0.06);
+    }
+
+    #outcomeCard.visible {
+      display: flex;
+      animation: slideDown 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+
+    #outcomeCard.fade-out {
+      animation: fadeOut 0.4s ease forwards;
+    }
+
+    @keyframes fadeOut {
+      from { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+      to   { opacity: 0; transform: translate(-50%, -50%) scale(0.97); }
+    }
+
+    #outcomeCardLabel {
+      font-size: 13px;
+      font-weight: 600;
+      color: rgba(255, 255, 255, 0.55);
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    #outcomePills {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .outcome-pill {
+      padding: 7px 14px;
+      border-radius: 9px;
+      background: rgba(255, 255, 255, 0.07);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      color: rgba(255, 255, 255, 0.8);
+      font-size: 13px;
+      font-weight: 500;
+      font-family: inherit;
+      cursor: pointer;
+      transition: background 0.15s, border-color 0.15s, color 0.15s;
+      letter-spacing: -0.01em;
+    }
+
+    .outcome-pill:hover {
+      background: rgba(255, 255, 255, 0.14);
+      border-color: rgba(255, 255, 255, 0.22);
+      color: #ffffff;
+    }
+
+    .outcome-pill.closed   { border-color: rgba(52,199,89,0.4);  color: #34c759; }
+    .outcome-pill.closed:hover   { background: rgba(52,199,89,0.15);  border-color: rgba(52,199,89,0.6); }
+    .outcome-pill.followup { border-color: rgba(0,122,255,0.4);  color: #4a90e2; }
+    .outcome-pill.followup:hover { background: rgba(0,122,255,0.15);  border-color: rgba(0,122,255,0.6); }
+    .outcome-pill.dq       { border-color: rgba(142,142,147,0.4); color: #8e8e93; }
+    .outcome-pill.dq:hover       { background: rgba(142,142,147,0.12); border-color: rgba(142,142,147,0.6); }
+    .outcome-pill.noshow   { border-color: rgba(255,159,10,0.4); color: #ff9f0a; }
+    .outcome-pill.noshow:hover   { background: rgba(255,159,10,0.15); border-color: rgba(255,159,10,0.6); }
+    .outcome-pill:disabled { opacity: 0.35; cursor: default; pointer-events: none; }
+
+    #outcomeConfirm {
+      display: none;
+      align-items: center;
+      gap: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      color: #34c759;
+    }
+
+    #outcomeConfirm.visible { display: flex; }
+
+    #outcomeError {
+      display: none;
+      font-size: 12px;
+      color: rgba(255, 59, 48, 0.85);
+    }
+
+    #outcomeError.visible { display: block; }
   </style>
 </head>
 <body>
@@ -573,6 +676,22 @@
     <div id="approachingLimitSub">2 hour session limit — wrap up or restart after</div>
   </div>
 
+  <!-- COMPONENT 4: Post-Call Outcome Card -->
+  <div id="outcomeCard">
+    <div id="outcomeCardLabel">How'd it go?</div>
+    <div id="outcomePills">
+      <button class="outcome-pill closed"   data-outcome="Closed">Closed</button>
+      <button class="outcome-pill followup" data-outcome="Follow Up">Follow Up</button>
+      <button class="outcome-pill dq"       data-outcome="DQ">DQ</button>
+      <button class="outcome-pill noshow"   data-outcome="No Show">No Show</button>
+      <button class="outcome-pill"          data-outcome="Other">Other</button>
+    </div>
+    <div id="outcomeConfirm">
+      <span>✓</span><span>Saved</span>
+    </div>
+    <div id="outcomeError">Couldn't save — log it in Flight Log</div>
+  </div>
+
   <!-- COMPONENT 2: Suggestion Bubble -->
   <div id="signalBubble">
     <div id="signalTag">ALERT</div>
@@ -601,6 +720,11 @@
     let completedStages   = [];
     let currentStage      = null;
 
+    // ── Outcome card state ────────────────────────────────────────────────
+    let outcomeCardShown   = false;  // guard — prevent showing twice
+    let outcomeCallId      = null;
+    let outcomeAutoDismiss = null;
+
     // ── Element refs ──────────────────────────────────────────────────────
     const stopBtn              = document.getElementById('stopBtn');
     const stageBar             = document.getElementById('stageBar');
@@ -613,6 +737,10 @@
     const signalTextEl         = document.getElementById('signalText');
     const gotItBtn             = document.getElementById('gotItBtn');
     const listeningText        = document.getElementById('listeningText');
+    const outcomeCard          = document.getElementById('outcomeCard');
+    const outcomePills         = document.getElementById('outcomePills');
+    const outcomeConfirm       = document.getElementById('outcomeConfirm');
+    const outcomeError         = document.getElementById('outcomeError');
     const detectionToast       = document.getElementById('detectionToast');
     const detectionDeployBtn   = document.getElementById('detectionDeployBtn');
     const detectionDismissBtn  = document.getElementById('detectionDismissBtn');
@@ -625,6 +753,49 @@
     const autoStopToast           = document.getElementById('autoStopToast');
     const autoStopMessage         = document.getElementById('autoStopMessage');
     const approachingLimitToast   = document.getElementById('approachingLimitToast');
+
+    // ── Outcome card ──────────────────────────────────────────────────────
+    function showOutcomeCard(callId) {
+      if (outcomeCardShown) return;   // guard against double-show
+      outcomeCardShown = true;
+      outcomeCallId = callId;
+
+      outcomeConfirm.classList.remove('visible');
+      outcomeError.classList.remove('visible');
+      outcomePills.querySelectorAll('.outcome-pill').forEach(b => b.disabled = false);
+
+      outcomeCard.classList.remove('fade-out');
+      outcomeCard.classList.add('visible');
+      if (window.hud) window.hud.setMouseIgnore(false);
+
+      // Auto-dismiss after 30 seconds if user ignores it
+      clearTimeout(outcomeAutoDismiss);
+      outcomeAutoDismiss = setTimeout(() => hideOutcomeCard(), 30000);
+    }
+
+    function hideOutcomeCard() {
+      clearTimeout(outcomeAutoDismiss);
+      outcomeCard.classList.add('fade-out');
+      setTimeout(() => {
+        outcomeCard.classList.remove('visible', 'fade-out');
+        outcomeCardShown = false;
+        outcomeCallId    = null;
+        if (window.hud) window.hud.setMouseIgnore(true);
+      }, 400);
+    }
+
+    // Pill clicks — pick an outcome, disable all, send IPC
+    outcomePills.addEventListener('click', (e) => {
+      const pill = e.target.closest('.outcome-pill');
+      if (!pill || !outcomeCallId) return;
+
+      const outcome = pill.dataset.outcome;
+
+      // Disable all pills immediately — prevent double-pick
+      outcomePills.querySelectorAll('.outcome-pill').forEach(b => b.disabled = true);
+
+      if (window.hud) window.hud.saveOutcome(outcomeCallId, outcome);
+    });
 
     // ── Detection toast ───────────────────────────────────────────────────
     let detectionTimeout = null;
@@ -1008,10 +1179,33 @@
       window.hud.onCallStart(() => setLive(true));
 
       // Call ended
-      window.hud.onCallEnd(() => {
+      window.hud.onCallEnd((data) => {
         setLive(false);
         hideSignal();
         hideEndCallConfirmToast();
+        // If a callId was passed, show the outcome card
+        if (data && data.callId) {
+          showOutcomeCard(data.callId);
+        }
+      });
+
+      // Outcome save result — show "Saved ✓" or error, then fade out
+      window.hud.onOutcomeSaved((success) => {
+        clearTimeout(outcomeAutoDismiss);
+        outcomePills.style.display = 'none';
+        if (success) {
+          outcomeConfirm.classList.add('visible');
+          setTimeout(() => {
+            outcomePills.style.display = '';
+            hideOutcomeCard();
+          }, 1500);
+        } else {
+          outcomeError.classList.add('visible');
+          setTimeout(() => {
+            outcomePills.style.display = '';
+            hideOutcomeCard();
+          }, 3000);
+        }
       });
 
       // Dismiss from main window

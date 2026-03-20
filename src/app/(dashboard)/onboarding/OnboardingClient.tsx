@@ -7,16 +7,15 @@ import type { OnboardingData, OnboardingStep } from "@/types";
 import Welcome from "@/components/onboarding/Welcome";
 import SalesStyle from "@/components/onboarding/SalesStyle";
 import YourOffer from "@/components/onboarding/YourOffer";
-import ObjectionsExit from "@/components/onboarding/ObjectionsExit";
 import Tutorial from "@/components/onboarding/Tutorial";
 import VaultNudge from "@/components/onboarding/VaultNudge";
 import Building from "@/components/onboarding/Building";
 
 const ONBOARDING_ORDER: OnboardingStep[] = [
-  "welcome", "style", "offer", "objections", "tutorial", "vaultnudge", "building",
+  "welcome", "style", "offer", "tutorial", "vaultnudge", "building",
 ];
 const DOT_SCREENS: OnboardingStep[] = [
-  "welcome", "style", "offer", "objections", "tutorial",
+  "welcome", "style", "offer", "tutorial",
 ];
 
 interface Props {
@@ -26,10 +25,11 @@ interface Props {
 
 export default function OnboardingClient({ initialProfile, userId }: Props) {
   // Forward legacy step values that no longer exist in the flow
-  const rawStep = initialProfile?.onboarding_step as OnboardingStep | "crawl" | "qualification" | "activation" | "phone" | "role" | undefined;
+  const rawStep = initialProfile?.onboarding_step as OnboardingStep | "crawl" | "qualification" | "activation" | "phone" | "role" | "objections" | undefined;
   const resolvedStep: OnboardingStep =
-    rawStep === "crawl"          ? "objections" :
-    rawStep === "qualification"  ? "objections" :
+    rawStep === "crawl"          ? "tutorial"   :
+    rawStep === "qualification"  ? "tutorial"   :
+    rawStep === "objections"     ? "tutorial"   :
     rawStep === "activation"     ? "tutorial"   :
     rawStep === "phone"          ? "vaultnudge" :
     rawStep === "role"           ? "style"      :
@@ -92,16 +92,6 @@ export default function OnboardingClient({ initialProfile, userId }: Props) {
       await supabase.from("offers").insert(offersToInsert);
     }
 
-    await updateProfile({ onboarding_step: "objections" });
-    setScreen("objections");
-  }, [supabase, userId, updateProfile]);
-
-  const handleObjections = useCallback(async (objections: string[], exitLine: string) => {
-    setData((d) => ({ ...d, objections, exitLine }));
-    await supabase.from("user_onboarding_data").upsert(
-      { user_id: userId, objections, exit_line: exitLine },
-      { onConflict: "user_id" }
-    );
     await updateProfile({ onboarding_step: "tutorial" });
     setScreen("tutorial");
   }, [supabase, userId, updateProfile]);
@@ -127,9 +117,9 @@ export default function OnboardingClient({ initialProfile, userId }: Props) {
       console.error("[Wingman] /api/onboarding/complete network error:", err);
     }
 
-    // Seed vault data in the background
+    // Seed vault signals in the background
     try {
-      const { DEFAULT_CLOSER_SIGNALS, DEFAULT_VAULT_OBJECTIONS } = await import("@/lib/utils");
+      const { DEFAULT_CLOSER_SIGNALS } = await import("@/lib/utils");
       const signals = DEFAULT_CLOSER_SIGNALS;
 
       await supabase.from("vault_signals").delete().eq("user_id", userId);
@@ -142,11 +132,6 @@ export default function OnboardingClient({ initialProfile, userId }: Props) {
           is_new:      false,
         }))
       );
-
-      await supabase.from("vault_objections").delete().eq("user_id", userId);
-      await supabase.from("vault_objections").insert(
-        DEFAULT_VAULT_OBJECTIONS.map((o) => ({ ...o, user_id: userId, is_new: false }))
-      );
     } catch (err) {
       console.error("Vault seeding error (non-fatal):", err);
     }
@@ -158,7 +143,6 @@ export default function OnboardingClient({ initialProfile, userId }: Props) {
     welcome:    <Welcome onNext={() => goTo("style", { role: "closer" })} />,
     style:      <SalesStyle onNext={handleStyle} />,
     offer:      <YourOffer onNext={handleOffer} />,
-    objections: <ObjectionsExit onNext={handleObjections} />,
     tutorial:   <Tutorial onNext={handleTutorial} />,
     vaultnudge: <VaultNudge onNext={handleVaultNudge} />,
     building:   <Building onNext={handleBuilding} />,
@@ -168,7 +152,7 @@ export default function OnboardingClient({ initialProfile, userId }: Props) {
     <div
       style={{
         minHeight:       "100vh",
-        background:      "#f2f2f7",
+        background:      "#f7f5f2",
         display:         "flex",
         flexDirection:   "column",
         alignItems:      "center",

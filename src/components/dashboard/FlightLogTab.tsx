@@ -29,9 +29,11 @@ function OutcomePicker({
   onSaved: (callId: string, outcome: string) => void;
 }) {
   const [saving, setSaving] = useState<string | null>(null);
+  const [otherMode, setOtherMode] = useState(false);
+  const [otherText, setOtherText] = useState("");
 
   const pick = async (e: React.MouseEvent, outcome: string) => {
-    e.stopPropagation(); // don't open the call detail
+    e.stopPropagation();
     setSaving(outcome);
     try {
       await fetch("/api/wingman/outcome", {
@@ -46,30 +48,98 @@ function OutcomePicker({
     setSaving(null);
   };
 
+  const pickOther = async (e: React.MouseEvent | React.KeyboardEvent) => {
+    e.stopPropagation();
+    if (!otherText.trim()) return;
+    setSaving("Other");
+    try {
+      await fetch("/api/wingman/outcome", {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ call_id: callId, outcome: otherText.trim() }),
+      });
+      onSaved(callId, otherText.trim());
+    } catch {}
+    setSaving(null);
+    setOtherMode(false);
+  };
+
+  const ghostPill: React.CSSProperties = {
+    fontSize: 10.5,
+    fontWeight: 600,
+    padding: "3px 9px",
+    borderRadius: 5,
+    background: "transparent",
+    fontFamily: "inherit",
+    transition: "all 0.15s",
+    cursor: saving ? "default" : "pointer",
+  };
+
   return (
-    <div style={{ display: "flex", gap: 5, marginTop: 7, flexWrap: "wrap" }}>
-      {OUTCOMES.map((o) => (
-        <button
-          key={o.label}
-          onClick={(e) => pick(e, o.label)}
-          disabled={saving !== null}
-          style={{
-            fontSize: 10.5,
-            fontWeight: 600,
-            padding: "3px 9px",
-            borderRadius: 5,
-            border: "none",
-            background: saving === o.label ? o.color : `${o.color}22`,
-            color: saving === o.label ? o.text : o.color,
-            cursor: saving ? "default" : "pointer",
-            fontFamily: "inherit",
-            transition: "all 0.15s",
-            opacity: saving && saving !== o.label ? 0.45 : 1,
-          }}
-        >
-          {saving === o.label ? "Saving…" : o.label}
-        </button>
-      ))}
+    <div onClick={(e) => e.stopPropagation()}>
+      <div style={{ fontSize: 10, color: "#8e8e93", fontWeight: 600, marginTop: 8, marginBottom: 5, letterSpacing: "0.06em" }}>
+        LOG OUTCOME
+      </div>
+      <div style={{ display: "flex", gap: 5, flexWrap: "wrap", alignItems: "center" }}>
+        {OUTCOMES.map((o) => (
+          <button
+            key={o.label}
+            onClick={(e) => pick(e, o.label)}
+            disabled={saving !== null}
+            style={{
+              ...ghostPill,
+              border: `1.5px solid ${o.color}`,
+              background: saving === o.label ? o.color : "transparent",
+              color: saving === o.label ? o.text : o.color,
+              opacity: saving && saving !== o.label ? 0.4 : 1,
+            }}
+          >
+            {saving === o.label ? "Saving…" : o.label}
+          </button>
+        ))}
+
+        {/* Other pill / inline input */}
+        {!otherMode ? (
+          <button
+            onClick={(e) => { e.stopPropagation(); setOtherMode(true); }}
+            disabled={saving !== null}
+            style={{ ...ghostPill, border: "1.5px solid #8e8e93", color: "#8e8e93", opacity: saving ? 0.4 : 1 }}
+          >
+            Other
+          </button>
+        ) : (
+          <>
+            <input
+              autoFocus
+              value={otherText}
+              onChange={(e) => setOtherText(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") pickOther(e);
+                if (e.key === "Escape") { setOtherMode(false); setOtherText(""); }
+              }}
+              onClick={(e) => e.stopPropagation()}
+              placeholder="Describe outcome…"
+              style={{
+                fontSize: 10.5,
+                padding: "3px 8px",
+                borderRadius: 5,
+                border: "1.5px solid #8e8e93",
+                outline: "none",
+                fontFamily: "inherit",
+                color: "#1c1c1e",
+                width: 140,
+              }}
+            />
+            <button
+              onClick={pickOther}
+              disabled={saving !== null || !otherText.trim()}
+              style={{ ...ghostPill, border: "1.5px solid #007aff", color: "#007aff", opacity: !otherText.trim() ? 0.4 : 1 }}
+            >
+              {saving === "Other" ? "Saving…" : "Save"}
+            </button>
+          </>
+        )}
+      </div>
     </div>
   );
 }
@@ -79,9 +149,12 @@ export default function FlightLogTab({ calls, initialCall, onInitialCallConsumed
   const [activeDetailTab, setActiveDetailTab] = useState<"debrief" | "transcript">("debrief");
   // Tracks outcomes set inline (without a full page reload)
   const [localOutcomes, setLocalOutcomes] = useState<Record<string, string>>({});
+  const [editingOutcomes, setEditingOutcomes] = useState<Record<string, boolean>>({});
+  const [hoveredCallId, setHoveredCallId] = useState<string | null>(null);
 
   const handleOutcomeSaved = (callId: string, outcome: string) => {
     setLocalOutcomes((prev) => ({ ...prev, [callId]: outcome }));
+    setEditingOutcomes((prev) => ({ ...prev, [callId]: false }));
   };
 
   // Helper: effective outcome for a call (local override wins)
@@ -95,9 +168,12 @@ export default function FlightLogTab({ calls, initialCall, onInitialCallConsumed
   const chatEndRef        = useRef<HTMLDivElement>(null);
   const globalEndRef      = useRef<HTMLDivElement>(null);
   const modalEndRef       = useRef<HTMLDivElement>(null);
-  const modalInputRef     = useRef<HTMLInputElement>(null);
-  const globalInFlightRef = useRef(false); // prevents double-sends during the 3s reading delay
-  const callInFlightRef   = useRef(false);
+  const modalInputRef     = useRef<HTMLTextAreaElement>(null);
+  const callInputRef      = useRef<HTMLTextAreaElement>(null);
+  const globalInFlightRef   = useRef(false); // prevents double-sends during the 2s reading delay
+  const callInFlightRef     = useRef(false);
+  const [userIsTyping, setUserIsTyping] = useState(false);
+  const userTypingTimerRef  = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
 
   useEffect(() => {
@@ -134,12 +210,48 @@ export default function FlightLogTab({ calls, initialCall, onInitialCallConsumed
     return () => document.removeEventListener("keydown", handler);
   }, [modalOpen]);
 
+  // Clean up debounce timer on unmount to prevent state updates on unmounted component
+  useEffect(() => {
+    return () => { if (userTypingTimerRef.current) clearTimeout(userTypingTimerRef.current); };
+  }, []);
+
+  // Restore global chat conversation from localStorage on mount (24-hour TTL)
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem("wingman_global_chat");
+      if (stored) {
+        const { messages, savedAt } = JSON.parse(stored);
+        const oneDayMs = 24 * 60 * 60 * 1000;
+        if (Date.now() - savedAt < oneDayMs && messages?.length > 0) {
+          setGlobalMessages(messages);
+        } else {
+          localStorage.removeItem("wingman_global_chat");
+        }
+      }
+    } catch { /* ignore corrupted data */ }
+  }, []);
+
+  // Save global chat conversation to localStorage whenever messages change
+  useEffect(() => {
+    if (globalMessages.length === 0) return;
+    try {
+      localStorage.setItem("wingman_global_chat", JSON.stringify({
+        messages: globalMessages,
+        savedAt: Date.now(),
+      }));
+    } catch { /* ignore if storage quota exceeded */ }
+  }, [globalMessages]);
+
   const sendGlobalMessage = async (text: string) => {
     if (!text.trim() || globalInFlightRef.current) return;
     globalInFlightRef.current = true;
     const newMessage = { role: "user" as const, text };
     setGlobalMessages((prev) => [...prev, newMessage]);
     setGlobalInput("");
+    if (modalInputRef.current) modalInputRef.current.style.height = "auto";
+    // Reset typing state immediately so it doesn't mask the indicator after send
+    if (userTypingTimerRef.current) clearTimeout(userTypingTimerRef.current);
+    setUserIsTyping(false);
 
     // Strip transcript data — payload would be too large for global context
     const callSummaries = calls.map((c) => ({
@@ -158,14 +270,14 @@ export default function FlightLogTab({ calls, initialCall, onInitialCallConsumed
     }));
 
     // Kick off API immediately so Wingman starts processing — but hold the typing
-    // indicator for 3 seconds so it looks like Wingman is reading first
+    // indicator for 2 seconds so it looks like Wingman is reading first
     const fetchPromise = fetch("/api/ai/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ mode: "global", messages, callSummaries }),
     });
 
-    await new Promise<void>(resolve => setTimeout(resolve, 3000));
+    await new Promise<void>(resolve => setTimeout(resolve, 2000));
     setGlobalLoading(true);
 
     try {
@@ -200,6 +312,10 @@ export default function FlightLogTab({ calls, initialCall, onInitialCallConsumed
     const newMessage = { role: "user" as const, text };
     setChatMessages((prev) => [...prev, newMessage]);
     setChatInput("");
+    if (callInputRef.current) callInputRef.current.style.height = "auto";
+    // Reset typing state immediately so it doesn't mask the indicator after send
+    if (userTypingTimerRef.current) clearTimeout(userTypingTimerRef.current);
+    setUserIsTyping(false);
 
     // Last 9 existing turns + the new one → API receives up to 10 turns total
     const messages = [...chatMessages.slice(-9), newMessage].map((m) => ({
@@ -207,14 +323,14 @@ export default function FlightLogTab({ calls, initialCall, onInitialCallConsumed
       content: m.text,
     }));
 
-    // Kick off API immediately — hold typing indicator 3s so it looks like Wingman is reading
+    // Kick off API immediately — hold typing indicator 2s so it looks like Wingman is reading
     const fetchPromise = fetch("/api/ai/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ mode: "single_call", messages, call }),
     });
 
-    await new Promise<void>(resolve => setTimeout(resolve, 3000));
+    await new Promise<void>(resolve => setTimeout(resolve, 2000));
     setChatLoading(true);
 
     try {
@@ -358,13 +474,28 @@ export default function FlightLogTab({ calls, initialCall, onInitialCallConsumed
                     ))
                   : <div key={i} style={{ alignSelf: "flex-end", maxWidth: "88%", background: "#1c1c1e", color: "#fff", borderRadius: "12px 12px 3px 12px", padding: "9px 13px", fontSize: 13, lineHeight: 1.5 }}>{m.text}</div>
               )}
-              {chatLoading && <div style={{ alignSelf: "flex-start", background: "#e5e5ea", borderRadius: "12px 12px 12px 3px", padding: "11px 14px", display: "flex", gap: 5, alignItems: "center" }}><span className="typing-dot" /><span className="typing-dot" /><span className="typing-dot" /></div>}
+              {chatLoading && !userIsTyping && <div style={{ alignSelf: "flex-start", background: "#e5e5ea", borderRadius: "12px 12px 12px 3px", padding: "11px 14px", display: "flex", gap: 5, alignItems: "center" }}><span className="typing-dot" /><span className="typing-dot" /><span className="typing-dot" /></div>}
               <div ref={chatEndRef} />
             </div>
           )}
           <div style={{ display: "flex", gap: 8 }}>
-            <input value={chatInput} onChange={(e) => setChatInput(e.target.value)} onKeyDown={(e) => e.key === "Enter" && sendCallMessage(chatInput, call)} placeholder="Ask anything about this call…" style={{ flex: 1, background: "#e5e5ea", border: "none", borderRadius: 9, padding: "11px 14px", color: "#1c1c1e", fontSize: 13, fontFamily: "inherit", outline: "none" }} />
-            <button onClick={() => sendCallMessage(chatInput, call)} style={{ padding: "11px 18px", background: "#1c1c1e", borderRadius: 9, color: "#fff", fontSize: 12, fontFamily: "inherit", fontWeight: 600, border: "none", cursor: "pointer" }}>Ask</button>
+            <textarea
+              ref={callInputRef}
+              value={chatInput}
+              rows={1}
+              onChange={(e) => {
+                setChatInput(e.target.value);
+                e.target.style.height = "auto";
+                e.target.style.height = Math.min(e.target.scrollHeight, 120) + "px";
+                setUserIsTyping(true);
+                if (userTypingTimerRef.current) clearTimeout(userTypingTimerRef.current);
+                userTypingTimerRef.current = setTimeout(() => setUserIsTyping(false), 1000);
+              }}
+              onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendCallMessage(chatInput, call); } }}
+              placeholder="Ask anything about this call…"
+              style={{ flex: 1, background: "#e5e5ea", border: "none", borderRadius: 9, padding: "11px 14px", color: "#1c1c1e", fontSize: 13, fontFamily: "inherit", outline: "none", resize: "none", overflow: "auto", lineHeight: 1.4, boxSizing: "border-box" }}
+            />
+            <button onClick={() => sendCallMessage(chatInput, call)} style={{ padding: "11px 18px", background: "#1c1c1e", borderRadius: 9, color: "#fff", fontSize: 12, fontFamily: "inherit", fontWeight: 600, border: "none", cursor: "pointer", alignSelf: "flex-end" }}>Ask</button>
           </div>
         </Card>
       </div>
@@ -384,13 +515,8 @@ export default function FlightLogTab({ calls, initialCall, onInitialCallConsumed
 
       {/* Mission Intel — entry point, opens modal */}
       <Card style={{ marginBottom: 14 }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+        <div style={{ marginBottom: 10 }}>
           <SectionLabel className="!mb-0">Mission Intel — Ask Your Wingman</SectionLabel>
-          {globalMessages.length > 0 && (
-            <button onClick={() => setModalOpen(true)} style={{ fontSize: 11.5, color: "#007aff", background: "none", border: "none", fontFamily: "inherit", fontWeight: 600, cursor: "pointer", padding: 0 }}>
-              Continue →
-            </button>
-          )}
         </div>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 10 }}>
           {["Where do I lose most deals?", "What's my top objection?", "What works on wins?"].map((q) => (
@@ -401,6 +527,31 @@ export default function FlightLogTab({ calls, initialCall, onInitialCallConsumed
           <input readOnly onClick={() => setModalOpen(true)} placeholder="Ask anything about your calls…" style={{ flex: 1, background: "#e5e5ea", border: "none", borderRadius: 9, padding: "11px 14px", color: "#8e8e93", fontSize: 13, fontFamily: "inherit", outline: "none", cursor: "pointer" }} />
           <button onClick={() => setModalOpen(true)} style={{ padding: "11px 18px", background: "#1c1c1e", borderRadius: 9, color: "#fff", fontSize: 12, fontFamily: "inherit", fontWeight: 600, border: "none", cursor: "pointer" }}>Ask</button>
         </div>
+        {globalMessages.length > 0 && (() => {
+          const lastWingman = [...globalMessages].reverse().find(m => m.role === "assistant");
+          if (!lastWingman) return null;
+          const preview = lastWingman.text.length > 70 ? lastWingman.text.slice(0, 70) + "…" : lastWingman.text;
+          return (
+            <>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 12, marginBottom: 10 }}>
+                <div style={{ flex: 1, height: 1, background: "#e5e5ea" }} />
+                <span style={{ fontSize: 11, color: "#8e8e93", fontFamily: "inherit", whiteSpace: "nowrap" }}>Previous conversation from today</span>
+                <div style={{ flex: 1, height: 1, background: "#e5e5ea" }} />
+              </div>
+              <button
+                onClick={() => setModalOpen(true)}
+                style={{ display: "flex", alignItems: "center", gap: 10, background: "none", border: "none", cursor: "pointer", padding: 0, textAlign: "left", width: "100%" }}
+              >
+                <div style={{ background: "#dde8f5", borderRadius: 10, padding: "8px 12px", fontSize: 12.5, color: "#1c1c1e", flex: 1, textAlign: "left", lineHeight: 1.4, overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis", fontFamily: "inherit" }}>
+                  {preview}
+                </div>
+                <span style={{ fontSize: 11.5, color: "#007aff", fontWeight: 600, whiteSpace: "nowrap", flexShrink: 0, fontFamily: "inherit" }}>
+                  Continue →
+                </span>
+              </button>
+            </>
+          );
+        })()}
       </Card>
 
       {/* Call list */}
@@ -419,7 +570,9 @@ export default function FlightLogTab({ calls, initialCall, onInitialCallConsumed
           calls.map((call, i) => (
             <div key={call.id}
               onClick={() => { setSelectedCall(call); setChatMessages([]); setChatInput(""); setActiveDetailTab("debrief"); }}
-              style={{ paddingBottom: i < calls.length - 1 ? 14 : 0, marginBottom: i < calls.length - 1 ? 14 : 0, borderBottom: i < calls.length - 1 ? "1px solid rgba(0,0,0,0.06)" : "none", cursor: "pointer" }}>
+              onMouseEnter={() => setHoveredCallId(call.id)}
+              onMouseLeave={() => setHoveredCallId(null)}
+              style={{ paddingBottom: i < calls.length - 1 ? 14 : 0, marginBottom: i < calls.length - 1 ? 14 : 0, borderBottom: i < calls.length - 1 ? "1px solid rgba(0,0,0,0.06)" : "none", cursor: "pointer", borderRadius: 8, padding: "10px 8px", margin: "0 -8px", background: hoveredCallId === call.id ? "#f5f5f7" : "transparent", transition: "background 0.15s" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 5 }}>
                 <div>
                   <div style={{ fontSize: 13.5, fontWeight: 600, color: "#1c1c1e" }}>{call.prospect_name}</div>
@@ -428,12 +581,26 @@ export default function FlightLogTab({ calls, initialCall, onInitialCallConsumed
                   </div>
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  {effectiveOutcome(call) && <OutcomeBadge outcome={effectiveOutcome(call)!} />}
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M9 18l6-6-6-6" stroke="#8e8e93" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                  {effectiveOutcome(call) && !editingOutcomes[call.id] && (
+                    <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                      <span style={{ fontSize: 10, color: "#8e8e93", fontWeight: 600, letterSpacing: "0.06em" }}>OUTCOME</span>
+                      <OutcomeBadge outcome={effectiveOutcome(call)!} />
+                      {hoveredCallId === call.id && (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setEditingOutcomes((prev) => ({ ...prev, [call.id]: true })); }}
+                          className="hover:bg-blue-100 rounded transition-colors"
+                          style={{ fontSize: 10, color: "#007aff", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", padding: "2px 6px" }}
+                        >
+                          Edit
+                        </button>
+                      )}
+                    </div>
+                  )}
+                  <span className="hover:bg-blue-100 rounded transition-colors" style={{ fontSize: 11.5, color: "#007aff", fontWeight: 600, whiteSpace: "nowrap", padding: "2px 6px", borderRadius: 6 }}>View →</span>
                 </div>
               </div>
               {call.summary && <div style={{ fontSize: 12, color: "#8e8e93", lineHeight: 1.4 }}>{call.summary}</div>}
-              {!effectiveOutcome(call) && (
+              {(!effectiveOutcome(call) || editingOutcomes[call.id]) && (
                 <OutcomePicker callId={call.id} onSaved={handleOutcomeSaved} />
               )}
             </div>
@@ -449,7 +616,7 @@ export default function FlightLogTab({ calls, initialCall, onInitialCallConsumed
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            style={{ background: "#fff", borderRadius: 18, width: 520, maxWidth: "100%", maxHeight: "82vh", display: "flex", flexDirection: "column", boxShadow: "0 24px 64px rgba(0,0,0,0.18)", overflow: "hidden" }}
+            style={{ background: "#fff", borderRadius: 18, width: 520, maxWidth: "100%", height: "82vh", display: "flex", flexDirection: "column", boxShadow: "0 24px 64px rgba(0,0,0,0.18)", overflow: "hidden" }}
           >
             {/* Header */}
             <div style={{ padding: "16px 20px", borderBottom: "1px solid rgba(0,0,0,0.07)", display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0 }}>
@@ -461,7 +628,7 @@ export default function FlightLogTab({ calls, initialCall, onInitialCallConsumed
             </div>
 
             {/* Messages */}
-            <div style={{ flex: 1, overflowY: "auto", padding: "16px 20px", display: "flex", flexDirection: "column", gap: 10 }}>
+            <div style={{ flex: 1, overflowY: "auto", padding: "16px 20px", display: "flex", flexDirection: "column", gap: 10, justifyContent: "flex-end" }}>
               {globalMessages.length === 0 && (
                 <div style={{ textAlign: "center", padding: "32px 0" }}>
                   <div style={{ fontSize: 13, color: "#8e8e93", lineHeight: 1.6, marginBottom: 16 }}>
@@ -481,7 +648,7 @@ export default function FlightLogTab({ calls, initialCall, onInitialCallConsumed
                     ))
                   : <div key={i} style={{ alignSelf: "flex-end", maxWidth: "85%", background: "#1c1c1e", color: "#fff", borderRadius: "12px 12px 3px 12px", padding: "9px 13px", fontSize: 13, lineHeight: 1.5 }}>{m.text}</div>
               )}
-              {globalLoading && (
+              {globalLoading && !userIsTyping && (
                 <div style={{ alignSelf: "flex-start", background: "#e5e5ea", borderRadius: "12px 12px 12px 3px", padding: "11px 14px", display: "flex", gap: 5, alignItems: "center" }}>
                   <span className="typing-dot" /><span className="typing-dot" /><span className="typing-dot" />
                 </div>
@@ -491,15 +658,23 @@ export default function FlightLogTab({ calls, initialCall, onInitialCallConsumed
 
             {/* Input */}
             <div style={{ padding: "14px 20px", borderTop: "1px solid rgba(0,0,0,0.07)", display: "flex", gap: 8, flexShrink: 0 }}>
-              <input
+              <textarea
                 ref={modalInputRef}
                 value={globalInput}
-                onChange={(e) => setGlobalInput(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && sendGlobalMessage(globalInput)}
+                rows={1}
+                onChange={(e) => {
+                  setGlobalInput(e.target.value);
+                  e.target.style.height = "auto";
+                  e.target.style.height = Math.min(e.target.scrollHeight, 120) + "px";
+                  setUserIsTyping(true);
+                  if (userTypingTimerRef.current) clearTimeout(userTypingTimerRef.current);
+                  userTypingTimerRef.current = setTimeout(() => setUserIsTyping(false), 1000);
+                }}
+                onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendGlobalMessage(globalInput); } }}
                 placeholder="Ask anything about your calls…"
-                style={{ flex: 1, background: "#e5e5ea", border: "none", borderRadius: 9, padding: "11px 14px", color: "#1c1c1e", fontSize: 13, fontFamily: "inherit", outline: "none" }}
+                style={{ flex: 1, background: "#e5e5ea", border: "none", borderRadius: 9, padding: "11px 14px", color: "#1c1c1e", fontSize: 13, fontFamily: "inherit", outline: "none", resize: "none", overflow: "auto", lineHeight: 1.4, boxSizing: "border-box" }}
               />
-              <button onClick={() => sendGlobalMessage(globalInput)} style={{ padding: "11px 18px", background: "#1c1c1e", borderRadius: 9, color: "#fff", fontSize: 12, fontFamily: "inherit", fontWeight: 600, border: "none", cursor: "pointer" }}>Ask</button>
+              <button onClick={() => sendGlobalMessage(globalInput)} style={{ padding: "11px 18px", background: "#1c1c1e", borderRadius: 9, color: "#fff", fontSize: 12, fontFamily: "inherit", fontWeight: 600, border: "none", cursor: "pointer", alignSelf: "flex-end" }}>Ask</button>
             </div>
           </div>
         </div>

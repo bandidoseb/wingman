@@ -1,5 +1,22 @@
 import type { Profile, Outcome, VaultObjection, VaultSignal } from "@/types";
 
+// ── Static label maps (defined once at module level, not per-call) ────────────
+const WEAKNESS_LABELS: Record<string, string> = {
+  too_much_talking: "talks too much in discovery",
+  not_pressing:     "doesn't press hard enough",
+  rush_pitch:       "rushes to pitch",
+  fold_price:       "folds on price",
+  objections:       "struggles with objections",
+};
+const DEAL_LOSS_LABELS: Record<string, string> = {
+  discovery:      "discovery",
+  pressing_pain:  "pressing pain",
+  pitching:       "pitching",
+  price_reveal:   "price reveal",
+  partner_spouse: "partner/spouse objection",
+  follow_up:      "follow-up",
+};
+
 interface RepProfileInput {
   profile: Profile;
   offerName: string | null;
@@ -56,6 +73,19 @@ export function buildRepProfile(input: RepProfileInput): string {
       ? `Pattern flags: ${lostReasons.join("; ")}.`
       : "No major pattern flags from recent calls.";
 
+  // ── Call coaching fields ──────────────────────────────────────────────────
+  let weaknessSummary = "";
+  try {
+    const parsed: string[] = JSON.parse(profile.call_weakness ?? "[]");
+    if (parsed.length > 0) weaknessSummary = parsed.map(v => WEAKNESS_LABELS[v] ?? v).join(", ");
+  } catch { /* ignore */ }
+
+  let dealLossSummary = "";
+  try {
+    const parsed: string[] = JSON.parse(profile.deal_loss_stage ?? "[]");
+    if (parsed.length > 0) dealLossSummary = parsed.map(v => DEAL_LOSS_LABELS[v] ?? v).join(", ");
+  } catch { /* ignore */ }
+
   // ── New personalisation fields ────────────────────────────────────────────
   const idealClient     = profile.ideal_client?.trim();
   const differentiator  = profile.unique_differentiator?.trim();
@@ -73,7 +103,9 @@ export function buildRepProfile(input: RepProfileInput): string {
     idealClient    ? `Ideal client: ${idealClient}`        : null,
     differentiator ? `Offer edge: ${differentiator}`       : null,
     guarantee      ? `Guarantee: ${guarantee}`             : null,
-    leadSource     ? `Lead source: ${leadSource}`          : null,
+    leadSource       ? `Lead source: ${leadSource}`              : null,
+    weaknessSummary  ? `Rep weakness: ${weaknessSummary}`         : null,
+    dealLossSummary  ? `Deals lost at: ${dealLossSummary}`        : null,
   ].filter(Boolean).join("\n");
 
   // ── Assemble ───────────────────────────────────────────────────────────────

@@ -44,8 +44,8 @@ contextBridge.exposeInMainWorld("wingman", {
   /** Called when user starts a live call. Starts audio capture + shows HUD. */
   startCall: () => ipcRenderer.invoke("call:start"),
 
-  /** Called when user ends a live call. Stops audio capture + hides HUD. */
-  endCall: () => ipcRenderer.invoke("call:end"),
+  /** Called when user ends a live call. Stops audio capture + shows HUD outcome card. */
+  endCall: (callId?: string, token?: string) => ipcRenderer.invoke("call:end", callId, token),
 
   // ── HUD control ─────────────────────────────────────────────────────────
   /** Show the floating HUD overlay */
@@ -161,8 +161,8 @@ contextBridge.exposeInMainWorld("hud", {
     ipcRenderer.on("call:started", () => callback());
   },
 
-  onCallEnd: (callback: () => void) => {
-    ipcRenderer.on("call:ended", () => callback());
+  onCallEnd: (callback: (data: { callId?: string }) => void) => {
+    ipcRenderer.on("call:ended", (_event, data) => callback(data ?? {}));
   },
 
   // ── Detection toast ──────────────────────────────────────────────────────
@@ -183,6 +183,15 @@ contextBridge.exposeInMainWorld("hud", {
   },
 
   confirmEndCall: () => ipcRenderer.invoke("hud:confirm-end-call"),
+
+  /** Send the picked outcome to main process to save via API */
+  saveOutcome: (callId: string, outcome: string) =>
+    ipcRenderer.invoke("hud:save-outcome", { callId, outcome }),
+
+  /** Fired by main process after the outcome save attempt completes */
+  onOutcomeSaved: (callback: (success: boolean) => void) => {
+    ipcRenderer.on("hud:outcome-saved", (_event, success) => callback(success));
+  },
 
   onAutoStopped: (callback: (reason: string) => void) => {
     ipcRenderer.on("hud:auto-stopped", (_event, reason) => callback(reason));

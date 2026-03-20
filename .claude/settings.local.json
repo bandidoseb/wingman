@@ -84,7 +84,10 @@
       "Bash(node -e \"const j = require\\(''''jimp''''\\); console.log\\(Object.keys\\(j\\).join\\('''', ''''\\)\\)\")",
       "Bash(node -e \"const { Jimp } = require\\(''jimp''\\); console.log\\(typeof Jimp, Object.getOwnPropertyNames\\(Jimp\\).slice\\(0,20\\).join\\('', ''\\)\\)\")",
       "Bash(bash scripts/make-icon.sh)",
-      "Bash(npm uninstall:*)"
+      "Bash(npm uninstall:*)",
+      "Bash(find \"/Users/sebastianperez/Desktop/Wingman CC\" -name \"layout.tsx\" -path \"*\\(dashboard\\)*\")",
+      "Bash(curl -s http://localhost:3000/login)",
+      "Bash(find '/Users/sebastianperez/Desktop/Wingman CC/src/app/\\(dashboard\\)/onboarding' -type f)"
     ]
   }
 }

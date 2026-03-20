@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
 import type { Profile, Call, VaultObjection, VaultSignal, CallStageLabel } from "@/types";
 import Sidebar from "@/components/dashboard/Sidebar";
 import HomeTab from "@/components/dashboard/HomeTab";
@@ -142,9 +143,17 @@ export default function DashboardClient({
   const handleEndCall = useCallback(async () => {
     setIsActive(false);
 
-    // Tell Electron to stop Recall AI and hide the HUD
+    // Tell Electron to stop Recall AI and show the HUD outcome card.
+    // Pass callId + access token so the HUD can save the outcome via API.
     if (typeof window !== "undefined" && window.wingman) {
-      window.wingman.endCall();
+      try {
+        const supabase = createClient();
+        const { data: { session } } = await supabase.auth.getSession();
+        window.wingman.endCall(callId ?? undefined, session?.access_token ?? undefined);
+      } catch {
+        // If token fetch fails, still end the call — outcome card just won't save
+        window.wingman.endCall();
+      }
     }
 
     if (!callId) return;

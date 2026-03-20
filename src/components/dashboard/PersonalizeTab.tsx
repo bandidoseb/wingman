@@ -169,6 +169,23 @@ function OfferSection({ userId }: { userId: string }) {
   );
 }
 
+const WEAKNESS_OPTIONS = [
+  { value: "too_much_talking", label: "I talk too much in discovery" },
+  { value: "not_pressing",     label: "I don't press hard enough" },
+  { value: "rush_pitch",       label: "I rush to pitch" },
+  { value: "fold_price",       label: "I fold on price" },
+  { value: "objections",       label: "I struggle with objections" },
+];
+
+const DEAL_LOSS_OPTIONS = [
+  { value: "discovery",      label: "Discovery" },
+  { value: "pressing_pain",  label: "Pressing pain" },
+  { value: "pitching",       label: "Pitching" },
+  { value: "price_reveal",   label: "Price reveal" },
+  { value: "partner_spouse", label: "Partner / spouse" },
+  { value: "follow_up",      label: "Follow-up" },
+];
+
 const LEAD_SOURCE_OPTIONS = [
   { value: "vsl_webinar", label: "VSL / Webinar" },
   { value: "referral", label: "Referral" },
@@ -372,6 +389,145 @@ function OfferCrawlSection({ profile, userId }: { profile: Profile; userId: stri
   );
 }
 
+// ── Call Coaching Section ──────────────────────────────────────────────────────
+function CallCoachingSection({ profile }: { profile: Profile }) {
+  const [weaknesses,      setWeaknesses]      = useState<string[]>(() => { try { return JSON.parse(profile.call_weakness   ?? "[]"); } catch { return []; } });
+  const [dealLoss,        setDealLoss]        = useState<string[]>(() => { try { return JSON.parse(profile.deal_loss_stage ?? "[]"); } catch { return []; } });
+
+  const [weaknessInput,   setWeaknessInput]   = useState("");
+  const [weaknessAdding,  setWeaknessAdding]  = useState(false);
+  const [weaknessHovered, setWeaknessHovered] = useState<string | null>(null);
+
+  const [dealLossInput,   setDealLossInput]   = useState("");
+  const [dealLossAdding,  setDealLossAdding]  = useState(false);
+  const [dealLossHovered, setDealLossHovered] = useState<string | null>(null);
+
+  const [saving, setSaving] = useState(false);
+  const [saved,  setSaved]  = useState(false);
+
+  const toggle = (arr: string[], set: (v: string[]) => void, value: string) => {
+    setSaved(false);
+    set(arr.includes(value) ? arr.filter(v => v !== value) : [...arr, value]);
+  };
+
+  const addCustom = (
+    arr: string[], set: (v: string[]) => void,
+    input: string, setInput: (v: string) => void, setAdding: (v: boolean) => void
+  ) => {
+    const val = input.trim();
+    if (val && !arr.includes(val)) { set([...arr, val]); setSaved(false); }
+    setInput(""); setAdding(false);
+  };
+
+  const handleSave = async () => {
+    setSaving(true);
+    await fetch("/api/profile/update", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        updates: {
+          call_weakness:   weaknesses.length > 0 ? JSON.stringify(weaknesses) : null,
+          deal_loss_stage: dealLoss.length   > 0 ? JSON.stringify(dealLoss)   : null,
+        },
+      }),
+    });
+    setSaving(false); setSaved(true);
+    setTimeout(() => setSaved(false), 3000);
+  };
+
+  const activePillStyle: React.CSSProperties = {
+    padding: "7px 14px", borderRadius: 20,
+    border: "1.5px solid #1c1c1e", background: "#1c1c1e",
+    color: "#fff", fontSize: 12, fontWeight: 500, fontFamily: "inherit",
+    cursor: "pointer", transition: "all 0.15s ease",
+    display: "inline-flex", alignItems: "center", gap: 5,
+  };
+  const inactivePillStyle: React.CSSProperties = {
+    ...activePillStyle, border: "1.5px solid rgba(0,0,0,0.12)",
+    background: "transparent", color: "#3a3a3c",
+  };
+  const addPillStyle: React.CSSProperties = {
+    ...inactivePillStyle, border: "1.5px dashed rgba(0,0,0,0.18)", color: "#8e8e93",
+  };
+
+  const renderPills = (
+    options: { value: string; label: string }[],
+    selected: string[], setSelected: (v: string[]) => void,
+    adding: boolean, setAdding: (v: boolean) => void,
+    inputVal: string, setInputVal: (v: string) => void,
+    hovered: string | null, setHovered: (v: string | null) => void,
+  ) => {
+    const customItems = selected.filter(v => !options.find(o => o.value === v));
+    return (
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+        {options.map(opt => (
+          <button key={opt.value} onClick={() => toggle(selected, setSelected, opt.value)}
+            style={selected.includes(opt.value) ? activePillStyle : inactivePillStyle}>
+            {opt.label}
+          </button>
+        ))}
+        {customItems.map(v => (
+          <button key={v}
+            onMouseEnter={() => setHovered(v)} onMouseLeave={() => setHovered(null)}
+            onClick={() => { setSaved(false); setSelected(selected.filter(x => x !== v)); }}
+            style={activePillStyle}>
+            {v}
+            {hovered === v && <span style={{ fontSize: 10, opacity: 0.65 }}>✕</span>}
+          </button>
+        ))}
+        {!adding ? (
+          <button onClick={() => setAdding(true)} style={addPillStyle}>+ Add your own</button>
+        ) : (
+          <input autoFocus value={inputVal} onChange={e => setInputVal(e.target.value)}
+            onKeyDown={e => {
+              if (e.key === "Enter") addCustom(selected, setSelected, inputVal, setInputVal, setAdding);
+              if (e.key === "Escape") { setAdding(false); setInputVal(""); }
+            }}
+            onBlur={() => {
+              if (inputVal.trim()) addCustom(selected, setSelected, inputVal, setInputVal, setAdding);
+              else { setAdding(false); setInputVal(""); }
+            }}
+            placeholder="Type and press enter…"
+            style={{ ...inputStyle, width: 180, padding: "6px 12px", fontSize: 12 }}
+          />
+        )}
+      </div>
+    );
+  };
+
+  return (
+    <Card style={{ marginBottom: 12 }}>
+      <SectionLabel>Call Coaching</SectionLabel>
+
+      <div style={{ fontSize: 11, color: "#8e8e93", fontWeight: 500, marginBottom: 10 }}>
+        What&apos;s your biggest weakness on calls?{" "}
+        <span style={{ fontWeight: 400 }}>(select all that apply)</span>
+      </div>
+      {renderPills(
+        WEAKNESS_OPTIONS, weaknesses, setWeaknesses,
+        weaknessAdding, setWeaknessAdding,
+        weaknessInput, setWeaknessInput,
+        weaknessHovered, setWeaknessHovered,
+      )}
+
+      <div style={{ height: 1, background: "rgba(0,0,0,0.06)", margin: "16px 0" }} />
+
+      <div style={{ fontSize: 11, color: "#8e8e93", fontWeight: 500, marginBottom: 10 }}>
+        Where do you lose most deals?{" "}
+        <span style={{ fontWeight: 400 }}>(select all that apply)</span>
+      </div>
+      {renderPills(
+        DEAL_LOSS_OPTIONS, dealLoss, setDealLoss,
+        dealLossAdding, setDealLossAdding,
+        dealLossInput, setDealLossInput,
+        dealLossHovered, setDealLossHovered,
+      )}
+
+      <SaveButton saving={saving} saved={saved} onClick={handleSave} />
+    </Card>
+  );
+}
+
 // ── Main Component ─────────────────────────────────────────────────────────────
 export default function PersonalizeTab({ profile, userId }: Props) {
   return (
@@ -383,6 +539,7 @@ export default function PersonalizeTab({ profile, userId }: Props) {
 
       <OfferSection userId={userId} />
       <OfferCrawlSection profile={profile} userId={userId} />
+      <CallCoachingSection profile={profile} />
     </div>
   );
 }

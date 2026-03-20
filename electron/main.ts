@@ -30,6 +30,12 @@ let tray:         Tray | null = null;
 // "Ready to deploy?" confirmation toast or end the current call.
 let callActive = false;
 
+// ─── Pending outcome state ────────────────────────────────────────────────────
+// Holds the callId + access token from the most recent ended call so the
+// hud:save-outcome handler can make an authenticated API request.
+let pendingOutcomeCallId: string | null = null;
+let pendingOutcomeToken:  string | null = null;
+
 // ─── Quit guard ───────────────────────────────────────────────────────────────
 // We hide the main window instead of destroying it so users can reopen it from
 // the tray or dock without relaunching. But app.quit() must still work — this
@@ -302,15 +308,66 @@ function setupIPC(): void {
     return { success: true };
   });
 
-  ipcMain.handle("call:end", async () => {
-    console.log("[IPC] call:end");
+  ipcMain.handle("call:end", async (_event, callId?: string, token?: string) => {
+    console.log("[IPC] call:end", callId ? "(with callId)" : "(no callId)");
     callActive = false;
-    hudWindow?.webContents.send("call:ended");
+
+    // Store for use when HUD picks an outcome
+    pendingOutcomeCallId = callId ?? null;
+    pendingOutcomeToken  = token  ?? null;
+
+    // Pass callId to HUD so it knows whether to show the outcome card
+    hudWindow?.webContents.send("call:ended", { callId });
     trayPopover?.webContents.send("tray:call-state", false);
     stopRecallAI();
-    // Small delay so HUD can animate out before hiding
-    setTimeout(() => hudWindow?.hide(), 600);
+
+    // Only auto-hide if there's no callId — when callId is present the HUD
+    // stays visible to show the "How'd it go?" outcome card and hides itself
+    // after the user picks (or after the 30s auto-dismiss).
+    if (!callId) {
+      setTimeout(() => hudWindow?.hide(), 600);
+    }
+
     return { success: true };
+  });
+
+  // ── HUD outcome save — called after user picks in the post-call card ────────
+  ipcMain.handle("hud:save-outcome", async (_event, { callId, outcome }: { callId: string; outcome: string }) => {
+    console.log("[IPC] hud:save-outcome", outcome);
+
+    const appUrl = getAppUrl();
+    const token  = pendingOutcomeToken;
+
+    if (!token) {
+      console.warn("[hud:save-outcome] No token available — cannot save");
+      hudWindow?.webContents.send("hud:outcome-saved", false);
+      return;
+    }
+
+    try {
+      const res = await fetch(`${appUrl}/api/wingman/hud-outcome`, {
+        method:  "PATCH",
+        headers: {
+          "Content-Type":  "application/json",
+          "Authorization": `Bearer ${token}`,
+        },
+        body: JSON.stringify({ call_id: callId, outcome }),
+      });
+
+      const ok = res.ok;
+      hudWindow?.webContents.send("hud:outcome-saved", ok);
+
+      if (ok) {
+        // Clear pending state — outcome is saved
+        pendingOutcomeCallId = null;
+        pendingOutcomeToken  = null;
+        // Hide HUD after the card shows its confirmation (1.5s handled in HUD)
+        setTimeout(() => hudWindow?.hide(), 2200);
+      }
+    } catch (err) {
+      console.error("[hud:save-outcome] fetch failed:", err);
+      hudWindow?.webContents.send("hud:outcome-saved", false);
+    }
   });
 
   // ── HUD Deploy button → start call via web app toggle ──────────────────────
