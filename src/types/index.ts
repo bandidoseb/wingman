@@ -206,7 +206,7 @@ export const DEFAULT_SCORECARD: LiveScorecard = {
 export interface WingmanBridge {
   // Call lifecycle
   startCall: () => Promise<{ success: boolean }>;
-  endCall:   () => Promise<{ success: boolean }>;
+  endCall:   (callId?: string, token?: string) => Promise<{ success: boolean }>;
 
   // HUD control
   showHud:       () => Promise<void>;
