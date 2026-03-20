@@ -15,6 +15,7 @@ interface SidebarProps {
   userId: string;
   callsUsed: number;
   callLimit: number;
+  chatMessagesToday: number;
 }
 
 /* ─────────────────────────────────────────────────────────────
@@ -259,7 +260,7 @@ const NAV_ITEMS: Array<{ id: DashboardTab; label: string; icon: (active: boolean
 ];
 
 export default function Sidebar({
-  tab, onTabClick, collapsed, onToggleCollapse, badges, role, salesStyle, subscriptionStatus, userId, callsUsed, callLimit,
+  tab, onTabClick, collapsed, onToggleCollapse, badges, role, salesStyle, subscriptionStatus, userId, callsUsed, callLimit, chatMessagesToday,
 }: SidebarProps) {
   const handleSignOut = async () => {
     const supabase = createClient();
@@ -399,6 +400,27 @@ export default function Sidebar({
                   transition: "width 0.4s ease",
                 }} />
               </div>
+              {/* Coaching messages used */}
+              <div style={{ marginBottom: 10, marginTop: 10 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 5 }}>
+                  <span style={{ fontSize: 11, color: "#8e8e93", fontWeight: 500 }}>
+                    {chatMessagesToday} of 20 coaching messages used
+                  </span>
+                  <span style={{ fontSize: 10, color: chatMessagesToday >= 14 ? "#ff9f0a" : "#aeaeb2", fontWeight: 600 }}>
+                    {20 - chatMessagesToday} left
+                  </span>
+                </div>
+                <div style={{ height: 4, borderRadius: 2, background: "rgba(0,0,0,0.07)", overflow: "hidden" }}>
+                  <div style={{
+                    height: "100%",
+                    width: `${Math.min((chatMessagesToday / 20) * 100, 100)}%`,
+                    borderRadius: 2,
+                    background: chatMessagesToday >= 18 ? "#ff3b30" : chatMessagesToday >= 14 ? "#ff9f0a" : "#007aff",
+                    transition: "width 0.4s ease",
+                  }} />
+                </div>
+              </div>
+
               <a
                 href={checkoutHref}
                 style={{

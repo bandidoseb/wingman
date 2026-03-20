@@ -338,6 +338,7 @@ export default function DashboardClient({
           userId={userId}
           callsUsed={profile.calls_used ?? 0}
           callLimit={FREE_CALL_LIMIT}
+          chatMessagesToday={profile.chat_messages_today ?? 0}
         />
 
         <div
