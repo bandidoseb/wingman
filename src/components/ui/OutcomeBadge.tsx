@@ -3,10 +3,12 @@ import type { Outcome } from "@/types";
 
 const styles: Record<string, { color: string; bg: string }> = {
   Closed:      { color: "#34c759", bg: "#f0faf4" },
+  "Follow Up": { color: "#007aff", bg: "#eef5ff" },
+  DQ:          { color: "#8e8e93", bg: "#f2f2f7" },
+  "No Show":   { color: "#ff9f0a", bg: "#fff8ee" },
+  Other:       { color: "#8e8e93", bg: "#f2f2f7" },
   Lost:        { color: "#ff3b30", bg: "#fff0f0" },
-  DQ:          { color: "#ff9f0a", bg: "#fff8ee" },
   Set:         { color: "#4a90d9", bg: "#eef5ff" },
-  "Follow Up": { color: "#ff9f0a", bg: "#fff8ee" },
 };
 
 export default function OutcomeBadge({ outcome }: { outcome: Outcome | string }) {
