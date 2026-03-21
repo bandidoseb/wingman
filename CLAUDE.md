@@ -13,7 +13,7 @@ Wingman is a Mac desktop app (Electron + Next.js) that acts as a real-time AI co
 **Repo:** bandidoseb/wingman  
 **Local path:** `/Users/sebastianperez/Desktop/Wingman CC`  
 **Deployed via:** Railway (web/backend auto-deploys on git push). Desktop app needs a release cut.  
-**Current version:** 1.7  
+**Current version:** 0.1.16
 
 ---
 
@@ -68,7 +68,7 @@ Wingman is a Mac desktop app (Electron + Next.js) that acts as a real-time AI co
 │   │       └── user/          # User data
 │   │
 │   ├── components/
-│   │   ├── dashboard/         # FlightLogTab, HomeTab, IntelTab, ObjectionVaultTab, SettingsTab, Sidebar, SignalVaultTab
+│   │   ├── dashboard/         # FlightLogTab, HomeTab, IntelTab, ObjectionVaultTab, SettingsTab, Sidebar, PlaybookTab (SignalVaultTab retired)
 │   │   ├── wingman/           # LiveCallView, SignalCard, SignalLog, StageBar, LiveScorecard
 │   │   ├── onboarding/        # Multi-step onboarding flow components
 │   │   └── ui/                # Shared UI primitives
@@ -109,25 +109,30 @@ Wingman is a Mac desktop app (Electron + Next.js) that acts as a real-time AI co
 - Signal card UI renders on screen (~80% confident)
 - Supabase connected (~90% confident)
 - Post-call job + Offer Brain updating (~98% confident)
-- Flight Log screen ✅
-- Mission Intel / IntelTab ✅
-- Objection Vault tab ✅
+- Flight Log screen ✅ — includes inline outcome picker, call chat, post-call debrief
+- Mission Intel modal ✅ — staggered multi-bubble chat, daily cap, KB-powered coaching
+- Objection Vault tab ✅ — only populated from real calls, no pre-seeded data
 - Onboarding flow (multi-step) ✅
 - Auth (login/signup) ✅
+- Post-call HUD outcome card ✅ — "How'd it go?" card fires after call ends, saves via Bearer token
 - Stripe routes exist (checkout, webhook, portal) — not fully wired/tested
 - Knowledge base: 37 videos, ~15 hours, 419 KB entries ingested ✅
 
 ### ❌ Broken / not connected
-- **Deploy Wingman button broke in v1.7** — button turns red but Wingman doesn't actually deploy. This is the #1 priority to fix before anything else.
+- **Deploy Wingman button** — uncertain if fully working end-to-end. #1 priority before beta.
 - Recall.ai live transcript connection — uncertain if fully working
 - End-to-end pipeline has NOT been tested (pieces built but not connected)
 - Stripe billing — not live
 - iMessage upsell trigger — not built yet
 
 ### 🔲 Not built yet
+- **Playbook page** — pre-call framework setup (replaces Signal Vault, see below)
 - Stripe billing fully wired
 - iMessage upsell trigger (Project Blue / Blooio)
 - Windows support (Mac only for now)
+
+### 🗑️ Retired
+- **Signal Vault tab** — removed from sidebar. Replaced by: (1) Playbook page for pre-call framework setup, (2) post-call framework review inside individual Flight Log entries.
 
 ---
 
@@ -138,11 +143,13 @@ A user can:
 2. Wingman listens live on their sales call
 3. Signal cards pop up at the right moments (objections, key triggers) — rare, powerful, not spammy
 4. Stage bar tracks them through the call stages
-5. Call ends → post-call job fires automatically
-6. User goes to dashboard → sees Flight Log entry with transcript, debrief, grade
-7. User can chat with "Ask Wingman" about that specific call
-8. Objections from the call appear in their Objection Vault
-9. Offer Brain updates silently in the background
+5. Call ends → "How'd it go?" HUD card fires → rep logs outcome instantly
+6. Post-call job fires automatically
+7. User goes to dashboard → sees Flight Log entry with transcript, debrief, grade, framework coverage
+8. User can chat with "Ask Wingman" (Mission Intel) about any call
+9. Objections from the call appear in their Objection Vault
+10. Offer Brain updates silently in the background
+11. Rep can set up their Playbook framework once → Wingman uses it silently every call
 
 **That's the finish line. Everything else is V2.**
 
@@ -159,6 +166,8 @@ A user can:
 7. **Never store audio or video.** Text only.
 8. **Post-call job never runs during a live call.** Always async.
 9. **Offer Brain updates silently.** User never configures it manually.
+10. **Wingman is bowling alley bumpers — not a script.** It only activates when a rep is about to go in the gutter. It does NOT tell reps what to say on every exchange. Reps that sound like they're reading AI suggestions are a product failure. Signal cards should be rare, surgical, and feel like intuition — not instructions.
+11. **Never make reps into robots.** If a feature would cause a rep to sound scripted, unnatural, or disconnected from the prospect — don't build it. The highest-performing closers in the industry will judge this product harshly if it produces robotic behavior. That reputation damage kills the business.
 
 ---
 
@@ -197,16 +206,41 @@ Rules: One active Offer Brain per user. Never let the user manually configure it
 
 ---
 
-## Call Stages
+## Call Stages (8-Stage Framework)
 
-1. Rapport — Build connection. Almost no signals fire here.
-2. Discovery — Excavate pain.
-3. Press — Make cost of inaction real.
-4. Confirm — Verify all topics before pitching.
-5. Pitch — Present solution tied to pain. Keep short.
-6. Close — Present price confidently. Go silent. Handle objections.
+Built on Jeremy Miner (NEPQ) + Cole Gordon methodology. This is the default Wingman Playbook framework.
 
-*(Stages are directional — final stage logic will be refined after KB learns from ingested videos)*
+1. **Rapport / Tonality** — Establish peer frame, not salesperson frame. Slow down, match energy. Almost no signals fire here.
+2. **Pre-frame / Agenda** — Tell them how the call works. Get permission to ask questions. Kills objections early.
+3. **Situation** — Fact-find. Current state, context, what they've tried. Logical setup for pain questions.
+4. **Pain / Problem** — NEPQ questions: dig into real problem, implications, emotional cost. Gordon "Gap": quantify distance between where they are and where they want to be.
+5. **Desired Outcome** — Get them to articulate their dream result in their own words. Future pace emotionally.
+6. **Transition / Bridge** — Summarize their pain + goal back to them. Ask: "Would it be okay if I showed you how we help?"
+7. **Pitch** — Tailored, short. Present only what solves their stated problem. Connect every feature back to their specific pain.
+8. **Close + Objections** — Assumptive or direct close. Objections = reopen pain, not fight. "What's making you hesitate?"
+
+**Signal card philosophy per stage:**
+- Stages 1–2: Almost nothing fires. Rep is building trust.
+- Stages 3–5: Cards fire only if rep is rushing past critical discovery items.
+- Stage 6: Card fires if rep skips the transition and tries to pitch too early.
+- Stages 7–8: Cards fire for objection handling and close support.
+
+---
+
+## The Playbook
+
+**What it is:** A pre-call framework setup page in the dashboard. Rep visits once, customizes their call checklist, and Wingman runs it silently in the background during every call.
+
+**What it is NOT:** A live HUD checklist. There is no checklist displayed during the call. Wingman uses the playbook framework internally to decide when to fire signal cards — the rep never sees it mid-call.
+
+**Three tiers of checklist items:**
+- 🔒 **Locked core** — Cannot be removed (e.g. pain, timeline, finances). Non-negotiable.
+- **Default on, toggleable** — Most reps need these but styles differ (e.g. cost of waiting, what they've tried).
+- **Custom** — Rep can add their own (e.g. "Confirm decision maker is on the call").
+
+**Post-call review:** After each call, the individual Flight Log entry shows which framework items Wingman detected as covered and which were missed. Coaching happens post-call, never during.
+
+**Philosophy:** The Playbook is silent infrastructure. Reps should never feel like they're following a script because of it.
 
 ---
 

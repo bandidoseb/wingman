@@ -17,6 +17,11 @@ files:
   - public/**/*           # Icons and images
   - "!node_modules/.cache/**/*"  # Exclude only cache, electron-builder handles prod deps automatically
 
+# Recall AI Desktop SDK ships native binaries that cannot run from inside app.asar.
+# asarUnpack extracts these files next to the archive so they can execute normally.
+asarUnpack:
+  - "node_modules/@recallai/desktop-sdk/**/*"
+
 # Extra files to bundle (these go in the app's Resources folder)
 extraResources:
   - from: public/

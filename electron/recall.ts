@@ -89,6 +89,24 @@ export async function setupRecallAI(onMeetingDetected?: () => void): Promise<voi
     // Must await init() before addEventListener — SDK is not ready until resolved
     await sdk.init({ apiUrl: "https://us-east-1.recall.ai" });
 
+    // ── Permission status logging ─────────────────────────────────────────────
+    // Fires on startup for each permission with its current state.
+    // Required: accessibility (meeting detection), microphone, screen-capture.
+    sdk.addEventListener("permission-status", (evt: { permission: string; status: string }) => {
+      console.log(`[Recall AI] Permission "${evt.permission}": ${evt.status}`);
+    });
+
+    sdk.addEventListener("permissions-granted", () => {
+      console.log("[Recall AI] All permissions granted — meeting detection active");
+    });
+
+    // Explicitly request all three required permissions.
+    // macOS will show a system dialog the first time each is requested.
+    // Without accessibility in particular, meeting-detected never fires.
+    sdk.requestPermission("accessibility");
+    sdk.requestPermission("microphone");
+    sdk.requestPermission("screen-capture");
+
     // Meeting started — store window ID (string), notify main process
     sdk.addEventListener("meeting-detected", (evt: { window: { id: string } }) => {
       detectedWindowId = evt.window.id;
