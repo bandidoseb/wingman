@@ -35,6 +35,17 @@ interface RecallOptions {
   onAutoStop?: (reason: AutoStopReason) => void;
   /** Called 10 minutes before the 2-hour hard cap so the HUD can warn the user */
   onApproachingLimit?: () => void;
+  /**
+   * Base URL of the Next.js app (e.g. https://app.meetwingman.ai).
+   * Used to fetch the Recall AI upload token from the server — the API key
+   * lives on Railway and is never embedded in the desktop app.
+   */
+  appUrl: string;
+  /**
+   * Supabase access token for the current user.
+   * Sent as Bearer auth to /api/wingman/recall-upload-token.
+   */
+  authToken: string;
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -75,13 +86,6 @@ let autoStopFn: ((reason: AutoStopReason) => void) | null = null;
  * isn't ready yet and meeting-detected events are never received.
  */
 export async function setupRecallAI(onMeetingDetected?: () => void): Promise<void> {
-  const apiKey = process.env.RECALL_AI_API_KEY;
-
-  if (!apiKey) {
-    console.error("[Recall AI] No API key found — set RECALL_AI_API_KEY in .env.local");
-    return;
-  }
-
   try {
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     sdk = require("@recallai/desktop-sdk");
@@ -177,37 +181,25 @@ export async function initRecallAI(options: RecallOptions): Promise<void> {
     }
   }, 60 * 1000); // check once per minute
 
-  const apiKey = process.env.RECALL_AI_API_KEY;
-
-  if (apiKey && sdk) {
+  if (sdk) {
     try {
-      // 1. Get a short-lived upload token from Recall AI
-      const res = await fetch("https://us-east-1.recall.ai/api/v1/sdk_upload/", {
+      // 1. Fetch a short-lived upload token from our Next.js API route.
+      //    The Recall AI API key lives on the server (Railway) — it is never
+      //    embedded in the desktop app binary.
+      const res = await fetch(`${options.appUrl}/api/wingman/recall-upload-token`, {
         method: "POST",
         headers: {
-          accept: "application/json",
-          "content-type": "application/json",
-          Authorization: `Token ${apiKey}`,
+          "content-type":  "application/json",
+          "Authorization": `Bearer ${options.authToken}`,
         },
-        body: JSON.stringify({
-          recording_config: {
-            transcript: {
-              provider: { deepgram: { model: "nova-2-general" } },
-            },
-            realtime_endpoints: [
-              {
-                type: "desktop_sdk_callback",
-                events: ["transcript.data"],
-              },
-            ],
-          },
-        }),
       });
 
-      const data = await res.json() as { upload_token?: string };
+      const data = await res.json() as { upload_token?: string; error?: string };
 
-      if (!data.upload_token) {
-        throw new Error(`Recall AI did not return an upload token: ${JSON.stringify(data)}`);
+      if (!res.ok || !data.upload_token) {
+        throw new Error(
+          `Failed to get upload token from server: ${data.error ?? res.status}`
+        );
       }
 
       if (!detectedWindowId) {
@@ -249,7 +241,7 @@ export async function initRecallAI(options: RecallOptions): Promise<void> {
       stopRecallAI();
     }
   } else {
-    console.error("[Recall AI] Cannot start — missing API key or SDK failed to initialize");
+    console.error("[Recall AI] Cannot start — SDK failed to initialize at startup");
     options.onAutoStop?.("meeting_lost");
     stopRecallAI();
   }

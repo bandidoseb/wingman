@@ -100,10 +100,25 @@ export default function DashboardClient({
       // Check meeting detection BEFORE creating a session record.
       // If no Zoom/Meet window is open, bail immediately — no DB entry created.
       if (typeof window !== "undefined" && window.wingman) {
-        const result = await window.wingman.startCall() as { success: boolean; error?: string } | undefined;
+        // Fetch the Supabase access token so Electron can authenticate
+        // the server-side Recall AI upload token request.
+        let authToken: string | undefined;
+        try {
+          const supabase = createClient();
+          const { data: { session } } = await supabase.auth.getSession();
+          authToken = session?.access_token ?? undefined;
+        } catch {
+          // Token fetch failure is non-fatal for the meeting detection check.
+          // If the token is missing, Electron will return no_auth and we surface
+          // a clear error to the user below.
+        }
+
+        const result = await window.wingman.startCall(authToken) as { success: boolean; error?: string } | undefined;
         if (result && !result.success) {
           if (result.error === "no_meeting") {
             setStartError("No call detected. Open Zoom or Google Meet first.");
+          } else if (result.error === "no_auth") {
+            setStartError("Session expired. Please refresh the page and try again.");
           } else {
             setStartError("Failed to start audio capture. Please try again.");
           }

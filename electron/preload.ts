@@ -42,7 +42,7 @@ ipcRenderer.on("call:auto-ended", () => {
 contextBridge.exposeInMainWorld("wingman", {
   // ── Call lifecycle ──────────────────────────────────────────────────────
   /** Called when user starts a live call. Starts audio capture + shows HUD. */
-  startCall: () => ipcRenderer.invoke("call:start"),
+  startCall: (token?: string) => ipcRenderer.invoke("call:start", token),
 
   /** Called when user ends a live call. Stops audio capture + shows HUD outcome card. */
   endCall: (callId?: string, token?: string) => ipcRenderer.invoke("call:end", callId, token),

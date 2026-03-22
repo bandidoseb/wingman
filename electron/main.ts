@@ -291,20 +291,33 @@ function sendToMainWindow(channel: string): void {
 function setupIPC(): void {
 
   // ── Call lifecycle ──────────────────────────────────────────────────────────
-  ipcMain.handle("call:start", async () => {
+  ipcMain.handle("call:start", async (_event, token?: string) => {
     console.log("[IPC] call:start");
+
     if (!hasMeetingDetected()) {
       return { success: false, error: "no_meeting" };
     }
+
+    // Auth token is required — used server-side to fetch the Recall AI upload token.
+    // The token comes from the web app's Supabase session (passed via startCall(token)).
+    if (!token) {
+      console.error("[call:start] No auth token — cannot fetch Recall AI upload token");
+      return { success: false, error: "no_auth" };
+    }
+
     callActive = true;
     hudWindow?.show();
     hudWindow?.webContents.send("call:started");
     trayPopover?.webContents.send("tray:call-state", true);
+
     await initRecallAI({
+      appUrl:             getAppUrl(),
+      authToken:          token,
       onChunk:            (chunk: string) => { mainWindow?.webContents.send("transcript:chunk", chunk); },
       onAutoStop:         autoStopCall,
       onApproachingLimit: () => { hudWindow?.webContents.send("hud:cap-warning"); },
     });
+
     return { success: true };
   });
 
