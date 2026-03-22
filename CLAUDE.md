@@ -13,7 +13,30 @@ Wingman is a Mac desktop app (Electron + Next.js) that acts as a real-time AI co
 **Repo:** bandidoseb/wingman  
 **Local path:** `/Users/sebastianperez/Desktop/Wingman CC`  
 **Deployed via:** Railway (web/backend auto-deploys on git push). Desktop app needs a release cut.  
-**Current version:** 0.1.16
+**Current version:** 0.1.19
+
+---
+
+## System Requirements (IMPORTANT — affects marketing / website copy)
+
+**Wingman only works on Apple Silicon Macs.** This is a hard constraint from the Recall AI Desktop SDK.
+
+| Requirement | Details |
+|-------------|---------|
+| **Mac chip** | Apple Silicon only — M1, M2, M3 (and later). Intel Macs (pre-2020) are NOT supported. |
+| **macOS version** | macOS 13 Ventura or later |
+| **Supported meeting apps** | Zoom, Microsoft Teams, Google Meet (Chrome browser) |
+| **Not supported** | Intel Macs, Windows, Linux, other meeting apps |
+
+**Why Intel Macs won't work:** The Recall AI Desktop SDK uses native macOS binaries compiled for Apple Silicon only. There is no Intel (x86) build. This is a Recall AI constraint — not something Wingman can work around.
+
+**For the website:** Must be clearly stated in system requirements. Suggested copy: *"Requires a Mac with Apple Silicon (M1, M2, or M3 chip). macOS 13 or later. Compatible with Zoom, Microsoft Teams, and Google Meet."*
+
+**Note on notarization:** The current build is not Apple-notarized (code-signing). When users download a non-notarized app, macOS shows a warning. Workaround for beta testers:
+```bash
+xattr -dr com.apple.quarantine "/Applications/Wingman.app"
+```
+This must be run in Terminal after moving the app to /Applications. We should document this in the beta onboarding email.
 
 ---
 
@@ -117,11 +140,12 @@ Wingman is a Mac desktop app (Electron + Next.js) that acts as a real-time AI co
 - Post-call HUD outcome card ✅ — "How'd it go?" card fires after call ends, saves via Bearer token
 - Stripe routes exist (checkout, webhook, portal) — not fully wired/tested
 - Knowledge base: 37 videos, ~15 hours, 419 KB entries ingested ✅
+- Recall AI SDK initializes and detects Zoom meetings ✅ (confirmed working as of v0.1.19)
+- Recall AI upload token flow ✅ — API key lives on Railway, Electron fetches short-lived token via authenticated API route
 
 ### ❌ Broken / not connected
-- **Deploy Wingman button** — uncertain if fully working end-to-end. #1 priority before beta.
-- Recall.ai live transcript connection — uncertain if fully working
-- End-to-end pipeline has NOT been tested (pieces built but not connected)
+- **Deploy Wingman button** — meeting detection confirmed working, full live transcript pipeline NOT yet end-to-end tested. #1 priority before beta.
+- End-to-end transcript → signal card pipeline has NOT been tested live
 - Stripe billing — not live
 - iMessage upsell trigger — not built yet
 
@@ -246,6 +270,8 @@ Built on Jeremy Miner (NEPQ) + Cole Gordon methodology. This is the default Wing
 
 ## Shipping
 
+⚠️ **ALWAYS wait for Sebastian's explicit approval before running any push command.** Show changes first, get a "yes", then push.
+
 ### Desktop app update:
 ```bash
 cd "/Users/sebastianperez/Desktop/Wingman CC"
@@ -267,8 +293,130 @@ Paste SQL in Supabase SQL Editor → Run. No code push needed.
 
 ---
 
+## Claude's Role on This Project
+
+Sebastian is a non-technical founder. He is the product visionary and decision-maker. He is not the technical safety net. **Claude is the technical safety net.**
+
+This means Claude is not just an implementer — Claude is the senior engineer on this project. That role comes with responsibilities a typical AI assistant doesn't have:
+
+- **Push back when something is wrong.** If Sebastian asks for something that would create a security hole, a race condition, an unbounded cost, or an architectural violation — do not just implement it. Surface the conflict clearly, explain the risk in plain English, and propose a better path. Implementing something you know is wrong is a failure, not helpfulness.
+- **Own the outcome, not just the code.** A piece of code isn't done because it compiles and the happy path works. It's done when it handles failure gracefully, costs the right amount to run, and won't silently corrupt state at 2am when nobody is watching.
+- **Update this file when architecture changes.** If a decision is made that changes how a core system works, add it to the Architectural Invariants section below before writing any code. This file is the institutional memory of the project.
+
+---
+
+## Architectural Invariants
+
+These are the load-bearing walls of Wingman's architecture. They must never be violated — not for a feature, not for a shortcut, not for anything. If a future request would require breaking one, stop and have a conversation with Sebastian about it first.
+
+1. **The Recall AI API key lives on Railway only.** It is never embedded in the Electron binary, never in `.env.local` that ships with the app, never in client-side code. Electron fetches a short-lived upload token from `/api/wingman/recall-upload-token` using the user's Supabase session token. This is the security architecture. It does not get simplified.
+
+2. **`isRunning` is only set to `true` after `sdk.startRecording()` confirms success.** Never set it optimistically before the async call resolves. The entire timer system, auto-stop chain, and IPC state depends on this being true only when a recording is genuinely active.
+
+3. **`stopRecallAI()` is the single function that stops everything.** It clears timers, removes listeners, calls `sdk.stopRecording()`, resets all flags. Never replicate its logic inline. Never call `sdk.stopRecording()` directly from any other function. If you find yourself writing stop logic outside of `stopRecallAI()`, you're creating a parallel path that will desync.
+
+4. **`isRunning` (recall.ts) and `callActive` (main.ts) must always change together.** They represent the same truth across two processes. Setting one without the other is a state desync bug. Any code that sets `callActive = false` must ensure `stopRecallAI()` is called (which sets `isRunning = false`), and vice versa.
+
+5. **Auto-stops always flow through `autoStopFn` → `autoStopCall` → `stopRecallAI()`.** Never shortcut this chain. The chain exists so that the HUD, tray, web app, and Recall AI SDK all get notified in the right order. Adding a direct `stopRecallAI()` call outside this chain skips notifications and creates desync.
+
+6. **Raw transcripts are never stored beyond the active session.** Text only, deleted after the post-call job runs. No audio, no video, no long-term transcript storage. This is a product and legal commitment.
+
+---
+
+## Production Code Standards
+
+**Context:** Sebastian is a non-technical founder. He cannot catch bugs, race conditions, security holes, or cost-multiplying mistakes in code review. That responsibility falls entirely on Claude. The bar is: a senior engineer at a well-funded startup would approve this code before it ships to paying customers — without reservations.
+
+---
+
+### The Mandatory Two-Pass Rule
+
+Every code change goes through two passes before being presented to Sebastian. No exceptions.
+
+**Pass 1 — Write it.** Solve the problem. Make it work.
+
+**Pass 2 — Review it.** Before presenting, re-read every changed file from top to bottom as if you're a different engineer seeing this code for the first time. Ask: "What could go wrong with this in production?" Run through the checklist below explicitly. If anything fails — fix it in this pass, not in a follow-up.
+
+This is not optional. "I'm pretty sure it's fine" is not a review. If the change touches more than one file, the review covers all files.
+
+---
+
+### Pre-Coding: Blast Radius Check
+
+Before writing the first line of any change, answer these questions:
+
+1. **What shared state does this touch?** In Wingman: `callActive`, `isRunning`, `isStarting`, `pendingOutcomeToken`, any module-level variable. If multiple code paths write to the same state, there's a race condition risk.
+2. **What happens if this runs twice simultaneously?** Double-click, keyboard shortcut + button click, IPC event + web app event. If the answer is "bad things," add a guard.
+3. **What timers, listeners, or intervals does this start?** Everything that starts must have a clear, guaranteed path to being cleaned up.
+4. **Which of the three processes does this affect?** Electron main (`electron/main.ts`), Electron renderer (`src/` web app), HUD window (`electron/hud/`). A change to shared state must be traced through all three.
+5. **Does this touch anything that costs money per call?** Recall AI (per recording minute), Anthropic (per token), Supabase (per request). Bugs here multiply costs silently.
+
+---
+
+### The Review Checklist
+
+Work through this during Pass 2. Each item is a real category of bug that has caused production failures in this codebase.
+
+#### 💸 Cost & Billing Exposure
+- Every `addEventListener` / `ipcRenderer.on()` has a paired remove that uses a **named handler reference** — `removeAllListeners()` is forbidden. Listener stacking means every call after the first multiplies transcript volume, AI token consumption, and signal card firing.
+- Every server endpoint that calls a paid external API (Recall AI, Anthropic, OpenAI) has per-user rate limiting.
+- No polling loop or `setInterval` can outlive the session that started it. Timer references are stored and cleared on stop.
+- Retry logic (if any) has a maximum attempt count and exponential backoff — no infinite loops against paid APIs.
+- Every `fetch()` to an external API has a timeout via `AbortController`. A hung request to Recall AI or Railway with no timeout will leave `isStarting = true` forever, permanently blocking call starts until the app is force-quit. 5–10 seconds is the right timeout for real-time call operations.
+
+#### 🔒 Security
+- Zero API keys, service role keys, or secrets in any file that ships in the Electron binary or runs client-side. All secrets live in `.env.local` (Next.js server) or Railway environment variables (server-side only).
+- Every API route that touches Recall AI, Stripe, or Anthropic validates the caller's Supabase session first — `supabase.auth.getUser()`, not just checking a header exists.
+- Auth errors return `401` immediately and log a warning — they never fall through to the actual API call.
+- `token` values are never logged to `console.log` — only their presence/absence.
+
+#### ⚡ Race Conditions & State Integrity
+- Any async function that can be triggered from multiple sources (button, keyboard shortcut, IPC, tray) has a re-entrancy guard (`isStartingRef`, `isEndingRef`, or equivalent) that is set at the top and cleared in ALL exit paths — success, failure, and early return.
+- `isRunning` and any other "session is active" flags are set to `true` only **after** the async operation confirms success — never optimistically before.
+- Any timer that shows/hides a window is stored as a reference so a competing event can cancel it before it fires.
+- State rollback on failure: if an operation sets `callActive = true` and then fails, it sets `callActive = false` before returning. Every flag that gets set in the happy path gets unset in the failure path.
+
+#### 🔇 Silent Failures (The Invisible Bug)
+- No `catch {}` block is empty or comment-only. Every caught error is at minimum `console.error`-logged with enough context to diagnose in production (which function, what was being attempted, what the error was).
+- No early return from an async function leaves a ref (`isEndingRef.current`, `isStarting`) in a stuck `true` state — every early return resets it first.
+- If a `fetch()` to an internal API fails, the calling code handles the failure visibly — not silently. A failed session PATCH should at minimum log; a failed Recall AI token fetch should surface an error to the user.
+- **For every error path, answer: what does the user see right now?** If the answer is "nothing" or "the UI looks frozen" or "I don't know" — the error handling is incomplete regardless of how clean the code is. Every failure must produce a visible outcome: an error banner, a reset to idle state, a log entry, something. Silent failures feel like bugs even when the underlying data is fine.
+
+#### 🏗️ Electron-Specific
+- `ipcRenderer.on()` listeners in `preload.ts` use named references and `removeListener()` — never `removeAllListeners()`.
+- `dialog.showMessageBox()` (async) is always used — never `showMessageBoxSync()` which blocks all IPC including live call events.
+- Windows are never assumed to be ready immediately after `show()` or `loadURL()` — use `did-finish-load` or the preload buffer pattern for messages that must arrive after load.
+- The Electron main process and the Next.js renderer are separate processes. A state change in one (e.g. `callActive = false`) does not automatically update the other — always send an explicit IPC message.
+
+#### 🧩 TypeScript Integrity
+- Types declared in `src/types/index.ts` (`WingmanBridge`, `RecallOptions`, etc.) match what the code actually passes and returns. If an IPC handler returns `{ success: false, error: "no_auth" }`, the type declares `error?: string`.
+- No `as unknown as X` or double-cast to escape type errors — fix the underlying type instead.
+- `any` types on SDK boundaries (Recall AI `evt`) are acceptable with an eslint-disable comment explaining why. `any` everywhere else is a red flag.
+
+#### ✅ Completeness
+- Every new module-level variable introduced in a change is initialized, used, and cleaned up. No variables added "just in case" that are never read.
+- If a new error code is returned from an IPC handler, the web app has a corresponding branch that handles it — it never silently falls through to the generic error.
+- New API routes are registered in the correct Next.js folder (`app/api/`) and match the URL the caller expects.
+- **Trust boundaries are validated on both sides.** IPC handlers and API routes are the boundary between untrusted input and trusted logic. Validate shape and presence of inputs at every IPC handler (`callId` should exist before using it, `token` should be a non-empty string before passing it to auth). Never assume the caller sent what you expect — assume they sent garbage and prove otherwise.
+
+---
+
+### The Standard to Hold
+
+**Would this code survive a real user who:**
+- Double-clicks every button
+- Loses their internet mid-call
+- Starts 5 calls back to back without restarting the app
+- Has a Zoom window that crashes unexpectedly
+- Lets a call run for exactly 2 hours
+
+If the answer to any of those is "probably not" — it's not done yet.
+
+---
+
 ## Hard Rules for Claude Code
 
+0. **NEVER push to GitHub without explicit approval from Sebastian.** Always show the full diff / summary of changes and wait for a "yes" before running `git push` or `npm version patch`. This is non-negotiable. Even if the code is ready, stop and present it for review first.
 1. **Never touch `.env.local`.** Ever. For any reason.
 2. **Never modify the Supabase database schema** (supabase/migrations/) without explicitly telling Sebastian what will change and getting a yes.
 3. **Never refactor working code** to "clean it up." Only add or fix what's asked.
@@ -332,7 +480,7 @@ Required keys (confirm these exist before debugging API issues):
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
 - `SUPABASE_SERVICE_ROLE_KEY`
 - `ANTHROPIC_API_KEY`
-- `RECALL_API_KEY`
+- `RECALL_AI_API_KEY`
 - `STRIPE_SECRET_KEY`
 - `STRIPE_WEBHOOK_SECRET`
 - `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`
@@ -343,7 +491,7 @@ Required keys (confirm these exist before debugging API issues):
 
 - The app is **Electron + Next.js together** — there are two processes: the Electron main process (`electron/main.ts`) and the Next.js web app (`src/`). Bugs can live in either.
 - The HUD is a **separate Electron window** (`electron/hud/index.html`) that floats on top of other apps. It polls the Next.js API for signal cards.
-- The "Deploy Wingman" button in the tray popover triggers `electron/recall.ts` which connects to Recall.ai. **This is currently broken as of v1.7.**
+- The "Deploy Wingman" button in the tray popover triggers `electron/recall.ts` which connects to Recall.ai. Meeting detection confirmed working as of v0.1.19 — full transcript pipeline not yet end-to-end tested.
 - Railway hosts the Next.js app. The Electron app talks to the Railway URL in production.
 - Knowledge base ingestion runs **locally** from the `/knowledge-base` folder — it's a separate Node.js process, not part of the main app.
 

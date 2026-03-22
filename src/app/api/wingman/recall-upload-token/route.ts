@@ -1,6 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
+// ── Rate limiting ─────────────────────────────────────────────────────────────
+// Prevents a leaked or replayed Supabase access token from minting unlimited
+// Recall AI upload tokens (Recall AI charges per recording minute).
+// One token per user per 30 seconds is far more than any legitimate use case needs.
+// NOTE: This map lives in-process. On a single Railway server this is sufficient
+// for beta. For multi-instance deployments, swap for a Redis-backed rate limiter.
+const tokenRateLimit = new Map<string, number>();
+const RATE_LIMIT_MS  = 30 * 1000; // 30 seconds between tokens per user
+
 /**
  * POST /api/wingman/recall-upload-token
  *
@@ -36,14 +45,26 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // ── 2. Verify server has the Recall AI key configured ────────────────────
+    // ── 2. Rate limit: one upload token per user per 30 seconds ──────────────
+    const now       = Date.now();
+    const lastMint  = tokenRateLimit.get(user.id) ?? 0;
+    if (now - lastMint < RATE_LIMIT_MS) {
+      console.warn(`[recall-upload-token] Rate limit hit for user ${user.id}`);
+      return NextResponse.json(
+        { error: "Too many requests — please wait a moment before starting a new call" },
+        { status: 429 }
+      );
+    }
+    tokenRateLimit.set(user.id, now);
+
+    // ── 4. Verify server has the Recall AI key configured ────────────────────
     const recallApiKey = process.env.RECALL_AI_API_KEY;
     if (!recallApiKey) {
       console.error("[recall-upload-token] RECALL_AI_API_KEY is not set in environment");
       return NextResponse.json({ error: "Server configuration error" }, { status: 500 });
     }
 
-    // ── 3. Request an upload token from Recall AI ─────────────────────────────
+    // ── 5. Request an upload token from Recall AI ─────────────────────────────
     // Creates a Desktop SDK Upload with live transcript streaming via Deepgram.
     const recallRes = await fetch("https://us-east-1.recall.ai/api/v1/sdk_upload/", {
       method: "POST",
@@ -80,7 +101,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "No upload token returned" }, { status: 502 });
     }
 
-    // ── 4. Return the token to Electron ───────────────────────────────────────
+    // ── 6. Return the token to Electron ───────────────────────────────────────
     return NextResponse.json({ upload_token: recallData.upload_token });
 
   } catch (err) {

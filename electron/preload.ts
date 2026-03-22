@@ -36,6 +36,13 @@ ipcRenderer.on("call:auto-ended", () => {
   if (_autoEndedCallback) _autoEndedCallback();
 });
 
+// ── Named IPC handler references ─────────────────────────────────────────────
+// Stored so we can call ipcRenderer.removeListener(channel, handler) precisely.
+// Using removeAllListeners(channel) is too broad — it would silently remove any
+// other listener on the same channel, causing invisible breakage.
+let _transcriptChunkHandler: ((_e: Electron.IpcRendererEvent, chunk: string) => void) | null = null;
+let _signalDismissHandler:   ((_e: Electron.IpcRendererEvent) => void) | null = null;
+
 // ─────────────────────────────────────────────────────────────────────────────
 
 // Expose the wingman API to the web app
@@ -72,12 +79,21 @@ contextBridge.exposeInMainWorld("wingman", {
    * These arrive automatically — no manual pasting needed.
    */
   onTranscriptChunk: (callback: (chunk: string) => void) => {
-    ipcRenderer.on("transcript:chunk", (_event, chunk) => callback(chunk));
+    // Remove any previous handler before adding the new one — prevents stacking
+    // if this is called more than once (e.g. component remount).
+    if (_transcriptChunkHandler) {
+      ipcRenderer.removeListener("transcript:chunk", _transcriptChunkHandler);
+    }
+    _transcriptChunkHandler = (_event, chunk) => callback(chunk);
+    ipcRenderer.on("transcript:chunk", _transcriptChunkHandler);
   },
 
   /** Remove the transcript listener (call this when component unmounts) */
   offTranscriptChunk: () => {
-    ipcRenderer.removeAllListeners("transcript:chunk");
+    if (_transcriptChunkHandler) {
+      ipcRenderer.removeListener("transcript:chunk", _transcriptChunkHandler);
+      _transcriptChunkHandler = null;
+    }
   },
 
   // ── Keyboard shortcut / tray / HUD toggle ────────────────────────────────
@@ -113,11 +129,18 @@ contextBridge.exposeInMainWorld("wingman", {
 
   // ── Signal dismiss (initiated from HUD window) ───────────────────────────
   onSignalDismiss: (callback: () => void) => {
-    ipcRenderer.on("signal:dismiss", () => callback());
+    if (_signalDismissHandler) {
+      ipcRenderer.removeListener("signal:dismiss", _signalDismissHandler);
+    }
+    _signalDismissHandler = () => callback();
+    ipcRenderer.on("signal:dismiss", _signalDismissHandler);
   },
 
   offSignalDismiss: () => {
-    ipcRenderer.removeAllListeners("signal:dismiss");
+    if (_signalDismissHandler) {
+      ipcRenderer.removeListener("signal:dismiss", _signalDismissHandler);
+      _signalDismissHandler = null;
+    }
   },
 
   // ── Environment detection ────────────────────────────────────────────────

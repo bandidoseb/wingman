@@ -70,6 +70,17 @@ let approachingLimitTimer: ReturnType<typeof setTimeout>  | null = null;
 let inactivityTimer:       ReturnType<typeof setInterval> | null = null;
 let lastChunkAt            = 0;
 
+// Prevents double-start: set true during the async init window (token fetch +
+// sdk.startRecording) so a second call:start cannot slip through before isRunning
+// is set. Cleared on both success and failure.
+let isStarting = false;
+
+// Stored so stopRecallAI() can remove it — prevents the listener from stacking
+// across multiple call start/stop cycles (each cycle would otherwise add another
+// copy, tripling/quadrupling transcript chunks and AI costs after 3+ calls).
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let realtimeHandler: ((evt: any) => void) | null = null;
+
 // Stored so the meeting-closed event handler (set up in setupRecallAI) can
 // reach the callback even though it's registered before initRecallAI runs.
 let autoStopFn: ((reason: AutoStopReason) => void) | null = null;
@@ -90,8 +101,16 @@ export async function setupRecallAI(onMeetingDetected?: () => void): Promise<voi
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     sdk = require("@recallai/desktop-sdk");
 
-    // Must await init() before addEventListener — SDK is not ready until resolved
-    await sdk.init({ apiUrl: "https://us-east-1.recall.ai" });
+    // Must await init() before addEventListener — SDK is not ready until resolved.
+    // restartOnError: true  — if the SDK's internal process crashes, it auto-restarts
+    //                         instead of staying dead for the rest of the session.
+    // acquirePermissionsOnStartup: [] — disable the SDK's default auto-request so we
+    //                         control timing with our own requestPermission() calls below.
+    await sdk.init({
+      apiUrl:                    "https://us-east-1.recall.ai",
+      restartOnError:            true,
+      acquirePermissionsOnStartup: [],
+    });
 
     // ── Permission status logging ─────────────────────────────────────────────
     // Fires on startup for each permission with its current state.
@@ -102,6 +121,32 @@ export async function setupRecallAI(onMeetingDetected?: () => void): Promise<voi
 
     sdk.addEventListener("permissions-granted", () => {
       console.log("[Recall AI] All permissions granted — meeting detection active");
+    });
+
+    // ── SDK error handler ─────────────────────────────────────────────────────
+    // Catches internal SDK errors. type === "process" means the SDK's helper
+    // process crashed. If a call is active we auto-stop rather than hanging.
+    sdk.addEventListener("error", (evt: { type: string; message: string }) => {
+      console.error(`[Recall AI] SDK error — type: ${evt.type}, message: ${evt.message}`);
+      if (evt.type === "process" && isRunning) {
+        console.error("[Recall AI] SDK process crashed — auto-stopping call");
+        // autoStopFn (autoStopCall in main.ts) already calls stopRecallAI() internally.
+        // If no callback is registered, call stopRecallAI() directly as a fallback.
+        if (autoStopFn) autoStopFn("meeting_lost");
+        else stopRecallAI();
+      }
+    });
+
+    // ── Network status handler ────────────────────────────────────────────────
+    // Per Recall AI docs: if network disconnects during a recording it ends
+    // automatically. We listen so Wingman can reflect that in the UI.
+    sdk.addEventListener("network-status", (evt: { status: "disconnected" | "reconnected" }) => {
+      console.log(`[Recall AI] Network: ${evt.status}`);
+      if (evt.status === "disconnected" && isRunning) {
+        console.log("[Recall AI] Network lost during active call — auto-stopping");
+        if (autoStopFn) autoStopFn("meeting_lost");
+        else stopRecallAI();
+      }
     });
 
     // Explicitly request all three required permissions.
@@ -123,10 +168,11 @@ export async function setupRecallAI(onMeetingDetected?: () => void): Promise<voi
     sdk.addEventListener("meeting-closed", (evt: { window: { id: string } }) => {
       console.log("[Recall AI] Meeting window closed — ID:", evt.window.id);
       if (detectedWindowId === evt.window.id) detectedWindowId = null;
-      if (isRunning && autoStopFn) {
+      if (isRunning) {
         console.log("[Recall AI] Auto-stopping — meeting window closed");
-        autoStopFn("meeting_lost");
-        stopRecallAI();
+        // autoStopFn (autoStopCall in main.ts) already calls stopRecallAI() internally.
+        if (autoStopFn) autoStopFn("meeting_lost");
+        else stopRecallAI();
       }
     });
 
@@ -154,12 +200,17 @@ export function hasMeetingDetected(): boolean {
  * surface failures to the web app before a DB session is created.
  */
 export async function initRecallAI(options: RecallOptions): Promise<boolean> {
-  if (isRunning) return false;
+  // Guard against both an already-running call AND a call that is mid-init
+  // (token fetch + sdk.startRecording can take ~500ms — a double-click or
+  // keyboard shortcut fired twice would slip through without isStarting).
+  if (isRunning || isStarting) return false;
+  isStarting = true;
   autoStopFn = options.onAutoStop ?? null;
 
   if (!sdk) {
     console.error("[Recall AI] Cannot start — SDK failed to initialize at startup");
     autoStopFn = null;
+    isStarting  = false;
     return false;
   }
 
@@ -193,13 +244,27 @@ export async function initRecallAI(options: RecallOptions): Promise<boolean> {
     // cleared by a meeting-closed event while a call is still being wrapped up.
     recordingWindowId = detectedWindowId;
 
-    // 2. Listen for real-time transcript events.
+    // 2. Start recording the detected meeting window
+    await sdk.startRecording({
+      windowId:    recordingWindowId,
+      uploadToken: data.upload_token,
+    });
+
+    // 3. Register the transcript listener AFTER startRecording confirms success.
+    //    Registering before would cause listeners to stack on each retry —
+    //    a failed attempt would leave a dangling listener, so the next successful
+    //    call would fire duplicate chunks for every transcript event.
+    //
+    //    We also store the handler reference in `realtimeHandler` so that
+    //    stopRecallAI() can remove it precisely. Without removal, each call
+    //    start/stop cycle stacks another listener — after 3 calls you'd have
+    //    3 listeners firing simultaneously, tripling transcript chunks and AI costs.
     // Event shape per Recall.ai docs:
     //   evt.event              — string, e.g. "transcript.data"
     //   evt.data.data.words    — array of { text: string } word objects
     //   evt.data.data.participant.name — speaker display name
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    sdk.addEventListener("realtime-event", (evt: any) => {
+    realtimeHandler = (evt: any) => {
       if (evt.event !== "transcript.data") return;
       const words: Array<{ text: string }> = evt.data?.data?.words ?? [];
       const text = words.map((w) => w.text).join(" ").trim();
@@ -207,16 +272,12 @@ export async function initRecallAI(options: RecallOptions): Promise<boolean> {
       const speaker: string = evt.data?.data?.participant?.name ?? "Speaker";
       lastChunkAt = Date.now(); // reset inactivity clock
       options.onChunk(`${speaker}: ${text}`);
-    });
-
-    // 3. Start recording the detected meeting window
-    await sdk.startRecording({
-      windowId:    recordingWindowId,
-      uploadToken: data.upload_token,
-    });
+    };
+    sdk.addEventListener("realtime-event", realtimeHandler);
 
     // ── Recording is confirmed active — now start all safeguard timers ────────
     isRunning   = true;
+    isStarting  = false; // clear the init semaphore now that we're fully running
     lastChunkAt = Date.now();
 
     // Layer 3: Hard cap — stop after 2 hours no matter what
@@ -252,6 +313,7 @@ export async function initRecallAI(options: RecallOptions): Promise<boolean> {
     // Clean up — recording never started so no timers to clear
     autoStopFn        = null;
     recordingWindowId = null;
+    isStarting        = false;
     return false;
   }
 }
@@ -263,12 +325,20 @@ export async function initRecallAI(options: RecallOptions): Promise<boolean> {
 export function stopRecallAI(): void {
   if (!isRunning) return;
   isRunning  = false;
+  isStarting = false; // safety reset in case stop is called during an edge-case init
   autoStopFn = null;
 
   // Clear all safeguard timers
   if (hardCapTimer)          { clearTimeout(hardCapTimer);          hardCapTimer          = null; }
   if (approachingLimitTimer) { clearTimeout(approachingLimitTimer); approachingLimitTimer = null; }
   if (inactivityTimer)       { clearInterval(inactivityTimer);      inactivityTimer       = null; }
+
+  // Remove the realtime-event listener precisely — prevents listener stacking
+  // across multiple call sessions (start → stop → start → stop → ...).
+  if (realtimeHandler) {
+    try { sdk?.removeEventListener("realtime-event", realtimeHandler); } catch { /* no-op */ }
+    realtimeHandler = null;
+  }
 
   if (sdk && recordingWindowId) {
     try {

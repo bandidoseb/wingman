@@ -65,6 +65,11 @@ export default function DashboardClient({
   const isActiveRef = useRef(false);
   useEffect(() => { isActiveRef.current = isActive; }, [isActive]);
 
+  // Re-entrancy guard: prevents handleEndCall from executing twice if the user
+  // clicks End Call AND hits the keyboard shortcut before the first async call
+  // resolves. Without this, two PATCH requests fire simultaneously.
+  const isEndingRef = useRef(false);
+
   // ── Paywall ────────────────────────────────────────────────────────────────
   const [showPaywall, setShowPaywall] = useState<boolean>(() => isPaywallActive(profile));
   const handleLimitReached = useCallback(() => setShowPaywall(true), []);
@@ -107,10 +112,11 @@ export default function DashboardClient({
           const supabase = createClient();
           const { data: { session } } = await supabase.auth.getSession();
           authToken = session?.access_token ?? undefined;
-        } catch {
+        } catch (sessionErr) {
           // Token fetch failure is non-fatal for the meeting detection check.
           // If the token is missing, Electron will return no_auth and we surface
-          // a clear error to the user below.
+          // a clear error to the user below. Log so it's visible in production.
+          console.error("[handleStartCall] Failed to get Supabase session:", sessionErr);
         }
 
         const result = await window.wingman.startCall(authToken) as { success: boolean; error?: string } | undefined;
@@ -156,6 +162,10 @@ export default function DashboardClient({
 
   // ── End the active call ────────────────────────────────────────────────────
   const handleEndCall = useCallback(async () => {
+    // Guard: if already ending (e.g. button click + keyboard shortcut fired simultaneously),
+    // skip the second invocation to prevent duplicate PATCH requests and UI flickers.
+    if (isEndingRef.current) return;
+    isEndingRef.current = true;
     setIsActive(false);
 
     // Tell Electron to stop Recall AI and show the HUD outcome card.
@@ -171,7 +181,10 @@ export default function DashboardClient({
       }
     }
 
-    if (!callId) return;
+    if (!callId) {
+      isEndingRef.current = false;
+      return;
+    }
 
     try {
       await fetch("/api/wingman/session", {
@@ -195,6 +208,7 @@ export default function DashboardClient({
 
     setCallId(null);
     setStage(defaultStage);
+    isEndingRef.current = false;
   }, [callId, completedStages, defaultStage, router]);
 
   // ── Auto-ended by Recall AI (meeting lost, inactivity, 2h cap) ────────────

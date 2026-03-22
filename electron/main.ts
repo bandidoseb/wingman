@@ -36,6 +36,12 @@ let callActive = false;
 let pendingOutcomeCallId: string | null = null;
 let pendingOutcomeToken:  string | null = null;
 
+// ─── HUD auto-hide timer ──────────────────────────────────────────────────────
+// Stored so call:end can cancel it if the user manually ends the call while
+// the auto-stop hide countdown is still running (prevents the outcome card
+// from being hidden moments after it appears).
+let hudAutoHideTimer: ReturnType<typeof setTimeout> | null = null;
+
 // ─── Quit guard ───────────────────────────────────────────────────────────────
 // We hide the main window instead of destroying it so users can reopen it from
 // the tray or dock without relaunching. But app.quit() must still work — this
@@ -57,8 +63,14 @@ function autoStopCall(reason: AutoStopReason): void {
   // Tell web app the call ended automatically — uses dedicated channel so the
   // web app can patch the session WITHOUT calling endCall() again (avoids double-stop).
   mainWindow?.webContents.send("call:auto-ended");
-  // Give the HUD 4 seconds to show the reason toast before hiding
-  setTimeout(() => hudWindow?.hide(), 4000);
+  // Give the HUD 4 seconds to show the reason toast before hiding.
+  // Store the timer so call:end can cancel it if the user manually ends while
+  // this countdown is running (prevents outcome card from being hidden prematurely).
+  if (hudAutoHideTimer) { clearTimeout(hudAutoHideTimer); hudAutoHideTimer = null; }
+  hudAutoHideTimer = setTimeout(() => {
+    hudWindow?.hide();
+    hudAutoHideTimer = null;
+  }, 4000);
 }
 
 // ─── Main Window ─────────────────────────────────────────────────────────────
@@ -345,8 +357,10 @@ function setupIPC(): void {
     stopRecallAI();
 
     if (callId) {
-      // Ensure the HUD is visible — it may have been hidden by a previous
-      // auto-stop. The outcome card needs to be seen by the user.
+      // Cancel any pending auto-hide from autoStopCall — the outcome card must
+      // stay visible long enough for the user to pick an outcome.
+      if (hudAutoHideTimer) { clearTimeout(hudAutoHideTimer); hudAutoHideTimer = null; }
+      // Ensure the HUD is visible — it may have been hidden by a previous auto-stop.
       hudWindow?.show();
     } else {
       setTimeout(() => hudWindow?.hide(), 600);
@@ -391,6 +405,10 @@ function setupIPC(): void {
     } catch (err) {
       console.error("[hud:save-outcome] fetch failed:", err);
       hudWindow?.webContents.send("hud:outcome-saved", false);
+      // Clear pending state even on failure — a stale token from a previous call
+      // should not be used for future saves (Supabase tokens expire after 1 hour).
+      pendingOutcomeCallId = null;
+      pendingOutcomeToken  = null;
     }
   });
 
@@ -556,13 +574,16 @@ autoUpdater.on("update-available", () => {
 });
 autoUpdater.on("update-downloaded", () => {
   console.log("[Updater] Update downloaded — prompting user to restart");
-  const response = dialog.showMessageBoxSync({
+  // Use async showMessageBox so the main process is not blocked while the dialog
+  // is open — a sync dialog would freeze all IPC (including active call events).
+  dialog.showMessageBox({
     type:      "info",
     title:     "Update Ready",
     message:   "Wingman has been updated.",
     detail:    "Restart now to install the latest version.",
     buttons:   ["Restart Now", "Later"],
     defaultId: 0,
+  }).then(({ response }) => {
+    if (response === 0) autoUpdater.quitAndInstall();
   });
-  if (response === 0) autoUpdater.quitAndInstall();
 });
