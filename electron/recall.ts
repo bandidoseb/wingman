@@ -148,102 +148,111 @@ export function hasMeetingDetected(): boolean {
  * Start audio capture when the user begins a call.
  * Records the detected meeting window via Recall AI.
  *
- * Starts all three auto-stop safeguards immediately on recording start.
+ * Returns true if recording started successfully, false if it failed.
+ * Timers only start after a confirmed successful startRecording() call —
+ * this prevents orphaned timers and lets call:start in main.ts cleanly
+ * surface failures to the web app before a DB session is created.
  */
-export async function initRecallAI(options: RecallOptions): Promise<void> {
-  if (isRunning) return;
-  isRunning  = true;
-  lastChunkAt = Date.now();
-  autoStopFn  = options.onAutoStop ?? null;
+export async function initRecallAI(options: RecallOptions): Promise<boolean> {
+  if (isRunning) return false;
+  autoStopFn = options.onAutoStop ?? null;
 
-  // ── Layer 3: Hard cap — stop after 2 hours no matter what ─────────────────
-  hardCapTimer = setTimeout(() => {
-    if (!isRunning) return;
-    console.log("[Recall AI] Hard cap reached (2 hours) — auto-stopping");
-    options.onAutoStop?.("max_duration");
-    stopRecallAI();
-  }, MAX_DURATION_MS);
-
-  // ── 10-minute warning — fires at 1h 50m ────────────────────────────────────
-  approachingLimitTimer = setTimeout(() => {
-    if (!isRunning) return;
-    console.log("[Recall AI] Approaching 2-hour limit — warning user");
-    options.onApproachingLimit?.();
-  }, APPROACHING_LIMIT_MS);
-
-  // ── Layer 2: Inactivity — stop if 20 minutes pass without a transcript chunk ─
-  inactivityTimer = setInterval(() => {
-    if (!isRunning) return;
-    if (Date.now() - lastChunkAt > INACTIVITY_MS) {
-      console.log("[Recall AI] Inactivity timeout (20 min) — auto-stopping");
-      options.onAutoStop?.("inactivity");
-      stopRecallAI();
-    }
-  }, 60 * 1000); // check once per minute
-
-  if (sdk) {
-    try {
-      // 1. Fetch a short-lived upload token from our Next.js API route.
-      //    The Recall AI API key lives on the server (Railway) — it is never
-      //    embedded in the desktop app binary.
-      const res = await fetch(`${options.appUrl}/api/wingman/recall-upload-token`, {
-        method: "POST",
-        headers: {
-          "content-type":  "application/json",
-          "Authorization": `Bearer ${options.authToken}`,
-        },
-      });
-
-      const data = await res.json() as { upload_token?: string; error?: string };
-
-      if (!res.ok || !data.upload_token) {
-        throw new Error(
-          `Failed to get upload token from server: ${data.error ?? res.status}`
-        );
-      }
-
-      if (!detectedWindowId) {
-        throw new Error(
-          "No meeting window detected. Make sure Zoom / Teams / Meet is open before starting."
-        );
-      }
-
-      // Save windowId for use in stopRecordingAI — detectedWindowId may be
-      // cleared by meeting-closed while a call is still being wrapped up.
-      recordingWindowId = detectedWindowId;
-
-      // 2. Listen for real-time transcript events — update lastChunkAt for inactivity tracking
-      // Event shape per Recall.ai docs:
-      //   evt.event          — string, e.g. "transcript.data"
-      //   evt.data.data.words — array of { text: string } word objects
-      //   evt.data.data.participant.name — speaker display name
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      sdk.addEventListener("realtime-event", (evt: any) => {
-        if (evt.event !== "transcript.data") return;
-        const words: Array<{ text: string }> = evt.data?.data?.words ?? [];
-        const text = words.map((w) => w.text).join(" ").trim();
-        if (!text) return;
-        const speaker: string = evt.data?.data?.participant?.name ?? "Speaker";
-        lastChunkAt = Date.now(); // reset inactivity clock
-        options.onChunk(`${speaker}: ${text}`);
-      });
-
-      // 3. Start recording the detected meeting window
-      await sdk.startRecording({
-        windowId:    recordingWindowId,
-        uploadToken: data.upload_token,
-      });
-
-      console.log("[Recall AI] Recording started (production mode)");
-    } catch (err) {
-      console.error("[Recall AI] Failed to start recording:", err);
-      options.onAutoStop?.("meeting_lost");
-      stopRecallAI();
-    }
-  } else {
+  if (!sdk) {
     console.error("[Recall AI] Cannot start — SDK failed to initialize at startup");
-    options.onAutoStop?.("meeting_lost");
-    stopRecallAI();
+    autoStopFn = null;
+    return false;
+  }
+
+  try {
+    // 1. Fetch a short-lived upload token from our Next.js API route.
+    //    The Recall AI API key lives on the server (Railway) — it is never
+    //    embedded in the desktop app binary.
+    const res = await fetch(`${options.appUrl}/api/wingman/recall-upload-token`, {
+      method: "POST",
+      headers: {
+        "content-type":  "application/json",
+        "Authorization": `Bearer ${options.authToken}`,
+      },
+    });
+
+    const data = await res.json() as { upload_token?: string; error?: string };
+
+    if (!res.ok || !data.upload_token) {
+      throw new Error(
+        `Failed to get upload token from server: ${data.error ?? res.status}`
+      );
+    }
+
+    if (!detectedWindowId) {
+      throw new Error(
+        "No meeting window detected. Make sure Zoom / Teams / Meet is open before starting."
+      );
+    }
+
+    // Save windowId for use in stopRecallAI — detectedWindowId may be
+    // cleared by a meeting-closed event while a call is still being wrapped up.
+    recordingWindowId = detectedWindowId;
+
+    // 2. Listen for real-time transcript events.
+    // Event shape per Recall.ai docs:
+    //   evt.event              — string, e.g. "transcript.data"
+    //   evt.data.data.words    — array of { text: string } word objects
+    //   evt.data.data.participant.name — speaker display name
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    sdk.addEventListener("realtime-event", (evt: any) => {
+      if (evt.event !== "transcript.data") return;
+      const words: Array<{ text: string }> = evt.data?.data?.words ?? [];
+      const text = words.map((w) => w.text).join(" ").trim();
+      if (!text) return;
+      const speaker: string = evt.data?.data?.participant?.name ?? "Speaker";
+      lastChunkAt = Date.now(); // reset inactivity clock
+      options.onChunk(`${speaker}: ${text}`);
+    });
+
+    // 3. Start recording the detected meeting window
+    await sdk.startRecording({
+      windowId:    recordingWindowId,
+      uploadToken: data.upload_token,
+    });
+
+    // ── Recording is confirmed active — now start all safeguard timers ────────
+    isRunning   = true;
+    lastChunkAt = Date.now();
+
+    // Layer 3: Hard cap — stop after 2 hours no matter what
+    hardCapTimer = setTimeout(() => {
+      if (!isRunning) return;
+      console.log("[Recall AI] Hard cap reached (2 hours) — auto-stopping");
+      options.onAutoStop?.("max_duration");
+      stopRecallAI();
+    }, MAX_DURATION_MS);
+
+    // 10-minute warning — fires at 1h 50m
+    approachingLimitTimer = setTimeout(() => {
+      if (!isRunning) return;
+      console.log("[Recall AI] Approaching 2-hour limit — warning user");
+      options.onApproachingLimit?.();
+    }, APPROACHING_LIMIT_MS);
+
+    // Layer 2: Inactivity — stop if 20 minutes pass without a transcript chunk
+    inactivityTimer = setInterval(() => {
+      if (!isRunning) return;
+      if (Date.now() - lastChunkAt > INACTIVITY_MS) {
+        console.log("[Recall AI] Inactivity timeout (20 min) — auto-stopping");
+        options.onAutoStop?.("inactivity");
+        stopRecallAI();
+      }
+    }, 60 * 1000);
+
+    console.log("[Recall AI] Recording started");
+    return true;
+
+  } catch (err) {
+    console.error("[Recall AI] Failed to start recording:", err);
+    // Clean up — recording never started so no timers to clear
+    autoStopFn        = null;
+    recordingWindowId = null;
+    return false;
   }
 }
 

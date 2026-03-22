@@ -310,13 +310,23 @@ function setupIPC(): void {
     hudWindow?.webContents.send("call:started");
     trayPopover?.webContents.send("tray:call-state", true);
 
-    await initRecallAI({
+    const started = await initRecallAI({
       appUrl:             getAppUrl(),
       authToken:          token,
       onChunk:            (chunk: string) => { mainWindow?.webContents.send("transcript:chunk", chunk); },
       onAutoStop:         autoStopCall,
       onApproachingLimit: () => { hudWindow?.webContents.send("hud:cap-warning"); },
     });
+
+    if (!started) {
+      // Recording failed to start — roll back Electron state so the web app
+      // knows not to create a session. HUD hides cleanly after 600ms.
+      callActive = false;
+      hudWindow?.webContents.send("call:ended", {});  // reset HUD to idle state
+      trayPopover?.webContents.send("tray:call-state", false);
+      setTimeout(() => hudWindow?.hide(), 600);
+      return { success: false, error: "recording_failed" };
+    }
 
     return { success: true };
   });
@@ -334,10 +344,11 @@ function setupIPC(): void {
     trayPopover?.webContents.send("tray:call-state", false);
     stopRecallAI();
 
-    // Only auto-hide if there's no callId — when callId is present the HUD
-    // stays visible to show the "How'd it go?" outcome card and hides itself
-    // after the user picks (or after the 30s auto-dismiss).
-    if (!callId) {
+    if (callId) {
+      // Ensure the HUD is visible — it may have been hidden by a previous
+      // auto-stop. The outcome card needs to be seen by the user.
+      hudWindow?.show();
+    } else {
       setTimeout(() => hudWindow?.hide(), 600);
     }
 
