@@ -33,6 +33,13 @@ export async function updateSession(request: NextRequest) {
 
   const { pathname } = request.nextUrl;
 
+  // API routes authenticate themselves via Bearer token — never redirect them.
+  // The middleware's cookie-based session check doesn't apply to Electron requests
+  // which carry a Supabase access token in the Authorization header, not a cookie.
+  if (pathname.startsWith("/api/")) {
+    return supabaseResponse;
+  }
+
   // Public paths that don't need auth
   const publicPaths = ["/login", "/signup", "/auth/callback", "/auth/confirm", "/auth/reset-password", "/terms", "/privacy", "/hud-preview", "/tray-preview", "/tutorial-preview"];
   const isPublicPath = publicPaths.some((p) => pathname.startsWith(p));
