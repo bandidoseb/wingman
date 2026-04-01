@@ -20,6 +20,7 @@ interface UseWingmanPollerOptions {
   stage: CallStageLabel;
   isActive: boolean;
   objections: VaultObjection[];
+  repName?: string | null;
 }
 
 interface UseWingmanPollerReturn {
@@ -38,6 +39,7 @@ export function useWingmanPoller({
   stage,
   isActive,
   objections,
+  repName,
 }: UseWingmanPollerOptions): UseWingmanPollerReturn {
   const [scorecard, setScorecard] = useState<LiveScorecard>({
     ...DEFAULT_SCORECARD,
@@ -61,10 +63,32 @@ export function useWingmanPoller({
   // Minimum gap between background KB scans (keyword hits bypass this cooldown)
   const lastKBCheckRef = useRef<number>(0);
   const KB_CHECK_COOLDOWN_MS = 10_000; // 10 seconds between background scans
+  // The rep's Zoom display name — seeded from Settings, falls back to auto-detection.
+  // Used to exclude the rep's lines from keyword trigger matching so cards
+  // only fire when the prospect says an objection phrase, not the rep.
+  const repSpeakerRef = useRef<string | null>(repName ?? null);
+  // Stable ref so the callId effect can read the latest repName without it
+  // being a dependency (which would cause it to fire on every name change).
+  const repNameRef = useRef<string | null>(repName ?? null);
 
   // Keep refs in sync
   useEffect(() => { stageRef.current = stage; }, [stage]);
   useEffect(() => { callIdRef.current = callId; }, [callId]);
+  // Unconditional: handles both "Settings name changed" and "Settings name cleared".
+  // Clearing zoom name (repName → null) resets repSpeakerRef so auto-detection
+  // re-runs on the next transcript chunk.
+  useEffect(() => {
+    repNameRef.current = repName ?? null;
+    repSpeakerRef.current = repName ?? null;
+  }, [repName]);
+  // Reset per-call speaker detection when a new call starts.
+  // Seeds from Settings if available; otherwise null triggers auto-detection.
+  // Prevents a stale auto-detected name from a previous call carrying into the next.
+  useEffect(() => {
+    if (callId) {
+      repSpeakerRef.current = repNameRef.current;
+    }
+  }, [callId]);
 
   /** Show a signal, respecting cooldown rules */
   const fireSignal = useCallback((signal: WingmanSignal) => {
@@ -218,12 +242,25 @@ export function useWingmanPoller({
   /** Add transcript text to buffer + run KB check */
   const addChunk = useCallback(
     (chunk: string) => {
+      // Capture the rep's speaker label from the very first chunk of the call.
+      // The first person speaking is almost always the rep (they open the call).
+      // We use their exact Zoom display name so it works regardless of format
+      // (e.g. "TLG - Sebastian Perez", "Sebastian | Company", plain "Sebastian").
+      if (!repSpeakerRef.current) {
+        const firstLine = chunk.split("\n").find((line) => line.includes(":"));
+        if (firstLine) {
+          const colonIdx = firstLine.indexOf(":");
+          repSpeakerRef.current = firstLine.slice(0, colonIdx).trim();
+          console.log("[Wingman] Rep speaker identified:", repSpeakerRef.current);
+        }
+      }
+
       chunkBufferRef.current += (chunkBufferRef.current ? "\n" : "") + chunk;
 
       const now = Date.now();
       // Keyword match → fire KB check immediately (known important moment, no cooldown)
       // No keyword match → fire KB check if 10s have passed since last background scan
-      const keywordHit = checkKeywordTriggers(chunk, objections);
+      const keywordHit = checkKeywordTriggers(chunk, objections, repSpeakerRef.current);
       const backgroundDue = now - lastKBCheckRef.current > KB_CHECK_COOLDOWN_MS;
 
       if (keywordHit || backgroundDue) {

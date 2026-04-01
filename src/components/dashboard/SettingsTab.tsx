@@ -12,6 +12,7 @@ import { formatPhone } from "@/lib/utils";
 interface Props {
   profile: Profile;
   calls: Call[];
+  onZoomNameSaved?: (name: string) => void;
 }
 
 const ROLE_LABELS: Record<string, string> = {
@@ -27,13 +28,15 @@ const STYLE_LABELS: Record<string, string> = {
   systematic: "Systematic & process-driven",
 };
 
-export default function SettingsTab({ profile, calls }: Props) {
+export default function SettingsTab({ profile, calls, onZoomNameSaved }: Props) {
   const supabase = createClient();
 
   const [aiModel, setAiModel] = useState<AiModelPreference>(
     profile.ai_model_preference ?? "smart"
   );
   const [assistEnabled, setAssistEnabled] = useState(profile.assist_enabled);
+  const [zoomDisplayName, setZoomDisplayName] = useState(profile.zoom_display_name ?? "");
+  const [zoomNameDirty, setZoomNameDirty] = useState(false);
   const [alerts, setAlerts] = useState({
     pitching_early: profile.alert_pitching_early,
     missed_topics: profile.alert_missed_topics,
@@ -112,6 +115,29 @@ export default function SettingsTab({ profile, calls }: Props) {
     setSaving(null);
   }
 
+  async function handleZoomNameSave() {
+    setError(null);
+    setSaving("zoom_name");
+    try {
+      const trimmed = zoomDisplayName.trim();
+      const { error } = await supabase
+        .from("profiles")
+        .update({ zoom_display_name: trimmed || null })
+        .eq("id", profile.id);
+      if (error) {
+        setError("Failed to save. Try again.");
+      } else {
+        setZoomDisplayName(trimmed); // sync to trimmed value so dirty check is accurate
+        setZoomNameDirty(false);
+        onZoomNameSaved?.(trimmed);  // notify DashboardClient so the deploy gate updates
+      }
+    } catch {
+      setError("Network error. Try again.");
+    } finally {
+      setSaving(null);
+    }
+  }
+
   async function handleSignOut() {
     await supabase.auth.signOut();
     window.location.href = "/login";
@@ -151,6 +177,66 @@ export default function SettingsTab({ profile, calls }: Props) {
             <div style={{ fontSize: 13, color: "#1c1c1e", fontWeight: 500 }}>
               {new Date(profile.created_at).toLocaleDateString("en-US", { month: "long", year: "numeric" })}
             </div>
+          </div>
+
+          {/* Zoom Display Name — required for keyword trigger exclusion */}
+          <div style={{ paddingTop: 14, borderTop: "1px solid #f2f2f7" }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+              <div style={{ fontSize: 12, color: "#8e8e93", fontWeight: 600 }}>Zoom Display Name</div>
+              {!zoomDisplayName.trim() && (
+                <div style={{ fontSize: 10, fontWeight: 700, color: "#ff3b30", background: "#fff0f0", padding: "2px 7px", borderRadius: 5, letterSpacing: "0.03em" }}>
+                  REQUIRED
+                </div>
+              )}
+            </div>
+            <input
+              type="text"
+              value={zoomDisplayName}
+              placeholder="e.g. Johnny Appleseed"
+              onChange={(e) => { setZoomDisplayName(e.target.value); setZoomNameDirty(true); }}
+              style={{
+                width: "100%",
+                padding: "9px 12px",
+                fontSize: 13,
+                fontFamily: "inherit",
+                border: `1.5px solid ${!zoomDisplayName.trim() ? "#ff9f0a" : "#e5e5ea"}`,
+                borderRadius: 9,
+                outline: "none",
+                background: "#fafafa",
+                color: "#1c1c1e",
+                boxSizing: "border-box",
+                transition: "border-color 0.2s",
+              }}
+            />
+            <div style={{ fontSize: 11, color: "#8e8e93", marginTop: 6, lineHeight: 1.5 }}>
+              Enter your name exactly as it appears on your Zoom profile — you can find it in the top right corner of the Zoom app.
+              Wingman uses this to know which voice is yours so it only fires cards for your prospect, not you.
+            </div>
+            {zoomNameDirty && (
+              <button
+                onClick={handleZoomNameSave}
+                disabled={saving === "zoom_name"}
+                style={{
+                  marginTop: 10,
+                  padding: "8px 18px",
+                  background: "#1c1c1e",
+                  color: "#fff",
+                  border: "none",
+                  borderRadius: 8,
+                  fontSize: 13,
+                  fontWeight: 600,
+                  cursor: saving === "zoom_name" ? "not-allowed" : "pointer",
+                  opacity: saving === "zoom_name" ? 0.6 : 1,
+                  fontFamily: "inherit",
+                  transition: "opacity 0.2s",
+                }}
+              >
+                {saving === "zoom_name" ? "Saving…" : "Save Name"}
+              </button>
+            )}
+            {saving === null && !zoomNameDirty && zoomDisplayName.trim() && (
+              <div style={{ fontSize: 11, color: "#34c759", marginTop: 6, fontWeight: 600 }}>✓ Saved</div>
+            )}
           </div>
         </div>
       </Card>

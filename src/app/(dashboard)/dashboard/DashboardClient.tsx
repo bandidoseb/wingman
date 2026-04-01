@@ -54,6 +54,10 @@ export default function DashboardClient({
   });
   const [pendingCall, setPendingCall] = useState<Call | null>(null);
 
+  // ── Zoom display name — lifted to client state so the deploy gate stays current
+  // when the user saves a new name in SettingsTab without a full page reload.
+  const [savedZoomName, setSavedZoomName] = useState(profile.zoom_display_name ?? "");
+
   // ── Call session state ─────────────────────────────────────────────────────
   const [callId, setCallId]       = useState<string | null>(null);
   const [isActive, setIsActive]   = useState(false);
@@ -86,6 +90,7 @@ export default function DashboardClient({
     stage,
     isActive,
     objections: initialObjections,
+    repName: savedZoomName || null,
   });
 
   // Keep stage in sync with what the AI detects so poll intervals adapt
@@ -101,6 +106,14 @@ export default function DashboardClient({
   // ── Start a live call ──────────────────────────────────────────────────────
   const handleStartCall = useCallback(async () => {
     setStartError(null);
+
+    // Gate: Zoom display name must be set so Wingman knows which voice is the rep's.
+    // Without it, keyword triggers may fire on the rep's own words.
+    if (!savedZoomName.trim()) {
+      setStartError("Set your Zoom display name in Settings before deploying Wingman.");
+      return;
+    }
+
     try {
       // Check meeting detection BEFORE creating a session record.
       // If no Zoom/Meet window is open, bail immediately — no DB entry created.
@@ -158,7 +171,7 @@ export default function DashboardClient({
     } catch (err) {
       setStartError(err instanceof Error ? err.message : "Failed to start call");
     }
-  }, [handleLimitReached]);
+  }, [handleLimitReached, savedZoomName]);
 
   // ── End the active call ────────────────────────────────────────────────────
   const handleEndCall = useCallback(async () => {
@@ -419,6 +432,7 @@ export default function DashboardClient({
             <SettingsTab
               profile={profile}
               calls={initialCalls}
+              onZoomNameSaved={(name) => setSavedZoomName(name)}
             />
           )}
           {tab === "personalize" && (

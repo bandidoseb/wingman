@@ -44,6 +44,7 @@ export interface Profile {
   deal_loss_stage?: string | null;
   chat_messages_today?: number;
   chat_reset_date?: string | null;
+  zoom_display_name?: string | null;
   created_at: string;
   updated_at: string;
 }

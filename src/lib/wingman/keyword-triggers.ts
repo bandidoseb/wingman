@@ -122,13 +122,26 @@ export const KEYWORD_TRIGGERS: KeywordTrigger[] = [
   },
 ];
 
-/** Extract only the prospect's words from a transcript chunk */
-function extractProspectText(chunk: string): string {
-  return chunk
-    .split("\n")
-    .filter((line) => /^prospect:/i.test(line.trim()))
-    .map((line) => line.replace(/^prospect:\s*/i, "").toLowerCase())
-    .join(" ");
+/**
+ * Extract spoken text from a transcript chunk, excluding the rep's lines.
+ *
+ * Recall AI uses the participant's actual Zoom display name as the speaker label
+ * (e.g. "TLG - Sebastian Perez: I hear you" or "John Smith: I need to think about it").
+ * We identify the rep by their speaker label captured from the first chunk of the call
+ * and exclude their lines — so keyword triggers only fire on the prospect's words.
+ *
+ * If repSpeaker is null (first chunk hasn't arrived yet), all lines are checked.
+ */
+function extractProspectText(chunk: string, repSpeaker?: string | null): string {
+  const repLower = repSpeaker?.toLowerCase();
+  const lines: string[] = [];
+  for (const line of chunk.split("\n")) {
+    const colonIdx = line.indexOf(":");
+    if (colonIdx === -1) continue;
+    if (repLower && line.slice(0, colonIdx).trim().toLowerCase() === repLower) continue;
+    lines.push(line.slice(colonIdx + 1).trim().toLowerCase());
+  }
+  return lines.join(" ");
 }
 
 /** Find the best matching objection handle from the vault */
@@ -155,13 +168,15 @@ function findVaultHandle(
 
 /**
  * Check a new transcript chunk for keyword triggers.
- * Only fires on Prospect lines. Returns a WingmanSignal or null.
+ * Excludes the rep's lines (identified by repSpeaker) so cards only fire
+ * on the prospect's words. Returns a WingmanSignal or null.
  */
 export function checkKeywordTriggers(
   chunk: string,
-  vault: VaultObjection[]
+  vault: VaultObjection[],
+  repSpeaker?: string | null
 ): WingmanSignal | null {
-  const prospectText = extractProspectText(chunk);
+  const prospectText = extractProspectText(chunk, repSpeaker);
   if (!prospectText) return null;
 
   for (const trigger of KEYWORD_TRIGGERS) {
