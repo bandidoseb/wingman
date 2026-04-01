@@ -14,7 +14,7 @@
 
 import { createServiceClient } from "@/lib/supabase/server";
 
-const SIMILARITY_THRESHOLD = 0.78;
+const SIMILARITY_THRESHOLD = 0.65;
 const MATCH_COUNT          = 5;
 const CACHE_TTL_MS         = 60_000; // 60 seconds
 

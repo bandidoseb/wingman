@@ -190,8 +190,15 @@ export async function PATCH(req: NextRequest) {
     // ── Fire post-call analysis job (fire-and-forget — does not block response) ─
     // Runs async: transcript → Sonnet → objection upsert → debrief written to DB.
     // Failures are non-fatal — call record is already saved above.
+    //
+    // Use x-forwarded-proto/host headers to build the correct public HTTPS URL.
+    // req.nextUrl.origin returns the internal Railway HTTP address on deployed
+    // instances, which causes ERR_SSL_PACKET_LENGTH_TOO_LONG when TLS is expected.
+    const proto    = req.headers.get("x-forwarded-proto") ?? req.nextUrl.protocol.replace(":", "");
+    const host     = req.headers.get("x-forwarded-host")  ?? req.nextUrl.host;
+    const origin   = `${proto}://${host}`;
     fetch(
-      `${req.nextUrl.origin}/api/wingman/post-call`,
+      `${origin}/api/wingman/post-call`,
       {
         method:  "POST",
         headers: {
