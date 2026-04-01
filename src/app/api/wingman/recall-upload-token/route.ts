@@ -66,7 +66,7 @@ export async function POST(req: NextRequest) {
 
     // ── 5. Request an upload token from Recall AI ─────────────────────────────
     // Creates a Desktop SDK Upload with live transcript streaming via Deepgram.
-    const recallRes = await fetch("https://us-east-1.recall.ai/api/v1/sdk_upload/", {
+    const recallRes = await fetch("https://us-west-2.recall.ai/api/v1/sdk_upload/", {
       method: "POST",
       headers: {
         "accept":        "application/json",

@@ -87,7 +87,23 @@
       "Bash(npm uninstall:*)",
       "Bash(find \"/Users/sebastianperez/Desktop/Wingman CC\" -name \"layout.tsx\" -path \"*\\(dashboard\\)*\")",
       "Bash(curl -s http://localhost:3000/login)",
-      "Bash(find '/Users/sebastianperez/Desktop/Wingman CC/src/app/\\(dashboard\\)/onboarding' -type f)"
+      "Bash(find '/Users/sebastianperez/Desktop/Wingman CC/src/app/\\(dashboard\\)/onboarding' -type f)",
+      "Bash(mdls /Applications/Wingman.app)",
+      "Bash(defaults read:*)",
+      "Skill(update-config)",
+      "Skill(update-config:*)"
+    ]
+  },
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo '{\"systemMessage\": \"Before you go: type wrap up so I can update CHANGELOG.md and commit the session.\"}'"
+          }
+        ]
+      }
     ]
   }
 }

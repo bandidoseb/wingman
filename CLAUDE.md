@@ -480,6 +480,7 @@ Required keys (confirm these exist before debugging API issues):
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
 - `SUPABASE_SERVICE_ROLE_KEY`
 - `ANTHROPIC_API_KEY`
+- `OPENAI_API_KEY` ← required for KB signal cards (embeddings in knowledge-search.ts)
 - `RECALL_AI_API_KEY`
 - `STRIPE_SECRET_KEY`
 - `STRIPE_WEBHOOK_SECRET`
@@ -506,3 +507,30 @@ Rules:
 - Import from `@/components/ui/[component-name]`
 - Do not install other UI libraries
 - When a component is needed that isn't installed yet, output the exact `npx shadcn@latest add [name]` command for me to run first
+
+---
+
+## Claude Code Behavior Rules (Read Every Session)
+
+### Honesty Requirements
+- **Never say a task is "done," "fixed," or "working" without showing the specific output or test that proves it.** If you can't show proof, say what's left unverified.
+- **Never use phrases like "this should work," "the rest follows the same pattern," or "similarly for X."** Either implement it fully or explicitly state what remains unfinished.
+- **Never adjust code just to make something *look* correct.** If something isn't working, say so directly. Do not mask the problem.
+- If asked to verify something, go line by line. Do not stop after finding one issue — keep checking until you find nothing new.
+
+### Session Start Protocol
+1. Read `CLAUDE.md` (this file) fully before touching any code.
+2. Read `CHANGELOG.md` to understand current state, last session's work, and any failed approaches.
+3. Confirm your understanding of the task before starting.
+
+### Session End Protocol
+1. Update `CHANGELOG.md` with: what was completed, what was attempted but failed (and why), current known issues, and what's next.
+2. Run a git commit with a descriptive message before ending the session.
+3. Do not declare the session complete if any acceptance criteria remain unverified.
+
+### Planning Rule
+- For any non-trivial feature (anything touching the RAG pipeline, Offer Brain, Recall.ai, or Supabase schema), write out the full implementation plan **before writing any code.** Wait for Sebastian's approval before proceeding.
+
+### Completion Rule
+- When finishing a task, explicitly list every acceptance criterion and confirm each one is met. Do not wrap up until this checklist is complete.
+- If asked "are you sure this is done?" — re-check everything from scratch, not just the last thing touched.

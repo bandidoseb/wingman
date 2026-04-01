@@ -107,7 +107,7 @@ export async function setupRecallAI(onMeetingDetected?: () => void): Promise<voi
     // acquirePermissionsOnStartup: [] — disable the SDK's default auto-request so we
     //                         control timing with our own requestPermission() calls below.
     await sdk.init({
-      apiUrl:                    "https://us-east-1.recall.ai",
+      apiUrl:                    "https://us-west-2.recall.ai",
       restartOnError:            true,
       acquirePermissionsOnStartup: [],
     });
