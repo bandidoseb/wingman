@@ -8,6 +8,32 @@ _This file is Claude's portable memory across sessions. Read it at the start of 
 Wingman is actively in development. Core architecture is defined. Claude Code is the primary builder. Sebastian is non-technical — all commands must be explicit.
 
 ## Last Session
+- **Date:** 2026-04-04
+
+- **What was completed:**
+  - First real test call — full pipeline diagnostic
+  - Transcript confirmed saving to Supabase and displaying in Flight Log dashboard ✅
+  - Identified and diagnosed 4 bugs (not yet fixed):
+    1. `fireSignal(keywordHit)` never called — signal cards can never fire via keyword path. Fix: `useWingmanPoller.ts` `addChunk`.
+    2. Transcript duplicates 4x — Recall.ai sends multiple interim events per utterance, no dedup in `recall.ts`.
+    3. Post-call 502 on Anthropic overload — no retry logic in `post-call/route.ts`.
+    4. KB returns 0 matches — semantic mismatch. KB entries embedded from rep/coach perspective; prospect speech doesn't match. Fix requires re-ingestion.
+  - KB root cause fully diagnosed: `ingest.js` embeds `trigger_phrase + technique_name + full_detail` — all rep-side text. Need `prospect_trigger` field (10-15 examples of what prospect says).
+
+- **What was attempted but didn't work:** No code written this session — diagnosis only.
+
+- **Known issues going into next session:**
+  - Signal cards never fire (fireSignal bug — #1 priority to fix)
+  - Transcript duplicates 4x
+  - Post-call job fails on Anthropic overload
+  - KB returns 0 matches (needs re-ingestion)
+  - HUD visible during screen share (needs testing with packaged build)
+
+- **Next up:** Fix the 3 code bugs (fireSignal, transcript dedup, post-call retry). Then run another test call to confirm signal cards fire.
+
+---
+
+## Previous Session
 - **Date:** 2026-04-01
 - **What was completed:**
   - Added `zoom_display_name` column to Supabase `profiles` table (SQL run by Sebastian, confirmed success)

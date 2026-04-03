@@ -1,4 +1,12 @@
 
+## Session: 2026-04-04
+
+### Always check .gitignore before telling Sebastian to commit or push anything
+**What happened:** Told Sebastian to commit and push the Wingman Brain files without checking `.gitignore` first. The folder was already excluded — the suggestion was unnecessary and wrong.
+**Rule:** Before suggesting any `git add` or `git push`, check `.gitignore` to confirm what's actually tracked. Never assume a folder inside the project is committed just because it exists there.
+
+---
+
 ## Session: 2026-04-03
 
 ### Always update WingmanBridge type when adding methods to preload.ts
