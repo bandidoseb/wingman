@@ -434,10 +434,14 @@ If the answer to any of those is "probably not" — it's not done yet.
 
 1. Read this file (`CLAUDE.md`) in full.
 2. Read `tasks/lessons.md` if it exists — these are mistakes made in past sessions, don't repeat them.
-3. Check current build status section above.
-4. Ask Sebastian: "What are we working on today?" — do not assume.
+3. Read these three Wingman Brain files for current context:
+   - `Wingman Brain/01 - Build Log/Current Sprint.md` — what was just done, what's next, what's blocking
+   - `Wingman Brain/01 - Build Log/Known Issues.md` — current bugs and their priority
+   - `Wingman Brain/01 - Build Log/Decisions Log.md` — decisions already made (don't relitigate these)
+4. Based on Current Sprint.md, tell Sebastian: "Here's where we left off and here's what I think we should work on today" — then ask if that's right before touching any code.
 5. Confirm the single task before writing any code.
 6. After completing the task, give exact test steps.
+7. Update `Wingman Brain/01 - Build Log/Current Sprint.md` to reflect what was completed and what's next.
 
 ---
 

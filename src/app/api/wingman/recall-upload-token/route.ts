@@ -76,7 +76,7 @@ export async function POST(req: NextRequest) {
       body: JSON.stringify({
         recording_config: {
           transcript: {
-            provider: { deepgram: { model: "nova-2-general" } },
+            provider: { deepgram_streaming: { model: "nova-2-general" } },
           },
           realtime_endpoints: [
             {

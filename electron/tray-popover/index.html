@@ -133,6 +133,20 @@
       margin-top: 2px;
     }
 
+    /* ── Setup required warning (Zoom display name not set) ─────────────── */
+    .setup-required-warning {
+      display: none;
+      font-size: 11px;
+      color: #ff9f0a;
+      background: rgba(255, 159, 10, 0.1);
+      border: 1px solid rgba(255, 159, 10, 0.25);
+      border-radius: 6px;
+      padding: 6px 8px;
+      text-align: center;
+      line-height: 1.4;
+    }
+    .setup-required-warning.visible { display: block; }
+
     /* ── No meeting detected warning ────────────────────────────────────── */
     .no-meeting-warning {
       display: none;
@@ -166,6 +180,7 @@
     <!-- Idle: no call active -->
     <div id="idleState">
       <button class="btn btn-deploy" id="deployBtn">Deploy Wingman</button>
+      <div class="setup-required-warning" id="setupRequiredWarning">Set your Zoom display name in Settings before deploying.</div>
       <div class="no-meeting-warning" id="noMeetingWarning">No call detected. Open Zoom or Google Meet first.</div>
       <div class="deploy-warning">Only deploy once your prospect has joined the call</div>
       <div class="deploy-warning" style="margin-top:4px;">Wrong person joined? Hit ■ to stop, then redeploy.</div>
@@ -213,6 +228,20 @@
     ipcRenderer.on('tray:call-state', (_event, isActive) => {
       callActive = isActive;
       updateUI();
+    });
+
+    // Setup required (Zoom name not set) — show warning briefly
+    const setupRequiredWarning = document.getElementById('setupRequiredWarning');
+    let setupRequiredTimeout = null;
+    ipcRenderer.on('tray:setup-required', () => {
+      if (setupRequiredTimeout !== null) clearTimeout(setupRequiredTimeout);
+      setupRequiredWarning.classList.add('visible');
+      ipcRenderer.invoke('tray:resize', 220);
+      setupRequiredTimeout = setTimeout(() => {
+        setupRequiredWarning.classList.remove('visible');
+        ipcRenderer.invoke('tray:resize', 180);
+        setupRequiredTimeout = null;
+      }, 4000);
     });
 
     // No meeting detected — show warning briefly (cancel any pending hide first)

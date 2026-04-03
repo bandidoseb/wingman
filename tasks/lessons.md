@@ -1,4 +1,12 @@
 
+## Session: 2026-04-01
+
+### Never make multi-file changes without showing a plan and getting explicit approval
+**What happened:** Made changes across keyword-triggers.ts and useWingmanPoller.ts without presenting a plan first and waiting for Sebastian's "yes."
+**Rule:** Any change touching more than 1 file requires writing the plan out first, showing it to Sebastian, and waiting for explicit approval before writing a single line of code. No exceptions, even if the fix seems obvious.
+
+---
+
 ## Session: 2026-03-17
 
 ### npm version patch requires a completely clean git working directory

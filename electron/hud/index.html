@@ -461,6 +461,12 @@
       line-height: 1.4;
     }
 
+    #setupRequiredSub {
+      font-size: 12px;
+      color: rgba(255, 255, 255, 0.45);
+      line-height: 1.45;
+    }
+
     #approachingLimitSub {
       font-size: 12px;
       color: rgba(255, 255, 255, 0.45);
@@ -676,6 +682,18 @@
     <div id="approachingLimitSub">2 hour session limit — wrap up or restart after</div>
   </div>
 
+  <!-- COMPONENT 3F: Setup Required Toast (Zoom display name not set) -->
+  <div id="setupRequiredToast" class="wingman-toast">
+    <div class="toast-header">
+      <span class="toast-title">Set your Zoom display name first</span>
+    </div>
+    <div id="setupRequiredSub">Wingman needs your name to know which voice is yours.</div>
+    <div class="toast-actions">
+      <button id="setupRequiredSettingsBtn" class="toast-deploy-btn">Open Settings</button>
+      <button id="setupRequiredDismissBtn" class="toast-dismiss-btn">Dismiss</button>
+    </div>
+  </div>
+
   <!-- COMPONENT 4: Post-Call Outcome Card -->
   <div id="outcomeCard">
     <div id="outcomeCardLabel">How'd it go?</div>
@@ -796,6 +814,39 @@
 
       if (window.hud) window.hud.saveOutcome(outcomeCallId, outcome);
     });
+
+    // ── Setup required toast (Zoom display name not set) ─────────────────
+    const setupRequiredToast       = document.getElementById('setupRequiredToast');
+    const setupRequiredSettingsBtn = document.getElementById('setupRequiredSettingsBtn');
+    const setupRequiredDismissBtn  = document.getElementById('setupRequiredDismissBtn');
+    let setupRequiredTimeout = null;
+
+    function showSetupRequiredToast() {
+      setupRequiredToast.classList.add('visible');
+      if (window.hud) window.hud.setMouseIgnore(false);
+      clearTimeout(setupRequiredTimeout);
+      setupRequiredTimeout = setTimeout(() => hideSetupRequiredToast(), 10000);
+    }
+
+    function hideSetupRequiredToast() {
+      setupRequiredToast.classList.remove('visible');
+      clearTimeout(setupRequiredTimeout);
+      if (!signalActive && !detectionToast.classList.contains('visible') && !manualTriggerToast.classList.contains('visible')) {
+        if (window.hud) window.hud.setMouseIgnore(true);
+      }
+      if (window.hud) window.hud.dismissDetection(); // hide HUD window
+    }
+
+    // "Open Settings" — navigates dashboard to Settings tab, hides HUD
+    setupRequiredSettingsBtn.addEventListener('click', () => {
+      clearTimeout(setupRequiredTimeout);
+      setupRequiredTimeout = null;
+      setupRequiredToast.classList.remove('visible');
+      if (window.hud) window.hud.setMouseIgnore(true);
+      if (window.hud) window.hud.openSettings();
+    });
+
+    setupRequiredDismissBtn.addEventListener('click', () => hideSetupRequiredToast());
 
     // ── Detection toast ───────────────────────────────────────────────────
     let detectionTimeout = null;
@@ -1171,6 +1222,9 @@
 
       // Manual trigger (Ctrl+Shift+W pressed, no active call — show confirmation)
       window.hud.onManualTrigger(() => showManualTriggerToast());
+
+      // Setup required (deploy attempted without Zoom display name set)
+      window.hud.onSetupRequired(() => showSetupRequiredToast());
 
       // End call confirmation (Ctrl+Shift+W pressed during active call)
       window.hud.onEndCallConfirm(() => showEndCallConfirmToast());

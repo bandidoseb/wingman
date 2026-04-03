@@ -42,6 +42,13 @@ let pendingOutcomeToken:  string | null = null;
 // from being hidden moments after it appears).
 let hudAutoHideTimer: ReturnType<typeof setTimeout> | null = null;
 
+// ─── Zoom display name status ─────────────────────────────────────────────────
+// Synced from the web app via 'app:set-zoom-status' IPC after DashboardClient mounts.
+// Three states: null = unknown (web app hasn't reported yet), true = name is set,
+// false = name is not set. We only block deploy on explicit false — null passes
+// through so the dashboard's own check handles it if the web app hasn't loaded yet.
+let zoomNameSet: boolean | null = null;
+
 // ─── Quit guard ───────────────────────────────────────────────────────────────
 // We hide the main window instead of destroying it so users can reopen it from
 // the tray or dock without relaunching. But app.quit() must still work — this
@@ -412,10 +419,36 @@ function setupIPC(): void {
     }
   });
 
+  // ── Zoom name status sync — web app reports on mount + on name save ────────
+  ipcMain.handle("app:set-zoom-status", (_event, hasName: boolean) => {
+    zoomNameSet = hasName;
+    console.log("[ZoomName] Status:", hasName ? "set" : "not set");
+  });
+
   // ── HUD Deploy button → start call via web app toggle ──────────────────────
   ipcMain.handle("hud:deploy-call", () => {
     console.log("[IPC] hud:deploy-call");
+    if (zoomNameSet === false) {
+      hudWindow?.webContents.send("hud:setup-required");
+      return;
+    }
     sendToMainWindow("shortcut:toggle-call");
+  });
+
+  // ── HUD "Open Settings" → show dashboard and navigate to Settings tab ───────
+  ipcMain.handle("hud:open-settings", () => {
+    console.log("[IPC] hud:open-settings");
+    hudWindow?.hide();
+    if (!mainWindow || mainWindow.isDestroyed()) {
+      createMainWindow();
+      mainWindow!.webContents.once("did-finish-load", () => {
+        mainWindow?.webContents.send("navigate:settings");
+      });
+    } else {
+      mainWindow.show();
+      mainWindow.focus();
+      mainWindow.webContents.send("navigate:settings");
+    }
   });
 
   // ── HUD End Call confirmed → end call via web app toggle ───────────────────
@@ -464,6 +497,10 @@ function setupIPC(): void {
 
   // ── Tray popover actions ────────────────────────────────────────────────────
   ipcMain.handle("tray:deploy", () => {
+    if (zoomNameSet === false) {
+      trayPopover?.webContents.send("tray:setup-required");
+      return;
+    }
     if (!hasMeetingDetected()) {
       trayPopover?.webContents.send("tray:no-meeting");
       return;

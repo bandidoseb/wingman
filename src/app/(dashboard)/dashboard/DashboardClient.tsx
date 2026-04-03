@@ -100,6 +100,24 @@ export default function DashboardClient({
     }
   }, [scorecard.current_stage]);
 
+  // ── Navigate to Settings when HUD "Open Settings" button is clicked ─────────
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.wingman) return;
+    window.wingman.onNavigateToSettings(() => setTab("settings"));
+  // Runs once on mount — DashboardClient never unmounts, so no cleanup needed.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // ── Sync Zoom name status to Electron so tray + HUD can gate deploys ────────
+  // Runs on mount (with the server-rendered value) and again whenever the name
+  // is saved in SettingsTab. Main process uses this to show a "set your Zoom
+  // name" warning before it even reaches handleStartCall.
+  useEffect(() => {
+    if (typeof window !== "undefined" && window.wingman) {
+      window.wingman.setZoomStatus(!!savedZoomName.trim());
+    }
+  }, [savedZoomName]);
+
   // ── Recall AI transcript listener (Electron only, no-op in browser) ────────
   const { isElectron } = useRecallTranscript({ isActive, addChunk });
 

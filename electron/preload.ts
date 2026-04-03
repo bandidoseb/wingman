@@ -143,6 +143,16 @@ contextBridge.exposeInMainWorld("wingman", {
     }
   },
 
+  // ── Zoom name status sync ────────────────────────────────────────────────
+  /** Tells the main process whether the user has a Zoom display name set.
+   *  Called on dashboard mount and whenever the name is saved in Settings. */
+  setZoomStatus: (hasName: boolean) => ipcRenderer.invoke("app:set-zoom-status", hasName),
+
+  // ── Navigate to Settings (sent by main when HUD "Open Settings" is clicked) ──
+  onNavigateToSettings: (callback: () => void) => {
+    ipcRenderer.on("navigate:settings", () => callback());
+  },
+
   // ── Environment detection ────────────────────────────────────────────────
   /** True when running inside the Electron desktop app (not a browser tab) */
   isElectron: true as const,
@@ -223,4 +233,12 @@ contextBridge.exposeInMainWorld("hud", {
   onCapWarning: (callback: () => void) => {
     ipcRenderer.on("hud:cap-warning", () => callback());
   },
+
+  // ── Setup required (Zoom display name not set — fired when deploy is attempted) ──
+  onSetupRequired: (callback: () => void) => {
+    ipcRenderer.on("hud:setup-required", () => callback());
+  },
+
+  // ── Open Settings — tells main to show the dashboard and navigate to Settings ──
+  openSettings: () => ipcRenderer.invoke("hud:open-settings"),
 });
