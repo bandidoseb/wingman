@@ -233,6 +233,12 @@ export interface WingmanBridge {
   onAutoEnded?:  (callback: () => void) => void;
   offAutoEnded?: () => void;
 
+  // Zoom name status sync — tells Electron whether the user's Zoom name is set
+  setZoomStatus: (hasName: boolean) => Promise<void>;
+
+  // Navigate to Settings tab (sent by main when HUD "Open Settings" is clicked)
+  onNavigateToSettings: (callback: () => void) => void;
+
   // true when running inside Electron desktop app, undefined in browser
   isElectron: true;
 }
