@@ -32,6 +32,7 @@ interface UseWingmanPollerReturn {
   completedStages: CallStageLabel[];
   addChunk: (chunk: string) => void;
   dismissSignal: () => void;
+  flushBuffer: () => Promise<void>;
 }
 
 export function useWingmanPoller({
@@ -296,6 +297,11 @@ export function useWingmanPoller({
     };
   }, [isActive, stage, callId, executePoll]);
 
+  /** Flush any buffered transcript chunks immediately — call on call end */
+  const flushBuffer = useCallback(async () => {
+    await executePoll();
+  }, [executePoll]);
+
   return {
     scorecard,
     currentSignal,
@@ -305,5 +311,6 @@ export function useWingmanPoller({
     completedStages,
     addChunk,
     dismissSignal,
+    flushBuffer,
   };
 }

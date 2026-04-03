@@ -85,6 +85,7 @@ export default function DashboardClient({
     completedStages,
     addChunk,
     dismissSignal,
+    flushBuffer,
   } = useWingmanPoller({
     callId,
     stage,
@@ -217,6 +218,10 @@ export default function DashboardClient({
       return;
     }
 
+    // Flush any buffered transcript chunks before closing the session so the
+    // last N seconds of the call aren't silently discarded between poll intervals.
+    await flushBuffer();
+
     try {
       await fetch("/api/wingman/session", {
         method: "PATCH",
@@ -240,7 +245,7 @@ export default function DashboardClient({
     setCallId(null);
     setStage(defaultStage);
     isEndingRef.current = false;
-  }, [callId, completedStages, defaultStage, router]);
+  }, [callId, completedStages, defaultStage, flushBuffer, router]);
 
   // ── Auto-ended by Recall AI (meeting lost, inactivity, 2h cap) ────────────
   // Patches the session WITHOUT calling window.wingman.endCall() — Electron
@@ -249,6 +254,9 @@ export default function DashboardClient({
     setIsActive(false);
 
     if (!callId) return;
+
+    // Flush any buffered transcript chunks before closing the session.
+    await flushBuffer();
 
     try {
       await fetch("/api/wingman/session", {
@@ -272,7 +280,7 @@ export default function DashboardClient({
 
     setCallId(null);
     setStage(defaultStage);
-  }, [callId, completedStages, defaultStage, router]);
+  }, [callId, completedStages, defaultStage, flushBuffer, router]);
 
   // Stable refs so the IPC listener (registered once) always calls latest handlers
   const handleStartCallRef = useRef(handleStartCall);

@@ -104,7 +104,7 @@ export async function POST(req: NextRequest) {
 
     // ── 2. Save transcript chunk to DB ─────────────────────────────────────
     const lines = transcript_chunk.split("\n").filter((l) => l.trim());
-    let sequenceBase = Date.now(); // use timestamp as sequence seed
+    let sequenceBase = Math.floor(Date.now() / 1000); // seconds — stays within INTEGER range
 
     const transcriptRows = lines
       .map((line, idx) => {
