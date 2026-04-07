@@ -12,13 +12,14 @@ interface Props {
   calls: Call[];
   onDebrief: (call: Call) => void;
   isActive: boolean;
+  isPendingOutcome?: boolean;
   savedMessage: string | null;
   onDeploy: () => void;
   onEndCall: () => void;
   onPersonalize: () => void;
 }
 
-export default function HomeTab({ profile, calls, onDebrief, isActive, savedMessage, onDeploy, onEndCall, onPersonalize }: Props) {
+export default function HomeTab({ profile, calls, onDebrief, isActive, isPendingOutcome = false, savedMessage, onDeploy, onEndCall, onPersonalize }: Props) {
   const { greeting, sub } = getGreeting();
   const mouseX = useMotionValue(0);
   const mouseY = useMotionValue(0);
@@ -193,9 +194,39 @@ export default function HomeTab({ profile, calls, onDebrief, isActive, savedMess
         <div style={{ fontSize: 11, fontWeight: 600, color: "#8e8e93", letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 12 }}>
           Today
         </div>
-        {todayCalls.length === 0 ? (
+        {/* Live call skeleton — green dot, actively recording */}
+        {isActive && (
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "11px 0", borderBottom: todayCalls.length > 0 ? "1px solid rgba(0,0,0,0.06)" : "none" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 12, flex: 1 }}>
+              <div style={{ width: 34, height: 34, borderRadius: "50%", background: "#e5f7eb", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#34c759", animation: "livePulse 2s ease-in-out infinite" }} />
+              </div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: "#1c1c1e" }}>Live Call in Progress…</div>
+                <div style={{ fontSize: 11, color: "#34c759", marginTop: 1, fontWeight: 500 }}>Recording now</div>
+              </div>
+            </div>
+            <div style={{ width: 56, height: 22, borderRadius: 6, background: "#e5e5ea", animation: "livePulse 2s ease-in-out infinite" }} />
+          </div>
+        )}
+        {/* Processing skeleton — call ended, waiting for disposition */}
+        {!isActive && isPendingOutcome && (
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "11px 0", borderBottom: todayCalls.length > 0 ? "1px solid rgba(0,0,0,0.06)" : "none" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 12, flex: 1 }}>
+              <div style={{ width: 34, height: 34, borderRadius: "50%", background: "#f2f2f7", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#aeaeb2", animation: "livePulse 2s ease-in-out infinite" }} />
+              </div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: "#1c1c1e" }}>Processing call…</div>
+                <div style={{ fontSize: 11, color: "#8e8e93", marginTop: 1 }}>Waiting for outcome</div>
+              </div>
+            </div>
+            <div style={{ width: 56, height: 22, borderRadius: 6, background: "#e5e5ea", animation: "livePulse 2s ease-in-out infinite" }} />
+          </div>
+        )}
+        {!isActive && todayCalls.length === 0 ? (
           <div style={{ fontSize: 13, color: "#aeaeb2", padding: "4px 0 8px" }}>No calls yet today.</div>
-        ) : (
+        ) : todayCalls.length > 0 ? (
           todayCalls.map((c, i) => (
             <div
               key={c.id}
@@ -223,7 +254,7 @@ export default function HomeTab({ profile, calls, onDebrief, isActive, savedMess
               </button>
             </div>
           ))
-        )}
+        ) : null}
       </Card>
     </div>
   );

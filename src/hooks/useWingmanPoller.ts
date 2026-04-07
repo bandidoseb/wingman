@@ -30,6 +30,7 @@ interface UseWingmanPollerReturn {
   isPolling: boolean;
   pollError: string | null;
   completedStages: CallStageLabel[];
+  prospectName: string | null;
   addChunk: (chunk: string) => void;
   dismissSignal: () => void;
   flushBuffer: () => Promise<void>;
@@ -51,6 +52,7 @@ export function useWingmanPoller({
   const [isPolling, setIsPolling] = useState(false);
   const [pollError, setPollError] = useState<string | null>(null);
   const [completedStages, setCompletedStages] = useState<CallStageLabel[]>([]);
+  const [prospectName, setProspectName] = useState<string | null>(null);
 
   // Refs for stable values inside intervals/callbacks
   const scorecardRef = useRef<LiveScorecard>({ ...DEFAULT_SCORECARD, current_stage: stage });
@@ -68,6 +70,9 @@ export function useWingmanPoller({
   // Used to exclude the rep's lines from keyword trigger matching so cards
   // only fire when the prospect says an objection phrase, not the rep.
   const repSpeakerRef = useRef<string | null>(repName ?? null);
+  // Tracks whether we've already identified the prospect's name this call.
+  // Flips to true on first detection so we don't overwrite with a later speaker.
+  const prospectDetectedRef = useRef(false);
   // Stable ref so the callId effect can read the latest repName without it
   // being a dependency (which would cause it to fire on every name change).
   const repNameRef = useRef<string | null>(repName ?? null);
@@ -87,7 +92,9 @@ export function useWingmanPoller({
   // Prevents a stale auto-detected name from a previous call carrying into the next.
   useEffect(() => {
     if (callId) {
-      repSpeakerRef.current = repNameRef.current;
+      repSpeakerRef.current      = repNameRef.current;
+      prospectDetectedRef.current = false;
+      setProspectName(null);
     }
   }, [callId]);
 
@@ -95,10 +102,14 @@ export function useWingmanPoller({
   const fireSignal = useCallback((signal: WingmanSignal) => {
     const now = Date.now();
     const isAlert = signal.type === "Alert";
+    const isKeyword = signal.source === "keyword";
     const cooldownElapsed = now - lastNonAlertSignalTimeRef.current > NON_ALERT_COOLDOWN_MS;
 
-    if (!isAlert && !cooldownElapsed) return; // cooldown active, skip non-alerts
-    if (!isAlert && currentSignalRef.current !== null) return; // already showing something
+    // Keyword-triggered objections always fire — bypass cooldown and any current card.
+    // A prospect raising a new objection is always more urgent than what's on screen.
+    // Poll-based nudges still respect the 90s cooldown and won't interrupt a live card.
+    if (!isAlert && !isKeyword && !cooldownElapsed) return;
+    if (!isAlert && !isKeyword && currentSignalRef.current !== null) return;
 
     setCurrentSignal(signal);
     currentSignalRef.current = signal;
@@ -175,6 +186,11 @@ export function useWingmanPoller({
         : chunk;
     };
 
+    // 10-second timeout — prevents a hung Anthropic request from locking
+    // isPollingRef = true indefinitely and stalling the entire poll loop.
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10_000);
+
     try {
       const res = await fetch("/api/wingman/poll", {
         method: "POST",
@@ -185,6 +201,7 @@ export function useWingmanPoller({
           transcript_chunk: chunk,
           scorecard: scorecardRef.current,
         }),
+        signal: controller.signal,
       });
 
       if (!res.ok) {
@@ -232,9 +249,17 @@ export function useWingmanPoller({
       }
     } catch (err) {
       restoreChunk();
-      setPollError("Network error — will retry on next poll.");
-      console.error("Poll error:", err);
+      if (err instanceof Error && err.name === "AbortError") {
+        // Request hit the 10s timeout — log and show a transient error.
+        // isPollingRef is cleared in finally so the next poll can proceed.
+        console.warn("[Wingman] Poll request timed out after 10s — will retry on next poll.");
+        setPollError("Response took too long — will retry.");
+      } else {
+        setPollError("Network error — will retry on next poll.");
+        console.error("Poll error:", err);
+      }
     } finally {
+      clearTimeout(timeoutId);
       isPollingRef.current = false;
       setIsPolling(false);
     }
@@ -256,6 +281,24 @@ export function useWingmanPoller({
         }
       }
 
+      // Detect the prospect's name — first speaker who isn't the rep.
+      // We compare against the rep's Zoom display name from Settings so this
+      // works even if multiple people join the call.
+      if (!prospectDetectedRef.current && repSpeakerRef.current) {
+        const repLower = repSpeakerRef.current.toLowerCase();
+        for (const line of chunk.split("\n")) {
+          const colonIdx = line.indexOf(":");
+          if (colonIdx === -1) continue;
+          const speaker = line.slice(0, colonIdx).trim();
+          if (speaker && speaker.toLowerCase() !== repLower) {
+            prospectDetectedRef.current = true;
+            setProspectName(speaker);
+            console.log("[Wingman] Prospect speaker identified:", speaker);
+            break;
+          }
+        }
+      }
+
       chunkBufferRef.current += (chunkBufferRef.current ? "\n" : "") + chunk;
 
       const now = Date.now();
@@ -264,12 +307,19 @@ export function useWingmanPoller({
       const keywordHit = checkKeywordTriggers(chunk, objections, repSpeakerRef.current);
       const backgroundDue = now - lastKBCheckRef.current > KB_CHECK_COOLDOWN_MS;
 
-      if (keywordHit || backgroundDue) {
+      if (keywordHit) {
+        // Keyword match — fire the signal immediately and run a KB check in
+        // parallel so a richer card can replace it if one is found.
+        lastKBCheckRef.current = now;
+        fireSignal(keywordHit);
+        runKBCheck(chunk);
+      } else if (backgroundDue) {
+        // No keyword match but 10s have passed — run a background KB scan.
         lastKBCheckRef.current = now;
         runKBCheck(chunk);
       }
     },
-    [objections, runKBCheck]
+    [objections, runKBCheck, fireSignal]
   );
 
   // ── Auto-poll timer — restarts whenever stage or isActive changes ─────────
@@ -309,6 +359,7 @@ export function useWingmanPoller({
     isPolling,
     pollError,
     completedStages,
+    prospectName,
     addChunk,
     dismissSignal,
     flushBuffer,

@@ -105,20 +105,28 @@ export async function PATCH(req: NextRequest) {
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     const body = await req.json();
-    const { call_id, outcome, summary, duration, stages } = body;
+    const { call_id, outcome, summary, duration, stages, prospect_name } = body;
 
     if (!call_id) {
       return NextResponse.json({ error: "call_id required" }, { status: 400 });
     }
 
+    // Build the update object — only include prospect_name if the caller
+    // detected one (non-empty string). Avoids overwriting a name set earlier
+    // with an empty/null value on a second PATCH.
+    const updateFields: Record<string, unknown> = {
+      outcome:  outcome ?? null,
+      summary:  summary ?? null,
+      duration: duration ?? null,
+    };
+    if (prospect_name && typeof prospect_name === "string" && prospect_name.trim()) {
+      updateFields.prospect_name = prospect_name.trim();
+    }
+
     // Update the call (ownership enforced by .eq("user_id", user.id))
     const { data: call, error } = await supabase
       .from("calls")
-      .update({
-        outcome:  outcome ?? null,
-        summary:  summary ?? null,
-        duration: duration ?? null,
-      })
+      .update(updateFields)
       .eq("id", call_id)
       .eq("user_id", user.id)
       .select()

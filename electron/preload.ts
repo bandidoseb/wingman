@@ -40,8 +40,9 @@ ipcRenderer.on("call:auto-ended", () => {
 // Stored so we can call ipcRenderer.removeListener(channel, handler) precisely.
 // Using removeAllListeners(channel) is too broad — it would silently remove any
 // other listener on the same channel, causing invisible breakage.
-let _transcriptChunkHandler: ((_e: Electron.IpcRendererEvent, chunk: string) => void) | null = null;
-let _signalDismissHandler:   ((_e: Electron.IpcRendererEvent) => void) | null = null;
+let _transcriptChunkHandler:  ((_e: Electron.IpcRendererEvent, chunk: string) => void) | null = null;
+let _signalDismissHandler:    ((_e: Electron.IpcRendererEvent) => void) | null = null;
+let _outcomeUpdatedHandler:   ((_e: Electron.IpcRendererEvent) => void) | null = null;
 
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -147,6 +148,22 @@ contextBridge.exposeInMainWorld("wingman", {
   /** Tells the main process whether the user has a Zoom display name set.
    *  Called on dashboard mount and whenever the name is saved in Settings. */
   setZoomStatus: (hasName: boolean) => ipcRenderer.invoke("app:set-zoom-status", hasName),
+
+  // ── Outcome saved — tells dashboard to refresh so disposition pill appears ──
+  onOutcomeUpdated: (callback: () => void) => {
+    if (_outcomeUpdatedHandler) {
+      ipcRenderer.removeListener("call:outcome-updated", _outcomeUpdatedHandler);
+    }
+    _outcomeUpdatedHandler = () => callback();
+    ipcRenderer.on("call:outcome-updated", _outcomeUpdatedHandler);
+  },
+
+  offOutcomeUpdated: () => {
+    if (_outcomeUpdatedHandler) {
+      ipcRenderer.removeListener("call:outcome-updated", _outcomeUpdatedHandler);
+      _outcomeUpdatedHandler = null;
+    }
+  },
 
   // ── Navigate to Settings (sent by main when HUD "Open Settings" is clicked) ──
   onNavigateToSettings: (callback: () => void) => {

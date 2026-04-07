@@ -25,8 +25,10 @@ export async function PATCH(req: NextRequest) {
       { global: { headers: { Authorization: `Bearer ${token}` } } }
     );
 
-    // Verify the token resolves to a real user
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    // Verify the token resolves to a real user.
+    // Must pass the token explicitly — getUser() without an arg reads from local
+    // session storage (which doesn't exist in a server context), not from headers.
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
     if (authError || !user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }

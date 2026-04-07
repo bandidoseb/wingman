@@ -67,7 +67,7 @@ export async function POST(req: NextRequest) {
     const knowledgeResults = await searchKnowledge(transcript_chunk);
 
     if (!knowledgeResults) {
-      // Nothing above 0.78 similarity — return null, don't fire a card
+      // Nothing above 0.65 similarity — return null, don't fire a card
       return NextResponse.json({ signal_card: null });
     }
 

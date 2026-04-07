@@ -239,6 +239,10 @@ export interface WingmanBridge {
   // Navigate to Settings tab (sent by main when HUD "Open Settings" is clicked)
   onNavigateToSettings: (callback: () => void) => void;
 
+  // Outcome saved from HUD — tells dashboard to refresh so pill appears immediately
+  onOutcomeUpdated?:  (callback: () => void) => void;
+  offOutcomeUpdated?: () => void;
+
   // true when running inside Electron desktop app, undefined in browser
   isElectron: true;
 }

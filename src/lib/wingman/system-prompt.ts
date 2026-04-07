@@ -32,4 +32,25 @@ Return in scorecard_update.prospect_anchors as a compact bullet string (• item
 Accumulate across polls — never clear existing anchors, only append new ones not yet captured.
 If no new anchors in this chunk, return the existing prospect_anchors string unchanged.
 
-Return only valid JSON matching the exact structure specified. No prose. No explanation. JSON only.`;
+Return only valid JSON matching this exact structure. No prose. No explanation. JSON only.
+
+{
+  "signal_to_fire": true,
+  "signal_type": "Alert" | "Nudge" | "Ready" | "Handle",
+  "signal_header": "short label shown above the card",
+  "signal_text": "what the rep says, written in first person, max 20 words",
+  "scorecard_update": {
+    "stage": "Rapport" | "Discovery" | "Press" | "Confirm" | "Pitch" | "Close",
+    "pain_locked": true | false,
+    "pain_detail": "one-line summary of the core pain, or empty string",
+    "timeline_confirmed": true | false,
+    "finances_touched": true | false,
+    "decision_maker_confirmed": true | false,
+    "objection_risk": "low" | "medium" | "high",
+    "gold_moment": "most powerful thing the prospect said, or empty string",
+    "predicted_next_objection": "what objection is likely coming, or null",
+    "prospect_anchors": "bullet string of emotional anchors accumulated so far"
+  }
+}
+
+If no signal should fire, set signal_to_fire to false and signal_type/signal_header/signal_text to empty strings.`;

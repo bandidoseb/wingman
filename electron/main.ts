@@ -406,6 +406,8 @@ function setupIPC(): void {
         // Clear pending state — outcome is saved
         pendingOutcomeCallId = null;
         pendingOutcomeToken  = null;
+        // Tell the dashboard to refresh so the disposition pill appears immediately
+        mainWindow?.webContents.send("call:outcome-updated");
         // Hide HUD after the card shows its confirmation (1.5s handled in HUD)
         setTimeout(() => hudWindow?.hide(), 2200);
       }

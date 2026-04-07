@@ -60,7 +60,12 @@ export default function DashboardClient({
 
   // ── Call session state ─────────────────────────────────────────────────────
   const [callId, setCallId]       = useState<string | null>(null);
-  const [isActive, setIsActive]   = useState(false);
+  const [isActive, setIsActive]     = useState(false);
+  // Stays true from call-end until the disposition is saved — keeps the
+  // "Processing call…" skeleton visible until the real entry (with outcome) loads.
+  const [pendingOutcome, setPendingOutcome] = useState(false);
+  // Tracks which call is pending so we can detect when it appears with an outcome.
+  const pendingCallIdRef = useRef<string | null>(null);
   const [stage, setStage]         = useState<CallStageLabel>(defaultStage);
   const [startError, setStartError] = useState<string | null>(null);
   const [savedMessage, setSavedMessage] = useState<string | null>(null);
@@ -83,6 +88,7 @@ export default function DashboardClient({
     scorecard,
     currentSignal,
     completedStages,
+    prospectName,
     addChunk,
     dismissSignal,
     flushBuffer,
@@ -187,6 +193,8 @@ export default function DashboardClient({
       if (!data.call_id) throw new Error("Failed to start");
       setCallId(data.call_id);
       setIsActive(true);
+      setPendingOutcome(false);
+      pendingCallIdRef.current = null;
     } catch (err) {
       setStartError(err instanceof Error ? err.message : "Failed to start call");
     }
@@ -201,7 +209,7 @@ export default function DashboardClient({
     setIsActive(false);
 
     // Tell Electron to stop Recall AI and show the HUD outcome card.
-    // Pass callId + access token so the HUD can save the outcome via API.
+    // This always runs regardless of callId — Electron needs the stop signal.
     if (typeof window !== "undefined" && window.wingman) {
       try {
         const supabase = createClient();
@@ -213,74 +221,122 @@ export default function DashboardClient({
       }
     }
 
+    // If there's no active call session, nothing more to do.
+    // Don't show the Processing skeleton — there's no call entry to wait for.
     if (!callId) {
       isEndingRef.current = false;
       return;
     }
 
-    // Flush any buffered transcript chunks before closing the session so the
-    // last N seconds of the call aren't silently discarded between poll intervals.
-    await flushBuffer();
+    // Only start the skeleton AFTER confirming there's a real call to track.
+    setPendingOutcome(true);
+    pendingCallIdRef.current = callId;
 
     try {
-      await fetch("/api/wingman/session", {
-        method: "PATCH",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          call_id: callId,
-          stages: completedStages.map((s, idx) => ({
-            name: s,
-            status: "complete",
-            display_order: idx,
-          })),
-        }),
-      });
-      setSavedMessage("Saved to Flight Log ✓");
-      setTimeout(() => setSavedMessage(null), 4000);
-      router.refresh();
-    } catch {
-      // fail silently — call record is already saved in DB
-    }
+      // Flush any buffered transcript chunks before closing the session so the
+      // last N seconds of the call aren't silently discarded between poll intervals.
+      await flushBuffer();
 
-    setCallId(null);
-    setStage(defaultStage);
-    isEndingRef.current = false;
-  }, [callId, completedStages, defaultStage, flushBuffer, router]);
+      try {
+        await fetch("/api/wingman/session", {
+          method: "PATCH",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            call_id:       callId,
+            prospect_name: prospectName ?? undefined,
+            stages: completedStages.map((s, idx) => ({
+              name: s,
+              status: "complete",
+              display_order: idx,
+            })),
+          }),
+        });
+        setSavedMessage("Saved to Flight Log ✓");
+        setTimeout(() => setSavedMessage(null), 4000);
+        router.refresh();
+      } catch {
+        // fail silently — call record is already saved in DB
+      }
+
+      setCallId(null);
+      setStage(defaultStage);
+    } finally {
+      // Always reset the guard — if flushBuffer or anything else throws,
+      // future calls to handleEndCall must not be permanently blocked.
+      isEndingRef.current = false;
+    }
+  }, [callId, completedStages, defaultStage, prospectName, flushBuffer, router]);
 
   // ── Auto-ended by Recall AI (meeting lost, inactivity, 2h cap) ────────────
-  // Patches the session WITHOUT calling window.wingman.endCall() — Electron
-  // already stopped Recall AI on this path, so calling it again would double-stop.
+  // Electron already stopped Recall AI before this fires, so we must NOT call
+  // window.wingman.endCall() for stopping purposes — stopRecallAI() is idempotent
+  // so it won't double-stop, but we call endCall() specifically to pass the callId
+  // + token to Electron so the HUD outcome card can appear and save correctly.
   const handleAutoEnd = useCallback(async () => {
     setIsActive(false);
 
+    // If there's no active call session, nothing to process.
     if (!callId) return;
+
+    // Only start the skeleton after confirming there's a real call to track.
+    setPendingOutcome(true);
+    pendingCallIdRef.current = callId;
+
+    // Capture callId now — it will be cleared by setCallId(null) below
+    const activeCallId = callId;
 
     // Flush any buffered transcript chunks before closing the session.
     await flushBuffer();
 
-    try {
-      await fetch("/api/wingman/session", {
+    // Run session PATCH and token fetch in parallel — no reason to wait for one
+    // before starting the other, and doing both at once cuts ~500ms off the delay
+    // before the outcome card appears.
+    const supabase = createClient();
+    const [patchResult, sessionResult] = await Promise.allSettled([
+      fetch("/api/wingman/session", {
         method: "PATCH",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
-          call_id: callId,
+          call_id:       activeCallId,
+          prospect_name: prospectName ?? undefined,
           stages: completedStages.map((s, idx) => ({
             name: s,
             status: "complete",
             display_order: idx,
           })),
         }),
-      });
+      }),
+      supabase.auth.getSession(),
+    ]);
+
+    if (patchResult.status === "fulfilled" && patchResult.value.ok) {
       setSavedMessage("Saved to Flight Log ✓");
       setTimeout(() => setSavedMessage(null), 4000);
       router.refresh();
-    } catch {
-      // fail silently — call record is already saved in DB
+    } else {
+      // Non-fatal — call record is already saved, this just updates stage data
+      console.error("[handleAutoEnd] Failed to patch session stages");
+    }
+
+    // Show the HUD outcome card so the rep can log the result.
+    // We pass callId + a fresh token so the HUD can authenticate the save.
+    // stopRecallAI() is already stopped — endCall() here is safe (idempotent guard
+    // inside stopRecallAI prevents any double-stop side effects).
+    if (typeof window !== "undefined" && window.wingman) {
+      const token = sessionResult.status === "fulfilled"
+        ? sessionResult.value.data.session?.access_token
+        : undefined;
+
+      if (sessionResult.status === "rejected") {
+        console.error("[handleAutoEnd] Failed to get Supabase session — outcome card shown without token");
+      }
+
+      window.wingman.endCall(activeCallId, token);
     }
 
     setCallId(null);
     setStage(defaultStage);
-  }, [callId, completedStages, defaultStage, flushBuffer, router]);
+  }, [callId, completedStages, defaultStage, prospectName, flushBuffer, router]);
 
   // Stable refs so the IPC listener (registered once) always calls latest handlers
   const handleStartCallRef = useRef(handleStartCall);
@@ -314,6 +370,48 @@ export default function DashboardClient({
     return () => { window.wingman?.offAutoEnded?.(); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // ── Outcome saved from HUD → fast path: clear skeleton immediately ──────────
+  useEffect(() => {
+    if (!isElectron || !window.wingman) return;
+    window.wingman.onOutcomeUpdated?.(() => {
+      setPendingOutcome(false);
+      pendingCallIdRef.current = null;
+      router.refresh();
+    });
+    return () => { window.wingman?.offOutcomeUpdated?.(); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // ── Polling fallback: refresh every 5s while waiting for the outcome ─────────
+  // This is the reliable path — it works even if the IPC message above never
+  // fires. Every 5 seconds we ask the server for fresh data. The effect below
+  // watches that data and clears the skeleton the moment the outcome appears.
+  useEffect(() => {
+    if (!pendingOutcome) return;
+    const interval = setInterval(() => router.refresh(), 5000);
+    return () => clearInterval(interval);
+  }, [pendingOutcome, router]);
+
+  // ── Watch initialCalls: clear skeleton when pending call has an outcome ──────
+  useEffect(() => {
+    if (!pendingOutcome || !pendingCallIdRef.current) return;
+    const call = initialCalls.find((c) => c.id === pendingCallIdRef.current);
+    if (call?.outcome) {
+      setPendingOutcome(false);
+      pendingCallIdRef.current = null;
+    }
+  }, [initialCalls, pendingOutcome]);
+
+  // ── Safety valve: clear skeleton after 10 min if nothing else does ───────────
+  useEffect(() => {
+    if (!pendingOutcome) return;
+    const t = setTimeout(() => {
+      setPendingOutcome(false);
+      pendingCallIdRef.current = null;
+    }, 10 * 60 * 1000);
+    return () => clearTimeout(t);
+  }, [pendingOutcome]);
 
   // ── Sync state → floating HUD (Electron only) ─────────────────────────────
   useEffect(() => {
@@ -425,6 +523,7 @@ export default function DashboardClient({
               calls={initialCalls}
               onDebrief={goToDebrief}
               isActive={isActive}
+              isPendingOutcome={pendingOutcome}
               savedMessage={savedMessage}
               onDeploy={handleStartCall}
               onEndCall={handleEndCall}
@@ -437,6 +536,8 @@ export default function DashboardClient({
               initialCall={pendingCall}
               onInitialCallConsumed={clearPendingCall}
               userId={userId}
+              isActive={isActive}
+              isPendingOutcome={pendingOutcome}
             />
           )}
           {tab === "objections" && (

@@ -11,6 +11,8 @@ interface Props {
   initialCall: Call | null;
   onInitialCallConsumed: () => void;
   userId: string;
+  isActive?: boolean;
+  isPendingOutcome?: boolean;
 }
 
 // Outcome options shown in the inline picker
@@ -144,7 +146,7 @@ function OutcomePicker({
   );
 }
 
-export default function FlightLogTab({ calls, initialCall, onInitialCallConsumed, userId }: Props) {
+export default function FlightLogTab({ calls, initialCall, onInitialCallConsumed, userId, isActive = false, isPendingOutcome = false }: Props) {
   const [selectedCall, setSelectedCall] = useState<Call | null>(initialCall);
   const [activeDetailTab, setActiveDetailTab] = useState<"debrief" | "transcript">("debrief");
   // Tracks outcomes set inline (without a full page reload)
@@ -560,13 +562,43 @@ export default function FlightLogTab({ calls, initialCall, onInitialCallConsumed
           <SectionLabel className="!mb-0">All Calls — {calls.length}</SectionLabel>
           <div style={{ fontSize: 11.5, color: "#8e8e93", fontWeight: 500 }}>{wins}/{qualifying} closed</div>
         </div>
-        {calls.length === 0 ? (
+        {/* Live call skeleton — green dot, actively recording */}
+        {isActive && (
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 8px", margin: "0 -8px", borderBottom: calls.length > 0 ? "1px solid rgba(0,0,0,0.06)" : "none", marginBottom: calls.length > 0 ? 14 : 0 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 12, flex: 1 }}>
+              <div style={{ width: 34, height: 34, borderRadius: "50%", background: "#e5f7eb", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#34c759", animation: "livePulse 2s ease-in-out infinite" }} />
+              </div>
+              <div>
+                <div style={{ fontSize: 13.5, fontWeight: 600, color: "#1c1c1e" }}>Live Call in Progress…</div>
+                <div style={{ fontSize: 11.5, color: "#34c759", marginTop: 2, fontWeight: 500 }}>Recording now</div>
+              </div>
+            </div>
+            <div style={{ width: 56, height: 22, borderRadius: 6, background: "#e5e5ea", animation: "livePulse 2s ease-in-out infinite" }} />
+          </div>
+        )}
+        {/* Processing skeleton — call ended, waiting for disposition */}
+        {!isActive && isPendingOutcome && (
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 8px", margin: "0 -8px", borderBottom: calls.length > 0 ? "1px solid rgba(0,0,0,0.06)" : "none", marginBottom: calls.length > 0 ? 14 : 0 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 12, flex: 1 }}>
+              <div style={{ width: 34, height: 34, borderRadius: "50%", background: "#f2f2f7", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#aeaeb2", animation: "livePulse 2s ease-in-out infinite" }} />
+              </div>
+              <div>
+                <div style={{ fontSize: 13.5, fontWeight: 600, color: "#1c1c1e" }}>Processing call…</div>
+                <div style={{ fontSize: 11.5, color: "#8e8e93", marginTop: 2 }}>Waiting for outcome</div>
+              </div>
+            </div>
+            <div style={{ width: 56, height: 22, borderRadius: 6, background: "#e5e5ea", animation: "livePulse 2s ease-in-out infinite" }} />
+          </div>
+        )}
+        {!isActive && calls.length === 0 ? (
           <div style={{ textAlign: "center", padding: "40px 0" }}>
             <div style={{ fontSize: 32, marginBottom: 12 }}>🎙️</div>
             <div style={{ fontSize: 15, fontWeight: 600, color: "#1c1c1e", marginBottom: 6 }}>No calls yet</div>
             <div style={{ fontSize: 13, color: "#8e8e93" }}>Your calls will appear here after your first session with Wingman.</div>
           </div>
-        ) : (
+        ) : calls.length > 0 ? (
           calls.map((call, i) => (
             <div key={call.id}
               onClick={() => { setSelectedCall(call); setChatMessages([]); setChatInput(""); setActiveDetailTab("debrief"); }}
@@ -605,7 +637,7 @@ export default function FlightLogTab({ calls, initialCall, onInitialCallConsumed
               )}
             </div>
           ))
-        )}
+        ) : null}
       </Card>
 
       {/* ── Mission Intel Chat Modal ─────────────────────────────────────────── */}
