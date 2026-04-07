@@ -75,11 +75,19 @@ let lastChunkAt            = 0;
 // is set. Cleared on both success and failure.
 let isStarting = false;
 
-// Stored so stopRecallAI() can remove it — prevents the listener from stacking
-// across multiple call start/stop cycles (each cycle would otherwise add another
-// copy, tripling/quadrupling transcript chunks and AI costs after 3+ calls).
+// Active transcript handler for the current call. Assigned by initRecallAI
+// after startRecording confirms success; nulled by stopRecallAI on call end.
+// The one-time delegate registered in initRecallAI routes all realtime-events
+// here — null means no call is active and events are silently ignored.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let realtimeHandler: ((evt: any) => void) | null = null;
+
+// Tracks whether the realtime-event delegate has been registered with the SDK.
+// The delegate is registered once (after the first startRecording) and then
+// reused across all subsequent calls by swapping realtimeHandler. Reset to
+// false if the SDK process crashes and restarts, since the new SDK process
+// has no knowledge of previously registered listeners.
+let realtimeListenerRegistered = false;
 
 // Stored so the meeting-closed event handler (set up in setupRecallAI) can
 // reach the callback even though it's registered before initRecallAI runs.
@@ -97,6 +105,11 @@ let autoStopFn: ((reason: AutoStopReason) => void) | null = null;
  * isn't ready yet and meeting-detected events are never received.
  */
 export async function setupRecallAI(onMeetingDetected?: () => void): Promise<void> {
+  // Guard: setupRecallAI must only run once. If called again (e.g. accidental
+  // double-invoke at startup), bail immediately — re-initializing the SDK or
+  // re-registering the permanent delegate listener would cause duplicate events.
+  if (sdk) return;
+
   try {
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     sdk = require("@recallai/desktop-sdk");
@@ -128,12 +141,18 @@ export async function setupRecallAI(onMeetingDetected?: () => void): Promise<voi
     // process crashed. If a call is active we auto-stop rather than hanging.
     sdk.addEventListener("error", (evt: { type: string; message: string }) => {
       console.error(`[Recall AI] SDK error — type: ${evt.type}, message: ${evt.message}`);
-      if (evt.type === "process" && isRunning) {
-        console.error("[Recall AI] SDK process crashed — auto-stopping call");
-        // autoStopFn (autoStopCall in main.ts) already calls stopRecallAI() internally.
-        // If no callback is registered, call stopRecallAI() directly as a fallback.
-        if (autoStopFn) autoStopFn("meeting_lost");
-        else stopRecallAI();
+      if (evt.type === "process") {
+        // SDK process crashed and will restart (restartOnError: true). The new
+        // SDK process has no knowledge of previously registered listeners, so
+        // the realtime-event delegate must be re-registered on the next call.
+        realtimeListenerRegistered = false;
+        if (isRunning) {
+          console.error("[Recall AI] SDK process crashed — auto-stopping call");
+          // autoStopFn (autoStopCall in main.ts) already calls stopRecallAI() internally.
+          // If no callback is registered, call stopRecallAI() directly as a fallback.
+          if (autoStopFn) autoStopFn("meeting_lost");
+          else stopRecallAI();
+        }
       }
     });
 
@@ -250,19 +269,27 @@ export async function initRecallAI(options: RecallOptions): Promise<boolean> {
       uploadToken: data.upload_token,
     });
 
-    // 3. Register the transcript listener AFTER startRecording confirms success.
-    //    Registering before would cause listeners to stack on each retry —
-    //    a failed attempt would leave a dangling listener, so the next successful
-    //    call would fire duplicate chunks for every transcript event.
+    // 3. Assign the transcript handler AFTER startRecording confirms success.
+    //    A failed startRecording attempt leaves realtimeHandler null — no stale
+    //    handler from a failed attempt can accidentally process events.
     //
-    //    We also store the handler reference in `realtimeHandler` so that
-    //    stopRecallAI() can remove it precisely. Without removal, each call
-    //    start/stop cycle stacks another listener — after 3 calls you'd have
-    //    3 listeners firing simultaneously, tripling transcript chunks and AI costs.
+    // Dedup map: tracks the last emitted text per speaker.
+    // Recall.ai fires the same utterance event multiple times as the transcript
+    // engine processes it — sometimes milliseconds apart, sometimes 600ms+ apart.
+    // A time-based window misses the slower duplicates, so we track last emitted
+    // text and only emit when the text changes for that speaker.
+    //
+    // Genuine repeats (e.g. "Yes." said twice) re-emit correctly because other
+    // speech from that speaker between the repeats resets the tracker.
+    //
+    // Map is scoped here — GC'd with the handler when the call ends.
+    //
     // Event shape per Recall.ai docs:
-    //   evt.event              — string, e.g. "transcript.data"
-    //   evt.data.data.words    — array of { text: string } word objects
+    //   evt.event                      — string, e.g. "transcript.data"
+    //   evt.data.data.words            — array of { text: string } word objects
     //   evt.data.data.participant.name — speaker display name
+    const lastChunkPerSpeaker = new Map<string, string>();
+
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     realtimeHandler = (evt: any) => {
       if (evt.event !== "transcript.data") return;
@@ -270,10 +297,29 @@ export async function initRecallAI(options: RecallOptions): Promise<boolean> {
       const text = words.map((w) => w.text).join(" ").trim();
       if (!text) return;
       const speaker: string = evt.data?.data?.participant?.name ?? "Speaker";
-      lastChunkAt = Date.now(); // reset inactivity clock
+
+      // Always reset inactivity clock — duplicate events still represent real
+      // call activity and must prevent a false inactivity auto-stop.
+      lastChunkAt = Date.now();
+
+      // Drop consecutive duplicates — only emit when text changes per speaker
+      if (lastChunkPerSpeaker.get(speaker) === text) return;
+      lastChunkPerSpeaker.set(speaker, text);
+
       options.onChunk(`${speaker}: ${text}`);
     };
-    sdk.addEventListener("realtime-event", realtimeHandler);
+
+    // Register the delegate once — on the first call after startRecording.
+    // Subsequent calls reuse the same delegate by swapping realtimeHandler above.
+    // This prevents listener stacking across call start/stop cycles while
+    // respecting the SDK requirement that listeners be registered post-startRecording.
+    if (!realtimeListenerRegistered) {
+      sdk.addEventListener("realtime-event", (evt: unknown) => {
+        realtimeHandler?.(evt);
+      });
+      realtimeListenerRegistered = true;
+      console.log("[Recall AI] Realtime-event delegate registered");
+    }
 
     // ── Recording is confirmed active — now start all safeguard timers ────────
     isRunning   = true;
@@ -333,12 +379,9 @@ export function stopRecallAI(): void {
   if (approachingLimitTimer) { clearTimeout(approachingLimitTimer); approachingLimitTimer = null; }
   if (inactivityTimer)       { clearInterval(inactivityTimer);      inactivityTimer       = null; }
 
-  // Remove the realtime-event listener precisely — prevents listener stacking
-  // across multiple call sessions (start → stop → start → stop → ...).
-  if (realtimeHandler) {
-    try { sdk?.removeEventListener("realtime-event", realtimeHandler); } catch { /* no-op */ }
-    realtimeHandler = null;
-  }
+  // Null the handler — the one-time delegate registered in initRecallAI will
+  // no-op on incoming events until initRecallAI assigns a new handler next call.
+  realtimeHandler = null;
 
   if (sdk && recordingWindowId) {
     try {

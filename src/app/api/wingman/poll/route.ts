@@ -37,8 +37,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Empty transcript chunk" }, { status: 400 });
     }
 
-    // Limit chunk size to prevent abuse / DB bloat
-    if (transcript_chunk.length > 10_000) {
+    // Limit chunk size to prevent abuse / DB bloat.
+    // With correct dedup a 30s poll chunk is ~500-1000 chars — 50K is a
+    // generous ceiling that should never trigger in normal operation.
+    if (transcript_chunk.length > 50_000) {
       return NextResponse.json({ error: "Transcript chunk too large" }, { status: 400 });
     }
 

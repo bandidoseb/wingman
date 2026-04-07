@@ -371,45 +371,44 @@ export default function DashboardClient({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ── Outcome saved from HUD → fast path: clear skeleton immediately ──────────
+  // ── Outcome saved from HUD → refresh data but keep skeleton up ──────────────
+  // Don't clear the skeleton here — the post-call job (debrief) takes a few
+  // more seconds. The watch below clears it once both outcome AND summary land.
   useEffect(() => {
     if (!isElectron || !window.wingman) return;
     window.wingman.onOutcomeUpdated?.(() => {
-      setPendingOutcome(false);
-      pendingCallIdRef.current = null;
       router.refresh();
     });
     return () => { window.wingman?.offOutcomeUpdated?.(); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ── Polling fallback: refresh every 5s while waiting for the outcome ─────────
-  // This is the reliable path — it works even if the IPC message above never
-  // fires. Every 5 seconds we ask the server for fresh data. The effect below
-  // watches that data and clears the skeleton the moment the outcome appears.
+  // ── Poll every 5s while skeleton is up — catches both outcome and summary ────
   useEffect(() => {
     if (!pendingOutcome) return;
     const interval = setInterval(() => router.refresh(), 5000);
     return () => clearInterval(interval);
   }, [pendingOutcome, router]);
 
-  // ── Watch initialCalls: clear skeleton when pending call has an outcome ──────
+  // ── Clear skeleton only when outcome AND summary are both present ─────────────
+  // This ensures the debrief is ready before the call entry appears, so the
+  // user never needs to hard-refresh to see the full post-call data.
   useEffect(() => {
     if (!pendingOutcome || !pendingCallIdRef.current) return;
     const call = initialCalls.find((c) => c.id === pendingCallIdRef.current);
-    if (call?.outcome) {
+    if (call?.outcome && call?.summary) {
       setPendingOutcome(false);
       pendingCallIdRef.current = null;
     }
   }, [initialCalls, pendingOutcome]);
 
-  // ── Safety valve: clear skeleton after 10 min if nothing else does ───────────
+  // ── Safety valve: clear skeleton after 2 min if post-call job fails ──────────
   useEffect(() => {
     if (!pendingOutcome) return;
     const t = setTimeout(() => {
       setPendingOutcome(false);
       pendingCallIdRef.current = null;
-    }, 10 * 60 * 1000);
+    }, 2 * 60 * 1000);
     return () => clearTimeout(t);
   }, [pendingOutcome]);
 

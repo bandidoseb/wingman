@@ -323,6 +323,27 @@ These are the load-bearing walls of Wingman's architecture. They must never be v
 
 ---
 
+## The Plan Review Loop (Mandatory Before Presenting Any Plan)
+
+Before presenting any implementation plan to Sebastian, run this loop internally. Never present Plan A. Never say "we could also..." — pick the best solution and present only that.
+
+**Round 1 — Draft Plan A. Then immediately ask:**
+- What are the silent failure modes?
+- What are the race conditions or edge cases?
+- What assumptions am I making that could be wrong?
+- Is this fixing the symptom or the root cause?
+- What happens on the 2nd, 5th, 10th run of this code?
+- What happens if this runs during a network drop, a crash, or an unexpected state?
+- What does the user see if this fails silently?
+
+**Round 2 — Revise into Plan B. Run the same questions again.**
+
+**Keep iterating until every question above has a clean answer.** Only then present the final plan.
+
+**The bar:** a senior engineer at a well-funded startup would approve this plan without asking a single follow-up question.
+
+---
+
 ## Production Code Standards
 
 **Context:** Sebastian is a non-technical founder. He cannot catch bugs, race conditions, security holes, or cost-multiplying mistakes in code review. That responsibility falls entirely on Claude. The bar is: a senior engineer at a well-funded startup would approve this code before it ships to paying customers — without reservations.
