@@ -549,9 +549,9 @@ Rules:
 3. Confirm your understanding of the task before starting.
 
 ### Session End Protocol
-1. Update `CHANGELOG.md` with: what was completed, what was attempted but failed (and why), current known issues, and what's next.
-2. Run a git commit with a descriptive message before ending the session.
-3. Do not declare the session complete if any acceptance criteria remain unverified.
+1. **Always end every session with `/wrap`.** This is non-negotiable. The `/wrap` skill writes a new dated build log in the Obsidian brain (`Wingman Brain/01 - Build Log/YYYY-MM-DD.md`), updates Known Issues and Current Sprint, checks Railway deploy status, and commits everything. One file per session — 7 sessions = 7 separate files.
+2. Do not declare the session complete if any acceptance criteria remain unverified.
+3. Do not end without running `/wrap`. If Sebastian hasn't said "wrap it up" yet, remind him.
 
 ### Planning Rule
 - For any non-trivial feature (anything touching the RAG pipeline, Offer Brain, Recall.ai, or Supabase schema), write out the full implementation plan **before writing any code.** Wait for Sebastian's approval before proceeding.

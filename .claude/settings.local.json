@@ -91,7 +91,12 @@
       "Bash(mdls /Applications/Wingman.app)",
       "Bash(defaults read:*)",
       "Skill(update-config)",
-      "Skill(update-config:*)"
+      "Skill(update-config:*)",
+      "Bash(/usr/local/bin/node node_modules/.bin/tsc --noEmit --skipLibCheck)",
+      "WebFetch(domain:moody.mjarosz.com)",
+      "Bash(find ~/.claude/plugins/marketplaces/claude-plugins-official/plugins -name \"SKILL.md\" -exec grep -l \"^name: update-config\\\\|^name: simplify\\\\|^name: loop\\\\|^name: keybindings\" {} \\\\;)",
+      "Bash(mkdir -p ~/.claude/plugins/marketplaces/claude-plugins-official/plugins/wingman-wrap/.claude-plugin)",
+      "Bash(mkdir -p ~/.claude/plugins/marketplaces/claude-plugins-official/plugins/wingman-wrap/skills/wrap)"
     ]
   },
   "hooks": {
@@ -100,7 +105,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "echo '{\"systemMessage\": \"Before you go: type wrap up so I can update CHANGELOG.md and commit the session.\"}'"
+            "command": "echo '{\"systemMessage\": \"STOP. Before this session ends: has Sebastian said he is done for the day? If yes, you MUST invoke the wrap skill right now (/wrap). The wrap skill writes the Obsidian build log, updates Known Issues and Current Sprint, and commits. Do not end the session without doing this. If Sebastian has not said he is done, you may ignore this message.\"}'"
           }
         ]
       }
