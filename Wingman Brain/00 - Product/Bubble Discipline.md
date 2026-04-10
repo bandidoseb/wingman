@@ -1,6 +1,6 @@
 # Bubble Discipline
 
-Last updated: 2026-04-02
+Last updated: 2026-04-10
 
 This is the philosophy and ruleset governing when signal cards fire. This document exists because the most common failure mode for a product like Wingman is signal cards that fire too often. When that happens, reps ignore them. When reps ignore them, the product is dead — it's just a notification machine they've learned to dismiss.
 
@@ -8,21 +8,32 @@ Read this before building any feature that touches when or how cards fire.
 
 ---
 
-## The Two UI Elements
+## The Three UI Elements
 
-Wingman has two visible elements during a live call. They are emotionally different. This difference is not cosmetic — it's the product's core mechanic.
+Wingman has three visible elements during a live call. They operate at three different levels of attention. This hierarchy is not cosmetic — it's the product's core mechanic.
 
-### Stage Bar
-A quiet presence. Always visible in the corner of the screen. Tracks which stage of the call the rep is in. It says: *"I'm here. I'm with you."*
+### 1. Stage Bar
+A quiet presence. Always visible at the top-center of the screen. Tracks which stage of the call the rep is in. It says: *"I'm here. I'm with you."*
 
 The Stage Bar is passive. It doesn't demand attention. Reps glance at it the way a driver glances at a speedometer — briefly, automatically, without breaking focus. It provides orientation without interruption.
 
 **Emotional message:** "You're being seen. Keep going."
 
-### Suggestion Bubble (Signal Card)
-A rare intervention. Only fires when it matters. When it appears, it demands attention — because it's supposed to. It says: *"Stop. This moment matters. Here's what to do."*
+### 2. Ambient Dot (added 2026-04-10)
+An always-on presence. 8px pulsing dot in the bottom-left corner. Visible at all times while Wingman is live. No text. Never fires or changes. It says: *"I'm listening. Something may come."*
 
-The contrast between the passive Stage Bar and the active Suggestion Bubble is what gives the bubble its power. If the Stage Bar fired constantly, reps would ignore the bubble. The bubble works *because* it's rare.
+The ambient dot solves a specific cognitive problem: **on-call attention** (Stothart et al., 2015). When the dot is absent, the rep's brain reserves attentional capacity to monitor empty space for a card that might appear — a background cost that runs the entire call. The dot gives the brain something stable to monitor, eliminating this cost. After 5-10 calls, monitoring the dot becomes fully automatic.
+
+The dot is not an alert. It never pulses faster. It never changes color. It is infrastructure, not communication.
+
+**Emotional message:** "Wingman is here. You don't have to watch for it."
+
+### 3. Signal Card
+A rare intervention. Only fires when silence would cost money. When it appears, it is noticed — because it expands from where the ambient dot already lives. It says: *"This moment matters. Here's what to do."*
+
+The signal card is intentionally non-demanding in its visual design (dark, semi-transparent, fades in — never slides or pops) but its rarity is what gives it power. The rep has learned that when a card appears, it's worth a glance. That trust is built by almost never firing.
+
+The contrast between the passive ambient dot and the active signal card is what makes the card feel signal-like rather than noise-like. The dot is always there. The card is almost never there. When it is — it means something.
 
 **Emotional message:** "This moment is costing you money if you miss it."
 
@@ -103,3 +114,18 @@ Log anything here that threatens Bubble Discipline:
 - Session memory not working (cards fire for things already covered)
 - Cooldown logic breaking due to race conditions
 - Cards queuing instead of being discarded when one is already active
+- Ambient dot not showing while Wingman is live — removes the stable anchor and reintroduces on-call attention anxiety
+- Signal card appearing without the ambient dot having been present first — breaks the "expands from anchor" mental model
+
+---
+
+## Design Change Log
+
+**2026-04-10 — Visual redesign based on cognitive science research**
+- Signal cards moved from bottom-right → bottom-left (natural gaze aversion direction, Kendon 1967)
+- Animation changed from slide-up → fade in place, 200ms (suppresses orienting reflex, Franconeri & Simons 2003)
+- Card style changed from light colored (4 type variants) → unified dark semi-transparent (recedes visually, reduces focal attention competition)
+- Headline word limit reduced from ~20 words → ≤5 words (dual-task cognitive load limit, Pashler 1994)
+- Two-tier card format introduced: headline (≤5 words, always) + support sentence (objection/close stages only)
+- "Listening…" text removed → replaced by always-on 8px ambient pulsing dot (eliminates on-call attention cost, Stothart et al. 2015)
+- Full research documentation: `00 - Product/Signal Card Design Science.md`
