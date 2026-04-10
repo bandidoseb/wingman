@@ -1,8 +1,17 @@
 # Current Sprint
 
-Last updated: 2026-04-09
+Last updated: 2026-04-10
 
 This is the first file Claude reads at session start. It answers: where are we, what's next, and what's blocking us.
+
+---
+
+## What Was Just Completed (2026-04-10)
+
+- **Signal card visual redesign** — `electron/hud/index.html` fully updated. Cards now bottom-left, dark unified style, fade in/out animation, 18px bold white text, ambient pulsing dot replaces "Listening…", two-tier format (headline + support text for objection/close cards). All changes based on cognitive science research (see `00 - Product/Signal Card Design Science.md`).
+- **Brain files corrected for contradictions** — `Prompt Library.md` headline word limit updated (20 → ≤5 words, two-tier format rules added to actual Haiku prompt). `Signal Card Examples.md` fully rewritten in two-tier format. `Bubble Discipline.md` updated with ambient dot as third UI element + design change log.
+- **New research doc created** — `00 - Product/Signal Card Design Science.md` — full scientific basis for every design decision with named studies, marketing copy snippets, color spec, and adaptation timeline.
+- **Design spec preview file** — `tasks/signal-card-preview.html` — downloadable visual reference with side-by-side current vs. optimized, annotated with research citations.
 
 ---
 
@@ -46,8 +55,8 @@ This is the first file Claude reads at session start. It answers: where are we, 
 
 ## What's Next (Priority Order)
 
-1. **#1 — Run a real test call to confirm everything end-to-end**
-   Clean transcript (no duplicates), debrief appears without refresh, disposition saves, post-call grade shows. This is the acceptance test for today's session.
+1. **#1 — Update `knowledge-signal.ts` for new two-tier prompt format**
+   The signal card generation prompt now specifies ≤5-word headline + optional support sentence. The `knowledge-signal.ts` file needs to reflect this. Low effort, high impact — directly affects quality of every live card.
 
 2. **#2 — Fix post-call 502 on Anthropic overload**
    No retry logic in `post-call/route.ts`. If Anthropic returns `overloaded_error`, entire post-call job fails silently. Add 3 retries with exponential backoff. (Known Issue #13)
@@ -61,7 +70,7 @@ This is the first file Claude reads at session start. It answers: where are we, 
 5. **#5 — Stripe billing end-to-end test**
 
 6. **#6 — Beta onboarding email**
-   Must include: install steps, quarantine removal command, what to expect on first call.
+   Must include: install steps, quarantine removal command, what to expect on first call. Include adaptation timeline: "first 5-10 calls feel slightly different, by call 10 it's automatic."
 
 ---
 
