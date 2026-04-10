@@ -174,11 +174,13 @@
       "daily-notes:Open today's daily note": false,
       "templates:Insert template": false,
       "command-palette:Open command palette": false,
-      "bases:Create new base": false
+      "bases:Create new base": false,
+      "obsidian-git:Open Git source control": false
     }
   },
   "active": "f2d87738639a2665",
   "lastOpenFiles": [
+    "Untitled 1.canvas",
     "05 - Operations/Wrap Skill.md",
     "01 - Build Log/2026-04-07.md",
     "01 - Build Log/2026-04-02.md",
@@ -207,7 +209,6 @@
     "08 - People/Affiliates.md",
     "08 - People/Beta Users.md",
     "08 - People",
-    "07 - North Star/Vision.md",
     "07 - North Star",
     "06 - Finance",
     "05 - Operations",
