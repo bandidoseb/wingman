@@ -1,8 +1,17 @@
 # Current Sprint
 
-Last updated: 2026-04-07
+Last updated: 2026-04-09
 
 This is the first file Claude reads at session start. It answers: where are we, what's next, and what's blocking us.
+
+---
+
+## What Was Just Completed (2026-04-09)
+
+- **`/wrap` skill built** — session end automation. Writes daily build log, updates brain files, commits, asks for push approval. Active from next session restart.
+- **Obsidian brain added to GitHub** — `Wingman Brain/` removed from `.gitignore`, full vault pushed to repo for cross-device sync.
+- **Brain files cleaned up** — Roadmap updated (signal cards working), Decisions Log updated (4 new entries), 2026-04-07 build log written retrospectively.
+- **Stop hook hardened** — `.claude/settings.local.json` now explicitly reminds Claude to run `/wrap` before ending a session.
 
 ---
 
