@@ -1,0 +1,818 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Signal Card Design — Current vs. Optimized</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: #0f0f12;
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
+      color: #fff;
+      min-height: 100vh;
+      padding: 40px 32px;
+    }
+
+    h1 {
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: rgba(255,255,255,0.35);
+      margin-bottom: 32px;
+      text-align: center;
+    }
+
+    .columns {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+
+    .col-label {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      margin-bottom: 16px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+    }
+    .col-label.current { color: rgba(255,255,255,0.35); }
+    .col-label.new { color: #4ade80; }
+
+    /* ─── ZOOM MOCK SCREEN ─── */
+    .zoom-mock {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 16/10;
+      border-radius: 12px;
+      overflow: hidden;
+      background: #1a1a2e;
+      border: 1px solid rgba(255,255,255,0.07);
+    }
+
+    .zoom-bg {
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(135deg, #1e2a3a 0%, #162032 50%, #1a2538 100%);
+    }
+
+    /* fake prospect face tile */
+    .prospect-face {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -52%);
+      width: 38%;
+      aspect-ratio: 4/3;
+      background: linear-gradient(160deg, #2a3548 0%, #1e2d40 100%);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .prospect-avatar {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #3a4a6a, #2a3855);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      color: rgba(255,255,255,0.5);
+    }
+    .prospect-name {
+      font-size: 9px;
+      color: rgba(255,255,255,0.3);
+      letter-spacing: 0.04em;
+    }
+
+    /* fake self-view */
+    .self-view {
+      position: absolute;
+      bottom: 10px;
+      right: 10px;
+      width: 16%;
+      aspect-ratio: 4/3;
+      background: linear-gradient(135deg, #2a3040, #1e2535);
+      border-radius: 5px;
+      border: 1px solid rgba(255,255,255,0.1);
+    }
+
+    /* zoom toolbar */
+    .zoom-toolbar {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 32px;
+      background: rgba(0,0,0,0.5);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      padding: 0 12px;
+    }
+    .toolbar-btn {
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.12);
+    }
+    .toolbar-btn.red { background: rgba(255,59,48,0.7); }
+
+    /* stage bar mock */
+    .stage-bar {
+      position: absolute;
+      top: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(16,16,18,0.85);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 20px;
+      padding: 4px 12px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 8.5px;
+      color: rgba(255,255,255,0.4);
+      white-space: nowrap;
+    }
+    .stage-dot { width: 5px; height: 5px; border-radius: 50%; background: #34c759; flex-shrink: 0; }
+    .stage-active { color: rgba(255,255,255,0.85); font-weight: 600; }
+
+    /* ─────────────────────────────────────────
+       CURRENT DESIGN — light bg, bottom-right
+    ───────────────────────────────────────── */
+    .card-current {
+      position: absolute;
+      bottom: 44px;
+      right: 10px;
+      width: 38%;
+      border-radius: 10px;
+      padding: 10px 11px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      background: #fff0f0;
+      border: 1.5px solid rgba(192,57,43,0.3);
+      box-shadow: 0 4px 20px rgba(192,57,43,0.2);
+    }
+    .current-tag {
+      font-size: 7.5px;
+      font-weight: 700;
+      letter-spacing: 0.07em;
+      text-transform: uppercase;
+      color: #ff3b30;
+      background: rgba(255,255,255,0.6);
+      border: 1px solid rgba(192,57,43,0.25);
+      padding: 2px 6px;
+      border-radius: 4px;
+      align-self: flex-start;
+    }
+    .current-text {
+      font-size: 10px;
+      font-weight: 500;
+      color: #ff3b30;
+      line-height: 1.5;
+    }
+    .current-btn {
+      width: 100%;
+      padding: 5px;
+      border-radius: 5px;
+      background: rgba(255,255,255,0.5);
+      border: 1px solid rgba(192,57,43,0.25);
+      font-size: 9px;
+      font-weight: 600;
+      color: #ff3b30;
+      text-align: center;
+      cursor: pointer;
+    }
+
+    /* ─────────────────────────────────────────
+       NEW DESIGN — dark bg, bottom-left
+    ───────────────────────────────────────── */
+
+    /* Always-on ambient dot */
+    .ambient-dot {
+      position: absolute;
+      bottom: 44px;
+      left: 10px;
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.15);
+      border: 1px solid rgba(255,255,255,0.2);
+    }
+
+    /* Discovery/Rapport card — pure nudge, 2-4 words */
+    .card-new-nudge {
+      position: absolute;
+      bottom: 44px;
+      left: 10px;
+      width: 36%;
+      border-radius: 10px;
+      padding: 10px 12px;
+      background: rgba(18, 18, 24, 0.82);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(255,255,255,0.09);
+      box-shadow: 0 6px 32px rgba(0,0,0,0.45);
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+    .new-stage-label {
+      font-size: 7.5px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: rgba(255,255,255,0.28);
+    }
+    .new-headline {
+      font-size: 13px;
+      font-weight: 700;
+      color: rgba(255,255,255,0.93);
+      line-height: 1.2;
+      letter-spacing: -0.01em;
+    }
+    .new-dismiss {
+      margin-top: 2px;
+      font-size: 8px;
+      color: rgba(255,255,255,0.2);
+      font-weight: 500;
+      letter-spacing: 0.03em;
+      cursor: pointer;
+    }
+
+    /* Objection card — headline + support */
+    .card-new-objection {
+      position: absolute;
+      bottom: 44px;
+      left: 10px;
+      width: 42%;
+      border-radius: 10px;
+      padding: 10px 12px;
+      background: rgba(18, 18, 24, 0.82);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(255,255,255,0.09);
+      box-shadow: 0 6px 32px rgba(0,0,0,0.45);
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .new-support {
+      font-size: 9.5px;
+      color: rgba(255,255,255,0.42);
+      line-height: 1.5;
+      border-top: 1px solid rgba(255,255,255,0.07);
+      padding-top: 6px;
+      font-style: italic;
+    }
+
+    /* ─── ANNOTATIONS ─── */
+    .annotation-list {
+      margin-top: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .annotation {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      font-size: 11px;
+      color: rgba(255,255,255,0.45);
+      line-height: 1.4;
+    }
+    .annotation .dot {
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      margin-top: 4px;
+      flex-shrink: 0;
+    }
+    .annotation.bad .dot { background: rgba(255,59,48,0.7); }
+    .annotation.good .dot { background: #4ade80; }
+    .annotation strong { color: rgba(255,255,255,0.75); }
+
+    /* ─── CARD TYPE TABS ─── */
+    .tabs {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+    .tab {
+      padding: 5px 12px;
+      border-radius: 20px;
+      font-size: 10px;
+      font-weight: 600;
+      cursor: pointer;
+      border: 1px solid rgba(255,255,255,0.1);
+      color: rgba(255,255,255,0.35);
+      background: transparent;
+      letter-spacing: 0.03em;
+      transition: all 0.15s;
+    }
+    .tab.active {
+      background: rgba(255,255,255,0.1);
+      color: rgba(255,255,255,0.9);
+      border-color: rgba(255,255,255,0.2);
+    }
+
+    /* ─── SECTION DIVIDER ─── */
+    .section-divider {
+      max-width: 1100px;
+      margin: 40px auto 28px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+    .section-divider hr { flex: 1; border: none; border-top: 1px solid rgba(255,255,255,0.07); }
+    .section-divider span {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: rgba(255,255,255,0.2);
+      white-space: nowrap;
+    }
+
+    /* ─── SPEC TABLE ─── */
+    .spec-table {
+      max-width: 1100px;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+    }
+    .spec-card {
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.07);
+      border-radius: 10px;
+      padding: 14px 16px;
+    }
+    .spec-label {
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 0.09em;
+      text-transform: uppercase;
+      color: rgba(255,255,255,0.28);
+      margin-bottom: 6px;
+    }
+    .spec-value {
+      font-size: 13px;
+      font-weight: 600;
+      color: rgba(255,255,255,0.88);
+      line-height: 1.4;
+    }
+    .spec-note {
+      font-size: 10px;
+      color: rgba(255,255,255,0.35);
+      margin-top: 4px;
+      line-height: 1.4;
+    }
+    .spec-source {
+      font-size: 9px;
+      color: rgba(74,222,128,0.6);
+      margin-top: 6px;
+      font-style: italic;
+    }
+
+    /* ─── COLOR SWATCHES ─── */
+    .swatch-row {
+      max-width: 1100px;
+      margin: 0 auto;
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .swatch {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.07);
+      border-radius: 8px;
+      padding: 10px 14px;
+      flex: 1;
+      min-width: 180px;
+    }
+    .swatch-block {
+      width: 32px;
+      height: 32px;
+      border-radius: 6px;
+      flex-shrink: 0;
+      border: 1px solid rgba(255,255,255,0.1);
+    }
+    .swatch-info { display: flex; flex-direction: column; gap: 2px; }
+    .swatch-name { font-size: 11px; font-weight: 600; color: rgba(255,255,255,0.8); }
+    .swatch-hex { font-size: 10px; color: rgba(255,255,255,0.3); font-family: monospace; }
+    .swatch-use { font-size: 9.5px; color: rgba(255,255,255,0.35); }
+
+  </style>
+</head>
+<body>
+
+  <h1>Wingman Signal Card — Design Spec</h1>
+
+  <!-- ── SIDE BY SIDE MOCKUPS ── -->
+  <div class="columns">
+
+    <!-- LEFT: CURRENT -->
+    <div>
+      <div class="col-label current">Current Design</div>
+
+      <!-- Discovery stage card -->
+      <div style="margin-bottom: 10px; font-size: 10px; color: rgba(255,255,255,0.3); letter-spacing: 0.05em; text-transform: uppercase;">Discovery stage card</div>
+      <div class="zoom-mock">
+        <div class="zoom-bg"></div>
+        <div class="prospect-face">
+          <div class="prospect-avatar">👤</div>
+          <div class="prospect-name">Prospect</div>
+        </div>
+        <div class="self-view"></div>
+        <div class="stage-bar">
+          <div class="stage-dot"></div>
+          Rapport &nbsp;·&nbsp; Pre-frame &nbsp;·&nbsp; <span class="stage-active">Situation</span> &nbsp;·&nbsp; Pain &nbsp;·&nbsp; Outcome
+        </div>
+        <!-- current signal card -->
+        <div class="card-current">
+          <div class="current-tag">Suggest</div>
+          <div class="current-text">Ask about their current situation — what have they already tried to solve this?</div>
+          <div class="current-btn">Got it</div>
+        </div>
+        <div class="zoom-toolbar">
+          <div class="toolbar-btn"></div>
+          <div class="toolbar-btn"></div>
+          <div class="toolbar-btn red"></div>
+          <div class="toolbar-btn"></div>
+          <div class="toolbar-btn"></div>
+        </div>
+      </div>
+
+      <div style="margin-top: 18px; margin-bottom: 10px; font-size: 10px; color: rgba(255,255,255,0.3); letter-spacing: 0.05em; text-transform: uppercase;">Objection card</div>
+      <div class="zoom-mock">
+        <div class="zoom-bg"></div>
+        <div class="prospect-face">
+          <div class="prospect-avatar">👤</div>
+          <div class="prospect-name">Prospect</div>
+        </div>
+        <div class="self-view"></div>
+        <div class="stage-bar">
+          <div class="stage-dot"></div>
+          Situation &nbsp;·&nbsp; Pain &nbsp;·&nbsp; <span class="stage-active">Close</span>
+        </div>
+        <div class="card-current">
+          <div class="current-tag">Alert</div>
+          <div class="current-text">Price objection — acknowledge, reopen the pain gap, then ask what staying stuck has cost them</div>
+          <div class="current-btn">Got it</div>
+        </div>
+        <div class="zoom-toolbar">
+          <div class="toolbar-btn"></div>
+          <div class="toolbar-btn"></div>
+          <div class="toolbar-btn red"></div>
+          <div class="toolbar-btn"></div>
+          <div class="toolbar-btn"></div>
+        </div>
+      </div>
+
+      <div class="annotation-list">
+        <div class="annotation bad"><div class="dot"></div><div><strong>Light background</strong> — advances visually, competes with video feed</div></div>
+        <div class="annotation bad"><div class="dot"></div><div><strong>Saturated color text</strong> — draws focal attention (parvocellular pathway)</div></div>
+        <div class="annotation bad"><div class="dot"></div><div><strong>Slides up on entry</strong> — peripheral motion triggers orienting reflex involuntarily</div></div>
+        <div class="annotation bad"><div class="dot"></div><div><strong>Bottom-right</strong> — Gutenberg terminal area, highest resting attention</div></div>
+        <div class="annotation bad"><div class="dot"></div><div><strong>13.5px text</strong> — too small for peripheral reading (need 18-20px)</div></div>
+        <div class="annotation bad"><div class="dot"></div><div><strong>25+ words</strong> — far exceeds 8-word peripheral processing limit under stress</div></div>
+        <div class="annotation bad"><div class="dot"></div><div><strong>Disappears between cards</strong> — "on-call attention" anxiety, brain monitors empty space</div></div>
+      </div>
+    </div>
+
+    <!-- RIGHT: NEW -->
+    <div>
+      <div class="col-label new">Scientifically Optimized</div>
+
+      <!-- Discovery nudge card -->
+      <div style="margin-bottom: 10px; font-size: 10px; color: rgba(255,255,255,0.3); letter-spacing: 0.05em; text-transform: uppercase;">Discovery stage — pure nudge (≤4 words)</div>
+      <div class="zoom-mock">
+        <div class="zoom-bg"></div>
+        <div class="prospect-face">
+          <div class="prospect-avatar">👤</div>
+          <div class="prospect-name">Prospect</div>
+        </div>
+        <div class="self-view"></div>
+        <div class="stage-bar">
+          <div class="stage-dot"></div>
+          Rapport &nbsp;·&nbsp; Pre-frame &nbsp;·&nbsp; <span class="stage-active">Situation</span> &nbsp;·&nbsp; Pain &nbsp;·&nbsp; Outcome
+        </div>
+        <!-- ambient dot always visible -->
+        <div class="ambient-dot"></div>
+        <!-- new nudge card -->
+        <div class="card-new-nudge">
+          <div class="new-stage-label">Discovery</div>
+          <div class="new-headline">Dig deeper on pain.</div>
+          <div class="new-dismiss">tap to dismiss</div>
+        </div>
+        <div class="zoom-toolbar">
+          <div class="toolbar-btn"></div>
+          <div class="toolbar-btn"></div>
+          <div class="toolbar-btn red"></div>
+          <div class="toolbar-btn"></div>
+          <div class="toolbar-btn"></div>
+        </div>
+      </div>
+
+      <!-- Objection two-tier card -->
+      <div style="margin-top: 18px; margin-bottom: 10px; font-size: 10px; color: rgba(255,255,255,0.3); letter-spacing: 0.05em; text-transform: uppercase;">Objection card — headline + support</div>
+      <div class="zoom-mock">
+        <div class="zoom-bg"></div>
+        <div class="prospect-face">
+          <div class="prospect-avatar">👤</div>
+          <div class="prospect-name">Prospect</div>
+        </div>
+        <div class="self-view"></div>
+        <div class="stage-bar">
+          <div class="stage-dot"></div>
+          Situation &nbsp;·&nbsp; Pain &nbsp;·&nbsp; <span class="stage-active">Close</span>
+        </div>
+        <div class="ambient-dot" style="bottom: 44px; left: 10px;"></div>
+        <div class="card-new-objection">
+          <div class="new-stage-label">Objection — Price</div>
+          <div class="new-headline">Reopen the pain.</div>
+          <div class="new-support">"What has staying stuck cost you over the last 6 months?"</div>
+          <div class="new-dismiss">tap to dismiss</div>
+        </div>
+        <div class="zoom-toolbar">
+          <div class="toolbar-btn"></div>
+          <div class="toolbar-btn"></div>
+          <div class="toolbar-btn red"></div>
+          <div class="toolbar-btn"></div>
+          <div class="toolbar-btn"></div>
+        </div>
+      </div>
+
+      <div class="annotation-list">
+        <div class="annotation good"><div class="dot"></div><div><strong>Dark semi-transparent bg</strong> — recedes, blends with video feed (Bauer & Cavonius)</div></div>
+        <div class="annotation good"><div class="dot"></div><div><strong>White/neutral text only</strong> — no saturated colors competing for focal attention</div></div>
+        <div class="annotation good"><div class="dot"></div><div><strong>Fade in place, 200ms</strong> — suppresses orienting reflex (Google Glass / FAA standard)</div></div>
+        <div class="annotation good"><div class="dot"></div><div><strong>Bottom-left</strong> — "strong fallow" zone, natural downward-left thinking gaze</div></div>
+        <div class="annotation good"><div class="dot"></div><div><strong>18px headline</strong> — sized for peripheral resolution (Arditi & Cho, 2005)</div></div>
+        <div class="annotation good"><div class="dot"></div><div><strong>≤4 words headline</strong> — processable in single sub-second glance under stress</div></div>
+        <div class="annotation good"><div class="dot"></div><div><strong>Ambient dot always present</strong> — eliminates "on-call attention" anxiety (Stothart et al. 2015)</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── AMBIENT DOT SECTION ── -->
+  <div class="section-divider">
+    <hr /><span>Ambient Dot — Size Comparison (no signal card)</span><hr />
+  </div>
+
+  <div style="max-width: 1100px; margin: 0 auto 28px; font-size: 12px; color: rgba(255,255,255,0.4); line-height: 1.6;">
+    This is what sits in the bottom-left corner at all times between signal cards — the always-on anchor. Three size options below. The dot never pulses or animates on its own; it just sits there quietly so your brain isn't watching empty space.
+  </div>
+
+  <div style="max-width: 1100px; margin: 0 auto; display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px;">
+
+    <!-- 6px dot -->
+    <div>
+      <div style="font-size: 10px; color: rgba(255,255,255,0.3); letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 10px;">Option A — 6px (current)</div>
+      <div class="zoom-mock">
+        <div class="zoom-bg"></div>
+        <div class="prospect-face">
+          <div class="prospect-avatar">👤</div>
+          <div class="prospect-name">Prospect</div>
+        </div>
+        <div class="self-view"></div>
+        <div class="stage-bar">
+          <div class="stage-dot"></div>
+          <span class="stage-active">Situation</span> &nbsp;·&nbsp; Pain &nbsp;·&nbsp; Outcome
+        </div>
+        <!-- 6px ambient dot only -->
+        <div style="position:absolute; bottom:44px; left:12px; width:6px; height:6px; border-radius:50%; background:rgba(255,255,255,0.18); border:1px solid rgba(255,255,255,0.25);"></div>
+        <div class="zoom-toolbar">
+          <div class="toolbar-btn"></div>
+          <div class="toolbar-btn"></div>
+          <div class="toolbar-btn red"></div>
+          <div class="toolbar-btn"></div>
+          <div class="toolbar-btn"></div>
+        </div>
+      </div>
+      <div style="margin-top:10px; font-size:11px; color:rgba(255,255,255,0.35);">Very subtle. Barely visible. Peripheral brain registers it's there — may be too easy to miss entirely.</div>
+    </div>
+
+    <!-- 8px dot -->
+    <div>
+      <div style="font-size: 10px; color: rgba(255,255,255,0.3); letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 10px;">Option B — 8px ★ recommended</div>
+      <div class="zoom-mock">
+        <div class="zoom-bg"></div>
+        <div class="prospect-face">
+          <div class="prospect-avatar">👤</div>
+          <div class="prospect-name">Prospect</div>
+        </div>
+        <div class="self-view"></div>
+        <div class="stage-bar">
+          <div class="stage-dot"></div>
+          <span class="stage-active">Situation</span> &nbsp;·&nbsp; Pain &nbsp;·&nbsp; Outcome
+        </div>
+        <!-- 8px ambient dot only -->
+        <div style="position:absolute; bottom:44px; left:12px; width:8px; height:8px; border-radius:50%; background:rgba(255,255,255,0.2); border:1px solid rgba(255,255,255,0.3);"></div>
+        <div class="zoom-toolbar">
+          <div class="toolbar-btn"></div>
+          <div class="toolbar-btn"></div>
+          <div class="toolbar-btn red"></div>
+          <div class="toolbar-btn"></div>
+          <div class="toolbar-btn"></div>
+        </div>
+      </div>
+      <div style="margin-top:10px; font-size:11px; color:rgba(255,255,255,0.35);">Sweet spot. Noticeable enough to register, small enough to ignore. Brain learns to monitor this zone without effort.</div>
+    </div>
+
+    <!-- Small pill -->
+    <div>
+      <div style="font-size: 10px; color: rgba(255,255,255,0.3); letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 10px;">Option C — Small pill</div>
+      <div class="zoom-mock">
+        <div class="zoom-bg"></div>
+        <div class="prospect-face">
+          <div class="prospect-avatar">👤</div>
+          <div class="prospect-name">Prospect</div>
+        </div>
+        <div class="self-view"></div>
+        <div class="stage-bar">
+          <div class="stage-dot"></div>
+          <span class="stage-active">Situation</span> &nbsp;·&nbsp; Pain &nbsp;·&nbsp; Outcome
+        </div>
+        <!-- small pill ambient indicator -->
+        <div style="position:absolute; bottom:44px; left:12px; display:flex; align-items:center; gap:5px; background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.1); border-radius:20px; padding:3px 8px;">
+          <div style="width:5px; height:5px; border-radius:50%; background:rgba(255,255,255,0.3);"></div>
+          <span style="font-size:8px; color:rgba(255,255,255,0.25); letter-spacing:0.05em; font-family:-apple-system,sans-serif;">wingman</span>
+        </div>
+        <div class="zoom-toolbar">
+          <div class="toolbar-btn"></div>
+          <div class="toolbar-btn"></div>
+          <div class="toolbar-btn red"></div>
+          <div class="toolbar-btn"></div>
+          <div class="toolbar-btn"></div>
+        </div>
+      </div>
+      <div style="margin-top:10px; font-size:11px; color:rgba(255,255,255,0.35);">More visible. Has a label so you always know Wingman is live. Card expands from this pill. More presence but also more screen real estate.</div>
+    </div>
+
+  </div>
+
+  <!-- ── SPEC TABLE ── -->
+  <div class="section-divider">
+    <hr /><span>Full Design Spec — Scientifically Sourced</span><hr />
+  </div>
+
+  <div class="spec-table">
+    <div class="spec-card">
+      <div class="spec-label">Position</div>
+      <div class="spec-value">Bottom-left</div>
+      <div class="spec-note">80px from bottom, 32px from left edge</div>
+      <div class="spec-source">Z-pattern + gaze aversion research, EBU subtitle standards</div>
+    </div>
+    <div class="spec-card">
+      <div class="spec-label">Animation In</div>
+      <div class="spec-value">Fade in place</div>
+      <div class="spec-note">200ms, ease-in curve. No slide, no scale, no bounce.</div>
+      <div class="spec-source">Franconeri & Simons 2003, Google Glass HIG, FAA HUD standard</div>
+    </div>
+    <div class="spec-card">
+      <div class="spec-label">Animation Out</div>
+      <div class="spec-value">Fade out</div>
+      <div class="spec-note">150ms ease-out. Abrupt disappearance also triggers orienting reflex.</div>
+      <div class="spec-source">Yantis & Jonides 1984 — onset/offset attention capture</div>
+    </div>
+    <div class="spec-card">
+      <div class="spec-label">Background</div>
+      <div class="spec-value">rgba(18,18,24, 0.82)</div>
+      <div class="spec-note">Dark blue-gray, 82% opacity + backdrop blur</div>
+      <div class="spec-source">Bauer & Cavonius 1980, automotive HUD opacity research</div>
+    </div>
+    <div class="spec-card">
+      <div class="spec-label">Headline Text</div>
+      <div class="spec-value">18px, weight 700</div>
+      <div class="spec-note">rgba(255,255,255,0.93) — near-white, not pure white</div>
+      <div class="spec-source">Arditi & Cho 2005 — peripheral font size requirements</div>
+    </div>
+    <div class="spec-card">
+      <div class="spec-label">Support Text</div>
+      <div class="spec-value">12px, weight 400</div>
+      <div class="spec-note">rgba(255,255,255,0.42) — clearly secondary, italic</div>
+      <div class="spec-source">Visual hierarchy — subordinate text shouldn't compete with headline</div>
+    </div>
+    <div class="spec-card">
+      <div class="spec-label">Font</div>
+      <div class="spec-value">System sans-serif</div>
+      <div class="spec-note">SF Pro on Mac. No dyslexic font — benefit is dyslexia-specific, not general.</div>
+      <div class="spec-source">Arditi & Cho 2005 — sans-serif superior for peripheral readability</div>
+    </div>
+    <div class="spec-card">
+      <div class="spec-label">Card Width</div>
+      <div class="spec-value">280px max</div>
+      <div class="spec-note">Nudge cards ~220px. Objection cards up to 280px.</div>
+      <div class="spec-source">NHTSA glance research — minimize eye travel from primary task</div>
+    </div>
+    <div class="spec-card">
+      <div class="spec-label">Word Count</div>
+      <div class="spec-value">Headline: ≤5 words</div>
+      <div class="spec-note">Body: 1 sentence max. Headline alone must be actionable.</div>
+      <div class="spec-source">Pashler 1994 dual-task + Arnsten 2009 stress/WM research</div>
+    </div>
+    <div class="spec-card">
+      <div class="spec-label">Ambient Element</div>
+      <div class="spec-value">Always-on dot</div>
+      <div class="spec-note">6px dot at bottom-left. Always visible. Card expands from it.</div>
+      <div class="spec-source">Stothart et al. 2015 — eliminates on-call attention cost</div>
+    </div>
+    <div class="spec-card">
+      <div class="spec-label">Accent Colors</div>
+      <div class="spec-value">None / muted only</div>
+      <div class="spec-note">No red, green, orange, blue text. Saturated colors activate focal attention.</div>
+      <div class="spec-source">Treisman Feature Integration Theory — color as pre-attentive feature</div>
+    </div>
+    <div class="spec-card">
+      <div class="spec-label">Border</div>
+      <div class="spec-value">rgba(255,255,255,0.09)</div>
+      <div class="spec-note">Barely visible. Defines the card without demanding attention.</div>
+      <div class="spec-source">Ambient/focal attention model — secondary info should be detectable, not demanding</div>
+    </div>
+  </div>
+
+  <!-- ── COLOR PALETTE ── -->
+  <div class="section-divider">
+    <hr /><span>Color System</span><hr />
+  </div>
+
+  <div class="swatch-row">
+    <div class="swatch">
+      <div class="swatch-block" style="background: rgba(18,18,24,0.82);"></div>
+      <div class="swatch-info">
+        <div class="swatch-name">Card Background</div>
+        <div class="swatch-hex">rgba(18, 18, 24, 0.82)</div>
+        <div class="swatch-use">Main card surface</div>
+      </div>
+    </div>
+    <div class="swatch">
+      <div class="swatch-block" style="background: rgba(255,255,255,0.93);"></div>
+      <div class="swatch-info">
+        <div class="swatch-name">Headline Text</div>
+        <div class="swatch-hex">rgba(255, 255, 255, 0.93)</div>
+        <div class="swatch-use">Primary action text</div>
+      </div>
+    </div>
+    <div class="swatch">
+      <div class="swatch-block" style="background: rgba(255,255,255,0.42);"></div>
+      <div class="swatch-info">
+        <div class="swatch-name">Support Text</div>
+        <div class="swatch-hex">rgba(255, 255, 255, 0.42)</div>
+        <div class="swatch-use">Example line, italic</div>
+      </div>
+    </div>
+    <div class="swatch">
+      <div class="swatch-block" style="background: rgba(255,255,255,0.28);"></div>
+      <div class="swatch-info">
+        <div class="swatch-name">Stage Label</div>
+        <div class="swatch-hex">rgba(255, 255, 255, 0.28)</div>
+        <div class="swatch-use">Small caps label above headline</div>
+      </div>
+    </div>
+    <div class="swatch">
+      <div class="swatch-block" style="background: rgba(255,255,255,0.09); border: 1px solid rgba(255,255,255,0.18);"></div>
+      <div class="swatch-info">
+        <div class="swatch-name">Card Border</div>
+        <div class="swatch-hex">rgba(255, 255, 255, 0.09)</div>
+        <div class="swatch-use">Edge definition only</div>
+      </div>
+    </div>
+    <div class="swatch">
+      <div class="swatch-block" style="background: rgba(255,255,255,0.15); border-radius: 50%;"></div>
+      <div class="swatch-info">
+        <div class="swatch-name">Ambient Dot</div>
+        <div class="swatch-hex">rgba(255, 255, 255, 0.15)</div>
+        <div class="swatch-use">Always-on anchor element</div>
+      </div>
+    </div>
+  </div>
+
+  <div style="max-width: 1100px; margin: 40px auto 0; padding: 16px 20px; background: rgba(74,222,128,0.06); border: 1px solid rgba(74,222,128,0.15); border-radius: 10px;">
+    <div style="font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: rgba(74,222,128,0.7); margin-bottom: 6px;">Card Format by Stage</div>
+    <div style="font-size: 12px; color: rgba(255,255,255,0.55); line-height: 1.7;">
+      <strong style="color: rgba(255,255,255,0.75);">Rapport → Discovery → Transition:</strong> Headline only. ≤4 words. Pure directional nudge. No body text.<br>
+      <strong style="color: rgba(255,255,255,0.75);">Objections → Close:</strong> Headline (≤5 words, actionable alone) + italic support sentence (example question or framing). Rep reads headline on glance, body during natural pause before responding.
+    </div>
+  </div>
+
+</body>
+</html>
