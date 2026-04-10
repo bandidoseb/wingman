@@ -132,116 +132,123 @@
       50%       { opacity: 0.2; }
     }
 
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to   { opacity: 1; }
+    }
+
+    @keyframes fadeOut {
+      from { opacity: 1; }
+      to   { opacity: 0; }
+    }
+
+    @keyframes ambientPulse {
+      0%, 100% { opacity: 0.45; }
+      50%       { opacity: 1; }
+    }
+
     /* ══════════════════════════════════════════════════════════════════════
-       COMPONENT 2 — SUGGESTION BUBBLE
-       Bottom-right corner, appears only when a signal fires
+       COMPONENT 2 — SIGNAL CARD
+       Bottom-left corner, appears only when a signal fires.
+       Unified dark style — no color coding by type.
     ══════════════════════════════════════════════════════════════════════ */
     #signalBubble {
       position: absolute;
       bottom: 80px;
-      right: 32px;
-      width: 296px;
+      left: 32px;
+      width: 280px;
       z-index: 100;
       display: none;
       flex-direction: column;
+      gap: 5px;
       border-radius: 14px;
       padding: 14px 16px;
-      pointer-events: auto;          /* bubble IS interactive — click passes through */
+      pointer-events: auto;
+      background: rgba(18, 18, 24, 0.82);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(255, 255, 255, 0.09);
+      box-shadow: 0 6px 32px rgba(0, 0, 0, 0.5);
     }
 
     #signalBubble.visible {
       display: flex;
-      animation: fadeUp 0.3s ease forwards;
+      animation: fadeIn 0.2s ease-in forwards;
     }
 
-    @keyframes fadeUp {
-      from { opacity: 0; transform: translateY(10px); }
-      to   { opacity: 1; transform: translateY(0); }
+    #signalBubble.hiding {
+      animation: fadeOut 0.15s ease-out forwards;
     }
 
-    /* Per-type colors — Alert / Ready / Topic / Suggest */
-    #signalBubble.alert {
-      background: #fff0f0;
-      border: 1.5px solid rgba(192, 57, 43, 0.3);
-      box-shadow: 0 4px 28px rgba(192,57,43,0.2), 0 0 0 1px rgba(192,57,43,0.3);
-    }
-    #signalBubble.ready {
-      background: #f0faf4;
-      border: 1.5px solid rgba(52, 199, 89, 0.3);
-      box-shadow: 0 4px 28px rgba(52,199,89,0.2), 0 0 0 1px rgba(52,199,89,0.3);
-    }
-    #signalBubble.topic {
-      background: #fff8ee;
-      border: 1.5px solid rgba(255, 159, 10, 0.3);
-      box-shadow: 0 4px 28px rgba(255,159,10,0.2), 0 0 0 1px rgba(255,159,10,0.3);
-    }
-    #signalBubble.suggest {
-      background: #eef5ff;
-      border: 1.5px solid rgba(0, 122, 255, 0.3);
-      box-shadow: 0 4px 28px rgba(0,122,255,0.2), 0 0 0 1px rgba(0,122,255,0.3);
-    }
-
-    /* Signal type tag pill */
+    /* Stage label — small muted caps above headline */
     #signalTag {
-      display: inline-block;
-      align-self: flex-start;
-      font-size: 9.5px;
+      font-size: 9px;
       font-weight: 700;
-      letter-spacing: 0.06em;
+      letter-spacing: 0.09em;
       text-transform: uppercase;
-      background: rgba(255, 255, 255, 0.6);
-      padding: 3px 9px;
-      border-radius: 5px;
-      margin-bottom: 7px;
+      color: rgba(255, 255, 255, 0.28);
     }
-    #signalBubble.alert  #signalTag { color: #ff3b30; border: 1px solid rgba(192,57,43,0.3); }
-    #signalBubble.ready  #signalTag { color: #34c759; border: 1px solid rgba(52,199,89,0.3); }
-    #signalBubble.topic  #signalTag { color: #ff9f0a; border: 1px solid rgba(255,159,10,0.3); }
-    #signalBubble.suggest #signalTag { color: #4a90d9; border: 1px solid rgba(0,122,255,0.3); }
 
-    /* Signal text */
+    /* Headline — 18px bold, actionable alone in a single glance */
     #signalText {
-      font-size: 13.5px;
-      font-weight: 500;
-      line-height: 1.5;
+      font-size: 18px;
+      font-weight: 700;
+      line-height: 1.2;
       letter-spacing: -0.01em;
-      margin-bottom: 12px;
+      color: rgba(255, 255, 255, 0.93);
     }
-    #signalBubble.alert   #signalText { color: #ff3b30; }
-    #signalBubble.ready   #signalText { color: #34c759; }
-    #signalBubble.topic   #signalText { color: #ff9f0a; }
-    #signalBubble.suggest #signalText { color: #4a90d9; }
 
-    /* "got it" dismiss button */
+    /* Support text — shown for objection/close cards only, read during pause */
+    #signalSupport {
+      font-size: 12px;
+      font-weight: 400;
+      font-style: italic;
+      line-height: 1.5;
+      color: rgba(255, 255, 255, 0.42);
+      border-top: 1px solid rgba(255, 255, 255, 0.07);
+      padding-top: 8px;
+      margin-top: 2px;
+      display: none;
+    }
+    #signalSupport.visible { display: block; }
+
+    /* Dismiss button — dark theme */
     #gotItBtn {
       width: 100%;
       padding: 7px;
       border-radius: 8px;
-      background: rgba(255, 255, 255, 0.5);
-      font-size: 12px;
+      background: rgba(255, 255, 255, 0.07);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      color: rgba(255, 255, 255, 0.35);
+      font-size: 11px;
       font-weight: 600;
       cursor: pointer;
       font-family: inherit;
-      transition: background 0.15s;
+      margin-top: 4px;
+      transition: background 0.15s, color 0.15s;
     }
-    #gotItBtn:hover { background: rgba(255,255,255,0.8); }
-    #signalBubble.alert   #gotItBtn { color: #ff3b30; border: 1px solid rgba(192,57,43,0.3); }
-    #signalBubble.ready   #gotItBtn { color: #34c759; border: 1px solid rgba(52,199,89,0.3); }
-    #signalBubble.topic   #gotItBtn { color: #ff9f0a; border: 1px solid rgba(255,159,10,0.3); }
-    #signalBubble.suggest #gotItBtn { color: #4a90d9; border: 1px solid rgba(0,122,255,0.3); }
+    #gotItBtn:hover {
+      background: rgba(255, 255, 255, 0.13);
+      color: rgba(255, 255, 255, 0.7);
+    }
 
-    /* ── "Listening…" — shown when live but no signal ───────────────────── */
-    #listeningText {
+    /* ── Ambient dot — always visible while Wingman is live, no signal ──── */
+    #ambientDot {
       position: absolute;
       bottom: 80px;
-      right: 32px;
-      font-size: 11px;
-      color: rgba(255, 255, 255, 0.2);
-      font-style: italic;
-      display: none;
+      left: 32px;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.2);
+      border: 1px solid rgba(255, 255, 255, 0.3);
       pointer-events: none;
+      display: none;
     }
-    #listeningText.visible { display: block; }
+    #ambientDot.visible {
+      display: block;
+      animation: ambientPulse 3s ease-in-out infinite;
+    }
 
     /* ══════════════════════════════════════════════════════════════════════
        SHARED TOAST BASE — Detection + Manual Trigger share most styles
@@ -625,8 +632,8 @@
     <button id="stopBtn" title="End call">■</button>
   </div>
 
-  <!-- "Listening…" indicator (live, no active signal) -->
-  <div id="listeningText">Listening…</div>
+  <!-- Ambient dot — always visible while Wingman is live, no signal showing -->
+  <div id="ambientDot"></div>
 
   <!-- COMPONENT 3A: Call Detection Toast -->
   <div id="detectionToast" class="wingman-toast">
@@ -710,10 +717,11 @@
     <div id="outcomeError">Couldn't save — log it in Flight Log</div>
   </div>
 
-  <!-- COMPONENT 2: Suggestion Bubble -->
+  <!-- COMPONENT 2: Signal Card -->
   <div id="signalBubble">
-    <div id="signalTag">ALERT</div>
-    <div id="signalText">Signal text goes here</div>
+    <div id="signalTag"></div>
+    <div id="signalText"></div>
+    <div id="signalSupport"></div>
     <button id="gotItBtn">got it</button>
   </div>
 
@@ -753,8 +761,10 @@
     const signalBubble         = document.getElementById('signalBubble');
     const signalTag            = document.getElementById('signalTag');
     const signalTextEl         = document.getElementById('signalText');
+    const signalSupportEl      = document.getElementById('signalSupport');
     const gotItBtn             = document.getElementById('gotItBtn');
-    const listeningText        = document.getElementById('listeningText');
+    const ambientDot           = document.getElementById('ambientDot');
+    let   hideSignalTimer      = null;
     const outcomeCard          = document.getElementById('outcomeCard');
     const outcomePills         = document.getElementById('outcomePills');
     const outcomeConfirm       = document.getElementById('outcomeConfirm');
@@ -999,13 +1009,13 @@
         startTimer();
         stageBar.classList.remove('glow-red');
         stageBar.classList.add('glow-blue');
-        if (!signalActive) listeningText.classList.add('visible');
+        if (!signalActive) ambientDot.classList.add('visible');
         stopBtn.classList.add('visible');
       } else {
         liveDot.classList.remove('live');
         stopTimer();
         stageBar.classList.remove('glow-blue', 'glow-red', 'active');
-        listeningText.classList.remove('visible');
+        ambientDot.classList.remove('visible');
         stopBtn.classList.remove('visible');
       }
     }
@@ -1039,22 +1049,34 @@
       });
     }
 
-    // ── Show a signal bubble ──────────────────────────────────────────────
+    // ── Show a signal card ────────────────────────────────────────────────
     function showSignal(signal) {
       const typeInfo = TYPE_MAP[signal.type] || TYPE_MAP['Nudge'];
       currentSignalType = typeInfo.cls;
 
-      const displayText = signal.header && signal.text
-        ? signal.header + ' — ' + signal.text
-        : signal.header || signal.text || '';
+      // Cancel any in-progress hide animation
+      clearTimeout(hideSignalTimer);
+      signalBubble.classList.remove('hiding');
 
-      signalBubble.className = 'signal-card visible ' + typeInfo.cls;
-      signalTag.textContent   = typeInfo.label.toUpperCase();
-      signalTextEl.textContent = displayText;
+      // Stage label: use current call stage if available, fallback to type label
+      signalTag.textContent = (currentStage || typeInfo.label).toUpperCase();
 
-      signalBubble.classList.add('visible');
+      // Headline — signal.header is the short actionable phrase (≤5 words)
+      signalTextEl.textContent = signal.header || signal.text || '';
+
+      // Support text — signal.text shown only when header also exists (two-tier cards)
+      if (signal.header && signal.text) {
+        signalSupportEl.textContent = signal.text;
+        signalSupportEl.classList.add('visible');
+      } else {
+        signalSupportEl.textContent = '';
+        signalSupportEl.classList.remove('visible');
+      }
+
+      // Show card, hide ambient dot
+      signalBubble.className = 'signal-card visible';
+      ambientDot.classList.remove('visible');
       signalActive = true;
-      listeningText.classList.remove('visible');
 
       stageBar.classList.remove('glow-blue', 'glow-red');
       if (typeInfo.cls === 'alert') {
@@ -1067,19 +1089,25 @@
     }
 
     function hideSignal() {
-      signalBubble.className = 'signal-card';
+      clearTimeout(hideSignalTimer);
+      signalBubble.classList.add('hiding');
       signalActive = false;
       currentSignalType = null;
 
       stageBar.classList.remove('glow-red');
       if (isLive) {
         stageBar.classList.add('glow-blue');
-        listeningText.classList.add('visible');
+        ambientDot.classList.add('visible');
       }
 
       // Don't re-enable pass-through if user is mid-drag — the mouseup/mouseleave
       // handlers will restore it once the drag ends or the mouse leaves the bar.
       if (!isDragging && window.hud) window.hud.setMouseIgnore(true);
+
+      // After fade-out completes, fully hide the card
+      hideSignalTimer = setTimeout(() => {
+        signalBubble.classList.remove('visible', 'hiding');
+      }, 150);
     }
 
     // ── Dismiss button ────────────────────────────────────────────────────

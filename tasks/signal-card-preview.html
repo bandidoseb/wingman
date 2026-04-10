@@ -95,7 +95,7 @@
     .zoom-mock {
       position: relative;
       width: 100%;
-      aspect-ratio: 16/9;
+      aspect-ratio: 16/10;
       border-radius: 12px;
       overflow: hidden;
       background: #1a1a2e;
@@ -155,25 +155,25 @@
     /* ─── CURRENT CARD (light, bottom-right) ─── */
     .card-current {
       position: absolute;
-      bottom: 34px; right: 8px;
-      width: 30%;
-      border-radius: 8px; padding: 6px 7px;
-      display: flex; flex-direction: column; gap: 3px;
+      bottom: 40px; right: 14px;
+      width: 42%;
+      border-radius: 10px; padding: 12px 14px;
+      display: flex; flex-direction: column; gap: 7px;
     }
     .card-current.alert { background: #fff0f0; border: 1.5px solid rgba(192,57,43,0.3); box-shadow: 0 4px 20px rgba(192,57,43,0.2); }
     .card-current.suggest { background: #eef5ff; border: 1.5px solid rgba(0,122,255,0.3); box-shadow: 0 4px 20px rgba(0,122,255,0.2); }
     .current-tag {
-      font-size: 6.5px; font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase;
-      background: rgba(255,255,255,0.6); padding: 2px 4px; border-radius: 3px; align-self: flex-start;
+      font-size: 9px; font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase;
+      background: rgba(255,255,255,0.6); padding: 3px 7px; border-radius: 4px; align-self: flex-start;
     }
     .card-current.alert .current-tag { color: #ff3b30; border: 1px solid rgba(192,57,43,0.25); }
     .card-current.suggest .current-tag { color: #4a90d9; border: 1px solid rgba(0,122,255,0.25); }
-    .current-text { font-size: 7.5px; font-weight: 500; line-height: 1.4; }
+    .current-text { font-size: 13px; font-weight: 500; line-height: 1.5; }
     .card-current.alert .current-text { color: #ff3b30; }
     .card-current.suggest .current-text { color: #4a90d9; }
     .current-btn {
-      width: 100%; padding: 3px; border-radius: 4px;
-      background: rgba(255,255,255,0.5); font-size: 7.5px; font-weight: 600;
+      width: 100%; padding: 7px; border-radius: 7px;
+      background: rgba(255,255,255,0.5); font-size: 12px; font-weight: 600;
       text-align: center; cursor: pointer; border: none;
     }
     .card-current.alert .current-btn { color: #ff3b30; border: 1px solid rgba(192,57,43,0.25); }
@@ -182,9 +182,9 @@
     /* ─── NEW CARD (dark, bottom-left) ─── */
     .card-new {
       position: absolute;
-      bottom: 34px; left: 8px;
-      width: 34%;
-      border-radius: 8px; padding: 7px 9px;
+      bottom: 40px; left: 14px;
+      width: 40%;
+      border-radius: 12px; padding: 14px 16px;
       background: rgba(18, 18, 24, 0.82);
       backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
       border: 1px solid rgba(255,255,255,0.09);
@@ -192,29 +192,29 @@
       display: flex; flex-direction: column; gap: 4px;
     }
     .new-stage-label {
-      font-size: 6.5px; font-weight: 700; letter-spacing: 0.09em;
+      font-size: 9px; font-weight: 700; letter-spacing: 0.09em;
       text-transform: uppercase; color: rgba(255,255,255,0.28);
     }
     .new-headline {
-      font-size: 9.5px; font-weight: 700;
+      font-size: 18px; font-weight: 700;
       color: rgba(255,255,255,0.93);
-      line-height: 1.25; letter-spacing: -0.01em;
+      line-height: 1.2; letter-spacing: -0.01em;
     }
     .new-support {
-      font-size: 7.5px; color: rgba(255,255,255,0.42);
-      line-height: 1.4; font-style: italic;
+      font-size: 12px; color: rgba(255,255,255,0.42);
+      line-height: 1.5; font-style: italic;
       border-top: 1px solid rgba(255,255,255,0.07);
-      padding-top: 4px; margin-top: 1px;
+      padding-top: 8px; margin-top: 2px;
     }
     .new-dismiss {
-      font-size: 6px; color: rgba(255,255,255,0.18);
-      font-weight: 500; letter-spacing: 0.03em; cursor: pointer; margin-top: 1px;
+      font-size: 10px; color: rgba(255,255,255,0.18);
+      font-weight: 500; letter-spacing: 0.03em; cursor: pointer; margin-top: 2px;
     }
 
     /* Ambient dot — pulsing */
     .ambient-dot-live {
       position: absolute;
-      bottom: 34px; left: 8px;
+      bottom: 40px; left: 14px;
       width: 8px; height: 8px; border-radius: 50%;
       background: rgba(255,255,255,0.2);
       border: 1px solid rgba(255,255,255,0.3);
@@ -349,7 +349,7 @@
         <div class="stage-bar"><div class="stage-dot"></div>Rapport · Pre-frame · <span class="stage-active">Situation</span> · Pain</div>
         <div class="card-current suggest">
           <div class="current-tag">Suggest</div>
-          <div class="current-text">Ask what they've tried to solve this already</div>
+          <div class="current-text">Ask about their current situation — what have they already tried to solve this?</div>
           <div class="current-btn">Got it</div>
         </div>
         <div class="zoom-toolbar"><div class="toolbar-btn"></div><div class="toolbar-btn"></div><div class="toolbar-btn red"></div><div class="toolbar-btn"></div><div class="toolbar-btn"></div></div>
@@ -363,7 +363,7 @@
         <div class="stage-bar"><div class="stage-dot"></div>Pain · Outcome · Transition · <span class="stage-active">Close</span></div>
         <div class="card-current alert">
           <div class="current-tag">Alert</div>
-          <div class="current-text">Price objection — reopen pain, ask what staying stuck has cost them</div>
+          <div class="current-text">Price objection — acknowledge, reopen the pain gap, then ask what staying stuck has cost them</div>
           <div class="current-btn">Got it</div>
         </div>
         <div class="zoom-toolbar"><div class="toolbar-btn"></div><div class="toolbar-btn"></div><div class="toolbar-btn red"></div><div class="toolbar-btn"></div><div class="toolbar-btn"></div></div>
