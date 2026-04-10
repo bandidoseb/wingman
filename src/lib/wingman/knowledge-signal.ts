@@ -1,32 +1,60 @@
 /**
  * knowledge-signal.ts — Signal card compression via Claude Haiku
  *
- * generateSignalCard(knowledgeResults, transcriptChunk):
- *   Takes the best-matching KB technique and compresses it into a
- *   first-person, 12-word-max signal card the rep can read in under 2 seconds.
+ * generateSignalCard(knowledgeResults, transcriptChunk, scorecardSnapshot, currentStage):
+ *   Takes the best-matching KB technique and compresses it into a two-tier signal
+ *   card: ≤5-word actionable headline + optional support sentence.
+ *   Returns structured JSON { headline, subtext, source }.
  *
  * Model: Claude Haiku (claude-haiku-4-5-20251001)
  * Target: under 500ms
  * Token budget: ~300 (KB techniques) + ~150 (trigger chunk) + ~300 (system prompt) + ~100 (scorecard snapshot) = ~850 tokens in
- *               ~80 tokens out = well under 1,300 total ✓
+ *               ~150 tokens out = well under 1,300 total ✓
  */
 
-// ── Signal card system prompt (exact — do not modify) ──────────────────────
-const SIGNAL_CARD_SYSTEM_PROMPT = `You are a real-time sales coach. A rep is on a live call right now and needs instant guidance. You have been given a detailed sales technique from a knowledge base.
+// Stage descriptions for context injection
+const STAGE_DESCRIPTIONS: Record<string, string> = {
+  "Rapport":          "Building connection and trust. Almost no signals fire here — let the rep lead.",
+  "Pre-frame":        "Setting agenda and getting permission to ask questions.",
+  "Situation":        "Fact-finding. Current state, context, what they've tried.",
+  "Pain":             "Excavating real pain, implications, and emotional cost. Go deep.",
+  "Desired Outcome":  "Getting the prospect to articulate their dream result in their own words.",
+  "Transition":       "Summarizing pain and goal. Asking permission to present.",
+  "Pitch":            "Presenting the solution tied directly to their stated pain.",
+  "Close":            "Price reveal, close attempt, and objection handling.",
+};
 
-Convert it into a signal card using this exact format: [MOMENT TYPE in caps] — "[what the rep says, written in first person, natural spoken language, max 12 words]"
+// ── Signal card system prompt ──────────────────────────────────────────────
+const SIGNAL_CARD_SYSTEM_PROMPT = `You are Wingman — a real-time AI sales coach for high-ticket phone closers.
+Your job is to surface the single most important thing the rep should do RIGHT NOW.
+You speak to the rep, not the prospect. The rep sees your card on screen.
 
 Rules:
-* Write it as words coming out of the rep's mouth, not instructions about what to say
-* First person only — 'I totally get that' not 'acknowledge their concern'
-* Maximum 12 words in the script line
-* No jargon, no sales terminology, no explanations
-* Natural spoken language only — how a confident closer actually talks
-* If a silent pause or micro-action helps, add it in brackets after — max 5 words. Example: [then go silent]
-* The rep must be able to read this entire card in under 2 seconds and know exactly what to do
-* Output the signal card only — no explanation, no preamble`;
+- One clear directive. Not a suggestion — an instruction.
+- HEADLINE: 5 words maximum. Must be fully actionable on its own. The rep reads this in a single glance while the prospect is talking — it must work alone.
+- SUBTEXT: One sentence only. An example question or framing the rep can use. Write this for when the rep has a natural pause before responding. Leave blank for Rapport / Pre-frame / Situation / Desired Outcome / Transition stage nudges — headline only.
+- Use the prospect's exact words when referencing their pain or hesitation.
+- Do NOT tell the rep to "consider" anything. Tell them what to do.
+- Do NOT sound like a training manual. Sound like their inner voice.
+
+Card format rules by stage:
+- Rapport / Pre-frame / Situation / Desired Outcome / Transition: headline only (≤4 words). Pure directional nudge. No subtext.
+- Pain / Close: headline (≤5 words, actionable alone) + subtext (one example sentence).
+
+Return JSON only — no explanation, no preamble:
+{
+  "headline": "≤5 words. Actionable alone. The thing to do right now.",
+  "subtext": "One sentence. Example question or framing. Empty string for early-stage nudges.",
+  "source": "The KB technique or principle this is based on."
+}`;
 
 // ─────────────────────────────────────────────────────────────────────────────
+
+export interface SignalCardResult {
+  headline: string;
+  subtext:  string;
+  source:   string;
+}
 
 interface ScorecardSnapshot {
   pain_detail?:               string;
@@ -39,8 +67,9 @@ interface ScorecardSnapshot {
 export async function generateSignalCard(
   knowledgeResults:  string,
   transcriptChunk:   string,
-  scorecardSnapshot?: ScorecardSnapshot
-): Promise<string | null> {
+  scorecardSnapshot?: ScorecardSnapshot,
+  currentStage?:     string,
+): Promise<SignalCardResult | null> {
   if (!knowledgeResults) return null;
 
   const apiKey = process.env.ANTHROPIC_API_KEY;
