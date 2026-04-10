@@ -96,7 +96,10 @@
       "WebFetch(domain:moody.mjarosz.com)",
       "Bash(find ~/.claude/plugins/marketplaces/claude-plugins-official/plugins -name \"SKILL.md\" -exec grep -l \"^name: update-config\\\\|^name: simplify\\\\|^name: loop\\\\|^name: keybindings\" {} \\\\;)",
       "Bash(mkdir -p ~/.claude/plugins/marketplaces/claude-plugins-official/plugins/wingman-wrap/.claude-plugin)",
-      "Bash(mkdir -p ~/.claude/plugins/marketplaces/claude-plugins-official/plugins/wingman-wrap/skills/wrap)"
+      "Bash(mkdir -p ~/.claude/plugins/marketplaces/claude-plugins-official/plugins/wingman-wrap/skills/wrap)",
+      "Bash(git -C \"/Users/sebastianperez/Desktop/Wingman CC\" config --list)",
+      "Bash(git config:*)",
+      "Bash(security find-internet-password:*)"
     ]
   },
   "hooks": {
