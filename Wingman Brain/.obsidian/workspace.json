@@ -11,10 +11,14 @@
             "id": "f2d87738639a2665",
             "type": "leaf",
             "state": {
-              "type": "graph",
-              "state": {},
-              "icon": "lucide-git-fork",
-              "title": "Graph view"
+              "type": "markdown",
+              "state": {
+                "file": "00 - Product/Signal Card Design Science.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "Signal Card Design Science"
             }
           }
         ]
@@ -180,6 +184,7 @@
   },
   "active": "f2d87738639a2665",
   "lastOpenFiles": [
+    "01 - Build Log/2026-04-10.md",
     "00 - Product/Signal Card Design Science.md",
     "01 - Build Log/2026-04-09.md",
     "_Templates/Daily Build Log.md",
@@ -207,7 +212,6 @@
     "01 - Build Log/Known Issues.md",
     "05 - Operations/Stripe and Billing.md",
     "01 - Build Log/Decisions Log.md",
-    "Welcome.md",
     "_Inbox",
     "08 - People",
     "07 - North Star",
