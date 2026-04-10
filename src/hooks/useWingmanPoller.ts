@@ -150,16 +150,20 @@ export function useWingmanPoller({
         headers: { "content-type": "application/json" },
         body:    JSON.stringify({
           transcript_chunk: chunk,
+          current_stage:    stageRef.current,
           scorecard_snapshot: { pain_detail, gold_moment, predicted_next_objection, objection_risk, prospect_anchors },
         }),
       })
         .then((res) => res.ok ? res.json() : null)
         .then((data) => {
-          if (!data?.signal_text) return;
+          // Guard on signal_header (the headline) — signal_text may be intentionally
+          // empty for early-stage headline-only cards. Checking signal_text would
+          // suppress those cards since empty string is falsy.
+          if (!data?.signal_header) return;
           fireSignal({
             type:    data.signal_type ?? "Handle",
-            header:  data.signal_header ?? "KB",
-            text:    data.signal_text,
+            header:  data.signal_header,
+            text:    data.signal_text ?? "",
             firedAt: Date.now(),
             source:  "keyword", // treated as instant-path for cooldown purposes
           });

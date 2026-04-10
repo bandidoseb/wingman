@@ -17,21 +17,6 @@ import { createClient }              from "@/lib/supabase/server";
 import { searchKnowledge }           from "@/lib/wingman/knowledge-search";
 import { generateSignalCard }        from "@/lib/wingman/knowledge-signal";
 
-// Parse a signal card string into header + text
-// Card format: "HANDLE — "I totally get that — what specifically is holding you back?""
-function parseCard(card: string): { header: string; text: string } {
-  const dashIdx = card.indexOf(" — ");
-  if (dashIdx === -1) return { header: "KB", text: card };
-
-  const header = card.slice(0, dashIdx).trim();
-  let   text   = card.slice(dashIdx + 3).trim();
-
-  // Strip surrounding quotes if present
-  text = text.replace(/^[""]/, "").replace(/[""]$/, "");
-
-  return { header, text };
-}
-
 export async function POST(req: NextRequest) {
   try {
     // Auth check
@@ -43,8 +28,10 @@ export async function POST(req: NextRequest) {
     const {
       transcript_chunk,
       scorecard_snapshot,
+      current_stage,
     }: {
       transcript_chunk:   string;
+      current_stage?:     string;
       scorecard_snapshot?: {
         pain_detail?:               string;
         gold_moment?:               string;
@@ -71,19 +58,23 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ signal_card: null });
     }
 
-    // ── 2. Generate compressed signal card via Haiku ──────────────────────
-    const card = await generateSignalCard(knowledgeResults, transcript_chunk, scorecard_snapshot);
+    // ── 2. Generate two-tier signal card via Haiku ────────────────────────
+    const card = await generateSignalCard(
+      knowledgeResults,
+      transcript_chunk,
+      scorecard_snapshot,
+      current_stage,
+    );
 
     if (!card) {
       return NextResponse.json({ signal_card: null });
     }
 
-    const { header, text } = parseCard(card);
-
     return NextResponse.json({
-      signal_card:   card,    // raw string e.g. "HANDLE — "I get that — what's really in the way?""
-      signal_header: header,  // e.g. "HANDLE"
-      signal_text:   text,    // e.g. "I get that — what's really in the way?"
+      signal_card:   card.headline,   // kept for backwards compat — raw card text
+      signal_header: card.headline,   // ≤5-word actionable headline
+      signal_text:   card.subtext,    // support sentence (empty string for early-stage cards)
+      signal_source: card.source,
       signal_type:   "Handle" as const,
     });
 

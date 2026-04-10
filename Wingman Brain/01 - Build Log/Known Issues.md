@@ -1,6 +1,6 @@
 # Known Issues
 
-Last updated: 2026-04-07
+Last updated: 2026-04-10
 
 A running list of known bugs, limitations, and things that need fixing. Add new issues at the top. Update status when resolved. Never delete — mark as Resolved with the date.
 
@@ -10,6 +10,7 @@ A running list of known bugs, limitations, and things that need fixing. Add new 
 
 | #   | Issue                                                            | Impact     | Status              | Notes                                                                                                                                                                                                                          |
 | --- | ---------------------------------------------------------------- | ---------- | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 21  | Embedding latency too high — no Redis cache | **Medium** | Open | OpenAI embedding calls in `knowledge-search.ts` are taking 400ms–2400ms (cold start on Railway can hit 2400ms). Target is under 200ms. Root cause: no caching — every keyword trigger re-embeds the same or similar phrases from scratch. Fix: add Redis cache keyed on the transcript chunk (or a normalized version). Not blocking for beta but will become a problem under real call volume. Cold start latency will also improve as Railway keeps the instance warm. |
 | 20  | FlightLogTab Mission Intel chat permanently blocks after any error | **Low** | Open | `globalInFlightRef` and `callInFlightRef` in `FlightLogTab.tsx` are set to `true` at the start of `sendGlobalMessage` / `sendCallMessage` but only reset in the happy path. If an error is thrown before the catch block, or inside the catch block, the ref stays `true` forever and the chat input stops responding. Fix: move `ref.current = false` into a finally block in both functions. |
 | 19  | Session route call-limit check is not atomic | **Low** | Open | `POST /api/wingman/session` reads `monthCount` then inserts a new call, but two simultaneous requests can both pass the limit check before either inserts. At low beta volume this is negligible but should be fixed before scaling. Fix: enforce the limit at the database level with a trigger or use a single `rpc` call that checks-and-inserts atomically. |
 | 18  | IPC listeners in DashboardClient could double-register in React StrictMode | **Low** | Open | `onToggleCall`, `onAutoEnded`, `onOutcomeUpdated`, and `onSignalDismiss` are registered in `useEffect` with empty dependency arrays. In React StrictMode (dev), effects run twice. Each double-registration means two handler calls per event. Cleanup functions are present so this self-corrects after unmount, but could cause transient double-fires in dev. Not a production risk — StrictMode is dev-only. Confirm preload bridge already guards against stacking before fixing. |
