@@ -17,9 +17,9 @@ export const KEYWORD_TRIGGERS: KeywordTrigger[] = [
       "need to think",
     ],
     objectionKey: "think about it",
-    fallbackHeader: "Handle: Think About It",
+    fallbackHeader: "What's in the way?",
     fallbackHandle:
-      "What specifically do you need to think about? Is it the investment, the timing, or whether this is the right fit?",
+      "What specifically do you need to think about — is it the investment, the timing, or whether this is the right fit?",
   },
   {
     patterns: [
@@ -30,9 +30,9 @@ export const KEYWORD_TRIGGERS: KeywordTrigger[] = [
       "that's too much",
     ],
     objectionKey: "price",
-    fallbackHeader: "Handle: Price Objection",
+    fallbackHeader: "If price wasn't a factor?",
     fallbackHandle:
-      "I hear you on the investment. Can I ask — if price wasn't a factor, would this be the obvious next step for you?",
+      "If price wasn't a factor, would this be the obvious next step for you?",
   },
   {
     patterns: [
@@ -43,9 +43,9 @@ export const KEYWORD_TRIGGERS: KeywordTrigger[] = [
       "need to run it by",
     ],
     objectionKey: "partner",
-    fallbackHeader: "Handle: Partner Objection",
+    fallbackHeader: "What would they say?",
     fallbackHandle:
-      "Totally understand. What do you think their main concern would be? Let's make sure you have everything you need to walk them through it.",
+      "What do you think their main concern would be?",
   },
   {
     patterns: [
@@ -56,9 +56,9 @@ export const KEYWORD_TRIGGERS: KeywordTrigger[] = [
       "can you send me",
     ],
     objectionKey: "more info",
-    fallbackHeader: "Handle: More Info",
+    fallbackHeader: "What would help you decide?",
     fallbackHandle:
-      "Of course. Before I do — what's the specific piece of information that would help you make this decision? I want to make sure I send exactly what's useful.",
+      "What's the specific piece of information that would actually help you make this decision?",
   },
   {
     patterns: [
@@ -68,9 +68,9 @@ export const KEYWORD_TRIGGERS: KeywordTrigger[] = [
       "not there yet",
     ],
     objectionKey: "not ready",
-    fallbackHeader: "Handle: Not Ready",
+    fallbackHeader: "What does ready look like?",
     fallbackHandle:
-      "What would need to be true for you to feel ready? Let's figure out what's actually in the way.",
+      "What would need to be true for you to feel ready?",
   },
   {
     patterns: [
@@ -81,9 +81,9 @@ export const KEYWORD_TRIGGERS: KeywordTrigger[] = [
       "done something similar",
     ],
     objectionKey: "past experience",
-    fallbackHeader: "Handle: Past Experience",
+    fallbackHeader: "What failed last time?",
     fallbackHandle:
-      "What happened with that? Understanding what didn't work last time helps me know if this would actually be different for you.",
+      "What happened with that — what specifically didn't work?",
   },
   {
     patterns: [
@@ -92,9 +92,9 @@ export const KEYWORD_TRIGGERS: KeywordTrigger[] = [
       "not until",
     ],
     objectionKey: "future event",
-    fallbackHeader: "Handle: Future Event",
+    fallbackHeader: "What's the cost of waiting?",
     fallbackHandle:
-      "What's happening after that? And what does waiting cost you between now and then?",
+      "What does waiting cost you between now and then?",
   },
   {
     patterns: [
@@ -104,9 +104,9 @@ export const KEYWORD_TRIGGERS: KeywordTrigger[] = [
       "really busy",
     ],
     objectionKey: "no time",
-    fallbackHeader: "Handle: No Time",
+    fallbackHeader: "What's it costing you now?",
     fallbackHandle:
-      "That's actually one of the biggest reasons people come to us — they don't have time because the problem is already taking up too much of it. How much time is the current situation costing you weekly?",
+      "How much time is the current situation already taking up each week?",
   },
   {
     patterns: [
@@ -116,9 +116,9 @@ export const KEYWORD_TRIGGERS: KeywordTrigger[] = [
       "check my bank",
     ],
     objectionKey: "money concern",
-    fallbackHeader: "Handle: Money Concern",
+    fallbackHeader: "Cash flow or ROI?",
     fallbackHandle:
-      "Completely fair. Is this more about cash flow right now, or about whether the ROI makes sense for you?",
+      "Is this more about cash flow right now, or about whether the return makes sense for you?",
   },
 ];
 

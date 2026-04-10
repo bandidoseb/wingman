@@ -156,13 +156,13 @@
       position: absolute;
       bottom: 80px;
       left: 32px;
-      width: 280px;
+      width: 340px;
       z-index: 100;
       display: none;
       flex-direction: column;
-      gap: 5px;
+      gap: 6px;
       border-radius: 14px;
-      padding: 14px 16px;
+      padding: 16px 18px;
       pointer-events: auto;
       background: rgba(18, 18, 24, 0.82);
       backdrop-filter: blur(20px);
@@ -182,16 +182,16 @@
 
     /* Stage label — small muted caps above headline */
     #signalTag {
-      font-size: 9px;
+      font-size: 11px;
       font-weight: 700;
       letter-spacing: 0.09em;
       text-transform: uppercase;
       color: rgba(255, 255, 255, 0.28);
     }
 
-    /* Headline — 18px bold, actionable alone in a single glance */
+    /* Headline — bold, actionable alone in a single glance */
     #signalText {
-      font-size: 18px;
+      font-size: 22px;
       font-weight: 700;
       line-height: 1.2;
       letter-spacing: -0.01em;
@@ -200,7 +200,7 @@
 
     /* Support text — shown for objection/close cards only, read during pause */
     #signalSupport {
-      font-size: 12px;
+      font-size: 14px;
       font-weight: 400;
       font-style: italic;
       line-height: 1.5;
@@ -215,12 +215,12 @@
     /* Dismiss button — dark theme */
     #gotItBtn {
       width: 100%;
-      padding: 7px;
+      padding: 8px;
       border-radius: 8px;
       background: rgba(255, 255, 255, 0.07);
       border: 1px solid rgba(255, 255, 255, 0.1);
       color: rgba(255, 255, 255, 0.35);
-      font-size: 11px;
+      font-size: 12px;
       font-weight: 600;
       cursor: pointer;
       font-family: inherit;
@@ -1085,7 +1085,10 @@
         stageBar.classList.add('glow-blue');
       }
 
-      if (window.hud) window.hud.setMouseIgnore(false);
+      // Do NOT disable pass-through here. The card is visible but the HUD window
+      // covers the full screen — disabling pass-through globally would block all
+      // clicks on the underlying app. The mouseenter handler on signalBubble
+      // enables capture only when the user hovers over the card to click "got it".
     }
 
     function hideSignal() {
@@ -1224,8 +1227,9 @@
       if (window.hud) window.hud.setMouseIgnore(false);
     });
     signalBubble.addEventListener('mouseleave', () => {
-      if (signalActive && window.hud) window.hud.setMouseIgnore(false);
-      else if (window.hud) window.hud.setMouseIgnore(true);
+      // Always restore pass-through when leaving the card — even if a signal is active.
+      // The card stays visible; the user can hover back to interact with "got it".
+      if (window.hud) window.hud.setMouseIgnore(true);
     });
 
     // ── IPC listeners (Electron → HUD) ───────────────────────────────────

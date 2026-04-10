@@ -6,6 +6,17 @@ This is the first file Claude reads at session start. It answers: where are we, 
 
 ---
 
+## What Was Just Completed (2026-04-10 — session 2)
+
+- **Signal card prompt updated to two-tier format** — `knowledge-signal.ts` now returns JSON `{ headline, subtext, source }`. Haiku gets stage context, stage-based format rules (Rapport/Confirm/Pitch = headline only, Discovery/Press/Close = headline + subtext). Markdown code fence stripping added before JSON parse.
+- **Stage labels fixed** — `STAGE_DESCRIPTIONS` now uses the real 6-stage labels (`Discovery`, `Press`, `Confirm`, etc.) instead of the old 8-stage NEPQ names that didn't exist in the codebase.
+- **KB signal route updated** — `parseCard()` removed, JSON fields mapped correctly to `signal_header`/`signal_text`. Accepts `current_stage` from poller.
+- **Poller guard fixed (critical bug)** — `if (!data?.signal_text)` → `if (!data?.signal_header)`. Empty string subtext was silently suppressing all headline-only cards.
+- **Keyword trigger cards updated to two-tier format** — all 9 triggers rewritten. Headlines are now ≤5-word actionable directives (e.g. "If price wasn't a factor?"). Subtext trimmed to one sentence per card.
+- **Issue #21 logged** — Embedding latency / Redis cache need tracked in Known Issues.
+
+---
+
 ## What Was Just Completed (2026-04-10)
 
 - **Signal card visual redesign** — `electron/hud/index.html` fully updated. Cards now bottom-left, dark unified style, fade in/out animation, 18px bold white text, ambient pulsing dot replaces "Listening…", two-tier format (headline + support text for objection/close cards). All changes based on cognitive science research (see `00 - Product/Signal Card Design Science.md`).
@@ -55,10 +66,7 @@ This is the first file Claude reads at session start. It answers: where are we, 
 
 ## What's Next (Priority Order)
 
-1. **#1 — Update `knowledge-signal.ts` for new two-tier prompt format**
-   The signal card generation prompt now specifies ≤5-word headline + optional support sentence. The `knowledge-signal.ts` file needs to reflect this. Low effort, high impact — directly affects quality of every live card.
-
-2. **#2 — Fix post-call 502 on Anthropic overload**
+1. **#1 — Fix post-call 502 on Anthropic overload**
    No retry logic in `post-call/route.ts`. If Anthropic returns `overloaded_error`, entire post-call job fails silently. Add 3 retries with exponential backoff. (Known Issue #13)
 
 3. **#3 — KB re-ingestion with prospect_trigger field**
@@ -70,6 +78,9 @@ This is the first file Claude reads at session start. It answers: where are we, 
 5. **#5 — Stripe billing end-to-end test**
 
 6. **#6 — Beta onboarding email**
+
+7. **#7 — "Retry analysis" button in Flight Log**
+   If the post-call job fails after all retries, the call record has no debrief. Add a retry button to the Flight Log entry that re-fires the post-call job for that call. Only show the button when `summary` is null on a completed call.
    Must include: install steps, quarantine removal command, what to expect on first call. Include adaptation timeline: "first 5-10 calls feel slightly different, by call 10 it's automatic."
 
 ---

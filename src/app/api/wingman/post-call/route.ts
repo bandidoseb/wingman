@@ -33,6 +33,81 @@ Rules:
 
 // ─────────────────────────────────────────────────────────────────────────────
 
+// Status codes worth retrying — overloaded (529), rate-limited (429), server error (500)
+const RETRYABLE_STATUS_CODES = new Set([429, 500, 529]);
+const RETRY_DELAYS_MS         = [1_000, 2_000, 4_000]; // 3 retries: 1s, 2s, 4s
+const SONNET_TIMEOUT_MS       = 60_000;                 // 60s per attempt
+
+/**
+ * Calls the Anthropic API with up to 3 retries on overload/rate-limit errors.
+ * Each attempt has a 60-second timeout via AbortController.
+ * Returns the final Response (caller checks res.ok).
+ */
+async function callSonnetWithRetry(
+  apiKey:  string,
+  payload: object,
+): Promise<Response> {
+  const maxAttempts = RETRY_DELAYS_MS.length + 1; // 4 total: 1 original + 3 retries
+  let lastResponse: Response | null = null;
+
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    const controller = new AbortController();
+    const timeoutId  = setTimeout(() => controller.abort(), SONNET_TIMEOUT_MS);
+
+    try {
+      const res = await fetch("https://api.anthropic.com/v1/messages", {
+        method:  "POST",
+        headers: {
+          "x-api-key":         apiKey,
+          "anthropic-version": "2023-06-01",
+          "content-type":      "application/json",
+        },
+        body:   JSON.stringify(payload),
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      // Success or a non-retryable error (e.g. 400, 401) — return immediately
+      if (res.ok || !RETRYABLE_STATUS_CODES.has(res.status)) {
+        return res;
+      }
+
+      lastResponse = res;
+
+      if (attempt < maxAttempts - 1) {
+        const delay = RETRY_DELAYS_MS[attempt];
+        console.warn(
+          `[post-call] Sonnet returned ${res.status} — retry ${attempt + 1}/${RETRY_DELAYS_MS.length} in ${delay}ms`
+        );
+        await new Promise((resolve) => setTimeout(resolve, delay));
+      }
+    } catch (err) {
+      clearTimeout(timeoutId);
+
+      const isTimeout = (err as Error)?.name === "AbortError";
+      const label     = isTimeout ? "timeout" : "network error";
+
+      if (attempt < maxAttempts - 1) {
+        const delay = RETRY_DELAYS_MS[attempt];
+        console.warn(
+          `[post-call] Sonnet ${label} — retry ${attempt + 1}/${RETRY_DELAYS_MS.length} in ${delay}ms`
+        );
+        await new Promise((resolve) => setTimeout(resolve, delay));
+      } else {
+        console.error(`[post-call] Sonnet ${label} — all retries exhausted:`, err);
+        throw err;
+      }
+    }
+  }
+
+  // All retries exhausted — return the last non-OK response so the caller can log it
+  console.error(`[post-call] Sonnet failed after ${maxAttempts} attempts — last status: ${lastResponse?.status}`);
+  return lastResponse!;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 export async function POST(req: NextRequest) {
   try {
     // ── Auth check ────────────────────────────────────────────────────────────
@@ -90,19 +165,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "AI not configured" }, { status: 503 });
     }
 
-    const claudeRes = await fetch("https://api.anthropic.com/v1/messages", {
-      method:  "POST",
-      headers: {
-        "x-api-key":         apiKey,
-        "anthropic-version": "2023-06-01",
-        "content-type":      "application/json",
-      },
-      body: JSON.stringify({
-        model:      "claude-sonnet-4-6",
-        max_tokens: 512,
-        system:     POST_CALL_SYSTEM_PROMPT,
-        messages:   [{ role: "user", content: `CALL TRANSCRIPT:\n${transcriptText}` }],
-      }),
+    const claudeRes = await callSonnetWithRetry(apiKey, {
+      model:      "claude-sonnet-4-6",
+      max_tokens: 512,
+      system:     POST_CALL_SYSTEM_PROMPT,
+      messages:   [{ role: "user", content: `CALL TRANSCRIPT:\n${transcriptText}` }],
     });
 
     if (!claudeRes.ok) {
