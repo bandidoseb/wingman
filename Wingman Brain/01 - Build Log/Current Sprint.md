@@ -66,6 +66,8 @@ This is the first file Claude reads at session start. It answers: where are we, 
 
 ## What's Next (Priority Order)
 
+- [ ] RESEARCH: Parallel Agent Execution — Figure out how to spin up multiple agents to work in parallel to knock off tasks faster (currently crawling one by one).
+
 1. **#1 — Fix post-call 502 on Anthropic overload**
    No retry logic in `post-call/route.ts`. If Anthropic returns `overloaded_error`, entire post-call job fails silently. Add 3 retries with exponential backoff. (Known Issue #13)
 
