@@ -11,10 +11,14 @@
             "id": "f2d87738639a2665",
             "type": "leaf",
             "state": {
-              "type": "graph",
-              "state": {},
-              "icon": "lucide-git-fork",
-              "title": "Graph view"
+              "type": "markdown",
+              "state": {
+                "file": "_Inbox/multi-turn objection handling.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "multi-turn objection handling"
             }
           }
         ]
@@ -70,8 +74,7 @@
               "title": "Bookmarks"
             }
           }
-        ],
-        "currentTab": 1
+        ]
       }
     ],
     "direction": "horizontal",
@@ -180,6 +183,9 @@
   },
   "active": "f2d87738639a2665",
   "lastOpenFiles": [
+    "_Inbox/New Ideas - April 9.md",
+    "_Inbox/multi-turn objection handling.md",
+    "00 - Product/Future Features/Objection Sequences (Option A).md",
     "_Inbox/New Ideas - April 10.md",
     "00 - Product/KB Ingestion Spec v1.md",
     "00 - Product/Future Features/KB Visual Brain.md",
@@ -195,7 +201,6 @@
     "01 - Build Log/2026-04-10.md",
     "01 - Build Log/2026-04-09.md",
     "_Templates/Daily Build Log.md",
-    "_Inbox/New Ideas - April 9.md",
     "05 - Operations/Wrap Skill.md",
     "01 - Build Log/2026-04-07.md",
     "01 - Build Log/2026-04-02.md",
@@ -206,8 +211,6 @@
     "00 - Product/Assumptions Ledger.md",
     "00 - Product/Architecture.md",
     "00 - Product/Anti-Vision.md",
-    "CLAUDE.md",
-    "05 - Operations/Deploy Runbook.md",
     "_Inbox",
     "08 - People",
     "07 - North Star",
