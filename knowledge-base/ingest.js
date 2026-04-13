@@ -143,33 +143,58 @@ Scoring criteria:
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * Call Claude with a timeout. Races the SDK promise against a timer.
- * On timeout: throws with a clear message. Never hangs indefinitely.
+ * Call Claude with a timeout and automatic retry on 529 (overloaded) errors.
+ *
+ * Retry schedule: 4 attempts total, delays of 10s → 30s → 60s between them.
+ * Only 529 (overloaded) is retried — all other errors throw immediately.
+ * Each attempt has its own independent timeout.
  */
-async function callClaude(anthropic, { model, system, user, maxTokens, timeoutMs }) {
-  let timeoutId;
-  const timeoutPromise = new Promise((_, reject) => {
-    timeoutId = setTimeout(
-      () => reject(new Error(`Claude call timed out after ${timeoutMs / 1000}s (model: ${model})`)),
-      timeoutMs
-    );
-  });
+const CLAUDE_RETRY_DELAYS_MS = [10_000, 30_000, 60_000]; // 3 retries after initial attempt
 
-  try {
-    const result = await Promise.race([
-      anthropic.messages.create({
-        model,
-        max_tokens: maxTokens,
-        system,
-        messages: [{ role: 'user', content: user }],
-      }),
-      timeoutPromise,
-    ]);
-    clearTimeout(timeoutId);
-    return result;
-  } catch (e) {
-    clearTimeout(timeoutId);
-    throw e;
+async function callClaude(anthropic, { model, system, user, maxTokens, timeoutMs }) {
+  const maxAttempts = CLAUDE_RETRY_DELAYS_MS.length + 1; // 4 total
+
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    let timeoutId;
+    const timeoutPromise = new Promise((_, reject) => {
+      timeoutId = setTimeout(
+        () => reject(new Error(`Claude call timed out after ${timeoutMs / 1000}s (model: ${model})`)),
+        timeoutMs
+      );
+    });
+
+    try {
+      const result = await Promise.race([
+        anthropic.messages.create({
+          model,
+          max_tokens: maxTokens,
+          system,
+          messages: [{ role: 'user', content: user }],
+        }),
+        timeoutPromise,
+      ]);
+      clearTimeout(timeoutId);
+      return result;
+
+    } catch (e) {
+      clearTimeout(timeoutId);
+
+      // Only retry on 529 overloaded — everything else fails immediately
+      const is529 = e?.status === 529 || (e?.message && e.message.includes('529'));
+      const hasRetry = attempt < maxAttempts - 1;
+
+      if (is529 && hasRetry) {
+        const delayMs = CLAUDE_RETRY_DELAYS_MS[attempt];
+        console.warn(
+          `  ⏳ Anthropic overloaded (529) — attempt ${attempt + 1}/${maxAttempts}. ` +
+          `Retrying in ${delayMs / 1000}s...`
+        );
+        await new Promise(resolve => setTimeout(resolve, delayMs));
+        continue;
+      }
+
+      throw e;
+    }
   }
 }
 
