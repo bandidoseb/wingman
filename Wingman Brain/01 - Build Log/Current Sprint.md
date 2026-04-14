@@ -6,6 +6,17 @@ This is the first file Claude reads at session start. It answers: where are we, 
 
 ---
 
+## What Was Just Completed (2026-04-13 — KB Re-ingestion Session)
+
+- **KB Ingestion Spec v2 locked** — went through Plans A → B → C → hardened plan → adversarial subagent review → 24 issues found → all fixed. Spec saved to `Wingman Brain/00 - Product/KB Ingestion Spec v2.md`.
+- **SQL migration 006_kb_v2.sql run and verified** — 15 new columns added to kb_entries, embedding renamed to technique_embedding, new dual-vector search RPC live, CHECK constraints added, existing entries backfilled so they still appear in search during transition.
+- **`knowledge-base/ingest.js` fully rewritten** — 3-pass pipeline (Haiku classify → Sonnet extract → Haiku quality gate), dual embeddings, transcript cache, --force flag, 5-minute Sonnet timeout, batched OpenAI embeddings, atomic dual embedding insertion, per-source delete, retry logic for 529 overloads (10s/30s/60s backoff), ingest_warnings.log, cost estimation gate with y/n confirmation.
+- **Re-ingestion in progress** — 3 runs attempted. 529 overloads on runs 1-2 (peak hours). Credits ran out mid-run 2 (auto-reload too low + wrong Anthropic account). New API key created under sebastian@meetwingman.ai. Run 3 in progress at session end with cached transcripts (no Whisper cost).
+- **KB quality issues identified by QA** — 3 categories of bad entries found: (1) offer-specific exact_scripts, (2) third-person prospect triggers, (3) non-sales content. Cleanup script needed.
+- **Anthropic account consolidated** — API now under sebastian@meetwingman.ai (console.anthropic.com). Old key was under sebmattiasperez@gmail.com. Both .env.local and Railway updated.
+
+---
+
 ## What Was Just Completed (2026-04-10 — session 2)
 
 - **Signal card prompt updated to two-tier format** — `knowledge-signal.ts` now returns JSON `{ headline, subtext, source }`. Haiku gets stage context, stage-based format rules (Rapport/Confirm/Pitch = headline only, Discovery/Press/Close = headline + subtext). Markdown code fence stripping added before JSON parse.
@@ -60,40 +71,68 @@ This is the first file Claude reads at session start. It answers: where are we, 
 
 ## What's In Progress
 
-- Nothing. Clean stopping point.
+- **KB re-ingestion Run 3** — running at session end. Let it complete. When terminal shows `X succeeded, 0 failed`, come back for next steps.
 
 ---
 
 ## What's Next (Priority Order)
 
-- [ ] RESEARCH: Parallel Agent Execution — Figure out how to spin up multiple agents to work in parallel to knock off tasks faster (currently crawling one by one).
-  - Use the `--worktree` or `-w` flag to start Claude in an isolated git worktree.
-  - Use `--tmux` to see multiple sessions side-by-side.
-  - Best practice: Give each session a narrow, non-overlapping scope to avoid file conflicts.
+### IMMEDIATE — Finish KB re-ingestion (do these in order next session)
 
-1. **#1 — Fix post-call 502 on Anthropic overload**
-   No retry logic in `post-call/route.ts`. If Anthropic returns `overloaded_error`, entire post-call job fails silently. Add 3 retries with exponential backoff. (Known Issue #13)
+1. **Wait for Run 3 to finish** — terminal will show `X succeeded, 0 failed`. If any still fail, run `node ingest.js --force` again from `knowledge-base/` folder.
 
-3. **#3 — KB re-ingestion with prospect_trigger field**
-   KB returns 0 matches because entries are written from rep/coach perspective. Add `prospect_trigger` field to ingest prompt — 10-15 examples of what the PROSPECT says before this technique is needed. Re-ingest all 37 videos (~$10-15 cost). (Known Issue #14)
+2. **Run ivfflat index SQL in Supabase SQL Editor:**
+   ```sql
+   CREATE INDEX ON public.kb_entries
+     USING ivfflat (prospect_embedding vector_cosine_ops)
+     WITH (lists = 20);
+   ```
+   Only run this AFTER all 38 sources are complete.
 
-4. **#4 — Playbook page**
-   Pre-call framework setup. Rep configures once. Three tiers: locked core, default-on toggleable, custom.
+3. **Update `src/lib/wingman/knowledge-search.ts`:**
+   - Change `SIMILARITY_THRESHOLD` constant from 0.65 → 0.72
+   - Update `KBMatch` interface to include `exact_script` and `why_it_works`
+   - Update `formatResults()` to pass these fields through to kb-signal route
 
-5. **#5 — Stripe billing end-to-end test**
+4. **Update `src/app/api/wingman/kb-signal/route.ts`:**
+   - Pass `exact_script`, `why_it_works`, `situation` to Haiku
 
-6. **#6 — Beta onboarding email**
+5. **Update `src/lib/wingman/knowledge-signal.ts`:**
+   - Use `exact_script` and `why_it_works` in the Haiku prompt
 
-7. **#7 — "Retry analysis" button in Flight Log**
-   If the post-call job fails after all retries, the call record has no debrief. Add a retry button to the Flight Log entry that re-fires the post-call job for that call. Only show the button when `summary` is null on a completed call.
-   Must include: install steps, quarantine removal command, what to expect on first call. Include adaptation timeline: "first 5-10 calls feel slightly different, by call 10 it's automatic."
+6. **Build `knowledge-base/cleanup.js`** — post-ingestion quality sweep:
+   - Re-score all existing KB entries with updated prompts
+   - Discard offer-specific exact_scripts (coach's specific business details)
+   - Discard third-person prospect triggers
+   - Discard non-sales content (personal habits, mindset routines)
+   - Does NOT re-extract from source videos — just re-scores existing entries
+
+7. **Update Pass 2 + Pass 3 prompts in `ingest.js`:**
+   - Pass 2: add explicit first-person trigger rule + exclude personal habits/routines
+   - Pass 3: add offer-specific script detection rule
+
+8. **Calibration:**
+   - Run 10 test trigger phrases with ?debug=true on kb-signal route
+   - Log actual similarity scores
+   - Tune SIMILARITY_THRESHOLD if needed
+   - Remove debug flag before beta
+
+### AFTER KB IS FULLY LIVE
+
+4. **Playbook page** — pre-call framework setup. Rep configures once. Three tiers: locked core, default-on toggleable, custom.
+
+5. **Stripe billing end-to-end test**
+
+6. **Beta onboarding email** — must include quarantine removal command for non-notarized app.
+
+7. **"Retry analysis" button in Flight Log** — low priority. Show retry button when `summary` is null on a completed call.
 
 ---
 
 ## Current Blockers
 
-- **KB returns 0 matches** — semantic mismatch between KB entries (rep-perspective) and search queries (prospect speech). Fix requires re-ingestion. (Known Issue #14)
-- **Post-call job fails on Anthropic overload** — no retry logic. (Known Issue #13)
+- **KB re-ingestion not yet complete** — Run 3 in progress. Steps 4-7 of build plan not yet done. KB pipeline is not fully live until knowledge-search.ts, kb-signal route, and knowledge-signal.ts are updated.
+- **KB quality issues** — even after ingestion completes, cleanup script needed to remove offer-specific scripts, third-person triggers, and non-sales content before KB should be considered production-ready.
 - **Playbook page not built** — Wingman has no rep-specific framework context beyond defaults until this exists.
 - **App not Apple-notarized** — beta testers must run quarantine command manually. (Known Issue #5)
 

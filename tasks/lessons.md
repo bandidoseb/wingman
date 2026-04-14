@@ -1,4 +1,36 @@
 
+## Session: 2026-04-13
+
+### Self-review of plans has diminishing returns — use an adversarial subagent
+**What happened:** Ran Plans A → B → C and declared Plan C production-grade. Sebastian challenged this. Ran an adversarial subagent whose only job was to break the plan. Found 24 issues — including 5 that would have caused silent production failures that neither of us would have caught without running and watching it break.
+**Rule:** For any major architectural plan, spin up an adversarial subagent explicitly tasked to find holes — not validate. Never ask it "does this look good?" Always ask "what would break this?" Self-review is biased toward the plan you wrote. The adversarial agent has no such bias.
+
+### Run batch ingestion at off-peak hours — 529s are time-of-day dependent
+**What happened:** Started ingestion during US business hours. Anthropic's API returned 529 "overloaded" errors on nearly every Sonnet call. 30 out of 38 sources failed on the first run. Running early morning CST (7am) on the second run cleared almost all of them.
+**Rule:** Any large batch job hitting Anthropic Sonnet should be scheduled for off-peak hours — before 8am CST or after midnight CST. Never start a large ingestion run during business hours.
+
+### console.anthropic.com and claude.ai are completely separate — document both
+**What happened:** Anthropic credits ran out mid-run. Sebastian went to top up and couldn't find the account — it was under a personal Gmail (sebmattiasperez@gmail.com), not his work email. He'd never set up console.anthropic.com consciously. Also accidentally bought $50 of claude.ai credits (chat interface) thinking it was the API console — they're completely separate billing systems.
+**Rule:** At the start of any project using the Anthropic API, confirm which email the console.anthropic.com account is under and document it. The API console and the Claude chat interface have zero billing relationship. Adding credits to one does nothing for the other.
+
+### Auto-reload threshold must be set high enough for the actual workload
+**What happened:** Anthropic auto-reload was set to top off to $15 when balance hits $5. A batch ingestion run burned through credits faster than the reload triggered, causing a mid-run failure at video 30 of 38.
+**Rule:** Before any large ingestion run, check the auto-reload threshold and set it to at least 3x the estimated run cost. For a ~$15 run, the threshold should be set to top off to $50.
+
+### Always QA a sample of KB entries immediately after ingestion — before wiring into the live pipeline
+**What happened:** After ingestion, Sebastian manually skimmed entries in Supabase and immediately found 3 categories of bad data: offer-specific scripts, third-person triggers, non-sales content. These would have fired garbage signal cards on real calls if we'd wired up the pipeline without reviewing.
+**Rule:** After any KB ingestion (initial or re-ingestion), always QA at least 20-30 random entries in Supabase before enabling the KB in the live pipeline. Look specifically for: (1) exact_script containing offer-specific details, (2) prospect_triggers in third person, (3) entries that have nothing to do with live sales conversations.
+
+### Prompt quality issues are invisible until you look at the actual data
+**What happened:** The Pass 2 and Pass 3 prompts looked solid in review. The adversarial agent didn't catch the extraction quality problems. Only by looking at real extracted entries did we find that Sonnet was extracting personal productivity content, writing third-person triggers, and failing to flag offer-specific scripts.
+**Rule:** You cannot fully evaluate an extraction prompt by reading it. You can only evaluate it by running it and reading the output. Always treat the first ingestion run as a prompt calibration exercise, not a final result.
+
+### The --force flag re-processes ALL sources including already-completed ones — cost implication
+**What happened:** Running `node ingest.js --force` re-processes all 38 sources regardless of status. The 8 that already succeeded were re-ingested on Run 2 and Run 3 unnecessarily. Small extra cost but adds up.
+**Rule:** Consider whether a smarter skip logic is needed for large KB updates — e.g., only re-process sources that are status='failed' or that have been explicitly flagged for re-ingestion. The current --force behavior is correct for full re-architecture runs but wasteful for partial updates.
+
+---
+
 ## Session: 2026-04-04
 
 ### Always check .gitignore before telling Sebastian to commit or push anything
