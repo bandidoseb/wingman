@@ -4,7 +4,7 @@
  * searchKnowledge(transcriptChunk) does:
  *   1. Embed the chunk with text-embedding-3-small (~80ms)
  *   2. Cosine similarity search against kb_entries via pgvector RPC (~50ms)
- *   3. Filter to matches above 0.78 threshold — return empty if nothing clears it
+ *   3. Filter to matches above 0.72 threshold — return empty if nothing clears it
  *   4. Format results as a clean string for injection into the Haiku prompt
  *   5. Cache the result for 60 seconds to prevent duplicate DB hits
  *
@@ -14,7 +14,7 @@
 
 import { createServiceClient } from "@/lib/supabase/server";
 
-const SIMILARITY_THRESHOLD = 0.65;
+const SIMILARITY_THRESHOLD = 0.72;
 const MATCH_COUNT          = 5;
 const CACHE_TTL_MS         = 60_000; // 60 seconds
 
@@ -37,9 +37,11 @@ function fastHash(str: string): number {
 interface KBMatch {
   id:             string;
   technique_name: string;
-  trigger_phrase: string;
-  full_detail:    string;
-  coach_name:     string;
+  situation:      string;
+  exact_script:   string;
+  why_it_works:   string;
+  call_stage:     string;
+  quality_score:  string;
   similarity:     number;
 }
 
@@ -128,7 +130,7 @@ export async function searchKnowledge(transcriptChunk: string): Promise<string> 
     console.warn(`[searchKnowledge] ⚠️  LATENCY EXCEEDED: ${totalMs}ms > 200ms target — consider adding Redis cache or upgrading pgvector index`);
   }
 
-  // Nothing cleared 0.78 — do not return weak matches to fill the quota
+  // Nothing cleared 0.72 — do not return weak matches to fill the quota
   if (matches.length === 0) return "";
 
   // ── 3. Format for prompt injection ───────────────────────────────────────
@@ -139,7 +141,7 @@ export async function searchKnowledge(transcriptChunk: string): Promise<string> 
   const result = [
     "RELEVANT SALES TECHNIQUES FROM KNOWLEDGE BASE:",
     ...top3.map((m, i) =>
-      `[TECHNIQUE ${i + 1}]\nTechnique: ${m.technique_name}\nTrigger: ${m.trigger_phrase}\nDetail: ${m.full_detail}`
+      `[TECHNIQUE ${i + 1}]\nName: ${m.technique_name}\nStage: ${m.call_stage}\nWhen to use: ${m.situation}\nScript: ${m.exact_script}\nWhy it works: ${m.why_it_works}`
     ),
   ].join("\n\n");
 

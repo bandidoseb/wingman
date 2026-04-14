@@ -35,6 +35,8 @@ Rules:
 - Use the prospect's exact words when referencing their pain or hesitation.
 - Do NOT tell the rep to "consider" anything. Tell them what to do.
 - Do NOT sound like a training manual. Sound like their inner voice.
+- When a SCRIPT is provided in the knowledge base technique, base your headline directly on that script — compress it to ≤5 words that capture its core directive. Do NOT invent an alternative approach if a script is provided.
+- The "Why it works" field gives you the psychological principle — use it to write a more precise subtext, not to replace the script.
 
 Card format rules by stage:
 - Rapport / Confirm / Pitch: headline only (≤4 words). Pure directional nudge. Set subtext to empty string "".

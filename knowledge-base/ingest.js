@@ -126,7 +126,9 @@ Critical rules:
 - situation is ONE sentence only.
 - Extract EVERY technique. Do not summarize multiple techniques into one.
 - If a technique has multiple variations, extract each as a separate entry.
-- Ignore: introductions, origin stories, motivational content with no tactical application, filler.`;
+- Ignore: introductions, origin stories, motivational content with no tactical application, filler.
+- prospect_triggers MUST be written in first person from the prospect's perspective ("I...", "We...", "My...", "It's...", "What about..."). NEVER write them in third person ("They want...", "The prospect says...", "He/she is looking for..."). These are the words the prospect speaks out loud.
+- Do NOT extract techniques about personal habits, mindset routines, daily self-review, or productivity practices. Only extract techniques that are directly used ON a live sales call between a rep and a prospect.`;
 
 const PASS3_SYSTEM = `You are a quality gate for a live sales AI coaching system. Score this sales technique entry.
 
@@ -136,7 +138,12 @@ Return ONLY a valid JSON object — no markdown, no explanation:
 Scoring criteria:
 - "high": Clear specific trigger, verbatim exact_script, precise situation, immediately usable on a live call without modification
 - "medium": Good technique but slightly vague trigger OR script needs minor polish — still usable on a live call
-- "low": Too generic to be useful in the right moment, OR anecdote without clear technique, OR missing specificity that would make it actionable`;
+- "low": Too generic to be useful in the right moment, OR anecdote without clear technique, OR missing specificity that would make it actionable
+
+Also score "low" if ANY of these are true:
+- exact_script contains specific numbers, team sizes, pricing, product names, or offer details that belong to the coach's specific business and would be factually wrong for a rep with a different offer (e.g. "we have five calls a week", "I only work with 10 people", "our program is $15,000")
+- any prospect_triggers are written in third person instead of first person
+- the technique is about personal habits, mindset routines, daily self-review, or productivity practices rather than a technique used directly on a live call`;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Helpers
