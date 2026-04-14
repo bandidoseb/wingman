@@ -71,23 +71,16 @@ This is the first file Claude reads at session start. It answers: where are we, 
 
 ## What's In Progress
 
-- **KB re-ingestion Run 3** — running at session end. Let it complete. When terminal shows `X succeeded, 0 failed`, come back for next steps.
+- Nothing. Clean stopping point.
 
 ---
 
 ## What's Next (Priority Order)
 
-### IMMEDIATE — Finish KB re-ingestion (do these in order next session)
+### IMMEDIATE — Next session (do these in order)
 
-1. **Wait for Run 3 to finish** — terminal will show `X succeeded, 0 failed`. If any still fail, run `node ingest.js --force` again from `knowledge-base/` folder.
-
-2. **Run ivfflat index SQL in Supabase SQL Editor:**
-   ```sql
-   CREATE INDEX ON public.kb_entries
-     USING ivfflat (prospect_embedding vector_cosine_ops)
-     WITH (lists = 20);
-   ```
-   Only run this AFTER all 38 sources are complete.
+1. ~~Wait for Run 3 to finish~~ ✅ Done — 38/38 succeeded
+2. ~~Run ivfflat index~~ ✅ Done — switched to HNSW (ivfflat failed due to Supabase memory limit of 32MB). HNSW index created on `prospect_embedding`.
 
 3. **Update `src/lib/wingman/knowledge-search.ts`:**
    - Change `SIMILARITY_THRESHOLD` constant from 0.65 → 0.72
@@ -131,8 +124,8 @@ This is the first file Claude reads at session start. It answers: where are we, 
 
 ## Current Blockers
 
-- **KB re-ingestion not yet complete** — Run 3 in progress. Steps 4-7 of build plan not yet done. KB pipeline is not fully live until knowledge-search.ts, kb-signal route, and knowledge-signal.ts are updated.
-- **KB quality issues** — even after ingestion completes, cleanup script needed to remove offer-specific scripts, third-person triggers, and non-sales content before KB should be considered production-ready.
+- **KB pipeline code not yet updated** — Steps 3-5 of build plan not done. `knowledge-search.ts`, `kb-signal` route, and `knowledge-signal.ts` must be updated before the new KB is live on real calls.
+- **KB quality issues** — cleanup script needed before KB is production-ready. Bad entries confirmed: offer-specific scripts, third-person triggers, non-sales content.
 - **Playbook page not built** — Wingman has no rep-specific framework context beyond defaults until this exists.
 - **App not Apple-notarized** — beta testers must run quarantine command manually. (Known Issue #5)
 
