@@ -5,7 +5,7 @@
   "showAttachments": false,
   "hideUnresolved": false,
   "showOrphans": true,
-  "collapse-color-groups": false,
+  "collapse-color-groups": true,
   "colorGroups": [
     {
       "query": "path:\"01 - Build Log\"  ",
@@ -47,12 +47,12 @@
   "showArrow": false,
   "textFadeMultiplier": -3,
   "nodeSizeMultiplier": 0.631684027777778,
-  "lineSizeMultiplier": 1.07255642361111,
-  "collapse-forces": true,
-  "centerStrength": 0.533116319444445,
+  "lineSizeMultiplier": 0.739296875,
+  "collapse-forces": false,
+  "centerStrength": 0.376519097222222,
   "repelStrength": 9.8125,
   "linkStrength": 1,
   "linkDistance": 30,
-  "scale": 0.7110422120095987,
-  "close": true
+  "scale": 0.9029038603013686,
+  "close": false
 }
