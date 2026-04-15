@@ -1,5 +1,7 @@
 # Signal Card Examples
 
+[[Architecture]] | [[Signal Card Design Science]] | [[Bubble Discipline]]
+
 Last updated: 2026-04-10
 
 A living library of signal card examples organized by trigger type and call stage. These are reference examples — what a signal card should look and feel like. As beta data comes in, replace synthetic examples with real ones that landed well.

@@ -1,5 +1,7 @@
 # Signal Card Design — Scientific Basis
 
+[[Architecture]] | [[Signal Card Examples]] | [[Bubble Discipline]]
+
 Built from research session on 2026-04-10. Use this when writing website copy, onboarding, or making future UI decisions.
 
 ---

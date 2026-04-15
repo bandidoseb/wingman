@@ -5,6 +5,8 @@ status: schema-ready, pipeline-not-built
 logged: 2026-04-10
 ---
 
+[[Architecture]] | [[Rep Speech Monitoring]] | [[KB Visual Brain]]
+
 # Objection Handling Sequences
 
 ## The Problem This Solves

@@ -5,6 +5,8 @@ status: backlog
 logged: 2026-04-10
 ---
 
+[[Architecture]] | [[Objection Sequences (Option A)]] | [[Rep Speech Monitoring]]
+
 # Dual Visual Brain
 
 Two separate Obsidian-style interactive knowledge graphs in the Wingman dashboard.

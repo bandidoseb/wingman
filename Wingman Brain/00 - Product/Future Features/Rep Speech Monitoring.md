@@ -5,6 +5,8 @@ status: schema-ready, pipeline-not-built
 logged: 2026-04-10
 ---
 
+[[Architecture]] | [[Objection Sequences (Option A)]] | [[KB Visual Brain]]
+
 # Rep Speech Monitoring
 
 ## What It Is

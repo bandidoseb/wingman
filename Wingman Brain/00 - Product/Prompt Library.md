@@ -1,5 +1,7 @@
 # Prompt Library
 
+[[Architecture]] | [[KB Ingestion Spec v2]]
+
 Last updated: 2026-04-02
 
 Every Claude prompt used in Wingman's AI pipeline. This file is the source of truth for what we're asking the AI to do and why.

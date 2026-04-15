@@ -5,13 +5,41 @@
   "showAttachments": false,
   "hideUnresolved": false,
   "showOrphans": true,
-  "collapse-color-groups": true,
+  "collapse-color-groups": false,
   "colorGroups": [
     {
       "query": "path:\"01 - Build Log\"  ",
       "color": {
         "a": 1,
         "rgb": 14701138
+      }
+    },
+    {
+      "query": "path:\"00 - Product\"  ",
+      "color": {
+        "a": 1,
+        "rgb": 14725458
+      }
+    },
+    {
+      "query": "path:\"05 - Operations\"  ",
+      "color": {
+        "a": 1,
+        "rgb": 11657298
+      }
+    },
+    {
+      "query": "path:\"02 - Market\"  ",
+      "color": {
+        "a": 1,
+        "rgb": 5431378
+      }
+    },
+    {
+      "query": "path:\"03 - GTM\"  ",
+      "color": {
+        "a": 1,
+        "rgb": 5431473
       }
     }
   ],
@@ -20,11 +48,11 @@
   "textFadeMultiplier": -3,
   "nodeSizeMultiplier": 0.631684027777778,
   "lineSizeMultiplier": 1.07255642361111,
-  "collapse-forces": false,
-  "centerStrength": 0.419357638888889,
+  "collapse-forces": true,
+  "centerStrength": 0.533116319444445,
   "repelStrength": 9.8125,
   "linkStrength": 1,
   "linkDistance": 30,
-  "scale": 0.5761135001315908,
-  "close": false
+  "scale": 0.7110422120095987,
+  "close": true
 }

@@ -4,6 +4,8 @@ status: approved
 logged: 2026-04-10
 ---
 
+[[Architecture]] | [[KB Ingestion Spec v2]]
+
 # Wingman KB Ingestion System — Spec v1
 
 This is the approved architecture for the Wingman knowledge base.

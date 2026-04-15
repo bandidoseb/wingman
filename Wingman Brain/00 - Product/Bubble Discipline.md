@@ -1,5 +1,7 @@
 # Bubble Discipline
 
+[[Architecture]] | [[Signal Card Examples]] | [[Signal Card Design Science]]
+
 Last updated: 2026-04-10
 
 This is the philosophy and ruleset governing when signal cards fire. This document exists because the most common failure mode for a product like Wingman is signal cards that fire too often. When that happens, reps ignore them. When reps ignore them, the product is dead — it's just a notification machine they've learned to dismiss.

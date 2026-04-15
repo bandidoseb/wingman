@@ -5,6 +5,8 @@ logged: 2026-04-13
 supersedes: KB Ingestion Spec v1.md
 ---
 
+[[Architecture]] | [[KB Ingestion Spec v1]] | [[Prompt Library]]
+
 # Wingman KB Ingestion System — Spec v2
 
 This is the locked, production-grade architecture for the Wingman knowledge base.

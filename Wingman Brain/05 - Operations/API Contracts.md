@@ -1,5 +1,7 @@
 # API Contracts
 
+[[Stack Reference]] | [[Deploy Runbook]]
+
 Last updated: 2026-04-02
 
 Documentation of every external API dependency. For each: what endpoints we use, what data we send, what we get back, failure handling, and the pricing cliff.

@@ -1,5 +1,7 @@
 # Stack Reference
 
+[[API Contracts]] | [[Deploy Runbook]]
+
 Last updated: 2026-04-02
 
 Every tool in the Wingman stack. What it does, where credentials live, what breaks if it goes down, pricing tier, and what we'd replace it with if forced to.
