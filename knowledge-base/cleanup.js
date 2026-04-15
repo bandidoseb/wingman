@@ -268,12 +268,12 @@ async function main() {
     for (const { entry, reason } of toDowngrade) {
       const { error } = await supabase
         .from('kb_signal_card_entries')
-        .update({ quality_score: 'low' })
+        .delete()
         .eq('id', entry.id);
       if (error) {
-        console.error(`  ERROR marking low "${entry.technique_name}": ${error.message}`);
+        console.error(`  ERROR deleting "${entry.technique_name}": ${error.message}`);
       } else {
-        console.log(`  ⬇  Marked low: "${entry.technique_name}"`);
+        console.log(`  🗑  Deleted: "${entry.technique_name}" (${reason})`);
       }
     }
 
