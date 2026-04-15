@@ -11,14 +11,10 @@
             "id": "f2d87738639a2665",
             "type": "leaf",
             "state": {
-              "type": "markdown",
-              "state": {
-                "file": "01 - Build Log/Code Reviews/YERRRRR TEST.md",
-                "mode": "source",
-                "source": false
-              },
-              "icon": "lucide-file",
-              "title": "YERRRRR TEST"
+              "type": "graph",
+              "state": {},
+              "icon": "lucide-git-fork",
+              "title": "Graph view"
             }
           }
         ]
@@ -183,7 +179,16 @@
   },
   "active": "f2d87738639a2665",
   "lastOpenFiles": [
+    "09 - Code Review/TEST TEST CODE REVIEW GROUP.md",
+    "09 - Code Review/Code review Thursday..md",
+    "09 - Code Review/Code review Friday.md",
+    "09 - Code Review/Co-review Saturday.md",
     "01 - Build Log/Current Sprint.md",
+    "01 - Build Log/2026-04-09.md",
+    "01 - Build Log/2026-04-07.md",
+    "01 - Build Log/Code Reviews/TEST TEST.md",
+    "09 - Code Review",
+    "01 - Build Log/Code Reviews/Untitled.base",
     "01 - Build Log/Code Reviews/YERRRRR TEST.md",
     "01 - Build Log/2026-04-02.md",
     "01 - Build Log/Code Reviews",
@@ -193,7 +198,6 @@
     "_Inbox/New Ideas - April 10.md",
     "_Inbox/Reset Intelligence Button.md",
     "01 - Build Log/2026-04-10.md",
-    "01 - Build Log/2026-04-07.md",
     "01 - Build Log/2026-04-13.md",
     "01 - Build Log/2026-04-15.md",
     "04 - Sales KB Meta/Video Ingestion Queue.md",
@@ -205,21 +209,13 @@
     "00 - Product/Future Features/KB Visual Brain.md",
     "00 - Product/Future Features/Rep Speech Monitoring.md",
     "Welcome.md",
-    "create a link.md",
-    "01 - Build Log/Decisions Log.md",
     "Untitled 1.canvas",
-    "08 - People/Advisors.md",
-    "00 - Product/Signal Card Design Science.md",
-    "01 - Build Log/2026-04-09.md",
-    "_Templates/Daily Build Log.md",
     "Untitled.canvas",
     "_Inbox",
     "08 - People",
     "07 - North Star",
     "06 - Finance",
     "05 - Operations",
-    "04 - Sales KB Meta",
-    "03 - GTM",
-    "02 - Market"
+    "04 - Sales KB Meta"
   ]
 }
