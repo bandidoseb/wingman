@@ -13,12 +13,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "01 - Build Log/Current Sprint.md",
+                "file": "01 - Build Log/Code Reviews/YERRRRR TEST.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "Current Sprint"
+              "title": "YERRRRR TEST"
             }
           }
         ]
@@ -183,8 +183,11 @@
   },
   "active": "f2d87738639a2665",
   "lastOpenFiles": [
-    "01 - Build Log/Known Issues.md",
     "01 - Build Log/Current Sprint.md",
+    "01 - Build Log/Code Reviews/YERRRRR TEST.md",
+    "01 - Build Log/2026-04-02.md",
+    "01 - Build Log/Code Reviews",
+    "01 - Build Log/Known Issues.md",
     "_Inbox/multi-turn objection handling.md",
     "_Inbox/New Ideas - April 9.md",
     "_Inbox/New Ideas - April 10.md",
@@ -209,8 +212,6 @@
     "00 - Product/Signal Card Design Science.md",
     "01 - Build Log/2026-04-09.md",
     "_Templates/Daily Build Log.md",
-    "05 - Operations/Wrap Skill.md",
-    "01 - Build Log/2026-04-02.md",
     "Untitled.canvas",
     "_Inbox",
     "08 - People",
@@ -219,7 +220,6 @@
     "05 - Operations",
     "04 - Sales KB Meta",
     "03 - GTM",
-    "02 - Market",
-    "01 - Build Log"
+    "02 - Market"
   ]
 }
