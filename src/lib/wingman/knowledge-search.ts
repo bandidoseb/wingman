@@ -3,7 +3,7 @@
  *
  * searchKnowledge(transcriptChunk) does:
  *   1. Embed the chunk with text-embedding-3-small (~80ms)
- *   2. Cosine similarity search against kb_entries via pgvector RPC (~50ms)
+ *   2. Cosine similarity search against kb_signal_card_entries via pgvector RPC (~50ms)
  *   3. Filter to matches above 0.72 threshold — return empty if nothing clears it
  *   4. Format results as a clean string for injection into the Haiku prompt
  *   5. Cache the result for 60 seconds to prevent duplicate DB hits
@@ -110,7 +110,7 @@ export async function searchKnowledge(transcriptChunk: string): Promise<string> 
   let matches: KBMatch[] = [];
 
   try {
-    const { data, error } = await supabase.rpc("search_kb_entries", {
+    const { data, error } = await supabase.rpc("search_kb_signal_card_entries", {
       query_embedding:      embedding,
       similarity_threshold: SIMILARITY_THRESHOLD,
       match_count:          MATCH_COUNT,

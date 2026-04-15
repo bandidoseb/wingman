@@ -142,7 +142,7 @@ async function main() {
   // ── Fetch all high/medium entries ─────────────────────────────────────────
   console.log('Fetching entries...');
   const { data: entries, error: fetchError } = await supabase
-    .from('kb_entries')
+    .from('kb_signal_card_entries')
     .select('id, technique_name, call_stage, situation, prospect_triggers, exact_script, why_it_works, quality_score')
     .in('quality_score', ['high', 'medium']);
 
@@ -267,7 +267,7 @@ async function main() {
 
     for (const { entry, reason } of toDowngrade) {
       const { error } = await supabase
-        .from('kb_entries')
+        .from('kb_signal_card_entries')
         .update({ quality_score: 'low' })
         .eq('id', entry.id);
       if (error) {
@@ -280,7 +280,7 @@ async function main() {
     for (const { entry, polished } of toPolish) {
       const updates = { quality_score: 'high', ...polished };
       const { error } = await supabase
-        .from('kb_entries')
+        .from('kb_signal_card_entries')
         .update(updates)
         .eq('id', entry.id);
       if (error) {

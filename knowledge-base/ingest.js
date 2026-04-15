@@ -667,7 +667,7 @@ async function ingestVideo(url, log = console.log, options = {}) {
     // when we know we have good replacement data (or intentionally zero).
     log(`Replacing existing entries for this source...`);
     const { error: delErr } = await supabase
-      .from('kb_entries')
+      .from('kb_signal_card_entries')
       .delete()
       .eq('source_id', sourceId);
 
@@ -675,7 +675,7 @@ async function ingestVideo(url, log = console.log, options = {}) {
 
     // ── 8. Insert new entries ──────────────────────────────────────────────
     if (rows.length > 0) {
-      const { error: insErr } = await supabase.from('kb_entries').insert(rows);
+      const { error: insErr } = await supabase.from('kb_signal_card_entries').insert(rows);
       if (insErr) throw new Error(`Entry insert failed: ${insErr.message}`);
     }
 
@@ -852,7 +852,7 @@ async function runBatchIngest({ force = false } = {}) {
     console.log(`   Failed sources remain at status='failed' — re-run to retry them`);
   }
   console.log(`\n📋 FINAL STEP — Run this SQL in Supabase SQL Editor:`);
-  console.log(`\n   CREATE INDEX ON public.kb_entries`);
+  console.log(`\n   CREATE INDEX ON public.kb_signal_card_entries`);
   console.log(`     USING ivfflat (prospect_embedding vector_cosine_ops)`);
   console.log(`     WITH (lists = 20);\n`);
   if (fs.existsSync(WARNINGS_LOG)) {

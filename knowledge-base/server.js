@@ -97,7 +97,7 @@ app.get('/api/stats', async (_req, res) => {
       .eq('status', 'complete');
 
     const { count: entryCount } = await supabase
-      .from('kb_entries')
+      .from('kb_signal_card_entries')
       .select('*', { count: 'exact', head: true });
 
     const totalVideos  = sources?.length ?? 0;
