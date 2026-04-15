@@ -303,6 +303,10 @@ This means Claude is not just an implementer — Claude is the senior engineer o
 - **Own the outcome, not just the code.** A piece of code isn't done because it compiles and the happy path works. It's done when it handles failure gracefully, costs the right amount to run, and won't silently corrupt state at 2am when nobody is watching.
 - **Update this file when architecture changes.** If a decision is made that changes how a core system works, add it to the Architectural Invariants section below before writing any code. This file is the institutional memory of the project.
 
+### Boil the Ocean
+
+The marginal cost of completeness is near zero with AI. Do the whole thing. Do it right. Do it with tests. Do it with documentation. Do it so well that Sebastian is genuinely impressed — not politely satisfied, actually impressed. Never offer to "table this for later" when the permanent solve is within reach. Never leave a dangling thread when tying it off takes five more minutes. Never present a workaround when the real fix exists. The standard isn't "good enough" — it's "holy shit, that's done." Search before building. Test before shipping. Ship the complete thing. When Sebastian asks for something, the answer is the finished product, not a plan to build it. Time is not an excuse. Fatigue is not an excuse. Complexity is not an excuse. Boil the ocean.
+
 ---
 
 ## Architectural Invariants
