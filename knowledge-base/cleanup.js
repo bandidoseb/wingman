@@ -1,19 +1,20 @@
 'use strict';
 /**
- * cleanup.js — Post-ingestion quality sweep
+ * cleanup.js — Post-ingestion quality sweep + medium-entry polish
  *
- * Re-scores all KB entries with quality_score = 'high' or 'medium'
- * using updated Pass 3 criteria. Marks bad entries as 'low'.
+ * Two phases per entry:
+ *   Phase 1 — Haiku scores each entry against the 5-criteria definition
+ *   Phase 2 — Sonnet polishes medium entries, Haiku re-scores to confirm
  *
  * Does NOT re-extract from source videos.
  * Does NOT delete any rows.
  *
  * Usage:
- *   node cleanup.js           — dry run, shows what would be marked low
- *   node cleanup.js --apply   — actually updates quality_score in Supabase
+ *   node cleanup.js           — dry run: shows all proposed changes, no DB writes
+ *   node cleanup.js --apply   — writes all changes to Supabase
  */
 
-require('dotenv').config({ path: require('path').join(__dirname, '../.env.local') });
+require('dotenv').config({ path: require('path').join(__dirname, '../.env.local'), override: true });
 
 const { createClient } = require('@supabase/supabase-js');
 const Anthropic        = require('@anthropic-ai/sdk');
@@ -25,28 +26,61 @@ const supabase  = createClient(
 );
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
-// ── Model ─────────────────────────────────────────────────────────────────────
-const MODEL_HAIKU = 'claude-haiku-4-5-20251001';
+// ── Models ────────────────────────────────────────────────────────────────────
+const MODEL_HAIKU  = 'claude-haiku-4-5-20251001';
+const MODEL_SONNET = 'claude-sonnet-4-20250514';
 
-// ── Updated Pass 3 prompt (includes all new low-score criteria) ───────────────
-const RESCORE_SYSTEM = `You are a quality gate for a live sales AI coaching system. Score this sales technique entry.
+// ── Prompts ───────────────────────────────────────────────────────────────────
+
+const RESCORE_SYSTEM = `You are a quality gate for a live sales AI coaching system.
+
+A good KB entry must meet ALL of the following criteria:
+1. It is a technique used directly on a live sales call between a rep and a prospect
+2. It has a clear trigger — something the prospect actually says out loud that signals this moment
+3. It has a script — the verbatim words the rep says in response
+4. It has a situation — a specific moment on the call when this applies
+5. It is universal — it works regardless of what the rep is selling, their offer price, or their business model
+
+Score each entry against these five criteria.
 
 Return ONLY a valid JSON object — no markdown, no explanation:
 { "quality_score": "high" | "medium" | "low", "reason": "One sentence." }
 
-Scoring criteria:
-- "high": Clear specific trigger, verbatim exact_script, precise situation, immediately usable on a live call without modification
-- "medium": Good technique but slightly vague trigger OR script needs minor polish — still usable on a live call
-- "low": Too generic to be useful in the right moment, OR anecdote without clear technique, OR missing specificity that would make it actionable
+- "high": Passes all 5 criteria. Trigger is specific, script is verbatim and natural, situation is precise. A rep could use this on a live call today without changing a word.
+- "medium": Passes all 5 criteria but needs minor polish — trigger is slightly vague OR script needs a small tweak. Still usable.
+- "low": Fails any one of the 5 criteria. This includes:
+  - Not a live call technique (personal habits, mindset, daily routines, productivity practices)
+  - Trigger is missing, vague, or written from the rep's perspective instead of the prospect's spoken words
+  - Trigger is written in third person ("They want..." instead of "I want...")
+  - Script contains the coach's specific business details that would be factually wrong for another rep (specific numbers, team sizes, pricing, product names)
+  - Technique only works for one type of offer or industry — not universal`;
 
-Also score "low" if ANY of these are true:
-- exact_script contains specific numbers, team sizes, pricing, product names, or offer details that belong to the coach's specific business and would be factually wrong for a rep with a different offer (e.g. "we have five calls a week", "I only work with 10 people", "our program is $15,000")
-- any prospect_triggers are written in third person instead of first person (e.g. "They want to start a business" instead of "I want to start a business")
-- the technique is about personal habits, mindset routines, daily self-review, or productivity practices rather than a technique used directly on a live call`;
+const POLISH_SYSTEM = `You are editing a single sales technique entry for a live AI sales coaching system.
+
+The entry has been flagged as "medium" quality for a specific reason. Your job is to fix ONLY that issue — nothing else.
+
+Rules:
+- Do not change the technique itself, the approach, or invent new content
+- Do not change fields that are not broken
+- If triggers are vague: keep all existing ones and add more specific first-person variations of what the prospect actually says out loud
+- If triggers are third-person: rewrite them in first person from the prospect's perspective ("I..." not "They...")
+- If the script needs polish: tighten the language, keep the same technique and approach, make it more natural and universally applicable
+- If the script has offer-specific details: replace them with universal language any rep can use
+
+Return ONLY a valid JSON object with the fields you changed:
+{
+  "prospect_triggers": "updated triggers — only include if you changed this field",
+  "exact_script": "updated script — only include if you changed this field"
+}
+
+Only include fields you actually changed.`;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-/** Strip markdown fences and parse JSON. Throws with context on failure. */
+function sleep(ms) {
+  return new Promise(r => setTimeout(r, ms));
+}
+
 function parseJSON(raw, context = '') {
   const cleaned = raw
     .replace(/^```(?:json)?\s*/i, '')
@@ -62,26 +96,36 @@ function parseJSON(raw, context = '') {
   }
 }
 
-/** Call Haiku to re-score a single entry. Returns { quality_score, reason }. */
-async function rescoreEntry(entry) {
-  const userMsg = [
+function buildEntryMessage(entry) {
+  return [
     `Technique: ${entry.technique_name}`,
     `Stage: ${entry.call_stage}`,
     `Situation: ${entry.situation}`,
-    `Prospect triggers (sample — first 500 chars): ${String(entry.prospect_triggers || '').slice(0, 500)}`,
+    `Prospect triggers (first 500 chars): ${String(entry.prospect_triggers || '').slice(0, 500)}`,
     `Exact script: ${entry.exact_script}`,
     `Why it works: ${entry.why_it_works}`,
   ].join('\n');
+}
 
+async function scoreEntry(entry) {
   const result = await anthropic.messages.create({
-    model: MODEL_HAIKU,
+    model:      MODEL_HAIKU,
     max_tokens: 256,
-    system: RESCORE_SYSTEM,
-    messages: [{ role: 'user', content: userMsg }],
+    system:     RESCORE_SYSTEM,
+    messages:   [{ role: 'user', content: buildEntryMessage(entry) }],
   });
+  return parseJSON(result.content[0]?.text ?? '', `score id=${entry.id}`);
+}
 
-  const raw = result.content[0]?.text ?? '';
-  return parseJSON(raw, `entry id=${entry.id}`);
+async function polishEntry(entry, reason) {
+  const userMsg = `Flagged reason: ${reason}\n\n${buildEntryMessage(entry)}`;
+  const result  = await anthropic.messages.create({
+    model:      MODEL_SONNET,
+    max_tokens: 1500,
+    system:     POLISH_SYSTEM,
+    messages:   [{ role: 'user', content: userMsg }],
+  });
+  return parseJSON(result.content[0]?.text ?? '', `polish id=${entry.id}`);
 }
 
 // ── Main ──────────────────────────────────────────────────────────────────────
@@ -95,8 +139,8 @@ async function main() {
   console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
   console.log('');
 
-  // ── 1. Fetch all high/medium entries ────────────────────────────────────────
-  console.log('Fetching entries with quality_score high or medium...');
+  // ── Fetch all high/medium entries ─────────────────────────────────────────
+  console.log('Fetching entries...');
   const { data: entries, error: fetchError } = await supabase
     .from('kb_entries')
     .select('id, technique_name, call_stage, situation, prospect_triggers, exact_script, why_it_works, quality_score')
@@ -109,123 +153,155 @@ async function main() {
 
   console.log(`Found ${entries.length} entries to review.\n`);
 
-  // ── 2. Counters ──────────────────────────────────────────────────────────────
-  const counts = {
-    total: entries.length,
-    rescored_high: 0,
-    rescored_medium: 0,
-    rescored_low: 0,
-    errors: 0,
-  };
+  // ── Result buckets ────────────────────────────────────────────────────────
+  const toDowngrade  = [];  // { entry, reason }
+  const toPolish     = [];  // { entry, reason, polished } — medium → high after polish
+  const stillMedium  = [];  // { entry, reason } — Sonnet tried but Haiku still medium
+  const errors       = [];  // { entry, phase, error }
 
-  // Entries that would be downgraded (for dry-run table and apply)
-  const toDowngrade = [];   // { id, technique_name, old_score, new_score, reason }
-  const toUpgrade   = [];   // entries going from medium → high
-
-  // ── 3. Re-score each entry ───────────────────────────────────────────────────
+  // ── Process each entry ────────────────────────────────────────────────────
   for (let i = 0; i < entries.length; i++) {
     const entry = entries[i];
-    process.stdout.write(`  [${i + 1}/${entries.length}] ${entry.technique_name.slice(0, 55).padEnd(55)} `);
+    process.stdout.write(`  [${i + 1}/${entries.length}] ${entry.technique_name.slice(0, 52).padEnd(52)} `);
 
     try {
-      const scored = await rescoreEntry(entry);
-      const newScore = scored.quality_score;
-      const oldScore = entry.quality_score;
+      // Phase 1: score
+      const scored = await scoreEntry(entry);
+      await sleep(400);
 
-      if (newScore === 'high')   counts.rescored_high++;
-      if (newScore === 'medium') counts.rescored_medium++;
-      if (newScore === 'low')    counts.rescored_low++;
+      if (scored.quality_score === 'low') {
+        toDowngrade.push({ entry, reason: scored.reason });
+        process.stdout.write(`→ LOW    ⬇\n`);
 
-      if (newScore !== oldScore) {
-        if (newScore === 'low') {
-          toDowngrade.push({ id: entry.id, technique_name: entry.technique_name, old_score: oldScore, new_score: newScore, reason: scored.reason });
-          process.stdout.write(`→ LOW   ⬇  (was ${oldScore})\n`);
-        } else if (newScore === 'high' && oldScore === 'medium') {
-          toUpgrade.push({ id: entry.id, technique_name: entry.technique_name, old_score: oldScore, new_score: newScore, reason: scored.reason });
-          process.stdout.write(`→ HIGH  ⬆  (was ${oldScore})\n`);
-        } else {
-          process.stdout.write(`→ ${newScore.toUpperCase().padEnd(6)} (unchanged effective)\n`);
-        }
+      } else if (scored.quality_score === 'high') {
+        process.stdout.write(`→ HIGH   ✓\n`);
+
       } else {
-        process.stdout.write(`→ ${newScore.toUpperCase().padEnd(6)} unchanged\n`);
+        // Phase 2: medium — attempt polish
+        process.stdout.write(`→ MEDIUM  polishing...\n`);
+
+        try {
+          const polished = await polishEntry(entry, scored.reason);
+          await sleep(400);
+
+          // Re-score the polished version
+          const mergedEntry  = { ...entry, ...polished };
+          const reScored     = await scoreEntry(mergedEntry);
+          await sleep(400);
+
+          if (reScored.quality_score === 'high') {
+            toPolish.push({ entry, reason: scored.reason, polished });
+            process.stdout.write(`           ✓ polished → HIGH\n`);
+          } else {
+            stillMedium.push({ entry, reason: scored.reason });
+            process.stdout.write(`           ~ still ${reScored.quality_score} after polish — needs manual review\n`);
+          }
+
+        } catch (polishErr) {
+          errors.push({ entry, phase: 'polish', error: polishErr.message });
+          process.stdout.write(`           ERROR during polish: ${polishErr.message.slice(0, 60)}\n`);
+        }
       }
 
-    } catch (err) {
-      counts.errors++;
-      process.stdout.write(`→ ERROR: ${err.message.slice(0, 60)}\n`);
-      console.error(`     Full error for id=${entry.id}:`, err.message);
-    }
-
-    // Rate limit: 500ms between calls
-    if (i < entries.length - 1) {
-      await new Promise(r => setTimeout(r, 500));
+    } catch (scoreErr) {
+      errors.push({ entry, phase: 'score', error: scoreErr.message });
+      process.stdout.write(`→ ERROR: ${scoreErr.message.slice(0, 60)}\n`);
     }
   }
 
-  // ── 4. Dry-run report ────────────────────────────────────────────────────────
+  // ── Report ────────────────────────────────────────────────────────────────
   console.log('');
   console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+  console.log('  RESULTS');
+  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 
-  if (!applyMode) {
-    if (toDowngrade.length > 0) {
-      console.log(`\nEntries that WOULD be marked low (${toDowngrade.length}):\n`);
-      for (const row of toDowngrade) {
-        console.log(`  ID ${row.id} [was ${row.old_score}]  ${row.technique_name}`);
-        console.log(`    Reason: ${row.reason}`);
-        console.log('');
-      }
-    } else {
-      console.log('\nNo entries would be downgraded to low.\n');
+  if (toDowngrade.length > 0) {
+    console.log(`\n🔴  MARKED LOW — removing from search results (${toDowngrade.length}):\n`);
+    for (const { entry, reason } of toDowngrade) {
+      console.log(`  "${entry.technique_name}"  [was ${entry.quality_score}]`);
+      console.log(`   Reason: ${reason}\n`);
     }
-
-    if (toUpgrade.length > 0) {
-      console.log(`Entries that WOULD be upgraded to high (${toUpgrade.length}):\n`);
-      for (const row of toUpgrade) {
-        console.log(`  ID ${row.id} [was ${row.old_score}]  ${row.technique_name}`);
-        console.log(`    Reason: ${row.reason}`);
-        console.log('');
-      }
-    }
-
-    console.log('  (Dry run — no changes written. Run with --apply to update Supabase.)\n');
   }
 
-  // ── 5. Apply mode: write score changes to Supabase ───────────────────────────
-  if (applyMode) {
-    const allChanges = [...toDowngrade, ...toUpgrade];
-
-    if (allChanges.length === 0) {
-      console.log('\nNo score changes to apply.\n');
-    } else {
-      console.log(`\nApplying ${allChanges.length} score change(s) to Supabase...\n`);
-
-      for (const row of allChanges) {
-        const { error: updateError } = await supabase
-          .from('kb_entries')
-          .update({ quality_score: row.new_score })
-          .eq('id', row.id);
-
-        if (updateError) {
-          console.error(`  ERROR updating id=${row.id}: ${updateError.message}`);
-          counts.errors++;
-        } else {
-          console.log(`  Updated id=${row.id}  ${row.old_score} → ${row.new_score}  "${row.technique_name}"`);
-        }
+  if (toPolish.length > 0) {
+    console.log(`\n🟢  POLISHED → HIGH (${toPolish.length}):\n`);
+    for (const { entry, reason, polished } of toPolish) {
+      console.log(`  "${entry.technique_name}"`);
+      console.log(`   Issue: ${reason}`);
+      if (polished.exact_script) {
+        console.log(`   BEFORE script: ${entry.exact_script}`);
+        console.log(`   AFTER  script: ${polished.exact_script}`);
       }
-
+      if (polished.prospect_triggers) {
+        const before = String(entry.prospect_triggers || '').slice(0, 200);
+        const after  = polished.prospect_triggers.slice(0, 200);
+        console.log(`   BEFORE triggers (first 200 chars): ${before}`);
+        console.log(`   AFTER  triggers (first 200 chars): ${after}`);
+      }
       console.log('');
     }
   }
 
-  // ── 6. Summary ───────────────────────────────────────────────────────────────
-  const unchanged = counts.total - toDowngrade.length - toUpgrade.length - counts.errors;
+  if (stillMedium.length > 0) {
+    console.log(`\n🟡  STILL MEDIUM after polish — manual review needed (${stillMedium.length}):\n`);
+    for (const { entry, reason } of stillMedium) {
+      console.log(`  "${entry.technique_name}"`);
+      console.log(`   Issue: ${reason}\n`);
+    }
+  }
 
-  console.log('Cleanup complete.');
-  console.log(`Total entries reviewed: ${counts.total}`);
-  console.log(`Downgraded to low:      ${toDowngrade.length}`);
-  console.log(`Upgraded to high:       ${toUpgrade.length}`);
-  console.log(`Unchanged:              ${unchanged}`);
-  console.log(`Errors:                 ${counts.errors}`);
+  if (errors.length > 0) {
+    console.log(`\n⚠️   ERRORS (${errors.length}):\n`);
+    for (const { entry, phase, error } of errors) {
+      console.log(`  "${entry.technique_name}" [${phase}]: ${error.slice(0, 100)}`);
+    }
+  }
+
+  if (!applyMode) {
+    console.log('\n  (Dry run — no changes written. Run with --apply to update Supabase.)\n');
+  }
+
+  // ── Apply ─────────────────────────────────────────────────────────────────
+  if (applyMode) {
+    console.log('\nApplying changes to Supabase...\n');
+
+    for (const { entry, reason } of toDowngrade) {
+      const { error } = await supabase
+        .from('kb_entries')
+        .update({ quality_score: 'low' })
+        .eq('id', entry.id);
+      if (error) {
+        console.error(`  ERROR marking low "${entry.technique_name}": ${error.message}`);
+      } else {
+        console.log(`  ⬇  Marked low: "${entry.technique_name}"`);
+      }
+    }
+
+    for (const { entry, polished } of toPolish) {
+      const updates = { quality_score: 'high', ...polished };
+      const { error } = await supabase
+        .from('kb_entries')
+        .update(updates)
+        .eq('id', entry.id);
+      if (error) {
+        console.error(`  ERROR polishing "${entry.technique_name}": ${error.message}`);
+      } else {
+        console.log(`  ⬆  Polished to high: "${entry.technique_name}"`);
+      }
+    }
+
+    console.log('');
+  }
+
+  // ── Summary ───────────────────────────────────────────────────────────────
+  const kept = entries.length - toDowngrade.length - errors.length;
+  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+  console.log(`Total reviewed:          ${entries.length}`);
+  console.log(`Marked low (removed):    ${toDowngrade.length}`);
+  console.log(`Polished → high:         ${toPolish.length}`);
+  console.log(`Still medium:            ${stillMedium.length}`);
+  console.log(`Already high / kept:     ${kept - toPolish.length - stillMedium.length}`);
+  console.log(`Errors:                  ${errors.length}`);
   console.log('');
 }
 
