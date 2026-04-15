@@ -6,6 +6,16 @@ This is the first file Claude reads at session start. It answers: where are we, 
 
 ---
 
+## What Was Just Completed (2026-04-15 — Dual KB Build Session)
+
+- **Dual KB architecture fully built.** All 5 steps from the previous session plan completed.
+- **SQL migration 007 run.** `kb_entries` renamed → `kb_signal_card_entries`. `search_kb_entries` RPC replaced with `search_kb_signal_card_entries`. `kb_coaching_entries` table created with `search_kb_coaching` RPC.
+- **4 code files updated.** `knowledge-search.ts`, `ingest.js`, `server.js`, `cleanup.js` all updated to use new table/RPC names. Zero stray `kb_entries` references remain.
+- **backfill-coaching.js built and run.** 431 rows copied from `kb_signal_card_entries` → `kb_coaching_entries` with re-embedding. Verified in Supabase.
+- **cleanup.js --apply run.** 216 bad signal entries deleted. 42 polished to high. `kb_signal_card_entries` now has 215 clean entries (~156 high, 58 medium).
+
+---
+
 ## What Was Just Completed (2026-04-15 — KB Architecture Session)
 
 - **Track A complete** — `knowledge-search.ts` updated: threshold 0.65→0.72, KBMatch interface now matches RPC columns (situation, exact_script, why_it_works, call_stage, quality_score), format string updated so Haiku receives all 5 fields per technique. `knowledge-signal.ts` updated: Haiku now instructed to base headline on exact_script when available, use why_it_works for subtext context.
@@ -80,7 +90,7 @@ This is the first file Claude reads at session start. It answers: where are we, 
 
 ## What's In Progress
 
-- **Dual KB architecture build** — architecture decided, nothing built yet. Full plan below.
+- Nothing currently in progress.
 
 ---
 
@@ -171,8 +181,7 @@ signal extraction: strict, 30+ first-person triggers required, dual-vector embed
 
 ## Current Blockers
 
-- **Dual KB architecture not yet built** — kb_coaching_entries table doesn't exist yet. Next session starts with SQL migration (Step 1 above).
-- **cleanup.js --apply not yet run** — 215 bad signal entries still in kb_entries. Will be deleted (not marked low) after backfill confirms success.
+- **ingest.js dual-pipeline not yet updated** — Steps 4-5 from the original plan (updating ingest.js to write to both tables, calibration) are deferred to next session.
 - **Playbook page not built** — Wingman has no rep-specific framework context beyond defaults until this exists. Powers gap-detection signal cards (separate from KB).
 - **App not Apple-notarized** — beta testers must run quarantine command manually. (Known Issue #5)
 

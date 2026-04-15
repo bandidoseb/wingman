@@ -8,6 +8,14 @@ Last updated: 2026-04-15
 
 ## 2026
 
+### 2026-04-15 — Table renamed: kb_entries → kb_signal_card_entries
+**Decision:** Rename the `kb_entries` table to `kb_signal_card_entries` across DB, code, and all references.
+**Reasoning:** The original name was ambiguous once the coaching table (`kb_coaching_entries`) was introduced. `kb_signal_card_entries` makes the table's purpose immediately clear — it powers live signal cards, not the chatbot.
+**Impact:** SQL migration 007 ran the rename. 4 code files updated. RPC renamed from `search_kb_entries` → `search_kb_signal_card_entries`.
+**Status:** Complete.
+
+---
+
 ### 2026-04-15 — Dual KB architecture: separate tables for signal cards and coaching chatbot
 **Decision:** Split the knowledge base into two separate Supabase tables: `kb_entries` (signal cards, existing) and `kb_coaching_entries` (coaching chatbot, new). One ingestion URL populates both automatically.
 **Reasoning:** Signal card entries require surgical precision — 30+ first-person prospect triggers, verbatim script, universal applicability across all offers. Coaching chatbot entries can be broader — mindset, habits, frameworks, general sales advice. The same schema and quality bar can't serve both without compromising one. Two focused tables > one muddled table.
