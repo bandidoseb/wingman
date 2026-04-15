@@ -2,11 +2,28 @@
 
 A running log of every major architectural or product decision made on Wingman. Append only — never delete. Each entry captures the decision, the date, the reasoning, and any alternatives that were rejected.
 
-Last updated: 2026-04-09
+Last updated: 2026-04-15
 
 ---
 
 ## 2026
+
+### 2026-04-15 — Dual KB architecture: separate tables for signal cards and coaching chatbot
+**Decision:** Split the knowledge base into two separate Supabase tables: `kb_entries` (signal cards, existing) and `kb_coaching_entries` (coaching chatbot, new). One ingestion URL populates both automatically.
+**Reasoning:** Signal card entries require surgical precision — 30+ first-person prospect triggers, verbatim script, universal applicability across all offers. Coaching chatbot entries can be broader — mindset, habits, frameworks, general sales advice. The same schema and quality bar can't serve both without compromising one. Two focused tables > one muddled table.
+**Rule:** Everything ingested goes into `kb_coaching_entries`. Only entries that pass the strict signal card quality gate ALSO go into `kb_entries`. Signal is a strict subset of coaching.
+**Trade-off accepted:** Two ingestion pipelines to maintain. More infrastructure. Worth it for quality.
+**Alternatives rejected:** One table with a `use_case` column — rejected because the schemas are genuinely different and the quality bars are incompatible.
+**Status:** Active — not yet built. SQL migration is next session priority #1.
+
+---
+
+### 2026-04-15 — Gap-detection signal cards are Playbook cards, not KB cards
+**Decision:** "You haven't touched on timeline/budget/decision maker" type signal cards are powered by the Playbook system (pre-call checklist), not by the KB pipeline.
+**Reasoning:** KB fires when a prospect says something specific that matches a technique. Gap detection fires when the AI notices a rep hasn't covered a required framework item. These are fundamentally different trigger types requiring different infrastructure.
+**Status:** Active — Playbook page not yet built.
+
+---
 
 ### 2026-04-02 — Recall.ai Desktop SDK for live audio capture
 **Decision:** Use Recall.ai Desktop SDK (not a bot joining the call) to capture audio invisibly.
