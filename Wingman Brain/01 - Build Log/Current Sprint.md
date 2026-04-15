@@ -167,56 +167,13 @@ signal extraction: strict, 30+ first-person triggers required, dual-vector embed
 
 10. **"Retry analysis" button in Flight Log** — low priority.
 
-### IMMEDIATE — Next session (do these in order)
-
-1. ~~Wait for Run 3 to finish~~ ✅ Done — 38/38 succeeded
-2. ~~Run ivfflat index~~ ✅ Done — switched to HNSW (ivfflat failed due to Supabase memory limit of 32MB). HNSW index created on `prospect_embedding`.
-
-3. **Update `src/lib/wingman/knowledge-search.ts`:**
-   - Change `SIMILARITY_THRESHOLD` constant from 0.65 → 0.72
-   - Update `KBMatch` interface to include `exact_script` and `why_it_works`
-   - Update `formatResults()` to pass these fields through to kb-signal route
-
-4. **Update `src/app/api/wingman/kb-signal/route.ts`:**
-   - Pass `exact_script`, `why_it_works`, `situation` to Haiku
-
-5. **Update `src/lib/wingman/knowledge-signal.ts`:**
-   - Use `exact_script` and `why_it_works` in the Haiku prompt
-
-6. **Build `knowledge-base/cleanup.js`** — post-ingestion quality sweep:
-   - Re-score all existing KB entries with updated prompts
-   - Discard offer-specific exact_scripts (coach's specific business details)
-   - Discard third-person prospect triggers
-   - Discard non-sales content (personal habits, mindset routines)
-   - Does NOT re-extract from source videos — just re-scores existing entries
-
-7. **Update Pass 2 + Pass 3 prompts in `ingest.js`:**
-   - Pass 2: add explicit first-person trigger rule + exclude personal habits/routines
-   - Pass 3: add offer-specific script detection rule
-
-8. **Calibration:**
-   - Run 10 test trigger phrases with ?debug=true on kb-signal route
-   - Log actual similarity scores
-   - Tune SIMILARITY_THRESHOLD if needed
-   - Remove debug flag before beta
-
-### AFTER KB IS FULLY LIVE
-
-4. **Playbook page** — pre-call framework setup. Rep configures once. Three tiers: locked core, default-on toggleable, custom.
-
-5. **Stripe billing end-to-end test**
-
-6. **Beta onboarding email** — must include quarantine removal command for non-notarized app.
-
-7. **"Retry analysis" button in Flight Log** — low priority. Show retry button when `summary` is null on a completed call.
-
 ---
 
 ## Current Blockers
 
-- **KB pipeline code not yet updated** — Steps 3-5 of build plan not done. `knowledge-search.ts`, `kb-signal` route, and `knowledge-signal.ts` must be updated before the new KB is live on real calls.
-- **KB quality issues** — cleanup script needed before KB is production-ready. Bad entries confirmed: offer-specific scripts, third-person triggers, non-sales content.
-- **Playbook page not built** — Wingman has no rep-specific framework context beyond defaults until this exists.
+- **Dual KB architecture not yet built** — kb_coaching_entries table doesn't exist yet. Next session starts with SQL migration (Step 1 above).
+- **cleanup.js --apply not yet run** — 215 bad signal entries still in kb_entries. Will be deleted (not marked low) after backfill confirms success.
+- **Playbook page not built** — Wingman has no rep-specific framework context beyond defaults until this exists. Powers gap-detection signal cards (separate from KB).
 - **App not Apple-notarized** — beta testers must run quarantine command manually. (Known Issue #5)
 
 ---
