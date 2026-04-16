@@ -103,7 +103,14 @@
       "Bash(node cleanup.js)",
       "Bash(node -e \"require\\('dotenv'\\).config\\({ path: require\\('path'\\).join\\(__dirname, '../.env.local'\\) }\\); console.log\\('KEY:', process.env.ANTHROPIC_API_KEY ? 'found \\(' + process.env.ANTHROPIC_API_KEY.slice\\(0,8\\) + '...\\)' : 'MISSING'\\);\")",
       "Bash(node -e \"const path = require\\('path'\\); const envPath = path.join\\('/Users/sebastianperez/Desktop/Wingman CC/knowledge-base', '../.env.local'\\); console.log\\('Path:', envPath\\); require\\('dotenv'\\).config\\({ path: envPath }\\); console.log\\('KEY:', process.env.ANTHROPIC_API_KEY ? 'found' : 'MISSING'\\);\")",
-      "Bash(node -e \"const result = require\\('dotenv'\\).config\\({ path: '/Users/sebastianperez/Desktop/Wingman CC/.env.local', debug: true }\\); console.log\\('error:', result.error\\); console.log\\('parsed keys:', result.parsed ? Object.keys\\(result.parsed\\) : 'none'\\);\")"
+      "Bash(node -e \"const result = require\\('dotenv'\\).config\\({ path: '/Users/sebastianperez/Desktop/Wingman CC/.env.local', debug: true }\\); console.log\\('error:', result.error\\); console.log\\('parsed keys:', result.parsed ? Object.keys\\(result.parsed\\) : 'none'\\);\")",
+      "Bash(git -C \"/Users/sebastianperez/Desktop/Wingman CC\" diff HEAD~17 HEAD --stat)",
+      "Bash(git -C \"/Users/sebastianperez/Desktop/Wingman CC\" diff HEAD~17 HEAD -- '*.ts' '*.tsx' '*.js' '*.html' '*.json')",
+      "Bash(git -C \"/Users/sebastianperez/Desktop/Wingman CC\" diff HEAD~17 HEAD -- package.json)",
+      "Bash(git -C \"/Users/sebastianperez/Desktop/Wingman CC\" diff HEAD~17 HEAD)",
+      "Bash(git -C \"/Users/sebastianperez/Desktop/Wingman CC\" diff HEAD~17 HEAD -- .env.local)",
+      "Bash(git -C \"/Users/sebastianperez/Desktop/Wingman CC\" diff HEAD~17 HEAD -- \"electron/\")",
+      "Bash(git -C \"/Users/sebastianperez/Desktop/Wingman CC\" diff HEAD~17 HEAD -- \"src/app/api/\")"
     ]
   },
   "hooks": {
