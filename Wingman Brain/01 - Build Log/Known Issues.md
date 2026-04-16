@@ -1,6 +1,6 @@
 # Known Issues
 
-Last updated: 2026-04-10
+Last updated: 2026-04-16
 
 A running list of known bugs, limitations, and things that need fixing. Add new issues at the top. Update status when resolved. Never delete — mark as Resolved with the date.
 
@@ -10,6 +10,8 @@ A running list of known bugs, limitations, and things that need fixing. Add new 
 
 | #   | Issue | Impact | Status | Notes |
 | --- | ----- | ------ | ------ | ----- |
+| 27 | `knowledge-search.ts` embedding fetch has no timeout | **Medium** | Open | The OpenAI embedding call in `knowledge-search.ts` (line 78) uses raw `fetch` with no `AbortController` timeout. If OpenAI is slow or unresponsive during a live call, the entire signal card pipeline hangs indefinitely — no signal cards fire, no error surfaces, the rep gets no coaching for the rest of the call. Fix: add a 5-second `AbortController` timeout to the `fetch` call. Found by automated review on 2026-04-16. |
+| 26 | `backfill-coaching.js` embedding fetch has no timeout | **Low** | Open | The `embedBatch` function (line 43) in `backfill-coaching.js` uses `fetch` with no timeout. If OpenAI hangs, the script freezes indefinitely with no error message. No user impact (local dev tool), but causes confusion when running on a slow network. Fix: add a 30-second `AbortController` timeout to `embedBatch`. Found by automated review on 2026-04-16. |
 | 25 | KB pipeline steps 4-5 not yet wired | **High** | Open | `knowledge-search.ts` still uses old KBMatch interface (no exact_script/why_it_works). `kb-signal` route and `knowledge-signal.ts` not yet updated to use new fields. Even after re-ingestion completes, Haiku won't receive exact_script or why_it_works until these 3 files are updated. Next session priority #1 after ingestion finishes. |
 | 24 | KB entries contain non-sales content | **High** | Open | Pass 2 Sonnet is extracting coach personal productivity habits, mindset routines, and daily self-review practices as if they were sales techniques. Example: prospect triggers like "How did I do today / I want to track my progress" with exact_script about sending an end-of-day report. Has zero application on a live sales call. Fix: update Pass 2 prompt with explicit exclusion rule + build cleanup.js to purge existing entries. |
 | 23 | Prospect triggers written in third person | **High** | Open | Pass 2 is sometimes generating prospect triggers in third person ("They want to start a new business") instead of first person ("I want to start a new business"). Third-person triggers won't match live prospect speech — the embedding similarity will be low. Fix: update Pass 2 prompt to explicitly require first-person triggers + build cleanup.js to flag/fix existing entries. |
