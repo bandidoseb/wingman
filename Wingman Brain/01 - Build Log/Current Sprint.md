@@ -1,8 +1,20 @@
 # Current Sprint
 
-Last updated: 2026-04-15
+Last updated: 2026-04-17
 
 This is the first file Claude reads at session start. It answers: where are we, what's next, and what's blocking us.
+
+---
+
+## What Was Just Completed (2026-04-17 — Junction Table + Calibration Session)
+
+- **Calibration tool built** — `knowledge-base/calibrate.js` runs 10 test phrases through the live pipeline and shows exact similarity scores. Reusable: run after every new batch of videos.
+- **Junction table architecture shipped** — `kb_prospect_triggers` table: one row per trigger phrase, each with its own embedding. 6,554 rows backfilled from 215 entries. HNSW index created. Migration 008 run in Supabase.
+- **Scores went from 0.38 to 0.65–0.88** — all critical signal card moments now fire correctly. Threshold set to 0.65.
+- **ingest.js updated** — future ingestion auto-populates junction table. No manual steps needed on new videos.
+- **Issues #25 and #27 resolved** — KB pipeline fully wired, embedding timeout fixed.
+- **Issues #28 and #29 logged** — negation blindness and duplicate triggers earmarked for next re-ingestion session.
+- **Pushed to Railway** — commit `819d518`, auto-deploy triggered.
 
 ---
 
@@ -96,93 +108,21 @@ This is the first file Claude reads at session start. It answers: where are we, 
 
 ## What's Next (Priority Order)
 
-### IMMEDIATE — Next session (do these in order, do NOT skip steps)
+1. **Wire Mission Intel chatbot to `kb_coaching_entries`** — coaching KB is built and backfilled but `ai/chat` route isn't querying it yet. Separate session.
 
-#### CONTEXT: Dual KB Architecture Decision
-We decided to split the knowledge base into two separate tables:
-- **`kb_entries`** (existing) — signal card only. High bar. Prospect-triggered, verbatim script, universal. Surgical.
-- **`kb_coaching_entries`** (new) — coaching chatbot. Broad bar. Techniques + mindset + frameworks + habits + anything real sales content. Used by Mission Intel chatbot (not yet wired).
+2. **Playbook page** — pre-call framework setup. Rep configures once. Three tiers: locked core, default-on toggleable, custom. Only remaining unbuilt V1 beta item.
 
-**Key rule:** Everything ingested goes into `kb_coaching_entries`. Only entries that pass the strict signal card quality gate ALSO go into `kb_entries`. Signal is a subset of coaching.
+3. **Next re-ingestion session** — fix Issues #28 + #29: add `trigger_type` classification (`objection` | `buying_signal`) to junction table, improve Pass 2 prompt for trigger diversity. Re-ingest all sources.
 
-**One ingestion URL in → ingest.js routes content to both tables automatically. Rep never sees two separate systems.**
+4. **Stripe billing end-to-end test**
 
-**Gap-detection signal cards** ("you haven't touched on timeline/budget/decision maker") are Playbook cards — powered by the Playbook system, NOT the KB. Do not confuse these with KB signal cards.
-
-#### CONTEXT: KB Dry Run Results (2026-04-15)
-cleanup.js dry run completed on 431 entries:
-- 215 → should be removed from signal card KB (bad quality for live call use)
-- 42 → Sonnet polished them, Haiku confirmed high quality
-- 61 → still medium after polish, manual review recommended
-- 111 → already high quality, untouched
-- 2 → errors (JSON parse failure, skipped)
-cleanup.js --apply has NOT been run. No DB changes made yet.
-
-#### Step 1 — SQL migration: create `kb_coaching_entries` table
-New table schema (simpler than kb_entries — no dual vectors, no prospect_triggers requirements):
-```sql
-id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
-source_id uuid REFERENCES kb_sources(id) ON DELETE CASCADE,
-topic text NOT NULL,           -- what is this technique/concept about
-content text NOT NULL,          -- full explanation, can be long
-coach_name text,
-call_stage text,                -- optional, nullable
-content_type text,              -- technique, mindset, framework, habit, objection_handling, etc.
-tags text,                      -- comma-separated topics
-embedding vector(1536),         -- embedded from topic + content (NOT prospect speech)
-created_at timestamptz DEFAULT now()
-```
-Also create search RPC: `search_kb_coaching(query_embedding, similarity_threshold, match_count)`
-Run in Supabase SQL Editor. No code push needed.
-
-#### Step 2 — Backfill: copy all 431 current `kb_entries` into `kb_coaching_entries`
-Write a backfill script (`knowledge-base/backfill-coaching.js`) that:
-- Reads all rows from kb_entries
-- Maps fields: technique_name→topic, full_detail+why_it_works→content, coach_name, call_stage, content_type
-- Re-embeds using topic + content (single embedding, not dual-vector)
-- Inserts into kb_coaching_entries
-- Logs progress, handles errors without crashing
-
-#### Step 3 — Delete bad signal entries from `kb_entries`
-After backfill confirms success:
-- Update cleanup.js to DELETE from kb_entries (not mark low) for the 215 bad-for-signal entries
-- Run cleanup.js --apply
-- Result: kb_entries becomes tight, surgical, signal-card-only table (~216 entries)
-
-#### Step 4 — Update `ingest.js` for dual-pipeline
-One URL in → both tables populated going forward:
-- Pass 1 (Haiku): classify content type — same as now
-- Pass 2A (Sonnet): extract ALL techniques broadly → insert into kb_coaching_entries
-- Pass 2B (Sonnet): extract ONLY signal-card-ready techniques → candidates for kb_entries
-- Pass 3 (Haiku): quality gate → only surgical entries make it into kb_entries
-Two separate Sonnet extraction passes for quality (not combined into one prompt).
-coaching extraction: broad, no 30+ trigger requirement, embed topic+content
-signal extraction: strict, 30+ first-person triggers required, dual-vector embedding
-
-#### Step 5 — Calibration (deferred from previous sprint)
-- Run 10 test trigger phrases with ?debug=true on kb-signal route
-- Log actual similarity scores
-- Tune SIMILARITY_THRESHOLD if needed
-- Remove debug flag before beta
-
-### AFTER DUAL KB IS BUILT
-
-6. **Wire Mission Intel chatbot to `kb_coaching_entries`** — separate session. Build search_kb_coaching RPC, update the ai/chat route to query coaching KB.
-
-7. **Playbook page** — pre-call framework setup. Rep configures once. Three tiers: locked core, default-on toggleable, custom. This powers gap-detection signal cards (completely separate from KB).
-
-8. **Stripe billing end-to-end test**
-
-9. **Beta onboarding email** — must include quarantine removal command for non-notarized app.
-
-10. **"Retry analysis" button in Flight Log** — low priority.
+5. **Beta onboarding email** — must include quarantine removal command for non-notarized app.
 
 ---
 
 ## Current Blockers
 
-- **ingest.js dual-pipeline not yet updated** — Steps 4-5 from the original plan (updating ingest.js to write to both tables, calibration) are deferred to next session.
-- **Playbook page not built** — Wingman has no rep-specific framework context beyond defaults until this exists. Powers gap-detection signal cards (separate from KB).
+- **Playbook page not built** — Wingman has no rep-specific framework context beyond defaults until this exists.
 - **App not Apple-notarized** — beta testers must run quarantine command manually. (Known Issue #5)
 
 ---
