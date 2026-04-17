@@ -150,6 +150,24 @@ Also score "low" if ANY of these are true:
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
+ * Splits a prospect_triggers text block into clean individual phrases.
+ * Handles numbered lists (1. 2.), bullets (- * •), blank lines, whitespace.
+ */
+function splitTriggerLines(text) {
+  if (!text || !text.trim()) return [];
+  return text
+    .split('\n')
+    .map(line => line
+      .trim()
+      .replace(/^[\d]+[\.\)]\s+/, '')
+      .replace(/^[-*•–]\s+/, '')
+      .trim()
+    )
+    .filter(line => line.length >= 10)
+    .filter(line => !line.startsWith('{') && !line.startsWith('['));
+}
+
+/**
  * Call Claude with a timeout and automatic retry on 529 (overloaded) errors.
  *
  * Retry schedule: 4 attempts total, delays of 10s → 30s → 60s between them.
@@ -675,8 +693,54 @@ async function ingestVideo(url, log = console.log, options = {}) {
 
     // ── 8. Insert new entries ──────────────────────────────────────────────
     if (rows.length > 0) {
-      const { error: insErr } = await supabase.from('kb_signal_card_entries').insert(rows);
+      const { data: insertedRows, error: insErr } = await supabase
+        .from('kb_signal_card_entries')
+        .insert(rows)
+        .select('id, prospect_triggers');
       if (insErr) throw new Error(`Entry insert failed: ${insErr.message}`);
+
+      // ── 8.5. Populate kb_prospect_triggers (junction table) ─────────────
+      // Each prospect trigger phrase gets its own embedding row.
+      // ON DELETE CASCADE on kb_prospect_triggers.entry_id means the delete
+      // in step 7 already cleaned up any old trigger rows for this source.
+      if (insertedRows && insertedRows.length > 0) {
+        const triggerPairs = [];
+        for (const row of insertedRows) {
+          const lines = splitTriggerLines(row.prospect_triggers || '');
+          for (const line of lines) {
+            triggerPairs.push({ entry_id: row.id, trigger_text: line });
+          }
+        }
+
+        if (triggerPairs.length > 0) {
+          log(`  Embedding ${triggerPairs.length} trigger phrases for junction table...`);
+          let triggerEmbedResp;
+          try {
+            triggerEmbedResp = await openai.embeddings.create({
+              model: MODEL_EMBEDDING,
+              input: triggerPairs.map(p => p.trigger_text),
+            });
+          } catch (e) {
+            throw new Error(`Trigger embedding failed: ${e.message}`);
+          }
+
+          const triggerCost = (triggerEmbedResp.usage?.total_tokens ?? 0) / 1_000_000 * COST_EMBED_PER_M;
+          totalCost += triggerCost;
+
+          const triggerRows = triggerPairs.map((p, i) => ({
+            entry_id:     p.entry_id,
+            trigger_text: p.trigger_text,
+            embedding:    triggerEmbedResp.data[i].embedding,
+          }));
+
+          const { error: trigInsErr } = await supabase
+            .from('kb_prospect_triggers')
+            .insert(triggerRows);
+          if (trigInsErr) throw new Error(`Trigger insert failed: ${trigInsErr.message}`);
+
+          log(`  ✅ ${triggerRows.length} trigger rows inserted ($${triggerCost.toFixed(5)})`);
+        }
+      }
     }
 
     // ── 9. Update source record ────────────────────────────────────────────

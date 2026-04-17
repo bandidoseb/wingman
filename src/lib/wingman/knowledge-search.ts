@@ -3,7 +3,7 @@
  *
  * searchKnowledge(transcriptChunk) does:
  *   1. Embed the chunk with text-embedding-3-small (~80ms)
- *   2. Cosine similarity search against kb_signal_card_entries via pgvector RPC (~50ms)
+ *   2. Cosine similarity search against kb_prospect_triggers via pgvector RPC (~50ms)
  *   3. Filter to matches above 0.72 threshold — return empty if nothing clears it
  *   4. Format results as a clean string for injection into the Haiku prompt
  *   5. Cache the result for 60 seconds to prevent duplicate DB hits
@@ -14,9 +14,10 @@
 
 import { createServiceClient } from "@/lib/supabase/server";
 
-const SIMILARITY_THRESHOLD = 0.72;
+const SIMILARITY_THRESHOLD = 0.65;
 const MATCH_COUNT          = 5;
 const CACHE_TTL_MS         = 60_000; // 60 seconds
+const EMBED_TIMEOUT_MS     = 5_000;  // abort OpenAI call if it hangs mid-call
 
 // ── In-process cache ──────────────────────────────────────────────────────────
 // Works correctly when Next.js runs as a persistent Node.js server (local Electron
@@ -35,14 +36,15 @@ function fastHash(str: string): number {
 
 // ── Return type from the pgvector RPC ────────────────────────────────────────
 interface KBMatch {
-  id:             string;
-  technique_name: string;
-  situation:      string;
-  exact_script:   string;
-  why_it_works:   string;
-  call_stage:     string;
-  quality_score:  string;
-  similarity:     number;
+  id:              string;
+  technique_name:  string;
+  situation:       string;
+  exact_script:    string;
+  why_it_works:    string;
+  call_stage:      string;
+  quality_score:   string;
+  similarity:      number;
+  matched_trigger: string;  // which specific trigger phrase matched — useful for logs
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -66,7 +68,6 @@ export async function searchKnowledge(transcriptChunk: string): Promise<string> 
   const t0 = Date.now();
 
   // ── 1. Embed the transcript chunk ─────────────────────────────────────────
-  // Using raw fetch (same pattern as the poll route) — no openai package needed.
   const openaiKey = process.env.OPENAI_API_KEY;
   if (!openaiKey) {
     console.error("[searchKnowledge] OPENAI_API_KEY not set");
@@ -75,17 +76,23 @@ export async function searchKnowledge(transcriptChunk: string): Promise<string> 
 
   let embedding: number[];
   try {
-    const embedResp = await fetch("https://api.openai.com/v1/embeddings", {
-      method:  "POST",
-      headers: {
-        "Authorization": `Bearer ${openaiKey}`,
-        "Content-Type":  "application/json",
-      },
-      body: JSON.stringify({
-        model: "text-embedding-3-small",
-        input: query,
-      }),
-    });
+    const controller = new AbortController();
+    const timeout    = setTimeout(() => controller.abort(), EMBED_TIMEOUT_MS);
+
+    let embedResp: Response;
+    try {
+      embedResp = await fetch("https://api.openai.com/v1/embeddings", {
+        method:  "POST",
+        headers: {
+          "Authorization": `Bearer ${openaiKey}`,
+          "Content-Type":  "application/json",
+        },
+        body:   JSON.stringify({ model: "text-embedding-3-small", input: query }),
+        signal: controller.signal,
+      });
+    } finally {
+      clearTimeout(timeout);
+    }
 
     if (!embedResp.ok) {
       const err = await embedResp.text();
@@ -105,12 +112,14 @@ export async function searchKnowledge(transcriptChunk: string): Promise<string> 
     console.warn(`[searchKnowledge] ⚠️  Embedding took ${embedMs}ms — approaching 200ms latency target`);
   }
 
-  // ── 2. pgvector cosine similarity search ─────────────────────────────────
+  // ── 2. pgvector cosine similarity search (junction table) ─────────────────
+  // search_kb_by_trigger: per-phrase embeddings → best trigger per technique →
+  // top N techniques by similarity. Returns matched_trigger for logging.
   const supabase = createServiceClient();
   let matches: KBMatch[] = [];
 
   try {
-    const { data, error } = await supabase.rpc("search_kb_signal_card_entries", {
+    const { data, error } = await supabase.rpc("search_kb_by_trigger", {
       query_embedding:      embedding,
       similarity_threshold: SIMILARITY_THRESHOLD,
       match_count:          MATCH_COUNT,
@@ -125,17 +134,18 @@ export async function searchKnowledge(transcriptChunk: string): Promise<string> 
 
   const totalMs = Date.now() - t0;
   console.log(`[searchKnowledge] ${matches.length} match(es) in ${totalMs}ms`);
-
-  if (totalMs > 200) {
-    console.warn(`[searchKnowledge] ⚠️  LATENCY EXCEEDED: ${totalMs}ms > 200ms target — consider adding Redis cache or upgrading pgvector index`);
+  if (matches.length > 0) {
+    console.log(`[searchKnowledge] Top match: "${matches[0].technique_name}" (${matches[0].similarity.toFixed(3)}) via trigger: "${matches[0].matched_trigger}"`);
   }
 
-  // Nothing cleared 0.72 — do not return weak matches to fill the quota
+  if (totalMs > 200) {
+    console.warn(`[searchKnowledge] ⚠️  LATENCY EXCEEDED: ${totalMs}ms > 200ms target`);
+  }
+
   if (matches.length === 0) return "";
 
   // ── 3. Format for prompt injection ───────────────────────────────────────
-  // Keep to top 3 matches to stay within the ~450-token KB budget (see architecture diagram).
-  // Each entry runs ~100-200 tokens; 3 × 150 = ~450 tokens ✓
+  // Top 3 to stay within the ~450-token KB budget.
   const top3 = matches.slice(0, 3);
 
   const result = [
