@@ -110,7 +110,11 @@
       "Bash(git -C \"/Users/sebastianperez/Desktop/Wingman CC\" diff HEAD~17 HEAD)",
       "Bash(git -C \"/Users/sebastianperez/Desktop/Wingman CC\" diff HEAD~17 HEAD -- .env.local)",
       "Bash(git -C \"/Users/sebastianperez/Desktop/Wingman CC\" diff HEAD~17 HEAD -- \"electron/\")",
-      "Bash(git -C \"/Users/sebastianperez/Desktop/Wingman CC\" diff HEAD~17 HEAD -- \"src/app/api/\")"
+      "Bash(git -C \"/Users/sebastianperez/Desktop/Wingman CC\" diff HEAD~17 HEAD -- \"src/app/api/\")",
+      "Bash(git -C:*)",
+      "Bash(mkdir -p:*)",
+      "Bash(grep:*)",
+      "Bash(cd \"/Users/sebastianperez/Desktop/Wingman CC\" && npx tsc:*)"
     ]
   },
   "hooks": {
