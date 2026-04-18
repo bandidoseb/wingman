@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import Card from "@/components/ui/Card";
 import SectionLabel from "@/components/ui/SectionLabel";
 import OutcomeBadge from "@/components/ui/OutcomeBadge";
@@ -146,6 +146,14 @@ function OutcomePicker({
   );
 }
 
+function formatTimestamp(ts: number): string {
+  const d   = new Date(ts);
+  const now = new Date();
+  const time = d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true });
+  if (d.toDateString() === now.toDateString()) return `Today ${time}`;
+  return `${d.toLocaleDateString("en-US", { weekday: "long" })} ${time}`;
+}
+
 export default function FlightLogTab({ calls, initialCall, onInitialCallConsumed, userId, isActive = false, isPendingOutcome = false }: Props) {
   const [selectedCall, setSelectedCall] = useState<Call | null>(initialCall);
   const [activeDetailTab, setActiveDetailTab] = useState<"debrief" | "transcript">("debrief");
@@ -161,10 +169,12 @@ export default function FlightLogTab({ calls, initialCall, onInitialCallConsumed
 
   // Helper: effective outcome for a call (local override wins)
   const effectiveOutcome = (call: Call) => localOutcomes[call.id] ?? call.outcome;
+  type GlobalMessage = { role: "user" | "assistant"; text: string; timestamp?: number };
+
   const [chatMessages, setChatMessages] = useState<Array<{ role: "user" | "assistant"; text: string }>>([]);
   const [chatInput, setChatInput] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
-  const [globalMessages, setGlobalMessages] = useState<Array<{ role: "user" | "assistant"; text: string }>>([]);
+  const [globalMessages, setGlobalMessages] = useState<GlobalMessage[]>([]);
   const [globalInput, setGlobalInput] = useState("");
   const [globalLoading, setGlobalLoading] = useState(false);
   const chatEndRef        = useRef<HTMLDivElement>(null);
@@ -177,6 +187,11 @@ export default function FlightLogTab({ calls, initialCall, onInitialCallConsumed
   const [userIsTyping, setUserIsTyping] = useState(false);
   const userTypingTimerRef  = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
+
+  // Deep dive state — set when Claude identifies a specific call, cleared on modal close
+  const [pendingCallSuggestion, setPendingCallSuggestion] = useState<{ call_id: string; name: string; date: string } | null>(null);
+  const [activeSingleCall, setActiveSingleCall]           = useState<object | null>(null);
+  const singleCallHistoryRef = useRef<Array<{ role: string; content: string }>>([]);
 
   useEffect(() => {
     if (initialCall) {
@@ -205,9 +220,16 @@ export default function FlightLogTab({ calls, initialCall, onInitialCallConsumed
     if (modalOpen) modalEndRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
   }, [globalMessages, globalLoading, modalOpen]);
 
-  // ESC closes modal
+  // ESC closes modal and clears deep dive state
   useEffect(() => {
-    const handler = (e: KeyboardEvent) => { if (e.key === "Escape") setModalOpen(false); };
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setModalOpen(false);
+        setPendingCallSuggestion(null);
+        setActiveSingleCall(null);
+        singleCallHistoryRef.current = [];
+      }
+    };
     if (modalOpen) document.addEventListener("keydown", handler);
     return () => document.removeEventListener("keydown", handler);
   }, [modalOpen]);
@@ -247,62 +269,130 @@ export default function FlightLogTab({ calls, initialCall, onInitialCallConsumed
   const sendGlobalMessage = async (text: string) => {
     if (!text.trim() || globalInFlightRef.current) return;
     globalInFlightRef.current = true;
-    const newMessage = { role: "user" as const, text };
+    const newMessage: GlobalMessage = { role: "user", text, timestamp: Date.now() };
     setGlobalMessages((prev) => [...prev, newMessage]);
     setGlobalInput("");
     if (modalInputRef.current) modalInputRef.current.style.height = "auto";
-    // Reset typing state immediately so it doesn't mask the indicator after send
     if (userTypingTimerRef.current) clearTimeout(userTypingTimerRef.current);
     setUserIsTyping(false);
 
-    // Strip transcript data — payload would be too large for global context
-    const callSummaries = calls.map((c) => ({
-      prospect_name: c.prospect_name,
-      outcome:       c.outcome,
-      call_date:     c.call_date,
-      duration:      c.duration,
-      summary:       c.summary,
-      missed_topics: c.missed_topics,
-    }));
+    // ── Build request body based on current mode ─────────────────────────────
+    const isInSingleCallMode = activeSingleCall !== null;
+    let body: object;
 
-    // Last 9 existing turns + the new one → API receives up to 10 turns total
-    const messages = [...globalMessages.slice(-9), newMessage].map((m) => ({
-      role:    m.role,
-      content: m.text,
-    }));
+    if (isInSingleCallMode) {
+      // Body size guard — full transcript can be large
+      const callDataStr = JSON.stringify(activeSingleCall);
+      if (callDataStr.length > 800_000) {
+        setGlobalMessages((prev) => [...prev, { role: "assistant", text: "That transcript is too large to process. Try asking about a shorter call.", timestamp: Date.now() }]);
+        setGlobalLoading(false);
+        globalInFlightRef.current = false;
+        return;
+      }
+      const newTurn = { role: "user" as const, content: text };
+      singleCallHistoryRef.current = [...singleCallHistoryRef.current, newTurn];
+      body = {
+        mode:     "single_call",
+        messages: singleCallHistoryRef.current.slice(-10),
+        call:     activeSingleCall,
+      };
+    } else {
+      // Global mode — strip transcript data, include pendingCallId if set
+      const callSummaries = calls.map((c) => ({
+        id:            c.id,
+        prospect_name: c.prospect_name,
+        outcome:       c.outcome,
+        call_date:     c.call_date,
+        duration:      c.duration,
+        summary:       c.summary,
+        missed_topics: c.missed_topics,
+      }));
+      const messages = [...globalMessages.slice(-9), newMessage].map((m) => ({
+        role:    m.role,
+        content: m.text,
+      }));
+      body = {
+        mode: "global",
+        messages,
+        callSummaries,
+        ...(pendingCallSuggestion ? { pendingCallId: pendingCallSuggestion.call_id } : {}),
+      };
+    }
 
-    // Kick off API immediately so Wingman starts processing — but hold the typing
-    // indicator for 2 seconds so it looks like Wingman is reading first
+    // Kick off API immediately — hold typing indicator 2s so it looks like Wingman is reading
     const fetchPromise = fetch("/api/ai/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ mode: "global", messages, callSummaries }),
+      body: JSON.stringify(body),
     });
 
-    await new Promise<void>(resolve => setTimeout(resolve, 2000));
+    await new Promise<void>((resolve) => setTimeout(resolve, 2000));
     setGlobalLoading(true);
 
     try {
-      const res = await fetchPromise;
+      const res  = await fetchPromise;
       const data = await res.json();
+
       if (data.limitReached) {
-        setGlobalMessages((prev) => [...prev, { role: "assistant", text: "You've hit today's coaching limit. Come back tomorrow — or upgrade to Pro for unlimited sessions." }]);
-      } else {
-        const reply  = data.reply || "Couldn't get a response.";
+        setGlobalMessages((prev) => [...prev, { role: "assistant", text: "You've hit today's coaching limit. Come back tomorrow — or upgrade to Pro for unlimited sessions.", timestamp: Date.now() }]);
+        setGlobalLoading(false);
+        globalInFlightRef.current = false;
+        return;
+      }
+
+      const reply      = data.reply || "Couldn't get a response.";
+      const diveReady  = data.diveReady  ?? null;
+      const suggestion = data.callSuggestion ?? null;
+
+      // ── Store callSuggestion silently (no button shown) ───────────────────
+      if (suggestion) {
+        setPendingCallSuggestion(suggestion);
+      }
+
+      // ── Handle diveReady: transcript fetched, switch to single-call mode ──
+      if (diveReady) {
+        // Show Claude's "reading transcript" reply (staggered bubbles)
         const chunks = reply.split("\n\n").filter(Boolean);
-        if (chunks.length <= 1) {
-          setGlobalMessages((prev) => [...prev, { role: "assistant", text: reply }]);
-        } else {
-          // Stagger bubbles: first lands immediately, each subsequent after 1.4s
-          // Typing indicator stays on until the last bubble is added
-          for (let i = 0; i < chunks.length; i++) {
-            if (i > 0) await new Promise<void>(resolve => setTimeout(resolve, 3000));
-            setGlobalMessages((prev) => [...prev, { role: "assistant", text: chunks[i] }]);
-          }
+        for (let i = 0; i < chunks.length; i++) {
+          if (i > 0) await new Promise<void>((r) => setTimeout(r, 3000));
+          setGlobalMessages((prev) => [...prev, { role: "assistant", text: chunks[i], timestamp: Date.now() }]);
+        }
+
+        // 2-second pause, then the personalized opener
+        await new Promise<void>((r) => setTimeout(r, 2000));
+        setGlobalMessages((prev) => [...prev, { role: "assistant", text: diveReady.openerReply, timestamp: Date.now() }]);
+
+        // Switch to single-call mode
+        setActiveSingleCall(diveReady.callData);
+        setPendingCallSuggestion(null);
+        singleCallHistoryRef.current = [{ role: "assistant", content: diveReady.openerReply }];
+
+        setGlobalLoading(false);
+        globalInFlightRef.current = false;
+        return;
+      }
+
+      // ── Normal staggered bubble display ───────────────────────────────────
+      const chunks = reply.split("\n\n").filter(Boolean);
+      if (chunks.length <= 1) {
+        setGlobalMessages((prev) => [...prev, { role: "assistant", text: reply, timestamp: Date.now() }]);
+      } else {
+        for (let i = 0; i < chunks.length; i++) {
+          if (i > 0) await new Promise<void>((resolve) => setTimeout(resolve, 3000));
+          setGlobalMessages((prev) => [...prev, { role: "assistant", text: chunks[i], timestamp: Date.now() }]);
         }
       }
+
+      // Track conversation history when in single-call mode
+      if (isInSingleCallMode) {
+        singleCallHistoryRef.current = [
+          ...singleCallHistoryRef.current,
+          { role: "assistant", content: reply },
+        ];
+      }
+
     } catch {
-      setGlobalMessages((prev) => [...prev, { role: "assistant", text: "Connection error. Try again." }]);
+      setGlobalMessages((prev) => [...prev, { role: "assistant", text: "Connection error. Try again.", timestamp: Date.now() }]);
     }
     setGlobalLoading(false);
     globalInFlightRef.current = false;
@@ -339,7 +429,7 @@ export default function FlightLogTab({ calls, initialCall, onInitialCallConsumed
       const res = await fetchPromise;
       const data = await res.json();
       if (data.limitReached) {
-        setChatMessages((prev) => [...prev, { role: "assistant", text: "You've hit today's coaching limit. Come back tomorrow — or upgrade to Pro for unlimited sessions." }]);
+        setChatMessages((prev) => [...prev, { role: "assistant", text: "You've hit today's coaching limit. Come back tomorrow — or upgrade to Pro for unlimited sessions.", timestamp: Date.now() }]);
       } else {
         const reply  = data.reply || "Couldn't get a response.";
         const chunks = reply.split("\n\n").filter(Boolean);
@@ -353,7 +443,7 @@ export default function FlightLogTab({ calls, initialCall, onInitialCallConsumed
         }
       }
     } catch {
-      setChatMessages((prev) => [...prev, { role: "assistant", text: "Connection error. Try again." }]);
+      setChatMessages((prev) => [...prev, { role: "assistant", text: "Connection error. Try again.", timestamp: Date.now() }]);
     }
     setChatLoading(false);
     callInFlightRef.current = false;
@@ -520,40 +610,42 @@ export default function FlightLogTab({ calls, initialCall, onInitialCallConsumed
         <div style={{ marginBottom: 10 }}>
           <SectionLabel className="!mb-0">Mission Intel — Ask Your Wingman</SectionLabel>
         </div>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 10 }}>
+
+        {/* Quick-send buttons — always visible */}
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 12 }}>
           {["Where do I lose most deals?", "What's my top objection?", "What works on wins?"].map((q) => (
             <button key={q} onClick={() => { setModalOpen(true); sendGlobalMessage(q); }} style={{ fontSize: 11.5, color: "#1c1c1e", background: "#e5e5ea", border: "none", borderRadius: 7, padding: "6px 11px", fontFamily: "inherit", fontWeight: 500, cursor: "pointer" }}>{q}</button>
           ))}
         </div>
-        <div style={{ display: "flex", gap: 8 }}>
-          <input readOnly onClick={() => setModalOpen(true)} placeholder="Ask anything about your calls…" style={{ flex: 1, background: "#e5e5ea", border: "none", borderRadius: 9, padding: "11px 14px", color: "#8e8e93", fontSize: 13, fontFamily: "inherit", outline: "none", cursor: "pointer" }} />
-          <button onClick={() => setModalOpen(true)} style={{ padding: "11px 18px", background: "#1c1c1e", borderRadius: 9, color: "#fff", fontSize: 12, fontFamily: "inherit", fontWeight: 600, border: "none", cursor: "pointer" }}>Ask</button>
-        </div>
-        {globalMessages.length > 0 && (() => {
-          const lastWingman = [...globalMessages].reverse().find(m => m.role === "assistant");
-          if (!lastWingman) return null;
-          const preview = lastWingman.text.length > 70 ? lastWingman.text.slice(0, 70) + "…" : lastWingman.text;
-          return (
-            <>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 12, marginBottom: 10 }}>
-                <div style={{ flex: 1, height: 1, background: "#e5e5ea" }} />
-                <span style={{ fontSize: 11, color: "#8e8e93", fontFamily: "inherit", whiteSpace: "nowrap" }}>Previous conversation from today</span>
-                <div style={{ flex: 1, height: 1, background: "#e5e5ea" }} />
-              </div>
-              <button
-                onClick={() => setModalOpen(true)}
-                style={{ display: "flex", alignItems: "center", gap: 10, background: "none", border: "none", cursor: "pointer", padding: 0, textAlign: "left", width: "100%" }}
-              >
-                <div style={{ background: "#dde8f5", borderRadius: 10, padding: "8px 12px", fontSize: 12.5, color: "#1c1c1e", flex: 1, textAlign: "left", lineHeight: 1.4, overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis", fontFamily: "inherit" }}>
-                  {preview}
-                </div>
-                <span style={{ fontSize: 11.5, color: "#007aff", fontWeight: 600, whiteSpace: "nowrap", flexShrink: 0, fontFamily: "inherit" }}>
-                  Continue →
-                </span>
-              </button>
-            </>
-          );
-        })()}
+
+        {/* Chat thread entry point */}
+        <button
+          onClick={() => setModalOpen(true)}
+          style={{ display: "flex", alignItems: "center", gap: 12, width: "100%", background: "#f5f5f7", border: "none", borderRadius: 12, padding: "10px 12px", cursor: "pointer", textAlign: "left" }}
+        >
+          {/* Avatar */}
+          <div style={{ width: 40, height: 40, borderRadius: "50%", background: "#1c1c1e", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, position: "relative" }}>
+            <span style={{ color: "#fff", fontSize: 15, fontWeight: 700, fontFamily: "inherit" }}>W</span>
+            <div style={{ position: "absolute", bottom: 1, right: 1, width: 9, height: 9, borderRadius: "50%", background: "#34c759", border: "1.5px solid #f5f5f7" }} />
+          </div>
+          {/* Name + preview */}
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 13.5, fontWeight: 700, color: "#1c1c1e", marginBottom: 2, fontFamily: "inherit" }}>Wingman</div>
+            <div style={{ fontSize: 12.5, color: "#8e8e93", overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis", fontFamily: "inherit" }}>
+              {globalMessages.length > 0
+                ? (() => {
+                    const last = [...globalMessages].reverse().find(m => m.role === "assistant");
+                    return last ? last.text.slice(0, 60) + (last.text.length > 60 ? "…" : "") : "Tap to start chatting";
+                  })()
+                : "Tap to start chatting"
+              }
+            </div>
+          </div>
+          {/* CTA */}
+          <span style={{ fontSize: 12, color: "#007aff", fontWeight: 600, whiteSpace: "nowrap", flexShrink: 0, fontFamily: "inherit" }}>
+            {globalMessages.length > 0 ? "Continue →" : "Open →"}
+          </span>
+        </button>
       </Card>
 
       {/* Call list */}
@@ -643,7 +735,7 @@ export default function FlightLogTab({ calls, initialCall, onInitialCallConsumed
       {/* ── Mission Intel Chat Modal ─────────────────────────────────────────── */}
       {modalOpen && (
         <div
-          onClick={() => setModalOpen(false)}
+          onClick={() => { setModalOpen(false); setPendingCallSuggestion(null); setActiveSingleCall(null); singleCallHistoryRef.current = []; }}
           style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(0,0,0,0.45)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}
         >
           <div
@@ -656,11 +748,13 @@ export default function FlightLogTab({ calls, initialCall, onInitialCallConsumed
                 <div style={{ width: 7, height: 7, borderRadius: "50%", background: "#34c759", boxShadow: "0 0 6px rgba(52,199,89,0.5)", flexShrink: 0 }} />
                 <div style={{ fontSize: 13, fontWeight: 700, color: "#1c1c1e", letterSpacing: "-0.01em" }}>Mission Intel — Ask Your Wingman</div>
               </div>
-              <button onClick={() => setModalOpen(false)} style={{ background: "#e5e5ea", border: "none", borderRadius: "50%", width: 28, height: 28, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", fontSize: 13, color: "#8e8e93", fontFamily: "inherit", flexShrink: 0 }}>✕</button>
+              <button onClick={() => { setModalOpen(false); setPendingCallSuggestion(null); setActiveSingleCall(null); singleCallHistoryRef.current = []; }} style={{ background: "#e5e5ea", border: "none", borderRadius: "50%", width: 28, height: 28, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", fontSize: 13, color: "#8e8e93", fontFamily: "inherit", flexShrink: 0 }}>✕</button>
             </div>
 
             {/* Messages */}
-            <div style={{ flex: 1, overflowY: "auto", padding: "16px 20px", display: "flex", flexDirection: "column", gap: 10, justifyContent: "flex-end" }}>
+            <div style={{ flex: 1, overflowY: "auto", padding: "16px 20px", display: "flex", flexDirection: "column", gap: 10 }}>
+              {/* Spacer pushes messages to bottom when chat is short; collapses when full so scroll works */}
+              <div style={{ flex: 1 }} />
               {globalMessages.length === 0 && (
                 <div style={{ textAlign: "center", padding: "32px 0" }}>
                   <div style={{ fontSize: 13, color: "#8e8e93", lineHeight: 1.6, marginBottom: 16 }}>
@@ -673,13 +767,38 @@ export default function FlightLogTab({ calls, initialCall, onInitialCallConsumed
                   </div>
                 </div>
               )}
-              {globalMessages.map((m, i) =>
-                m.role === "assistant"
-                  ? m.text.split("\n\n").filter(Boolean).map((chunk, ci) => (
-                      <div key={`${i}-${ci}`} style={{ alignSelf: "flex-start", maxWidth: "85%", background: "#e5e5ea", color: "#1c1c1e", borderRadius: "12px 12px 12px 3px", padding: "9px 13px", fontSize: 13, lineHeight: 1.5 }}>{chunk}</div>
-                    ))
-                  : <div key={i} style={{ alignSelf: "flex-end", maxWidth: "85%", background: "#1c1c1e", color: "#fff", borderRadius: "12px 12px 3px 12px", padding: "9px 13px", fontSize: 13, lineHeight: 1.5 }}>{m.text}</div>
-              )}
+              {globalMessages.flatMap((m, i) => {
+                const items: React.ReactNode[] = [];
+                // Show timestamp if: first message, or 10+ min gap from previous
+                const prevTs = i > 0 ? globalMessages[i - 1].timestamp : undefined;
+                const showTs = m.timestamp && (i === 0 || (prevTs && m.timestamp - prevTs >= 10 * 60 * 1000));
+                if (showTs) {
+                  items.push(
+                    <div key={`ts-${i}`} style={{ textAlign: "center", fontSize: 11, color: "#8e8e93", margin: "2px 0", fontFamily: "inherit" }}>
+                      {formatTimestamp(m.timestamp!)}
+                    </div>
+                  );
+                }
+                if (m.role === "assistant") {
+                  items.push(
+                    <div key={i} style={{ display: "flex", gap: 8, alignItems: "flex-end" }}>
+                      <div style={{ width: 28, height: 28, borderRadius: "50%", background: "#1c1c1e", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                        <span style={{ color: "#fff", fontSize: 12, fontWeight: 700, fontFamily: "inherit" }}>W</span>
+                      </div>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 4, alignItems: "flex-start", maxWidth: "calc(85% - 36px)" }}>
+                        {m.text.split("\n\n").filter(Boolean).map((chunk, ci) => (
+                          <div key={ci} style={{ background: "#e5e5ea", color: "#1c1c1e", borderRadius: "12px 12px 12px 3px", padding: "9px 13px", fontSize: 13, lineHeight: 1.5 }}>{chunk}</div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                } else {
+                  items.push(
+                    <div key={i} style={{ alignSelf: "flex-end", maxWidth: "85%", background: "#1c1c1e", color: "#fff", borderRadius: "12px 12px 3px 12px", padding: "9px 13px", fontSize: 13, lineHeight: 1.5 }}>{m.text}</div>
+                  );
+                }
+                return items;
+              })}
               {globalLoading && !userIsTyping && (
                 <div style={{ alignSelf: "flex-start", background: "#e5e5ea", borderRadius: "12px 12px 12px 3px", padding: "11px 14px", display: "flex", gap: 5, alignItems: "center" }}>
                   <span className="typing-dot" /><span className="typing-dot" /><span className="typing-dot" />

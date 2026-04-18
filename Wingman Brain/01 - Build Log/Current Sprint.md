@@ -1,8 +1,31 @@
 # Current Sprint
 
-Last updated: 2026-04-17
+Last updated: 2026-04-18
 
 This is the first file Claude reads at session start. It answers: where are we, what's next, and what's blocking us.
+
+---
+
+## What Was Just Completed (2026-04-18 — Mission Intel Deep Dive)
+
+- **Deep dive flow built** — 3-turn confirmation flow inside global chat modal. No navigation, no button. Claude identifies a call, confirms it, offers the dive, then fetches the full transcript and switches the modal into a dedicated per-call coaching session.
+- **CALL_MATCH at Step 2** — Claude embeds `CALL_MATCH:{...}` when offering the dive. Server parses and strips it, returns as `callSuggestion`. Client stores silently as `pendingCallSuggestion` — nothing shown to user.
+- **DIVE_NOW at Step 3** — Claude appends `DIVE_NOW` when user accepts. Server detects with case-insensitive regex, auto-retries Supabase fetch 2x (500ms delay), returns `diveReady: { openerReply, callData }`. Client shows staggered messages then switches mode.
+- **Transcript cap removed** — `capTranscript()` deleted entirely. Full transcript goes in. 2-hour hard stop is the natural ceiling.
+- **Prompt caching added** — `cache_control: ephemeral` on the context block in single_call mode. ~90% cheaper on follow-up turns within 5-minute window. `anthropic-beta` header added conditionally.
+- **Security guard** — `fetchCallWithRetry` always includes `.eq("user_id", user.id)`. UUID_REGEX validation on all `pendingCallId` inputs.
+- **State clears on modal close** — `pendingCallSuggestion`, `activeSingleCall`, `singleCallHistoryRef` all reset via backdrop click, ✕ button, and ESC.
+- **Files changed:** `ai/chat/route.ts` (full rewrite), `FlightLogTab.tsx` (significant changes to global chat section)
+
+---
+
+## What Was Just Completed (2026-04-18 — Mission Intel Coaching KB + Call Triage)
+
+- **Mission Intel now searches `kb_coaching_entries`** — added `searchCoachingKnowledge()` to `knowledge-search.ts`. Coaching chatbot previously searched the live signal card KB (wrong table). Now queries the coaching-specific table with lower threshold (0.60) and 5 results instead of 3.
+- **Call triage feature built** — global mode detects when user is asking about a specific past call, asks for confirmation ("Are you talking about the call with X on Apr 12?"), then surfaces a CTA button that navigates directly into that call's single-call mode with full transcript context.
+- **CALL_MATCH protocol** — server-side: Claude embeds a `CALL_MATCH:{...}` marker in its response when it identifies a specific call; server strips the marker, validates the JSON, returns `callSuggestion` as a separate field. Frontend: attaches to last bubble of the response, renders blue "Open [Name] — [Date] →" button.
+- **Call IDs now sent in global context** — `callSummaries` payload includes `id` field so Claude can reference exact call UUIDs in CALL_MATCH. Added to `buildGlobalContext()` format string.
+- **Files changed:** `knowledge-search.ts`, `ai/chat/route.ts`, `FlightLogTab.tsx`
 
 ---
 
@@ -108,7 +131,7 @@ This is the first file Claude reads at session start. It answers: where are we, 
 
 ## What's Next (Priority Order)
 
-1. **Wire Mission Intel chatbot to `kb_coaching_entries`** — coaching KB is built and backfilled but `ai/chat` route isn't querying it yet. Separate session.
+1. **Test signal card quality during a live call** — end-to-end pipeline has never been tested on a real call. Must verify signal cards fire at the right moments, coaching KB search returns meaningful results, and latency stays under 1s.
 
 2. **Playbook page** — pre-call framework setup. Rep configures once. Three tiers: locked core, default-on toggleable, custom. Only remaining unbuilt V1 beta item.
 

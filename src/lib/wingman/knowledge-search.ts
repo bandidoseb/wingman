@@ -160,3 +160,114 @@ export async function searchKnowledge(transcriptChunk: string): Promise<string> 
 
   return result;
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// searchCoachingKnowledge — used by Mission Intel chatbot only
+//
+// Searches kb_coaching_entries (broad, explanatory content) rather than the
+// live-call signal card table. Lower similarity threshold (0.60) and more
+// results (5) because coaching benefits from broader context.
+// ─────────────────────────────────────────────────────────────────────────────
+
+interface CoachingCacheEntry { result: string; cachedAt: number; }
+const coachingCache = new Map<number, CoachingCacheEntry>();
+
+interface CoachingKBMatch {
+  id:           string;
+  topic:        string;
+  content:      string;
+  coach_name:   string | null;
+  call_stage:   string | null;
+  content_type: string | null;
+  similarity:   number;
+}
+
+export async function searchCoachingKnowledge(query: string): Promise<string> {
+  const q = query.trim();
+  if (!q) return "";
+
+  // ── Cache lookup ──────────────────────────────────────────────────────────
+  const key    = fastHash(q);
+  const cached = coachingCache.get(key);
+  if (cached && Date.now() - cached.cachedAt < CACHE_TTL_MS) {
+    return cached.result;
+  }
+
+  for (const [k, v] of coachingCache) {
+    if (Date.now() - v.cachedAt > CACHE_TTL_MS) coachingCache.delete(k);
+  }
+
+  // ── Embed the query ───────────────────────────────────────────────────────
+  const openaiKey = process.env.OPENAI_API_KEY;
+  if (!openaiKey) {
+    console.error("[searchCoachingKnowledge] OPENAI_API_KEY not set");
+    return "";
+  }
+
+  let embedding: number[];
+  try {
+    const controller = new AbortController();
+    const timeout    = setTimeout(() => controller.abort(), 8_000);
+
+    let embedResp: Response;
+    try {
+      embedResp = await fetch("https://api.openai.com/v1/embeddings", {
+        method:  "POST",
+        headers: {
+          "Authorization": `Bearer ${openaiKey}`,
+          "Content-Type":  "application/json",
+        },
+        body:   JSON.stringify({ model: "text-embedding-3-small", input: q }),
+        signal: controller.signal,
+      });
+    } finally {
+      clearTimeout(timeout);
+    }
+
+    if (!embedResp.ok) {
+      const err = await embedResp.text();
+      console.error("[searchCoachingKnowledge] OpenAI embed error:", err);
+      return "";
+    }
+
+    const embedData = await embedResp.json() as { data: [{ embedding: number[] }] };
+    embedding = embedData.data[0].embedding;
+  } catch (err) {
+    console.error("[searchCoachingKnowledge] Embedding failed:", err);
+    return "";
+  }
+
+  // ── pgvector search against kb_coaching_entries ───────────────────────────
+  const supabase = createServiceClient();
+  let matches: CoachingKBMatch[] = [];
+
+  try {
+    const { data, error } = await supabase.rpc("search_kb_coaching", {
+      query_embedding:      embedding,
+      similarity_threshold: 0.60,
+      match_count:          5,
+    });
+
+    if (error) throw error;
+    matches = (data as CoachingKBMatch[]) ?? [];
+  } catch (err) {
+    console.error("[searchCoachingKnowledge] Vector search failed:", err);
+    return "";
+  }
+
+  console.log(`[searchCoachingKnowledge] ${matches.length} match(es)`);
+  if (matches.length === 0) return "";
+
+  // ── Format for prompt injection ───────────────────────────────────────────
+  // Content capped at 500 chars per entry to stay within token budget.
+  const result = matches
+    .map((m, i) => {
+      const stageLabel = m.call_stage ? ` (${m.call_stage})` : "";
+      const content    = m.content.length > 500 ? m.content.slice(0, 500) + "…" : m.content;
+      return `[COACHING ${i + 1}] ${m.topic}${stageLabel}\n${content}`;
+    })
+    .join("\n\n");
+
+  coachingCache.set(key, { result, cachedAt: Date.now() });
+  return result;
+}
