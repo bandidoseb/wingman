@@ -1,5 +1,6 @@
 {
   "permissions": {
+    "defaultMode": "bypassPermissions",
     "allow": [
       "Bash(npx create-next-app@latest . --typescript --tailwind --eslint --app --src-dir --import-alias \"@/*\" --no-git)",
       "Bash(node --version)",
@@ -114,7 +115,8 @@
       "Bash(git -C:*)",
       "Bash(mkdir -p:*)",
       "Bash(grep:*)",
-      "Bash(cd \"/Users/sebastianperez/Desktop/Wingman CC\" && npx tsc:*)"
+      "Bash(cd \"/Users/sebastianperez/Desktop/Wingman CC\" && npx tsc:*)",
+      "mcp__scheduled-tasks__list_scheduled_tasks"
     ]
   },
   "hooks": {
