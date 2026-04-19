@@ -128,6 +128,21 @@ const SIDEBAR_STYLES = `
     to { transform: rotate(180deg); }
   }
 
+  /* ── Flight Plan: paper plane shoots forward then returns ── */
+  .sb-plane {
+    transform-box: view-box;
+    transform-origin: 12px 12px;
+  }
+  button[data-tab="flight-plan"]:hover .sb-plane {
+    animation: sbPlaneFly 0.5s cubic-bezier(0.22,1,0.36,1) forwards;
+  }
+  @keyframes sbPlaneFly {
+    0%   { transform: translate(0, 0); opacity: 1; }
+    40%  { transform: translate(4px, -4px); opacity: 0.4; }
+    60%  { transform: translate(-2px, 2px); opacity: 0.4; }
+    100% { transform: translate(0, 0); opacity: 1; }
+  }
+
   /* ── Personalize: sparkle star scales in ── */
   .sb-sparkle {
     transform-box: view-box;
@@ -161,6 +176,29 @@ const NAV_ITEMS: Array<{ id: DashboardTab; label: string; icon: (active: boolean
           fill={active ? "#ffffff" : "#8e8e93"}
           opacity={active ? 0.18 : 0.72}
         />
+      </svg>
+    ),
+  },
+  {
+    id: "flight-plan", label: "Flight Plan",
+    icon: (active) => (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+        <g className="sb-plane">
+          <path
+            d="M22 2L11 13"
+            stroke={active ? "#1c1c1e" : "#8e8e93"}
+            strokeWidth="1.6"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+          <path
+            d="M22 2L15 22L11 13L2 9L22 2z"
+            fill={active ? "#1c1c1e" : "none"}
+            stroke={active ? "#1c1c1e" : "#8e8e93"}
+            strokeWidth="1.6"
+            strokeLinejoin="round"
+          />
+        </g>
       </svg>
     ),
   },

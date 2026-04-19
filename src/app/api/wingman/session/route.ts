@@ -13,12 +13,32 @@ export async function POST(req: NextRequest) {
     const body = await req.json().catch(() => ({}));
     const { prospect_name } = body;
 
-    // Load profile to check subscription + usage
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("role, subscription_status, subscription_plan, calls_used, extra_calls_remaining")
-      .eq("id", user.id)
-      .single();
+    // Load profile and flight plan in parallel.
+    // Flight plan has a 3s timeout — a slow fetch must never block call start.
+    const [profileRes, flightPlan] = await Promise.all([
+      supabase
+        .from("profiles")
+        .select("role, subscription_status, subscription_plan, calls_used, extra_calls_remaining")
+        .eq("id", user.id)
+        .single(),
+      Promise.race([
+        (async () => {
+          try {
+            const { data } = await supabase
+              .from("flight_plans")
+              .select("*")
+              .eq("user_id", user.id)
+              .maybeSingle();
+            return data;
+          } catch {
+            return null;
+          }
+        })(),
+        new Promise<null>((resolve) => setTimeout(() => resolve(null), 3_000)),
+      ]),
+    ]);
+
+    const { data: profile } = profileRes;
 
     const status    = profile?.subscription_status ?? "trialing";
     const callsUsed = profile?.calls_used ?? 0;
@@ -79,11 +99,12 @@ export async function POST(req: NextRequest) {
     const { data: call, error } = await supabase
       .from("calls")
       .insert({
-        user_id:       user.id,
-        prospect_name: prospect_name || "Live Call",
-        outcome:       null,
-        call_date:     new Date().toISOString(),
-        missed_topics: [],
+        user_id:              user.id,
+        prospect_name:        prospect_name || "Live Call",
+        outcome:              null,
+        call_date:            new Date().toISOString(),
+        missed_topics:        [],
+        flight_plan_snapshot: flightPlan ?? null,
       })
       .select()
       .single();

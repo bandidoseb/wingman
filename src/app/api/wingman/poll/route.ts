@@ -9,6 +9,39 @@ import {
 } from "@/lib/wingman/rep-profile";
 import type { LiveScorecard, WingmanPollResponse } from "@/types";
 
+function buildFlightPlanContext(snapshot: unknown): string {
+  if (!snapshot || typeof snapshot !== "object") return "";
+  const p = snapshot as Record<string, unknown>;
+  const lines: string[] = [];
+
+  if (p.target_market)      lines.push(`Ideal client: ${p.target_market}`);
+  if (p.core_problem)       lines.push(`Core problem: ${p.core_problem}`);
+  if (p.dream_outcome)      lines.push(`Dream outcome: ${p.dream_outcome}`);
+
+  const min = typeof p.investment_min === "number" ? p.investment_min : null;
+  const max = typeof p.investment_max === "number" ? p.investment_max : null;
+  if (min !== null && max !== null) {
+    lines.push(`Typical investment: $${min.toLocaleString()} – $${max.toLocaleString()}`);
+  } else if (min !== null) {
+    lines.push(`Typical investment: $${min.toLocaleString()}+`);
+  } else if (max !== null) {
+    lines.push(`Typical investment: up to $${max.toLocaleString()}`);
+  }
+
+  if (p.involves_partner === true) {
+    lines.push("Decision usually involves a partner or spouse — establish both on the call.");
+  }
+  if (p.method_differentiation) lines.push(`Why this offer: ${p.method_differentiation}`);
+
+  const checkpoints = Array.isArray(p.custom_checkpoints) ? (p.custom_checkpoints as string[]) : [];
+  if (checkpoints.length > 0) {
+    lines.push(`Custom checkpoints: ${checkpoints.join("; ")}`);
+  }
+
+  if (lines.length === 0) return "";
+  return `REP'S FLIGHT PLAN:\n${lines.join("\n")}`;
+}
+
 const MODEL_MAP: Record<string, string> = {
   smart: "claude-sonnet-4-6",
   fast:  "claude-haiku-4-5-20251001",
@@ -46,17 +79,19 @@ export async function POST(req: NextRequest) {
 
     const service = createServiceClient();
 
-    // ── 0. Verify call belongs to this user ──────────────────────────────────
+    // ── 0. Verify call belongs to this user + load flight plan snapshot ───────
+    let flightPlanSnapshot: unknown = null;
     if (call_id) {
       const { data: callCheck } = await service
         .from("calls")
-        .select("id")
+        .select("id, flight_plan_snapshot")
         .eq("id", call_id)
         .eq("user_id", user.id)
         .single();
       if (!callCheck) {
         return NextResponse.json({ error: "Call not found" }, { status: 404 });
       }
+      flightPlanSnapshot = callCheck.flight_plan_snapshot ?? null;
     }
 
     // ── 1. Load all context in parallel ──────────────────────────────────────
@@ -143,6 +178,8 @@ export async function POST(req: NextRequest) {
 
     const scorecardStr = `LIVE SCORECARD:\n${JSON.stringify(scorecard, null, 2)}`;
 
+    const flightPlanStr = buildFlightPlanContext(flightPlanSnapshot);
+
     const userMessage = `CURRENT STAGE: ${stage}
 
 ${repProfileStr}
@@ -152,7 +189,7 @@ ${signalVaultStr}
 ${objectionVaultStr}
 
 ${scorecardStr}
-
+${flightPlanStr ? `\n${flightPlanStr}\n` : ""}
 NEW TRANSCRIPT CHUNK (since last poll):
 ${transcript_chunk}
 
@@ -168,20 +205,44 @@ Based on the new chunk and scorecard above, return your JSON response now.`;
     }
 
     // ── 5. Call Claude ────────────────────────────────────────────────────
-    const claudeRes = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01",
-        "content-type": "application/json",
-      },
-      body: JSON.stringify({
-        model,
-        max_tokens: 512,
-        system: WINGMAN_SYSTEM_PROMPT,
-        messages: [{ role: "user", content: userMessage }],
-      }),
-    });
+    // AbortController ensures a hung Anthropic request never freezes the poll
+    // indefinitely — 10s is generous for a live-call round trip.
+    const controller = new AbortController();
+    const claudeTimeout = setTimeout(() => controller.abort(), 10_000);
+
+    let claudeRes: Response;
+    try {
+      claudeRes = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        signal: controller.signal,
+        headers: {
+          "x-api-key": apiKey,
+          "anthropic-version": "2023-06-01",
+          "anthropic-beta": "prompt-caching-2024-07-31",
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          model,
+          max_tokens: 512,
+          system: [
+            {
+              type: "text",
+              text: WINGMAN_SYSTEM_PROMPT,
+              cache_control: { type: "ephemeral" },
+            },
+          ],
+          messages: [{ role: "user", content: userMessage }],
+        }),
+      });
+    } catch (fetchErr) {
+      clearTimeout(claudeTimeout);
+      if (fetchErr instanceof Error && fetchErr.name === "AbortError") {
+        console.error("[poll] Claude API timed out after 10s");
+        return NextResponse.json({ error: "AI timeout" }, { status: 504 });
+      }
+      throw fetchErr;
+    }
+    clearTimeout(claudeTimeout);
 
     if (!claudeRes.ok) {
       const errText = await claudeRes.text();

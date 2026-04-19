@@ -14,6 +14,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient }        from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/server";
+import type { PillarCoverage, PillarResult } from "@/types";
 
 // ── Post-call analysis system prompt ────────────────────────────────────────
 const POST_CALL_SYSTEM_PROMPT = `You are analyzing a completed sales call transcript to help the rep improve.
@@ -22,14 +23,90 @@ Return valid JSON only with this exact structure:
 {
   "debrief": "2-3 sentence summary. What worked, what was missed, key moments. Be specific and actionable.",
   "objections_raised": ["short objection phrase", ...],
-  "missed_topics": ["topic name", ...]
+  "missed_topics": ["topic name", ...],
+  "pillar_coverage": {
+    "core_problem":         { "covered": true, "evidence": "short quote ≤100 chars or null" },
+    "cant_diy":             { "covered": false, "evidence": null },
+    "cost_of_waiting":      { "covered": true, "evidence": "short quote ≤100 chars or null" },
+    "dream_outcome":        { "covered": true, "evidence": "short quote ≤100 chars or null" },
+    "investment_readiness": { "covered": false, "evidence": null },
+    "whos_involved":        { "covered": true, "evidence": "short quote ≤100 chars or null" },
+    "why_you":              { "covered": false, "evidence": null }
+  }
 }
 
-Rules:
+Rules for pillar_coverage — evaluate each against the full transcript:
+* core_problem: Rep dug into the prospect's real pain — root cause and emotional weight, not just surface symptoms
+* cant_diy: Rep established why the prospect cannot solve this themselves (complexity, time, expertise gap)
+* cost_of_waiting: Rep made the cost of inaction tangible — money lost, time lost, pain continuing
+* dream_outcome: Prospect articulated their desired result in their own words (future-pace moment)
+* investment_readiness: Rep qualified budget, price range, or financial capacity at any point
+* whos_involved: Rep confirmed who has authority to make the final decision
+* why_you: Rep presented their unique differentiation — why this offer over alternatives
+* covered: true only if clearly and meaningfully addressed — not just briefly touched on
+* evidence: a short direct quote or paraphrase (≤100 chars) showing it was covered; null if not covered
+If a FLIGHT PLAN is provided, use it to inform how each pillar should have appeared on this specific call.
+
+Other rules:
 * debrief: plain English, 2-3 sentences, specific to this call, direct and honest
-* objections_raised: only objections the prospect actually voiced (e.g. "need to think about it", "too expensive", "not the right time"). Max 8 words each. Max 8 entries. Empty array if none.
-* missed_topics: gates the rep never covered (e.g. "budget", "decision maker", "timeline", "press stage", "pain depth"). Empty array if all covered.
+* objections_raised: only objections the prospect actually voiced. Max 8 words each. Max 8 entries. Empty array if none.
+* missed_topics: call stages or topics the rep skipped (e.g. "press stage", "decision maker", "timeline"). Empty array if all covered.
 * JSON only — no explanation, no preamble, no markdown fences`;
+
+// ── Pillar helpers ───────────────────────────────────────────────────────────
+
+const PILLAR_KEYS = [
+  "core_problem",
+  "cant_diy",
+  "cost_of_waiting",
+  "dream_outcome",
+  "investment_readiness",
+  "whos_involved",
+  "why_you",
+] as const;
+
+function validatePillarCoverage(raw: unknown): PillarCoverage | null {
+  if (!raw || typeof raw !== "object") return null;
+  const obj = raw as Record<string, unknown>;
+  const result: Partial<PillarCoverage> = {};
+
+  for (const key of PILLAR_KEYS) {
+    const entry = obj[key];
+    if (!entry || typeof entry !== "object") return null;
+    const e       = entry as Record<string, unknown>;
+    const covered = typeof e.covered === "boolean" ? e.covered : false;
+    let evidence: string | null = typeof e.evidence === "string" ? e.evidence.trim().slice(0, 100) : null;
+    if (evidence === "") evidence = null;
+    (result as Record<string, PillarResult>)[key] = { covered, evidence };
+  }
+
+  return result as PillarCoverage;
+}
+
+function formatFlightPlanForEval(snapshot: unknown): string {
+  if (!snapshot || typeof snapshot !== "object") return "";
+  const p     = snapshot as Record<string, unknown>;
+  const lines: string[] = ["REP'S FLIGHT PLAN:"];
+
+  if (p.target_market)          lines.push(`Target market: ${p.target_market}`);
+  if (p.core_problem)           lines.push(`Core problem to address: ${p.core_problem}`);
+  if (p.dream_outcome)          lines.push(`Dream outcome to surface: ${p.dream_outcome}`);
+  if (p.method_differentiation) lines.push(`Why choose them: ${p.method_differentiation}`);
+
+  const min = typeof p.investment_min === "number" ? p.investment_min : null;
+  const max = typeof p.investment_max === "number" ? p.investment_max : null;
+  if (min !== null && max !== null)      lines.push(`Investment range: $${min.toLocaleString()}–$${max.toLocaleString()}`);
+  else if (min !== null)                 lines.push(`Investment: $${min.toLocaleString()}+`);
+  else if (max !== null)                 lines.push(`Investment: up to $${max.toLocaleString()}`);
+
+  if (p.involves_partner === true)
+    lines.push("Decision maker: involves a partner/spouse — rep should have confirmed both on call");
+
+  const checkpoints = Array.isArray(p.custom_checkpoints) ? (p.custom_checkpoints as string[]) : [];
+  if (checkpoints.length > 0) lines.push(`Custom checkpoints: ${checkpoints.join("; ")}`);
+
+  return lines.length > 1 ? lines.join("\n") : "";
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -120,15 +197,17 @@ export async function POST(req: NextRequest) {
 
     const service = createServiceClient();
 
-    // ── 1. Verify call belongs to this user ──────────────────────────────────
+    // ── 1. Verify call belongs to this user + load flight plan snapshot ────────
     const { data: call } = await service
       .from("calls")
-      .select("id")
+      .select("id, flight_plan_snapshot")
       .eq("id", call_id)
       .eq("user_id", user.id)
       .single();
 
     if (!call) return NextResponse.json({ error: "Call not found" }, { status: 404 });
+
+    const flightPlanContext = formatFlightPlanForEval(call.flight_plan_snapshot);
 
     // ── 2. Load full transcript ───────────────────────────────────────────────
     const { data: transcript } = await service
@@ -167,9 +246,12 @@ export async function POST(req: NextRequest) {
 
     const claudeRes = await callSonnetWithRetry(apiKey, {
       model:      "claude-sonnet-4-6",
-      max_tokens: 512,
+      max_tokens: 1_536,
       system:     POST_CALL_SYSTEM_PROMPT,
-      messages:   [{ role: "user", content: `CALL TRANSCRIPT:\n${transcriptText}` }],
+      messages:   [{
+        role:    "user",
+        content: `${flightPlanContext ? `${flightPlanContext}\n\n` : ""}CALL TRANSCRIPT:\n${transcriptText}`,
+      }],
     });
 
     if (!claudeRes.ok) {
@@ -184,6 +266,7 @@ export async function POST(req: NextRequest) {
       debrief:           string;
       objections_raised: string[];
       missed_topics:     string[];
+      pillar_coverage?:  unknown;
     };
 
     try {
@@ -237,7 +320,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // ── 6. Write debrief + missed topics back to call record ─────────────────
+    // ── 6a. Write debrief + missed topics back to call record ────────────────
     await service
       .from("calls")
       .update({
@@ -246,9 +329,26 @@ export async function POST(req: NextRequest) {
       })
       .eq("id", call_id);
 
+    // ── 6b. Write pillar_coverage — independent so a parse failure here never
+    //        blocks the debrief that was just saved above ─────────────────────
+    const pillarCoverage = validatePillarCoverage(analysis.pillar_coverage);
+    if (pillarCoverage) {
+      try {
+        await service
+          .from("calls")
+          .update({ pillar_coverage: pillarCoverage })
+          .eq("id", call_id);
+      } catch (pillarErr) {
+        console.error(`[post-call] pillar_coverage write failed for call ${call_id}:`, pillarErr);
+      }
+    } else {
+      console.warn(`[post-call] pillar_coverage malformed or missing for call ${call_id} — skipping write`);
+    }
+
     console.log(
       `[post-call] ✓ call ${call_id} — debrief written, ` +
-      `${detected.length} objection(s) processed`
+      `${detected.length} objection(s) processed, ` +
+      `pillar_coverage ${pillarCoverage ? "saved" : "skipped"}`
     );
 
     return NextResponse.json({ ok: true });

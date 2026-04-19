@@ -6,6 +6,16 @@ import SectionLabel from "@/components/ui/SectionLabel";
 import OutcomeBadge from "@/components/ui/OutcomeBadge";
 import type { Call } from "@/types";
 
+const PILLAR_DISPLAY: Array<{ key: string; label: string; description: string }> = [
+  { key: "core_problem",         label: "Core Problem",      description: "Rep dug into the real pain" },
+  { key: "cant_diy",             label: "Can't DIY",         description: "Why they can't solve it themselves" },
+  { key: "cost_of_waiting",      label: "Cost of Waiting",   description: "Made inaction feel expensive" },
+  { key: "dream_outcome",        label: "Dream Outcome",     description: "Prospect named their desired result" },
+  { key: "investment_readiness", label: "Investment",        description: "Budget/capacity qualified" },
+  { key: "whos_involved",        label: "Who's Deciding",    description: "Decision maker confirmed" },
+  { key: "why_you",              label: "Why You",           description: "Rep's unique differentiation landed" },
+];
+
 interface Props {
   calls: Call[];
   initialCall: Call | null;
@@ -525,6 +535,43 @@ export default function FlightLogTab({ calls, initialCall, onInitialCallConsumed
             )}
           </Card>
         )}
+
+        {activeDetailTab === "debrief" && call.pillar_coverage && (() => {
+          const coverage = call.pillar_coverage as unknown as Record<string, { covered: boolean; evidence: string | null }>;
+          const coveredCount = PILLAR_DISPLAY.filter(({ key }) => coverage[key]?.covered).length;
+          return (
+            <Card style={{ marginTop: 12 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+                <SectionLabel className="!mb-0">Framework Coverage</SectionLabel>
+                <div style={{ fontSize: 11.5, fontWeight: 600, color: coveredCount >= 6 ? "#34c759" : coveredCount >= 4 ? "#ff9500" : "#ff3b30" }}>
+                  {coveredCount}/{PILLAR_DISPLAY.length}
+                </div>
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                {PILLAR_DISPLAY.map(({ key, label, description }) => {
+                  const result   = coverage[key];
+                  const covered  = result?.covered ?? false;
+                  const evidence = result?.evidence ?? null;
+                  return (
+                    <div key={key} style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+                      <div style={{ width: 20, height: 20, borderRadius: "50%", flexShrink: 0, marginTop: 1, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 700, background: covered ? "#34c759" : "#e5e5ea", color: covered ? "#fff" : "#aeaeb2" }}>
+                        {covered ? "✓" : "—"}
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: covered ? "#1c1c1e" : "#aeaeb2" }}>{label}</div>
+                        {covered && evidence ? (
+                          <div style={{ fontSize: 11.5, color: "#8e8e93", marginTop: 2, lineHeight: 1.45, fontStyle: "italic" }}>"{evidence}"</div>
+                        ) : !covered ? (
+                          <div style={{ fontSize: 11.5, color: "#c7c7cc", marginTop: 2 }}>{description}</div>
+                        ) : null}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </Card>
+          );
+        })()}
 
         {activeDetailTab === "transcript" && (
           <Card>

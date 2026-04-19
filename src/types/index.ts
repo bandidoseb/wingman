@@ -124,6 +124,8 @@ export interface Call {
   created_at: string;
   call_stages?: CallStage[];
   call_transcript?: TranscriptLine[];
+  flight_plan_snapshot?: FlightPlan | null;
+  pillar_coverage?: PillarCoverage | null;
 }
 
 // ─── Wingman Phase 2 Types ───────────────────────────────────────────────────
@@ -252,6 +254,34 @@ declare global {
   interface Window {
     wingman?: WingmanBridge;
   }
+}
+
+export interface FlightPlan {
+  id: string;
+  user_id: string;
+  syntax: "problems-first" | "goals-first";
+  target_market: string | null;
+  core_problem: string | null;
+  dream_outcome: string | null;
+  investment_min: number | null;
+  investment_max: number | null;
+  involves_partner: boolean;
+  method_differentiation: string | null;
+  custom_checkpoints: string[];
+  created_at: string;
+  updated_at: string;
+}
+
+export type PillarResult = { covered: boolean; evidence: string | null };
+
+export interface PillarCoverage {
+  core_problem: PillarResult;
+  cant_diy: PillarResult;
+  cost_of_waiting: PillarResult;
+  dream_outcome: PillarResult;
+  investment_readiness: PillarResult;
+  whos_involved: PillarResult;
+  why_you: PillarResult;
 }
 
 export interface OnboardingData {

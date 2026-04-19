@@ -12,13 +12,14 @@ import SignalVaultTab from "@/components/dashboard/SignalVaultTab";
 import IntelTab from "@/components/dashboard/IntelTab";
 import SettingsTab from "@/components/dashboard/SettingsTab";
 import PersonalizeTab from "@/components/dashboard/PersonalizeTab";
+import FlightPlanTab from "@/components/dashboard/FlightPlanTab";
 import PaywallModal from "@/components/ui/PaywallModal";
 import { FREE_CALL_LIMIT } from "@/lib/constants";
 import { getStagesForRole, getDefaultStage } from "@/lib/wingman/poll-intervals";
 import { useWingmanPoller } from "@/hooks/useWingmanPoller";
 import { useRecallTranscript } from "@/hooks/useRecallTranscript";
 
-export type DashboardTab = "home" | "library" | "objections" | "signals" | "intel" | "settings" | "personalize";
+export type DashboardTab = "home" | "flight-plan" | "library" | "objections" | "signals" | "intel" | "settings" | "personalize";
 
 interface Props {
   profile: Profile;
@@ -529,6 +530,7 @@ export default function DashboardClient({
               onPersonalize={() => setTab("personalize")}
             />
           )}
+          {tab === "flight-plan" && <FlightPlanTab />}
           {tab === "library" && (
             <FlightLogTab
               calls={initialCalls}

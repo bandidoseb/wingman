@@ -123,6 +123,20 @@ This is the first file Claude reads at session start. It answers: where are we, 
 
 ---
 
+## What Was Just Completed (2026-04-19 — Flight Plan Feature)
+
+- **Flight Plan SQL run** — `flight_plans` table created, `flight_plan_snapshot` and `pillar_coverage` JSONB columns added to `calls` table. Run manually in Supabase SQL Editor.
+- **Flight Plan UI built** — `FlightPlanTab.tsx` (new), guided walkthrough mode (spotlight effect, scrolls to active section), all-at-once edit mode, 7 fields across 4 sections, paper plane nav icon with animation in `Sidebar.tsx`.
+- **Flight plan API built** — `api/flight-plan/route.ts` (new), GET + POST (upsert), server-side validation.
+- **Flight plan snapshot wired to session** — `session/route.ts` fetches flight plan in parallel with profile at call start (3s timeout via Promise.race), snapshot stored in `calls.flight_plan_snapshot`. Zero extra latency on poll hot path.
+- **Flight plan injected into live poll** — `poll/route.ts` reads `flight_plan_snapshot` from call record, formats into `REP'S FLIGHT PLAN:` context block, prepended to user message. AbortController (10s) + prompt caching (`cache_control: ephemeral`) also added.
+- **Post-call pillar evaluation built** — `post-call/route.ts` now evaluates all 7 pillars (core_problem, cant_diy, cost_of_waiting, dream_outcome, investment_readiness, whos_involved, why_you) against the full transcript using Sonnet. Flight plan context injected so evaluation is offer-specific. Results written to `calls.pillar_coverage` as independent step (never blocks debrief). `max_tokens` raised 512 → 1,536.
+- **Types updated** — `FlightPlan`, `PillarResult`, `PillarCoverage` added to `src/types/index.ts`.
+
+**Step 5 complete** — Framework Coverage card in Flight Log Debrief tab. 7-pillar scorecard with color-coded score (green/orange/red), covered pillars show AI evidence quote, missed pillars show a coaching hint. Design previewed and approved.
+
+---
+
 ## What's In Progress
 
 - Nothing currently in progress.
@@ -131,21 +145,21 @@ This is the first file Claude reads at session start. It answers: where are we, 
 
 ## What's Next (Priority Order)
 
-1. **Test signal card quality during a live call** — end-to-end pipeline has never been tested on a real call. Must verify signal cards fire at the right moments, coaching KB search returns meaningful results, and latency stays under 1s.
+1. **Transcript tester tool (local dev only)** — paste a real sales call transcript into a simple local UI, run it through the post-call scoring pipeline (same system prompt + pillar evaluation), and see the full visual output. Goal: let Sebastian verify pillar scoring quality without needing a live call. Build as a standalone HTML file or simple Next.js dev-only page. No auth required — local only.
 
-2. **Playbook page** — pre-call framework setup. Rep configures once. Three tiers: locked core, default-on toggleable, custom. Only remaining unbuilt V1 beta item.
+3. **Test signal card quality during a live call** — end-to-end pipeline has never been tested on a real call. Must verify signal cards fire at the right moments, coaching KB search returns meaningful results, and latency stays under 1s.
 
-3. **Next re-ingestion session** — fix Issues #28 + #29: add `trigger_type` classification (`objection` | `buying_signal`) to junction table, improve Pass 2 prompt for trigger diversity. Re-ingest all sources.
+4. **Next re-ingestion session** — fix Issues #28 + #29: add `trigger_type` classification (`objection` | `buying_signal`) to junction table, improve Pass 2 prompt for trigger diversity. Re-ingest all sources.
 
-4. **Stripe billing end-to-end test**
+5. **Stripe billing end-to-end test**
 
-5. **Beta onboarding email** — must include quarantine removal command for non-notarized app.
+6. **Beta onboarding email** — must include quarantine removal command for non-notarized app.
 
 ---
 
 ## Current Blockers
 
-- **Playbook page not built** — Wingman has no rep-specific framework context beyond defaults until this exists.
+- **Flight Log doesn't yet show pillar coverage** — data is being collected (Step 4 done), display not built yet.
 - **App not Apple-notarized** — beta testers must run quarantine command manually. (Known Issue #5)
 
 ---
