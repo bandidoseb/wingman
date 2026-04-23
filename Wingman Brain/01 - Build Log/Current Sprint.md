@@ -1,8 +1,19 @@
 # Current Sprint
 
-Last updated: 2026-04-18
+Last updated: 2026-04-23
 
 This is the first file Claude reads at session start. It answers: where are we, what's next, and what's blocking us.
+
+---
+
+## What Was Just Completed (2026-04-23 — Planning + Compliance Research)
+
+- **Bug #30 fix reverted** — transcript deletion step removed from `post-call/route.ts`. Stress-testing found the fix would've silently broken "Ask Wingman" chatbot (reads transcript via `src/app/api/ai/chat/route.ts:125`) and Flight Log transcript view (`FlightLogTab.tsx:465`). Issue #30 closed as superseded.
+- **Issue #33 logged — wiretap compliance initiative** — critical pre-beta blocker. 2025 case law (*Ambriz v. Google*, *Brewer v. Otter.ai*) confirmed AI transcription is subject to CIPA + ECPA. Full research agent report saved at `05 - Operations/Wiretap Compliance Research.md`. 5-layer plan scoped.
+- **Two V2 Offer Brain features killed after adversarial review** — custom objection handles and rep blind spots. Both fail the same attribution problem: text transcripts can't see tonality/authority/pacing, so any stored pattern is either too generic or biases the next call wrong.
+- **Marketing honesty principles saved** — `03 - GTM/Marketing Honesty Principles.md`. Wingman is a tool in the tool belt, not the whole belt. Will shape website copy, onboarding, and FAQ.
+- **Voice chatbot idea captured in Inbox** — ElevenLabs voice coaching is a V2+ differentiator. Not now.
+- **Decision locked: keep transcripts indefinitely, user-deletable** — 1-year auto-delete was tempting but Sebastian's own usage (6+-month-old transcripts) and industry norm (Gong/Chorus indefinite) made indefinite the cleaner answer. Breach exposure is the real risk, handled via user-controlled delete in #33.
 
 ---
 
@@ -145,21 +156,29 @@ This is the first file Claude reads at session start. It answers: where are we, 
 
 ## What's Next (Priority Order)
 
+0. 🚨 **Wiretap compliance initiative (Issue #33)** — critical pre-beta blocker. Multi-session build. Start with Layer 1: rep-facing ToS + one-screen onboarding compliance acknowledgment checkbox. This is the minimum legal foothold to ship any public beta. Subsequent layers: user-controlled transcript deletion UI → website compliance page → auto-post chat message at call start → calendar invite auto-insert → unshipped kill-switch code. Full game plan in `05 - Operations/Wiretap Compliance Research.md`.
+
 1. **Transcript tester tool (local dev only)** — paste a real sales call transcript into a simple local UI, run it through the post-call scoring pipeline (same system prompt + pillar evaluation), and see the full visual output. Goal: let Sebastian verify pillar scoring quality without needing a live call. Build as a standalone HTML file or simple Next.js dev-only page. No auth required — local only.
 
-3. **Test signal card quality during a live call** — end-to-end pipeline has never been tested on a real call. Must verify signal cards fire at the right moments, coaching KB search returns meaningful results, and latency stays under 1s.
+2. **Signal card simulation testing** — the best way to test signal card quality without waiting for a real sales call. Plan: find a full high-ticket info product sales call transcript (YouTube or personal archive), use Claude to generate 50 variations (different objections, different prospect personas, different stages), then run them through the live signal card pipeline and evaluate which cards fired, when, and what they said. Goal: catch misfires, missed moments, and quality issues before beta. No code needed first — start by sourcing a real gold-standard transcript.
 
-4. **Next re-ingestion session** — fix Issues #28 + #29: add `trigger_type` classification (`objection` | `buying_signal`) to junction table, improve Pass 2 prompt for trigger diversity. Re-ingest all sources.
+3. **Ask Wingman automated test suite** — pressure test the chatbot with hundreds of automated test cases run directly from terminal (no app UI needed). Define a list of failure modes we're testing for (profanity, hallucinations, out-of-scope answers, confidently wrong advice, etc.) and have Claude generate and run 200+ diverse queries against the live `ai/chat` route. Log pass/fail per query. Goal: surface quality issues systematically before beta testers find them manually.
 
-5. **Stripe billing end-to-end test**
+4. **Test signal card quality during a live call** — end-to-end pipeline has never been tested on a real call. Must verify signal cards fire at the right moments, coaching KB search returns meaningful results, and latency stays under 1s.
 
-6. **Beta onboarding email** — must include quarantine removal command for non-notarized app.
+5. **Next re-ingestion session** — fix Issues #28 + #29: add `trigger_type` classification (`objection` | `buying_signal`) to junction table, improve Pass 2 prompt for trigger diversity. Re-ingest all sources.
+
+6. **Stripe billing end-to-end test**
+
+7. **Beta onboarding email** — must include quarantine removal command for non-notarized app.
+
+8. **Wingman Intelligence graph visualizer** — add an Obsidian-style node graph to the dashboard showing that rep's AI brain (Offer Brain nodes, objections, patterns, call history connections). Grows over time. Not mission-critical — V1.5 feature, but worth planning. No immediate action needed.
 
 ---
 
 ## Current Blockers
 
-- **Flight Log doesn't yet show pillar coverage** — data is being collected (Step 4 done), display not built yet.
+- 🚨 **Wiretap compliance initiative (Issue #33)** — critical pre-beta blocker. No consent disclosure mechanism in place. 2025 case law confirms AI transcription is subject to CIPA + ECPA. Every competitor uses bot-in-call with visible presence; Wingman + Cluely are silent-desktop outliers. Multi-session build required before public beta. Research + game plan saved at `05 - Operations/Wiretap Compliance Research.md`.
 - **App not Apple-notarized** — beta testers must run quarantine command manually. (Known Issue #5)
 
 ---

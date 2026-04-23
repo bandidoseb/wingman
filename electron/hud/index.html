@@ -833,7 +833,6 @@
 
     function showSetupRequiredToast() {
       setupRequiredToast.classList.add('visible');
-      if (window.hud) window.hud.setMouseIgnore(false);
       clearTimeout(setupRequiredTimeout);
       setupRequiredTimeout = setTimeout(() => hideSetupRequiredToast(), 10000);
     }
@@ -864,7 +863,6 @@
     function showDetectionToast() {
       hideManualTriggerToast(false); // can't show both
       detectionToast.classList.add('visible');
-      if (window.hud) window.hud.setMouseIgnore(false);
 
       // Auto-dismiss after 12 seconds
       clearTimeout(detectionTimeout);
@@ -893,7 +891,6 @@
     function showManualTriggerToast() {
       hideDetectionToast(false); // can't show both
       manualTriggerToast.classList.add('visible');
-      if (window.hud) window.hud.setMouseIgnore(false);
 
       // Auto-dismiss after 10 seconds if user doesn't act
       clearTimeout(manualTimeout);
@@ -921,7 +918,6 @@
 
     function showEndCallConfirmToast() {
       endCallToast.classList.add('visible');
-      if (window.hud) window.hud.setMouseIgnore(false);
 
       // Auto-dismiss after 8 seconds — just cancels the action, doesn't end the call
       clearTimeout(endCallTimeout);
@@ -1230,6 +1226,21 @@
       // Always restore pass-through when leaving the card — even if a signal is active.
       // The card stays visible; the user can hover back to interact with "got it".
       if (window.hud) window.hud.setMouseIgnore(true);
+    });
+
+    // ── Toast hover — enable mouse capture only when cursor is over the toast ──
+    // Toasts appear over a full-screen transparent window. Calling setMouseIgnore(false)
+    // globally when a toast appears blocks ALL clicks on the screen underneath (e.g. Zoom).
+    // Instead, we enable capture only on hover — same pattern as signalBubble + stageBar.
+    [detectionToast, manualTriggerToast, endCallToast, setupRequiredToast].forEach(toast => {
+      toast.addEventListener('mouseenter', () => {
+        if (window.hud) window.hud.setMouseIgnore(false);
+      });
+      toast.addEventListener('mouseleave', () => {
+        if (!signalActive && !isDragging) {
+          if (window.hud) window.hud.setMouseIgnore(true);
+        }
+      });
     });
 
     // ── IPC listeners (Electron → HUD) ───────────────────────────────────
