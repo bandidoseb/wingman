@@ -9,7 +9,6 @@ export type OnboardingStep =
   | "objections"
   | "tutorial"
   | "vaultnudge"
-  | "compliance"
   | "building"
   | "complete";
 

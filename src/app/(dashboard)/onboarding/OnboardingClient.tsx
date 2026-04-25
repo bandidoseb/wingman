@@ -8,11 +8,10 @@ import Welcome from "@/components/onboarding/Welcome";
 import YourOffer from "@/components/onboarding/YourOffer";
 import Tutorial from "@/components/onboarding/Tutorial";
 import VaultNudge from "@/components/onboarding/VaultNudge";
-import Compliance from "@/components/onboarding/Compliance";
 import Building from "@/components/onboarding/Building";
 
 const ONBOARDING_ORDER: OnboardingStep[] = [
-  "welcome", "offer", "tutorial", "vaultnudge", "compliance", "building",
+  "welcome", "offer", "tutorial", "vaultnudge", "building",
 ];
 const DOT_SCREENS: OnboardingStep[] = [
   "welcome", "offer", "tutorial",
@@ -96,30 +95,8 @@ export default function OnboardingClient({ initialProfile, userId }: Props) {
   }, [updateProfile]);
 
   const handleVaultNudge = useCallback(async () => {
-    await updateProfile({ onboarding_step: "compliance" });
-    setScreen("compliance");
-  }, [updateProfile]);
-
-  const handleCompliance = useCallback(async () => {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 10000);
-    try {
-      const res = await fetch("/api/onboarding/compliance", {
-        method: "POST",
-        signal: controller.signal,
-      });
-      clearTimeout(timeout);
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        console.error("[Wingman] /api/onboarding/compliance failed:", res.status, body);
-        throw new Error("Failed to save acknowledgment");
-      }
-      await updateProfile({ onboarding_step: "building" });
-      setScreen("building");
-    } catch (err) {
-      clearTimeout(timeout);
-      throw err;
-    }
+    await updateProfile({ onboarding_step: "building" });
+    setScreen("building");
   }, [updateProfile]);
 
   const handleBuilding = useCallback(async () => {
@@ -160,7 +137,6 @@ export default function OnboardingClient({ initialProfile, userId }: Props) {
     offer:      <YourOffer onNext={handleOffer} />,
     tutorial:   <Tutorial onNext={handleTutorial} />,
     vaultnudge: <VaultNudge onNext={handleVaultNudge} />,
-    compliance: <Compliance onNext={handleCompliance} />,
     building:   <Building onNext={handleBuilding} />,
   };
 
@@ -208,7 +184,7 @@ export default function OnboardingClient({ initialProfile, userId }: Props) {
       {screens[screen]}
 
       {/* Back button */}
-      {!["welcome", "building", "vaultnudge", "compliance"].includes(screen) && (
+      {!["welcome", "building", "vaultnudge"].includes(screen) && (
         <button
           onClick={() => {
             const prev = ONBOARDING_ORDER[ONBOARDING_ORDER.indexOf(screen) - 1];

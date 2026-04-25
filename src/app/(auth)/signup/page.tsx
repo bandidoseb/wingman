@@ -246,8 +246,8 @@ export default function SignupPage() {
               By signing up you agree to our{" "}
               <Link href="/terms" style={{ color: "#8e8e93", textDecoration: "underline" }}>Terms of Service</Link>
               {" "}and{" "}
-              <Link href="/privacy" style={{ color: "#8e8e93", textDecoration: "underline" }}>Privacy Policy</Link>.
-              {" "}You also consent to receive a one-time SMS verification code. Msg & data rates may apply.
+              <Link href="/privacy" style={{ color: "#8e8e93", textDecoration: "underline" }}>Privacy Policy</Link>,
+              {" "}including responsibility for complying with call-recording laws in your jurisdiction.
             </div>
           </div>
         )}
