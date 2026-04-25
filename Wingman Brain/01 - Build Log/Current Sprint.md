@@ -6,6 +6,16 @@ This is the first file Claude reads at session start. It answers: where are we, 
 
 ---
 
+## What Was Just Completed (2026-04-25 — Legal Pages, ToS Recording Law Section)
+
+- **`/terms` and `/privacy` confirmed live** — both pages already existed. P0 compliance blocker cleared.
+- **Section 5 "Recording Laws & Your Responsibility" added to ToS** — shifts wiretap liability to user. Lists all 14 all-party consent states, cites ECPA, explicit indemnification clause. Mirrors Cluely's ToS-only approach but more explicit.
+- **Operator updated to "Wingman LLC"** on both pages — Sebastian's personal name removed. LLC to be filed in MN before first paid users.
+- **"Setters" removed from Terms** — closers-only language, setters are future expansion.
+- **Pushed** — commit `8c569bc`, Railway auto-deployed.
+
+---
+
 ## What Was Just Completed (2026-04-25 — Bug Fixes, Compliance, Auth, Onboarding)
 
 - **Issue #32 confirmed fixed** — HUD mouse passthrough already correct. `setIgnoreMouseEvents(true, { forward: true })` at creation + hover-only capture on interactive elements. No code change needed, marked resolved.
@@ -222,7 +232,6 @@ This is the first file Claude reads at session start. It answers: where are we, 
 
 ## Current Blockers
 
-- 🚨 **`/terms` and `/privacy` pages not yet built** — the signup page links to `/terms`. Before any public beta user signs up, that URL must resolve. Copy direction at `Wingman Brain/03 - GTM/Website Plan.md`. (Issue #33 partial — basic compliance posture in place.)
 - **App not Apple-notarized** — beta testers must run quarantine command manually. (Known Issue #5)
 
 ---
