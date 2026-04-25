@@ -63,9 +63,6 @@ export function useWingmanPoller({
   const stageRef = useRef<CallStageLabel>(stage);
   const callIdRef = useRef<string | null>(callId);
   const isPollingRef = useRef(false);
-  // Minimum gap between background KB scans (keyword hits bypass this cooldown)
-  const lastKBCheckRef = useRef<number>(0);
-  const KB_CHECK_COOLDOWN_MS = 10_000; // 10 seconds between background scans
   // The rep's Zoom display name — seeded from Settings, falls back to auto-detection.
   // Used to exclude the rep's lines from keyword trigger matching so cards
   // only fire when the prospect says an objection phrase, not the rep.
@@ -305,21 +302,11 @@ export function useWingmanPoller({
 
       chunkBufferRef.current += (chunkBufferRef.current ? "\n" : "") + chunk;
 
-      const now = Date.now();
-      // Keyword match → fire KB check immediately (known important moment, no cooldown)
-      // No keyword match → fire KB check if 10s have passed since last background scan
+      // Keyword match → fire the signal immediately and run a KB check in
+      // parallel so a richer card can replace it if one is found.
       const keywordHit = checkKeywordTriggers(chunk, objections, repSpeakerRef.current);
-      const backgroundDue = now - lastKBCheckRef.current > KB_CHECK_COOLDOWN_MS;
-
       if (keywordHit) {
-        // Keyword match — fire the signal immediately and run a KB check in
-        // parallel so a richer card can replace it if one is found.
-        lastKBCheckRef.current = now;
         fireSignal(keywordHit);
-        runKBCheck(chunk);
-      } else if (backgroundDue) {
-        // No keyword match but 10s have passed — run a background KB scan.
-        lastKBCheckRef.current = now;
         runKBCheck(chunk);
       }
     },
