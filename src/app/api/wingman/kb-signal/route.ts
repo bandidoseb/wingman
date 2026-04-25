@@ -2,20 +2,22 @@
  * POST /api/wingman/kb-signal
  *
  * RAG-powered signal card endpoint.
- * Fires on trigger detection (keyword match or classifier hit) — NOT on a timer.
+ * Fires on trigger detection (keyword match) — NOT on a timer.
  *
  * Flow:
  *   searchKnowledge(chunk) → embed → pgvector → top 3 matches
  *   generateSignalCard(results, chunk) → Haiku → first-person card
+ *   pusherServer.trigger() → pushes card to client WebSocket channel
  *
  * Target latency: under 500ms total
- * Returns: { signal_card, signal_header } or { signal_card: null } if no match
+ * Returns: { ok: true } — card is pushed via Pusher, not in the response body
  */
 
 import { NextRequest, NextResponse } from "next/server";
 import { createClient }              from "@/lib/supabase/server";
 import { searchKnowledge }           from "@/lib/wingman/knowledge-search";
 import { generateSignalCard }        from "@/lib/wingman/knowledge-signal";
+import { pusherServer }              from "@/lib/pusher";
 
 export async function POST(req: NextRequest) {
   try {
@@ -27,10 +29,12 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const {
       transcript_chunk,
+      call_id,
       scorecard_snapshot,
       current_stage,
     }: {
       transcript_chunk:   string;
+      call_id?:           string;
       current_stage?:     string;
       scorecard_snapshot?: {
         pain_detail?:               string;
@@ -42,20 +46,20 @@ export async function POST(req: NextRequest) {
     } = body;
 
     if (!transcript_chunk?.trim()) {
-      return NextResponse.json({ signal_card: null }, { status: 200 });
+      return NextResponse.json({ ok: true });
     }
 
     // Limit chunk size
     if (transcript_chunk.length > 2_000) {
-      return NextResponse.json({ signal_card: null }, { status: 200 });
+      return NextResponse.json({ ok: true });
     }
 
     // ── 1. Search knowledge base ──────────────────────────────────────────
     const knowledgeResults = await searchKnowledge(transcript_chunk);
 
     if (!knowledgeResults) {
-      // Nothing above 0.65 similarity — return null, don't fire a card
-      return NextResponse.json({ signal_card: null });
+      // Nothing above 0.65 similarity — no card to push
+      return NextResponse.json({ ok: true });
     }
 
     // ── 2. Generate two-tier signal card via Haiku ────────────────────────
@@ -67,19 +71,32 @@ export async function POST(req: NextRequest) {
     );
 
     if (!card) {
-      return NextResponse.json({ signal_card: null });
+      return NextResponse.json({ ok: true });
     }
 
-    return NextResponse.json({
-      signal_card:   card.headline,   // kept for backwards compat — raw card text
-      signal_header: card.headline,   // ≤5-word actionable headline
-      signal_text:   card.subtext,    // support sentence (empty string for early-stage cards)
-      signal_source: card.source,
-      signal_type:   "Handle" as const,
-    });
+    // Push signal card to client via Pusher.
+    // KB signals use source "keyword" so they bypass the 90-second cooldown —
+    // a prospect raising an objection is always urgent regardless of timing.
+    if (!call_id) {
+      console.warn("[kb-signal] No call_id — cannot push signal via Pusher");
+      return NextResponse.json({ ok: true });
+    }
+
+    try {
+      await pusherServer.trigger(`private-wingman-call-${call_id}`, "signal-card", {
+        signal_type:   "Handle",
+        signal_header: card.headline,
+        signal_text:   card.subtext ?? "",
+        source:        "kb",
+      });
+    } catch (pusherErr) {
+      console.error("[kb-signal] Pusher push failed — signal card not delivered:", pusherErr);
+    }
+
+    return NextResponse.json({ ok: true });
 
   } catch (err) {
     console.error("[kb-signal] Error:", err);
-    return NextResponse.json({ signal_card: null }, { status: 500 });
+    return NextResponse.json({ ok: false }, { status: 500 });
   }
 }

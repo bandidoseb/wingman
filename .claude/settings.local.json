@@ -127,7 +127,8 @@
       "Bash(xargs cat *)",
       "Bash(git add *)",
       "Bash(git commit -m ' *)",
-      "Bash(git push *)"
+      "Bash(git push *)",
+      "Bash(node -e \"require\\('pusher'\\); require\\('pusher-js'\\); console.log\\('both packages installed ok'\\)\")"
     ],
     "defaultMode": "bypassPermissions"
   },

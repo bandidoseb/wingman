@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/server";
 import { WINGMAN_SYSTEM_PROMPT } from "@/lib/wingman/system-prompt";
+import { pusherServer } from "@/lib/pusher";
 import {
   buildRepProfile,
   buildSignalVaultSummary,
@@ -264,7 +265,32 @@ Based on the new chunk and scorecard above, return your JSON response now.`;
       return NextResponse.json({ error: "Invalid AI response" }, { status: 502 });
     }
 
-    return NextResponse.json(parsed);
+    // ── 7. Push results to client via Pusher ─────────────────────────────────
+    // The client subscribes to this channel and receives both events in real time.
+    // Pusher push failures are non-fatal — transcript was saved and Claude ran.
+    // The call continues; the user just misses this particular card.
+    const channelName = `private-wingman-call-${call_id}`;
+    try {
+      // Always push scorecard — client needs it for stage tracking even when
+      // no signal fires. Include signal_type so client can detect "Ready" transitions.
+      await pusherServer.trigger(channelName, "scorecard-update", {
+        scorecard_update: parsed.scorecard_update,
+        signal_type:      parsed.signal_type,
+      });
+
+      if (parsed.signal_to_fire) {
+        await pusherServer.trigger(channelName, "signal-card", {
+          signal_type:   parsed.signal_type,
+          signal_header: parsed.signal_header,
+          signal_text:   parsed.signal_text,
+          source:        "poll",
+        });
+      }
+    } catch (pusherErr) {
+      console.error("[poll] Pusher push failed — signal card not delivered:", pusherErr);
+    }
+
+    return NextResponse.json({ ok: true });
   } catch (err) {
     console.error("Poll route error:", err);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });

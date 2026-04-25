@@ -1,9 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import PusherClient from "pusher-js";
 import type {
   CallStageLabel,
   LiveScorecard,
+  SignalType,
   WingmanSignal,
   SignalLogEntry,
   WingmanPollResponse,
@@ -12,6 +14,19 @@ import { DEFAULT_SCORECARD } from "@/types";
 import { POLL_INTERVALS } from "@/lib/wingman/poll-intervals";
 import { checkKeywordTriggers } from "@/lib/wingman/keyword-triggers";
 import type { VaultObjection } from "@/types";
+
+// ── Pusher event payload types ────────────────────────────────────────────────
+interface PusherSignalEvent {
+  signal_type:   SignalType;
+  signal_header: string;
+  signal_text:   string;
+  source:        "poll" | "kb";
+}
+
+interface PusherScorecardEvent {
+  scorecard_update: WingmanPollResponse["scorecard_update"];
+  signal_type:      SignalType;
+}
 
 const NON_ALERT_COOLDOWN_MS = 90_000; // 90 seconds
 
@@ -54,6 +69,10 @@ export function useWingmanPoller({
   const [completedStages, setCompletedStages] = useState<CallStageLabel[]>([]);
   const [prospectName, setProspectName] = useState<string | null>(null);
 
+  // Pusher client — created once on mount, persists for the lifetime of the hook.
+  // Initialized in a useEffect so it only runs in the browser (never during SSR).
+  const pusherRef = useRef<PusherClient | null>(null);
+
   // Refs for stable values inside intervals/callbacks
   const scorecardRef = useRef<LiveScorecard>({ ...DEFAULT_SCORECARD, current_stage: stage });
   const chunkBufferRef = useRef<string>("");
@@ -94,6 +113,91 @@ export function useWingmanPoller({
       setProspectName(null);
     }
   }, [callId]);
+
+  // ── Pusher client init — runs once on mount (browser only) ──────────────────
+  useEffect(() => {
+    const key     = process.env.NEXT_PUBLIC_PUSHER_KEY;
+    const cluster = process.env.NEXT_PUBLIC_PUSHER_CLUSTER;
+
+    if (!key || !cluster) {
+      console.error("[Wingman] Pusher env vars not set — real-time signal push disabled");
+      return;
+    }
+
+    pusherRef.current = new PusherClient(key, {
+      cluster,
+      authEndpoint: "/api/pusher/auth",
+    });
+
+    return () => {
+      pusherRef.current?.disconnect();
+      pusherRef.current = null;
+    };
+  }, []);
+
+  // ── Pusher channel subscription — per call ────────────────────────────────
+  // Subscribe when a call becomes active; unsubscribe on call end.
+  // All signal cards and scorecard updates arrive via this channel instead
+  // of being parsed out of fetch response bodies.
+  useEffect(() => {
+    if (!isActive || !callId || !pusherRef.current) return;
+
+    const channelName = `private-wingman-call-${callId}`;
+    const channel     = pusherRef.current.subscribe(channelName);
+
+    channel.bind("signal-card", (data: PusherSignalEvent) => {
+      try {
+        if (!data?.signal_header) return;
+        fireSignal({
+          type:    data.signal_type ?? "Handle",
+          header:  data.signal_header,
+          text:    data.signal_text ?? "",
+          firedAt: Date.now(),
+          // KB signals ("kb") use the "keyword" path so they bypass the 90s cooldown —
+          // a prospect raising an objection is always urgent. Poll signals respect it.
+          source:  data.source === "kb" ? "keyword" : "poll",
+        });
+      } catch (err) {
+        console.error("[Wingman] Error handling signal-card event:", err);
+      }
+    });
+
+    channel.bind("scorecard-update", (data: PusherScorecardEvent) => {
+      try {
+        if (!data?.scorecard_update) return;
+        const su = data.scorecard_update;
+        const newScorecard: LiveScorecard = {
+          current_stage:             su.stage,
+          pain_locked:               su.pain_locked,
+          pain_detail:               su.pain_detail,
+          timeline_confirmed:        su.timeline_confirmed,
+          finances_touched:          su.finances_touched,
+          decision_maker_confirmed:  su.decision_maker_confirmed,
+          objection_risk:            su.objection_risk,
+          gold_moment:               su.gold_moment,
+          predicted_next_objection:  su.predicted_next_objection,
+          prospect_anchors:          su.prospect_anchors ?? scorecardRef.current.prospect_anchors,
+        };
+        scorecardRef.current = newScorecard;
+        setScorecard(newScorecard);
+
+        // Mark the current stage as complete when Claude signals a transition.
+        // "Ready" means stage is done; a stage mismatch means Claude advanced past it.
+        if (data.signal_type === "Ready" || su.stage !== stageRef.current) {
+          setCompletedStages((prev) =>
+            prev.includes(stageRef.current) ? prev : [...prev, stageRef.current]
+          );
+        }
+      } catch (err) {
+        console.error("[Wingman] Error handling scorecard-update event:", err);
+      }
+    });
+
+    return () => {
+      channel.unbind_all();
+      pusherRef.current?.unsubscribe(channelName);
+    };
+  }, [isActive, callId, fireSignal]);
 
   /** Show a signal, respecting cooldown rules */
   const fireSignal = useCallback((signal: WingmanSignal) => {
