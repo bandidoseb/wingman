@@ -11,10 +11,14 @@
             "id": "f2d87738639a2665",
             "type": "leaf",
             "state": {
-              "type": "graph",
-              "state": {},
-              "icon": "lucide-git-fork",
-              "title": "Graph view"
+              "type": "markdown",
+              "state": {
+                "file": "03 - GTM/Website Plan.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "Website Plan"
             }
           }
         ]
@@ -180,6 +184,8 @@
   },
   "active": "f2d87738639a2665",
   "lastOpenFiles": [
+    "03 - GTM/Website Plan.md",
+    "_Inbox/Website To-Do.md",
     "09 - Code Review/Code Review 2026-04-20.md",
     "01 - Build Log/Build Log.md",
     "01 - Build Log/2026-04-13.md",
@@ -207,8 +213,6 @@
     "01 - Build Log/Code Reviews",
     "01 - Build Log/Known Issues.md",
     "_Inbox/multi-turn objection handling.md",
-    "_Inbox/New Ideas - April 9.md",
-    "_Inbox/New Ideas - April 10.md",
     "03 - Market",
     "Untitled 1.canvas",
     "Untitled.canvas",
