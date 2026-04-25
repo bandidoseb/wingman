@@ -117,7 +117,13 @@
       "Bash(cd \"/Users/sebastianperez/Desktop/Wingman CC\" && npx tsc:*)",
       "mcp__scheduled-tasks__list_scheduled_tasks",
       "WebSearch",
-      "WebFetch(domain:docs.google.com)"
+      "WebFetch(domain:docs.google.com)",
+      "WebFetch(domain:www.recall.ai)",
+      "WebFetch(domain:cluely.com)",
+      "WebFetch(domain:support.cluely.com)",
+      "WebFetch(domain:cluely.trust.pagerduty.com)",
+      "Bash(gh api *)",
+      "WebFetch(domain:www.ycombinator.com)"
     ],
     "defaultMode": "bypassPermissions"
   },
