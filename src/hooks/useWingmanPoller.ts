@@ -8,7 +8,7 @@ import type {
   SignalType,
   WingmanSignal,
   SignalLogEntry,
-  WingmanPollResponse,
+  WingmanPollResponse,  // used in PusherScorecardEvent type below
 } from "@/types";
 import { DEFAULT_SCORECARD } from "@/types";
 import { POLL_INTERVALS } from "@/lib/wingman/poll-intervals";
@@ -135,70 +135,6 @@ export function useWingmanPoller({
     };
   }, []);
 
-  // ── Pusher channel subscription — per call ────────────────────────────────
-  // Subscribe when a call becomes active; unsubscribe on call end.
-  // All signal cards and scorecard updates arrive via this channel instead
-  // of being parsed out of fetch response bodies.
-  useEffect(() => {
-    if (!isActive || !callId || !pusherRef.current) return;
-
-    const channelName = `private-wingman-call-${callId}`;
-    const channel     = pusherRef.current.subscribe(channelName);
-
-    channel.bind("signal-card", (data: PusherSignalEvent) => {
-      try {
-        if (!data?.signal_header) return;
-        fireSignal({
-          type:    data.signal_type ?? "Handle",
-          header:  data.signal_header,
-          text:    data.signal_text ?? "",
-          firedAt: Date.now(),
-          // KB signals ("kb") use the "keyword" path so they bypass the 90s cooldown —
-          // a prospect raising an objection is always urgent. Poll signals respect it.
-          source:  data.source === "kb" ? "keyword" : "poll",
-        });
-      } catch (err) {
-        console.error("[Wingman] Error handling signal-card event:", err);
-      }
-    });
-
-    channel.bind("scorecard-update", (data: PusherScorecardEvent) => {
-      try {
-        if (!data?.scorecard_update) return;
-        const su = data.scorecard_update;
-        const newScorecard: LiveScorecard = {
-          current_stage:             su.stage,
-          pain_locked:               su.pain_locked,
-          pain_detail:               su.pain_detail,
-          timeline_confirmed:        su.timeline_confirmed,
-          finances_touched:          su.finances_touched,
-          decision_maker_confirmed:  su.decision_maker_confirmed,
-          objection_risk:            su.objection_risk,
-          gold_moment:               su.gold_moment,
-          predicted_next_objection:  su.predicted_next_objection,
-          prospect_anchors:          su.prospect_anchors ?? scorecardRef.current.prospect_anchors,
-        };
-        scorecardRef.current = newScorecard;
-        setScorecard(newScorecard);
-
-        // Mark the current stage as complete when Claude signals a transition.
-        // "Ready" means stage is done; a stage mismatch means Claude advanced past it.
-        if (data.signal_type === "Ready" || su.stage !== stageRef.current) {
-          setCompletedStages((prev) =>
-            prev.includes(stageRef.current) ? prev : [...prev, stageRef.current]
-          );
-        }
-      } catch (err) {
-        console.error("[Wingman] Error handling scorecard-update event:", err);
-      }
-    });
-
-    return () => {
-      channel.unbind_all();
-      pusherRef.current?.unsubscribe(channelName);
-    };
-  }, [isActive, callId, fireSignal]);
-
   /** Show a signal, respecting cooldown rules */
   const fireSignal = useCallback((signal: WingmanSignal) => {
     const now = Date.now();
@@ -235,6 +171,70 @@ export function useWingmanPoller({
     lastNonAlertSignalTimeRef.current = Date.now();
   }, []);
 
+  // ── Pusher channel subscription — per call ────────────────────────────────
+  // Placed after fireSignal so its dep array can reference the stable callback
+  // without hitting the const temporal dead zone.
+  // Subscribe when a call becomes active; unsubscribe and unbind on call end.
+  useEffect(() => {
+    if (!isActive || !callId || !pusherRef.current) return;
+
+    const channelName = `private-wingman-call-${callId}`;
+    const channel     = pusherRef.current.subscribe(channelName);
+
+    channel.bind("signal-card", (data: PusherSignalEvent) => {
+      try {
+        if (!data?.signal_header) return;
+        fireSignal({
+          type:    data.signal_type ?? "Handle",
+          header:  data.signal_header,
+          text:    data.signal_text ?? "",
+          firedAt: Date.now(),
+          // KB signals ("kb") use the "keyword" cooldown path so they bypass the
+          // 90s cooldown — a prospect raising an objection is always urgent.
+          source:  data.source === "kb" ? "keyword" : "poll",
+        });
+      } catch (err) {
+        console.error("[Wingman] Error handling signal-card event:", err);
+      }
+    });
+
+    channel.bind("scorecard-update", (data: PusherScorecardEvent) => {
+      try {
+        if (!data?.scorecard_update) return;
+        const su = data.scorecard_update;
+        const newScorecard: LiveScorecard = {
+          current_stage:            su.stage,
+          pain_locked:              su.pain_locked,
+          pain_detail:              su.pain_detail,
+          timeline_confirmed:       su.timeline_confirmed,
+          finances_touched:         su.finances_touched,
+          decision_maker_confirmed: su.decision_maker_confirmed,
+          objection_risk:           su.objection_risk,
+          gold_moment:              su.gold_moment,
+          predicted_next_objection: su.predicted_next_objection,
+          prospect_anchors:         su.prospect_anchors ?? scorecardRef.current.prospect_anchors,
+        };
+        scorecardRef.current = newScorecard;
+        setScorecard(newScorecard);
+
+        // Mark the current stage complete when Claude signals a transition.
+        // "Ready" = stage done; stage mismatch = Claude advanced past it.
+        if (data.signal_type === "Ready" || su.stage !== stageRef.current) {
+          setCompletedStages((prev) =>
+            prev.includes(stageRef.current) ? prev : [...prev, stageRef.current]
+          );
+        }
+      } catch (err) {
+        console.error("[Wingman] Error handling scorecard-update event:", err);
+      }
+    });
+
+    return () => {
+      channel.unbind_all();
+      pusherRef.current?.unsubscribe(channelName);
+    };
+  }, [isActive, callId, fireSignal]);
+
   /**
    * RAG-powered KB signal check — fires in parallel with keyword check.
    * Calls /api/wingman/kb-signal which runs searchKnowledge → generateSignalCard.
@@ -246,32 +246,20 @@ export function useWingmanPoller({
     (chunk: string) => {
       const { pain_detail, gold_moment, predicted_next_objection, objection_risk, prospect_anchors } =
         scorecardRef.current;
+      // Fire and forget — the server pushes the resulting card via Pusher.
+      // No response body processing needed.
       fetch("/api/wingman/kb-signal", {
         method:  "POST",
         headers: { "content-type": "application/json" },
         body:    JSON.stringify({
-          transcript_chunk: chunk,
-          current_stage:    stageRef.current,
+          transcript_chunk:   chunk,
+          call_id:            callIdRef.current,
+          current_stage:      stageRef.current,
           scorecard_snapshot: { pain_detail, gold_moment, predicted_next_objection, objection_risk, prospect_anchors },
         }),
-      })
-        .then((res) => res.ok ? res.json() : null)
-        .then((data) => {
-          // Guard on signal_header (the headline) — signal_text may be intentionally
-          // empty for early-stage headline-only cards. Checking signal_text would
-          // suppress those cards since empty string is falsy.
-          if (!data?.signal_header) return;
-          fireSignal({
-            type:    data.signal_type ?? "Handle",
-            header:  data.signal_header,
-            text:    data.signal_text ?? "",
-            firedAt: Date.now(),
-            source:  "keyword", // treated as instant-path for cooldown purposes
-          });
-        })
-        .catch(() => { /* KB search failures are non-fatal */ });
+      }).catch(() => { /* KB search failures are non-fatal */ });
     },
-    [fireSignal]
+    []
   );
 
   /** Send current buffer to the poll API */
@@ -316,42 +304,8 @@ export function useWingmanPoller({
         return;
       }
       setPollError(null);
-
-      const data: WingmanPollResponse = await res.json();
-
-      // Update scorecard
-      const newScorecard: LiveScorecard = {
-        current_stage: data.scorecard_update.stage,
-        pain_locked: data.scorecard_update.pain_locked,
-        pain_detail: data.scorecard_update.pain_detail,
-        timeline_confirmed: data.scorecard_update.timeline_confirmed,
-        finances_touched: data.scorecard_update.finances_touched,
-        decision_maker_confirmed: data.scorecard_update.decision_maker_confirmed,
-        objection_risk: data.scorecard_update.objection_risk,
-        gold_moment: data.scorecard_update.gold_moment,
-        predicted_next_objection: data.scorecard_update.predicted_next_objection,
-        prospect_anchors: data.scorecard_update.prospect_anchors ?? scorecardRef.current.prospect_anchors,
-      };
-      scorecardRef.current = newScorecard;
-      setScorecard(newScorecard);
-
-      // Track completed stages when Ready signal fires or stage advances
-      if (data.signal_type === "Ready" || data.scorecard_update.stage !== stageRef.current) {
-        setCompletedStages((prev) =>
-          prev.includes(stageRef.current) ? prev : [...prev, stageRef.current]
-        );
-      }
-
-      // Fire signal if needed
-      if (data.signal_to_fire) {
-        fireSignal({
-          type: data.signal_type,
-          header: data.signal_header,
-          text: data.signal_text,
-          firedAt: Date.now(),
-          source: "poll",
-        });
-      }
+      // Response is { ok: true } — signal cards and scorecard updates
+      // arrive via the Pusher "scorecard-update" and "signal-card" events.
     } catch (err) {
       restoreChunk();
       if (err instanceof Error && err.name === "AbortError") {
@@ -368,7 +322,7 @@ export function useWingmanPoller({
       isPollingRef.current = false;
       setIsPolling(false);
     }
-  }, [fireSignal]);
+  }, []);
 
   /** Add transcript text to buffer + run KB check */
   const addChunk = useCallback(
