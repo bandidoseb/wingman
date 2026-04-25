@@ -6,6 +6,17 @@ This is the first file Claude reads at session start. It answers: where are we, 
 
 ---
 
+## What Was Just Completed (2026-04-25 — Bug Fixes, Compliance, Auth, Onboarding)
+
+- **Issue #32 confirmed fixed** — HUD mouse passthrough already correct. `setIgnoreMouseEvents(true, { forward: true })` at creation + hover-only capture on interactive elements. No code change needed, marked resolved.
+- **Issue #31 fixed** — profanity rule hardened in `src/app/api/ai/chat/route.ts`. Changed from soft style suggestion to hard constraint: "Never use profanity, vulgar language, slang, or expletives. Not once, not even for emphasis. This is a hard rule." Marked resolved.
+- **Issue #33 — wiretap compliance basic posture set** — ToS-only approach (same as Cluely) adopted for beta. `compliance_acknowledged_at` now logged at account creation via DB trigger. Signup ToS line updated. Website Plan created (`Wingman Brain/03 - GTM/Website Plan.md`). `/terms` and `/privacy` flagged as P0 blockers before public beta.
+- **SalesStyle onboarding step removed** — was collecting data Wingman doesn't use. `OnboardingClient.tsx` flow now: welcome → offer → tutorial → vaultnudge → building.
+- **Signup auth fixes (4):** (1) show/hide password toggles with inline Eye/EyeOff SVGs; (2) "Didn't get it? Resend email" button in emailSent view; (3) Google OAuth `ERR_CONNECTION_REFUSED` fixed by adding `http://localhost:3000/**` to Supabase Redirect URLs allowlist (no code change); (4) diagnosed silent duplicate account issue — must delete from Supabase Auth Users dashboard, not just profiles table.
+- **Compliance.tsx built** — checkbox screen component created at `src/components/onboarding/Compliance.tsx`. Not wired into onboarding flow (deemed too scary for conversion). Available if needed.
+
+---
+
 ## What Was Just Completed (2026-04-25 — Competitive Research + Financial Modeling)
 
 - **Cluely competitive intelligence completed** — full deep-dive on product, pricing, subprocessors, positioning. Full report in `2026-04-25.md` build log.
@@ -169,7 +180,7 @@ This is the first file Claude reads at session start. It answers: where are we, 
 
 ## What's Next (Priority Order)
 
-0. 🚨 **Wiretap compliance initiative (Issue #33)**— unchanged, still #1 pre-beta blocker.
+0. 🚨 **Build `/terms` and `/privacy` pages on meetwingman.ai** — P0 before any public beta user signs up. The signup ToS line links to `/terms` — that URL must resolve. Copy direction in `Wingman Brain/03 - GTM/Website Plan.md`. Issue #33 basic posture is now set; these pages are the remaining compliance blocker.
 
 0a. ⚡ **Quick win: eliminate background Haiku KB scan** — remove the every-10-second background KB scan from `useWingmanPoller.ts`. Only run KB on keyword triggers. Saves $0.41/call immediately. ~30 minutes. No architecture change. Do this before or alongside the full push migration.
 
@@ -211,7 +222,7 @@ This is the first file Claude reads at session start. It answers: where are we, 
 
 ## Current Blockers
 
-- 🚨 **Wiretap compliance initiative (Issue #33)** — critical pre-beta blocker. No consent disclosure mechanism in place. 2025 case law confirms AI transcription is subject to CIPA + ECPA. Every competitor uses bot-in-call with visible presence; Wingman + Cluely are silent-desktop outliers. Multi-session build required before public beta. Research + game plan saved at `05 - Operations/Wiretap Compliance Research.md`.
+- 🚨 **`/terms` and `/privacy` pages not yet built** — the signup page links to `/terms`. Before any public beta user signs up, that URL must resolve. Copy direction at `Wingman Brain/03 - GTM/Website Plan.md`. (Issue #33 partial — basic compliance posture in place.)
 - **App not Apple-notarized** — beta testers must run quarantine command manually. (Known Issue #5)
 
 ---
