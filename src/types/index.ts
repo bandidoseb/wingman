@@ -9,6 +9,7 @@ export type OnboardingStep =
   | "objections"
   | "tutorial"
   | "vaultnudge"
+  | "compliance"
   | "building"
   | "complete";
 
@@ -45,6 +46,8 @@ export interface Profile {
   chat_messages_today?: number;
   chat_reset_date?: string | null;
   zoom_display_name?: string | null;
+  compliance_acknowledged_at?: string | null;
+  compliance_acknowledged_ip?: string | null;
   created_at: string;
   updated_at: string;
 }
