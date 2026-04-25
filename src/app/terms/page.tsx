@@ -1,9 +1,8 @@
 import Link from "next/link";
 
 export default function TermsPage() {
-  // TODO: Replace "Sebastian Perez d/b/a Wingman" with your LLC name once formed
   const COMPANY = "Wingman";
-  const OPERATOR = "Sebastian Perez d/b/a Wingman";
+  const OPERATOR = "Wingman LLC";
   const EMAIL = "support@getwingman.ai";
   const STATE = "Minnesota";
   const EFFECTIVE_DATE = "March 9, 2026";
@@ -49,7 +48,7 @@ export default function TermsPage() {
 
           <h2 style={{ fontSize: 19, fontWeight: 700, color: "#1c1c1e", marginTop: 36, marginBottom: 12 }}>1. The Service</h2>
           <p style={{ marginBottom: 16 }}>
-            {COMPANY} is an AI-powered sales coaching platform designed to help sales professionals — including closers and setters — track calls, manage objection responses, and improve performance over time. The Service is intended for business use by adults 18 years of age or older.
+            {COMPANY} is an AI-powered sales coaching platform designed to help sales professionals — including closers — track calls, manage objection responses, and improve performance over time. The Service is intended for business use by adults 18 years of age or older.
           </p>
 
           <h2 style={{ fontSize: 19, fontWeight: 700, color: "#1c1c1e", marginTop: 36, marginBottom: 12 }}>2. Accounts</h2>

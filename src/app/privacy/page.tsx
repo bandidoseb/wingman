@@ -1,9 +1,8 @@
 import Link from "next/link";
 
 export default function PrivacyPage() {
-  // TODO: Replace "Sebastian Perez d/b/a Wingman" with your LLC name once formed
   const COMPANY = "Wingman";
-  const OPERATOR = "Sebastian Perez d/b/a Wingman";
+  const OPERATOR = "Wingman LLC";
   const EMAIL = "support@getwingman.ai";
   const STATE = "Minnesota";
   const EFFECTIVE_DATE = "March 9, 2026";
