@@ -1,0 +1,654 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Wingman Margin Calculator</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #0a0a0a;
+      color: #e5e5e5;
+      font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', sans-serif;
+      min-height: 100vh;
+      padding: 48px 32px;
+      max-width: 960px;
+      margin: 0 auto;
+    }
+
+    h1 {
+      font-size: 22px;
+      font-weight: 600;
+      color: #fff;
+      margin-bottom: 4px;
+      letter-spacing: -0.3px;
+    }
+
+    .subtitle {
+      font-size: 13px;
+      color: #666;
+      margin-bottom: 40px;
+    }
+
+    /* ── Sliders ── */
+    .sliders {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+      margin-bottom: 40px;
+    }
+
+    .slider-group {
+      background: #141414;
+      border: 1px solid #222;
+      border-radius: 12px;
+      padding: 20px 24px;
+    }
+
+    .slider-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      margin-bottom: 14px;
+    }
+
+    .slider-label {
+      font-size: 13px;
+      color: #999;
+      font-weight: 500;
+    }
+
+    .slider-value {
+      font-size: 22px;
+      font-weight: 700;
+      color: #fff;
+      letter-spacing: -0.5px;
+    }
+
+    .slider-value span {
+      font-size: 13px;
+      font-weight: 400;
+      color: #666;
+      margin-left: 2px;
+    }
+
+    input[type="range"] {
+      width: 100%;
+      height: 4px;
+      border-radius: 4px;
+      outline: none;
+      cursor: pointer;
+      -webkit-appearance: none;
+      background: linear-gradient(to right, #6366f1 0%, #6366f1 var(--pct, 50%), #2a2a2a var(--pct, 50%), #2a2a2a 100%);
+    }
+
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: #fff;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.5);
+      cursor: pointer;
+    }
+
+    .slider-range {
+      display: flex;
+      justify-content: space-between;
+      font-size: 11px;
+      color: #444;
+      margin-top: 8px;
+    }
+
+    /* ── Main comparison ── */
+    .comparison {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-bottom: 32px;
+    }
+
+    .card {
+      background: #141414;
+      border: 1px solid #222;
+      border-radius: 12px;
+      padding: 24px;
+    }
+
+    .card.push {
+      border-color: #6366f1;
+      background: #0f0f1a;
+    }
+
+    .card-title {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: #555;
+      margin-bottom: 20px;
+    }
+
+    .card.push .card-title {
+      color: #6366f1;
+    }
+
+    .cost-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 0;
+      border-bottom: 1px solid #1e1e1e;
+      font-size: 13px;
+    }
+
+    .cost-row:last-of-type {
+      border-bottom: none;
+    }
+
+    .cost-label { color: #888; }
+    .cost-amount { color: #ccc; font-weight: 500; font-variant-numeric: tabular-nums; }
+    .cost-amount.red { color: #ef4444; }
+    .cost-amount.green { color: #22c55e; }
+    .cost-amount.yellow { color: #eab308; }
+
+    .divider {
+      border: none;
+      border-top: 1px solid #2a2a2a;
+      margin: 12px 0;
+    }
+
+    .total-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-top: 4px;
+      font-size: 13px;
+    }
+
+    .total-label { color: #666; font-weight: 500; }
+    .total-amount { color: #ccc; font-weight: 600; font-variant-numeric: tabular-nums; }
+
+    /* ── Margin pill ── */
+    .margin-section {
+      margin-top: 20px;
+      padding-top: 20px;
+      border-top: 1px solid #222;
+      text-align: center;
+    }
+
+    .margin-label {
+      font-size: 11px;
+      color: #555;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 8px;
+    }
+
+    .margin-number {
+      font-size: 48px;
+      font-weight: 800;
+      letter-spacing: -2px;
+      line-height: 1;
+    }
+
+    .margin-number.great { color: #22c55e; }
+    .margin-number.ok    { color: #eab308; }
+    .margin-number.bad   { color: #ef4444; }
+
+    .margin-status {
+      font-size: 12px;
+      margin-top: 6px;
+    }
+
+    .margin-status.great { color: #16a34a; }
+    .margin-status.ok    { color: #ca8a04; }
+    .margin-status.bad   { color: #dc2626; }
+
+    /* ── Scale table ── */
+    .section-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: #fff;
+      margin-bottom: 16px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+      margin-bottom: 32px;
+    }
+
+    th {
+      text-align: left;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: #555;
+      padding: 0 12px 10px 0;
+      border-bottom: 1px solid #222;
+    }
+
+    td {
+      padding: 11px 12px 11px 0;
+      border-bottom: 1px solid #1a1a1a;
+      color: #ccc;
+      font-variant-numeric: tabular-nums;
+    }
+
+    td.profit { font-weight: 600; }
+    td.green { color: #22c55e; }
+    td.red { color: #ef4444; }
+    td.yellow { color: #eab308; }
+
+    /* ── Targets ── */
+    .targets {
+      background: #141414;
+      border: 1px solid #222;
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 32px;
+    }
+
+    .target-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 0;
+      border-bottom: 1px solid #1e1e1e;
+      font-size: 13px;
+    }
+
+    .target-row:last-child { border-bottom: none; }
+    .target-label { color: #888; }
+    .target-rate { font-weight: 600; font-variant-numeric: tabular-nums; }
+    .target-note { font-size: 11px; color: #555; margin-top: 2px; }
+
+    .badge {
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      padding: 2px 8px;
+      border-radius: 20px;
+    }
+
+    .badge.current { background: #1f1f1f; color: #666; }
+    .badge.need    { background: #1a1f1a; color: #22c55e; }
+    .badge.danger  { background: #1f1a1a; color: #ef4444; }
+
+    .current-rate-note {
+      font-size: 12px;
+      color: #555;
+      margin-top: 16px;
+      padding-top: 16px;
+      border-top: 1px solid #1e1e1e;
+    }
+
+    .current-rate-note strong { color: #888; }
+  </style>
+</head>
+<body>
+
+  <h1>Wingman Margin Calculator</h1>
+  <p class="subtitle">Adjust the inputs to model your unit economics in real time.</p>
+
+  <!-- Sliders -->
+  <div class="sliders">
+    <div class="slider-group">
+      <div class="slider-header">
+        <div class="slider-label">Monthly Price</div>
+        <div class="slider-value" id="val-price">$149</div>
+      </div>
+      <input type="range" id="sl-price" min="49" max="499" step="10" value="149"
+             oninput="update()" style="--pct: 20%">
+      <div class="slider-range"><span>$49</span><span>$499</span></div>
+    </div>
+
+    <div class="slider-group">
+      <div class="slider-header">
+        <div class="slider-label">Calls per Month</div>
+        <div class="slider-value" id="val-calls">100 <span>calls</span></div>
+      </div>
+      <input type="range" id="sl-calls" min="10" max="300" step="5" value="100"
+             oninput="update()" style="--pct: 30%">
+      <div class="slider-range"><span>10</span><span>300</span></div>
+    </div>
+
+    <div class="slider-group">
+      <div class="slider-header">
+        <div class="slider-label">Average Call Length</div>
+        <div class="slider-value" id="val-length">60 <span>min</span></div>
+      </div>
+      <input type="range" id="sl-length" min="15" max="120" step="5" value="60"
+             oninput="update()" style="--pct: 40%">
+      <div class="slider-range"><span>15 min</span><span>120 min</span></div>
+    </div>
+
+    <div class="slider-group">
+      <div class="slider-header">
+        <div class="slider-label">Recall.ai Rate</div>
+        <div class="slider-value" id="val-recall">$0.0117 <span>/min</span></div>
+      </div>
+      <input type="range" id="sl-recall" min="0.001" max="0.015" step="0.0001" value="0.0075"
+             oninput="update()" style="--pct: 45%">
+      <div class="slider-range"><span>$0.001</span><span>$0.015</span></div>
+    </div>
+  </div>
+
+  <!-- Side-by-side comparison -->
+  <div class="comparison">
+    <div class="card">
+      <div class="card-title">Current — Timer Polling</div>
+
+      <div class="cost-row">
+        <span class="cost-label">Anthropic (Sonnet polling)</span>
+        <span class="cost-amount" id="c-poll-ai">—</span>
+      </div>
+      <div class="cost-row">
+        <span class="cost-label">Haiku KB scans (every 10s)</span>
+        <span class="cost-amount" id="c-poll-kb">—</span>
+      </div>
+      <div class="cost-row">
+        <span class="cost-label">Recall.ai</span>
+        <span class="cost-amount" id="c-poll-recall">—</span>
+      </div>
+      <div class="cost-row">
+        <span class="cost-label">Post-call + hosting</span>
+        <span class="cost-amount" id="c-poll-fixed">—</span>
+      </div>
+
+      <hr class="divider">
+
+      <div class="total-row">
+        <span class="total-label">Total cost / user</span>
+        <span class="total-amount" id="c-poll-total">—</span>
+      </div>
+      <div class="total-row" style="margin-top:6px;">
+        <span class="total-label">Revenue</span>
+        <span class="total-amount" id="c-poll-rev">—</span>
+      </div>
+
+      <div class="margin-section">
+        <div class="margin-label">Gross Margin</div>
+        <div class="margin-number" id="c-poll-margin">—</div>
+        <div class="margin-status" id="c-poll-status">—</div>
+      </div>
+    </div>
+
+    <div class="card push">
+      <div class="card-title">WebSocket Push — Event Driven</div>
+
+      <div class="cost-row">
+        <span class="cost-label">Anthropic (Sonnet, event-driven)</span>
+        <span class="cost-amount" id="c-push-ai">—</span>
+      </div>
+      <div class="cost-row">
+        <span class="cost-label">Haiku KB (keyword triggers only)</span>
+        <span class="cost-amount" id="c-push-kb">—</span>
+      </div>
+      <div class="cost-row">
+        <span class="cost-label">Recall.ai</span>
+        <span class="cost-amount" id="c-push-recall">—</span>
+      </div>
+      <div class="cost-row">
+        <span class="cost-label">Pusher + post-call + hosting</span>
+        <span class="cost-amount" id="c-push-fixed">—</span>
+      </div>
+
+      <hr class="divider">
+
+      <div class="total-row">
+        <span class="total-label">Total cost / user</span>
+        <span class="total-amount" id="c-push-total">—</span>
+      </div>
+      <div class="total-row" style="margin-top:6px;">
+        <span class="total-label">Revenue</span>
+        <span class="total-amount" id="c-push-rev">—</span>
+      </div>
+
+      <div class="margin-section">
+        <div class="margin-label">Gross Margin</div>
+        <div class="margin-number" id="c-push-margin">—</div>
+        <div class="margin-status" id="c-push-status">—</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- At scale -->
+  <div class="section-title">Profit at Scale (WebSocket Push)</div>
+  <table>
+    <thead>
+      <tr>
+        <th>Active Users</th>
+        <th>Monthly Revenue</th>
+        <th>Monthly Cost</th>
+        <th>Monthly Profit</th>
+        <th>Annual Profit</th>
+      </tr>
+    </thead>
+    <tbody id="scale-tbody"></tbody>
+  </table>
+
+  <!-- Recall targets -->
+  <div class="section-title">Recall.ai Negotiation Targets</div>
+  <div class="targets">
+    <div class="target-row">
+      <div>
+        <div class="target-label">Break-even (0% margin)</div>
+      </div>
+      <div style="text-align:right">
+        <div class="target-rate" id="t-breakeven">—</div>
+      </div>
+    </div>
+    <div class="target-row">
+      <div>
+        <div class="target-label">40% gross margin</div>
+      </div>
+      <div style="text-align:right">
+        <div class="target-rate" id="t-40">—</div>
+      </div>
+    </div>
+    <div class="target-row">
+      <div>
+        <div class="target-label">60% gross margin</div>
+        <div class="target-note">Investor-grade SaaS benchmark</div>
+      </div>
+      <div style="text-align:right">
+        <div class="target-rate" id="t-60">—</div>
+      </div>
+    </div>
+    <div class="target-row">
+      <div>
+        <div class="target-label">70% gross margin</div>
+        <div class="target-note">Best-in-class SaaS</div>
+      </div>
+      <div style="text-align:right">
+        <div class="target-rate" id="t-70">—</div>
+      </div>
+    </div>
+    <div class="current-rate-note" id="current-rate-note">—</div>
+  </div>
+
+  <script>
+    const SONNET_INPUT_CACHED = 0.30 / 1_000_000;
+    const SONNET_OUTPUT       = 15.00 / 1_000_000;
+    const HAIKU_INPUT         = 0.80 / 1_000_000;
+    const HAIKU_OUTPUT        = 4.00 / 1_000_000;
+
+    // Per 60-min baseline token counts
+    const POLL_SONNET_CALLS_PER_60  = 191;
+    const PUSH_SONNET_CALLS_PER_60  = 45;
+    const POLL_HAIKU_SCANS_PER_60   = 252;
+    const PUSH_HAIKU_TRIGGERS_PER_60 = 12;
+
+    const TOKENS_SONNET_IN  = 3000;  // cached system prompt + user message
+    const TOKENS_SONNET_OUT = 300;
+    const TOKENS_HAIKU_IN   = 1300;
+    const TOKENS_HAIKU_OUT  = 150;
+
+    const COST_SONNET_PER_CALL = (TOKENS_SONNET_IN * SONNET_INPUT_CACHED) + (TOKENS_SONNET_OUT * SONNET_OUTPUT);
+    const COST_HAIKU_PER_CALL  = (TOKENS_HAIKU_IN  * HAIKU_INPUT)         + (TOKENS_HAIKU_OUT  * HAIKU_OUTPUT);
+
+    function calcCosts(price, calls, lengthMin, recallRate) {
+      const scale = lengthMin / 60;
+
+      // Polling
+      const pollSonnet  = calls * POLL_SONNET_CALLS_PER_60 * scale * COST_SONNET_PER_CALL;
+      const pollHaiku   = calls * POLL_HAIKU_SCANS_PER_60  * scale * COST_HAIKU_PER_CALL;
+      const pollRecall  = calls * lengthMin * recallRate;
+      const pollFixed   = (calls * 0.03) + 3; // post-call + hosting
+      const pollTotal   = pollSonnet + pollHaiku + pollRecall + pollFixed;
+      const pollMargin  = (price - pollTotal) / price * 100;
+
+      // Push
+      const pushSonnet  = calls * PUSH_SONNET_CALLS_PER_60  * scale * COST_SONNET_PER_CALL;
+      const pushHaiku   = calls * PUSH_HAIKU_TRIGGERS_PER_60 * scale * COST_HAIKU_PER_CALL;
+      const pushRecall  = calls * lengthMin * recallRate;
+      const pushFixed   = (calls * 0.03) + 3 + 5; // post-call + hosting + Pusher
+      const pushTotal   = pushSonnet + pushHaiku + pushRecall + pushFixed;
+      const pushMargin  = (price - pushTotal) / price * 100;
+
+      // Recall targets (using push AI costs)
+      const pushAiFixed = pushSonnet + pushHaiku + pushFixed;
+      const minutes     = calls * lengthMin;
+
+      const targetRate = (targetMargin) => {
+        // price * (1 - targetMargin/100) = pushAiFixed + minutes * rate
+        const allowedCost = price * (1 - targetMargin / 100);
+        const rate = (allowedCost - pushAiFixed) / minutes;
+        return rate;
+      };
+
+      return {
+        poll: { sonnet: pollSonnet, haiku: pollHaiku, recall: pollRecall, fixed: pollFixed, total: pollTotal, margin: pollMargin },
+        push: { sonnet: pushSonnet, haiku: pushHaiku, recall: pushRecall, fixed: pushFixed, total: pushTotal, margin: pushMargin },
+        targets: {
+          breakeven: targetRate(0),
+          t40: targetRate(40),
+          t60: targetRate(60),
+          t70: targetRate(70),
+        },
+        minutes,
+      };
+    }
+
+    function fmt(n)    { return '$' + Math.abs(n).toFixed(2); }
+    function fmtRate(r) {
+      if (r <= 0) return 'Not achievable at this price';
+      return '$' + r.toFixed(4) + '/min';
+    }
+    function marginClass(m) {
+      if (m >= 55) return 'great';
+      if (m >= 35) return 'ok';
+      return 'bad';
+    }
+    function marginStatus(m) {
+      if (m >= 60) return '✓ Investor-grade';
+      if (m >= 55) return '✓ Solid';
+      if (m >= 40) return '⚠ Below target — workable';
+      if (m >= 20) return '⚠ Tight — not sustainable at scale';
+      if (m >= 0)  return '✗ Thin — will compress under growth';
+      return '✗ Underwater — losing money per user';
+    }
+
+    function setText(id, text, cls) {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.textContent = text;
+      if (cls) { el.className = el.className.replace(/\b(great|ok|bad|red|green|yellow)\b/g, ''); el.classList.add(cls); }
+    }
+
+    function updateSliderFill(slider) {
+      const min = parseFloat(slider.min);
+      const max = parseFloat(slider.max);
+      const val = parseFloat(slider.value);
+      const pct = ((val - min) / (max - min) * 100).toFixed(1) + '%';
+      slider.style.setProperty('--pct', pct);
+    }
+
+    function update() {
+      const price      = parseFloat(document.getElementById('sl-price').value);
+      const calls      = parseFloat(document.getElementById('sl-calls').value);
+      const lengthMin  = parseFloat(document.getElementById('sl-length').value);
+      const recallRate = parseFloat(document.getElementById('sl-recall').value);
+
+      // Update display values
+      document.getElementById('val-price').textContent  = '$' + price;
+      document.getElementById('val-calls').innerHTML    = calls + ' <span>calls</span>';
+      document.getElementById('val-length').innerHTML   = lengthMin + ' <span>min</span>';
+      document.getElementById('val-recall').innerHTML   = '$' + recallRate.toFixed(4) + ' <span>/min</span>';
+
+      // Update slider fills
+      ['sl-price','sl-calls','sl-length','sl-recall'].forEach(id => updateSliderFill(document.getElementById(id)));
+
+      const d = calcCosts(price, calls, lengthMin, recallRate);
+
+      // Polling card
+      setText('c-poll-ai',     fmt(d.poll.sonnet));
+      setText('c-poll-kb',     fmt(d.poll.haiku));
+      setText('c-poll-recall', fmt(d.poll.recall));
+      setText('c-poll-fixed',  fmt(d.poll.fixed));
+      setText('c-poll-total',  fmt(d.poll.total));
+      setText('c-poll-rev',    '$' + price.toFixed(2));
+      const pm = d.poll.margin;
+      const pmClass = marginClass(pm);
+      setText('c-poll-margin', (pm >= 0 ? '' : '-') + Math.abs(pm).toFixed(1) + '%', pmClass);
+      setText('c-poll-status', marginStatus(pm), pmClass);
+
+      // Push card
+      setText('c-push-ai',     fmt(d.push.sonnet));
+      setText('c-push-kb',     fmt(d.push.haiku));
+      setText('c-push-recall', fmt(d.push.recall));
+      setText('c-push-fixed',  fmt(d.push.fixed));
+      setText('c-push-total',  fmt(d.push.total));
+      setText('c-push-rev',    '$' + price.toFixed(2));
+      const xm = d.push.margin;
+      const xmClass = marginClass(xm);
+      setText('c-push-margin', (xm >= 0 ? '' : '-') + Math.abs(xm).toFixed(1) + '%', xmClass);
+      setText('c-push-status', marginStatus(xm), xmClass);
+
+      // Scale table
+      const userCounts = [10, 25, 50, 100, 250, 500];
+      const tbody = document.getElementById('scale-tbody');
+      tbody.innerHTML = userCounts.map(u => {
+        const rev     = price * u;
+        const cost    = d.push.total * u;
+        const profit  = rev - cost;
+        const annual  = profit * 12;
+        const cls     = profit >= 0 ? 'green' : 'red';
+        return `<tr>
+          <td>${u.toLocaleString()} users</td>
+          <td>$${rev.toLocaleString(undefined, {maximumFractionDigits:0})}</td>
+          <td>$${cost.toLocaleString(undefined, {maximumFractionDigits:0})}</td>
+          <td class="profit ${cls}">${profit >= 0 ? '+' : '-'}$${Math.abs(profit).toLocaleString(undefined, {maximumFractionDigits:0})}</td>
+          <td class="profit ${cls}">${annual >= 0 ? '+' : '-'}$${Math.abs(annual).toLocaleString(undefined, {maximumFractionDigits:0})}</td>
+        </tr>`;
+      }).join('');
+
+      // Negotiation targets
+      const t = d.targets;
+      const needClass = (rate, current) => rate > 0 && rate < current ? 'green' : rate > 0 ? 'yellow' : 'red';
+
+      setText('t-breakeven', fmtRate(t.breakeven));
+      setText('t-40',        fmtRate(t.t40));
+      setText('t-60',        fmtRate(t.t60));
+      setText('t-70',        fmtRate(t.t70));
+
+      document.getElementById('current-rate-note').innerHTML =
+        `<strong>Your current rate:</strong> $${recallRate.toFixed(4)}/min &nbsp;·&nbsp; ` +
+        (t.t60 > 0 && recallRate <= t.t60
+          ? `<span style="color:#22c55e">✓ You're already at 60%+ margin territory</span>`
+          : t.t40 > 0 && recallRate <= t.t40
+          ? `<span style="color:#eab308">You need $${t.t60.toFixed(4)}/min to hit 60% — negotiate from here</span>`
+          : `<span style="color:#ef4444">You need to get to $${t.breakeven > 0 ? t.breakeven.toFixed(4) : '—'}/min just to break even — pricing or Recall deal needs work</span>`
+        );
+    }
+
+    update();
+  </script>
+</body>
+</html>

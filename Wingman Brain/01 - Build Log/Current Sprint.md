@@ -1,8 +1,21 @@
 # Current Sprint
 
-Last updated: 2026-04-23
+Last updated: 2026-04-25
 
 This is the first file Claude reads at session start. It answers: where are we, what's next, and what's blocking us.
+
+---
+
+## What Was Just Completed (2026-04-25 — Competitive Research + Financial Modeling)
+
+- **Cluely competitive intelligence completed** — full deep-dive on product, pricing, subprocessors, positioning. Full report in `2026-04-25.md` build log.
+- **Polling vs. WebSocket push cost analysis** — 191 Sonnet polls + 252 Haiku KB scans per 60-min call costs $1.98 in AI. WebSocket push drops that to $0.37 (81% reduction). Decision: migrate to Pusher.
+- **Background Haiku KB scan identified as quick win** — `useWingmanPoller.ts` scans KB every 10 seconds regardless of call activity. Costs $0.41/call. Removing it is a 30-min standalone fix that doesn't require the full push migration.
+- **Recall.ai pricing confirmed** — 2026 rate is $0.50/hr (not the old $0.0117/min from earlier screenshot). Launch plan quote received: $0.45/hr for 6,000 hours over 12 months with white-glove Slack support.
+- **Unit economics modeled** — margin calculator built at `margin-calculator.html`. At Launch plan + push + 65 calls/month avg: $179/month = 73% gross margin. Worst-case heavy user (130 calls, 60 min): 37.6% at $179. All numbers are model assumptions — no real user data yet.
+- **Pricing direction set** — $179–$199/month, unlimited calls. Target users (high-ticket closers doing 100+ calls/month) will churn on any call cap.
+- **Full undetectability scoped** — `setContentProtection(true)` already in `main.ts:172`. Still needs: Dock hide during calls, app switcher removal, Settings toggle.
+- **Infrastructure decisions made** — PostHog (analytics), Pinecone (vector DB), Vercel (hosting) all added to roadmap.
 
 ---
 
@@ -155,6 +168,26 @@ This is the first file Claude reads at session start. It answers: where are we, 
 ---
 
 ## What's Next (Priority Order)
+
+0. 🚨 **Wiretap compliance initiative (Issue #33)**— unchanged, still #1 pre-beta blocker.
+
+0a. ⚡ **Quick win: eliminate background Haiku KB scan** — remove the every-10-second background KB scan from `useWingmanPoller.ts`. Only run KB on keyword triggers. Saves $0.41/call immediately. ~30 minutes. No architecture change. Do this before or alongside the full push migration.
+
+0b. 🔌 **WebSocket push migration (Pusher)** — replace all polling in `useWingmanPoller.ts` with Pusher WebSocket push. Server pushes signal cards and scorecard updates the moment they're ready. Eliminates 8–90 second polling delays and saves 81% on Anthropic costs. Dedicated session. Key files: `useWingmanPoller.ts`, `src/app/api/wingman/poll/route.ts`, `src/app/api/wingman/kb-signal/route.ts`. Add `PUSHER_APP_ID`, `PUSHER_KEY`, `PUSHER_SECRET`, `PUSHER_CLUSTER` to env.
+
+0c. 📊 **PostHog analytics** — wire up PostHog for product analytics. Free at beta scale. Need to know: which features fire, whether signal cards get dismissed immediately, which stages cause drop-off. Dedicated session. Add `NEXT_PUBLIC_POSTHOG_KEY` to env.
+
+0d. 🕵️ **Full undetectability buildout** — `setContentProtection(true)` already done at `electron/main.ts:172`. Still needs: `app.dock.hide()` during active calls, remove from CMD+Tab switcher, user-facing toggle in Settings tab. Use case: reps sharing screen during demos should never expose signal cards to prospect. Dedicated session.
+
+0e. 🗄️ **Pinecone migration** — replace pgvector (Supabase RPC `search_kb_entries`) with Pinecone vector search in `src/lib/wingman/knowledge-search.ts`. Build for scale now while only 419 entries exist. Steps: create Pinecone index (dimension 1536, cosine), write migration script to export vectors from Supabase → Pinecone, update `knowledge-search.ts` to use Pinecone SDK. Dedicated session. Add `PINECONE_API_KEY` to env.
+
+0f. ☁️ **Vercel migration** — move web/backend hosting from Railway to Vercel. Better Next.js cold starts, edge functions, per-branch preview deploys. Not urgent while Railway is stable. Steps: export env vars, connect repo to Vercel, re-point `meetwingman.ai` DNS. Dedicated session.
+
+0g. 📋 **Recall.ai Launch plan** — reply to sales rep before signing. Two questions to ask: (1) overage rate above 6,000 hours, (2) 3,000-hour starter option. Do not sign until answers received. Once signed, update Recall rate in `margin-calculator.html`.
+
+---
+
+## What's Next (Old Priority Order — below new items)
 
 0. 🚨 **Wiretap compliance initiative (Issue #33)** — critical pre-beta blocker. Multi-session build. Start with Layer 1: rep-facing ToS + one-screen onboarding compliance acknowledgment checkbox. This is the minimum legal foothold to ship any public beta. Subsequent layers: user-controlled transcript deletion UI → website compliance page → auto-post chat message at call start → calendar invite auto-insert → unshipped kill-switch code. Full game plan in `05 - Operations/Wiretap Compliance Research.md`.
 
