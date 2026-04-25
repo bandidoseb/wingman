@@ -123,7 +123,8 @@
       "WebFetch(domain:support.cluely.com)",
       "WebFetch(domain:cluely.trust.pagerduty.com)",
       "Bash(gh api *)",
-      "WebFetch(domain:www.ycombinator.com)"
+      "WebFetch(domain:www.ycombinator.com)",
+      "Bash(xargs cat *)"
     ],
     "defaultMode": "bypassPermissions"
   },
