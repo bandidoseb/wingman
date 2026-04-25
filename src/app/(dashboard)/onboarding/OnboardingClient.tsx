@@ -5,7 +5,6 @@ import { createClient } from "@/lib/supabase/client";
 import type { OnboardingData, OnboardingStep } from "@/types";
 // Onboarding screen components
 import Welcome from "@/components/onboarding/Welcome";
-import SalesStyle from "@/components/onboarding/SalesStyle";
 import YourOffer from "@/components/onboarding/YourOffer";
 import Tutorial from "@/components/onboarding/Tutorial";
 import VaultNudge from "@/components/onboarding/VaultNudge";
@@ -13,10 +12,10 @@ import Compliance from "@/components/onboarding/Compliance";
 import Building from "@/components/onboarding/Building";
 
 const ONBOARDING_ORDER: OnboardingStep[] = [
-  "welcome", "style", "offer", "tutorial", "vaultnudge", "compliance", "building",
+  "welcome", "offer", "tutorial", "vaultnudge", "compliance", "building",
 ];
 const DOT_SCREENS: OnboardingStep[] = [
-  "welcome", "style", "offer", "tutorial",
+  "welcome", "offer", "tutorial",
 ];
 
 interface Props {
@@ -68,12 +67,6 @@ export default function OnboardingClient({ initialProfile, userId }: Props) {
   const goTo = useCallback((next: OnboardingStep, extra?: Record<string, unknown>) => {
     setScreen(next);
     updateProfile({ onboarding_step: next, ...extra });
-  }, [updateProfile]);
-
-  const handleStyle = useCallback(async (style: string, length: string) => {
-    setData((d) => ({ ...d, salesStyle: style, callLength: length }));
-    await updateProfile({ sales_style: style, call_length: length, onboarding_step: "offer" });
-    setScreen("offer");
   }, [updateProfile]);
 
   const handleOffer = useCallback(async (
@@ -163,8 +156,7 @@ export default function OnboardingClient({ initialProfile, userId }: Props) {
   }, [supabase, userId]);
 
   const screens: Partial<Record<OnboardingStep, React.ReactNode>> = {
-    welcome:    <Welcome onNext={() => goTo("style", { role: "closer" })} />,
-    style:      <SalesStyle onNext={handleStyle} />,
+    welcome:    <Welcome onNext={() => goTo("offer", { role: "closer" })} />,
     offer:      <YourOffer onNext={handleOffer} />,
     tutorial:   <Tutorial onNext={handleTutorial} />,
     vaultnudge: <VaultNudge onNext={handleVaultNudge} />,
