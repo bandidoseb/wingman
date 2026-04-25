@@ -124,7 +124,9 @@
       "WebFetch(domain:cluely.trust.pagerduty.com)",
       "Bash(gh api *)",
       "WebFetch(domain:www.ycombinator.com)",
-      "Bash(xargs cat *)"
+      "Bash(xargs cat *)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)"
     ],
     "defaultMode": "bypassPermissions"
   },
