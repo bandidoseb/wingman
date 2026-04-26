@@ -182,6 +182,14 @@ This is the first file Claude reads at session start. It answers: where are we, 
 
 ---
 
+## What Was Just Completed (2026-04-26 — Pusher WebSocket Push Migration)
+
+- **Background Haiku KB scan removed (#0a)** — `useWingmanPoller.ts` no longer runs KB search every 10 seconds. Only fires on keyword trigger hits. Saves $0.41/call.
+- **Pusher migration fully built (#0b)** — 7 steps complete: `pusher` + `pusher-js` installed, `src/lib/pusher.ts` singleton created, `/api/pusher/auth` private channel auth endpoint built, `poll/route.ts` and `kb-signal/route.ts` now push via Pusher and return `{ ok: true }`, `useWingmanPoller.ts` subscribes to Pusher channel and handles both event types, Railway env vars added. TypeScript-clean (`npx tsc --noEmit` = zero errors). Cost: $1.98 → $0.37/call (81% reduction). Latency: up to 90s delay → instant.
+- **NOT YET TESTED** — Electron dev window is stuck on blank `/onboarding` page. Fix before testing: Supabase → profiles → set `onboarding_completed = true` → save. Then in Electron DevTools console: `window.location.assign('http://localhost:3000/dashboard')`.
+
+---
+
 ## What's In Progress
 
 - Nothing currently in progress.
@@ -192,9 +200,9 @@ This is the first file Claude reads at session start. It answers: where are we, 
 
 0. 🚨 **Build `/terms` and `/privacy` pages on meetwingman.ai** — P0 before any public beta user signs up. The signup ToS line links to `/terms` — that URL must resolve. Copy direction in `Wingman Brain/03 - GTM/Website Plan.md`. Issue #33 basic posture is now set; these pages are the remaining compliance blocker.
 
-0a. ⚡ **Quick win: eliminate background Haiku KB scan** — remove the every-10-second background KB scan from `useWingmanPoller.ts`. Only run KB on keyword triggers. Saves $0.41/call immediately. ~30 minutes. No architecture change. Do this before or alongside the full push migration.
+0a. ✅ **Quick win: eliminate background Haiku KB scan** — DONE. Removed 2026-04-26.
 
-0b. 🔌 **WebSocket push migration (Pusher)** — replace all polling in `useWingmanPoller.ts` with Pusher WebSocket push. Server pushes signal cards and scorecard updates the moment they're ready. Eliminates 8–90 second polling delays and saves 81% on Anthropic costs. Dedicated session. Key files: `useWingmanPoller.ts`, `src/app/api/wingman/poll/route.ts`, `src/app/api/wingman/kb-signal/route.ts`. Add `PUSHER_APP_ID`, `PUSHER_KEY`, `PUSHER_SECRET`, `PUSHER_CLUSTER` to env.
+0b. ✅ **WebSocket push migration (Pusher)** — DONE. Built 2026-04-26. NOT YET TESTED on a live call — Electron dev window blocked by onboarding issue. Fix: Supabase → profiles → `onboarding_completed = true`. Then test per steps in 2026-04-26.md.
 
 0c. 📊 **PostHog analytics** — wire up PostHog for product analytics. Free at beta scale. Need to know: which features fire, whether signal cards get dismissed immediately, which stages cause drop-off. Dedicated session. Add `NEXT_PUBLIC_POSTHOG_KEY` to env.
 
