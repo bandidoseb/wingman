@@ -1,0 +1,709 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Wingman — Architecture Overview</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: #07080f;
+    color: #e2e8f0;
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif;
+    padding: 36px 32px 60px;
+    min-height: 100vh;
+  }
+
+  h1 {
+    text-align: center;
+    font-size: 20px;
+    font-weight: 700;
+    color: #fff;
+    letter-spacing: -0.4px;
+    margin-bottom: 4px;
+  }
+
+  .subtitle {
+    text-align: center;
+    font-size: 12px;
+    color: #475569;
+    margin-bottom: 36px;
+  }
+
+  /* ── Swimlane grid ── */
+  .swimlane-wrapper {
+    display: grid;
+    grid-template-columns: 160px 1fr 1fr 1fr 1fr;
+    gap: 0;
+    max-width: 1100px;
+    margin: 0 auto;
+  }
+
+  /* Phase labels (left column) */
+  .phase-col {
+    display: flex;
+    flex-direction: column;
+    padding-right: 16px;
+    padding-top: 54px; /* align with lane headers */
+  }
+
+  .phase-marker {
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 1.2px;
+    text-transform: uppercase;
+    color: #334155;
+    writing-mode: horizontal-tb;
+    display: flex;
+    align-items: flex-start;
+    padding-top: 12px;
+  }
+
+  /* Lane columns */
+  .lane {
+    border-left: 1px solid #1e293b;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 0 10px 40px;
+    position: relative;
+  }
+
+  .lane:last-child {
+    border-right: 1px solid #1e293b;
+  }
+
+  /* Lane headers */
+  .lane-header {
+    width: calc(100% + 20px);
+    margin-left: -10px;
+    padding: 12px 10px;
+    text-align: center;
+    border-bottom: 1px solid #1e293b;
+    margin-bottom: 20px;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+
+  .lane-header-title {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    margin-bottom: 2px;
+  }
+
+  .lane-header-sub {
+    font-size: 9px;
+    color: #475569;
+  }
+
+  .lane-electron .lane-header { background: #0d0e1f; }
+  .lane-electron .lane-header-title { color: #818cf8; }
+
+  .lane-api .lane-header { background: #0a1209; }
+  .lane-api .lane-header-title { color: #4ade80; }
+
+  .lane-ai .lane-header { background: #110d1a; }
+  .lane-ai .lane-header-title { color: #c084fc; }
+
+  .lane-hud .lane-header { background: #090f09; }
+  .lane-hud .lane-header-title { color: #86efac; }
+
+  /* ── Node cards ── */
+  .node {
+    width: 100%;
+    border-radius: 8px;
+    padding: 10px 12px;
+    border: 1px solid transparent;
+    margin-bottom: 6px;
+    position: relative;
+  }
+
+  .node-title {
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 1.3;
+    margin-bottom: 3px;
+  }
+
+  .node-sub {
+    font-size: 10px;
+    color: #64748b;
+    line-height: 1.4;
+  }
+
+  .node-tag {
+    font-size: 9px;
+    font-family: 'SF Mono', monospace;
+    margin-top: 5px;
+    padding: 2px 6px;
+    border-radius: 3px;
+    display: inline-block;
+  }
+
+  /* Node themes */
+  .n-electron {
+    background: #0f1128;
+    border-color: #1e2150;
+  }
+  .n-electron .node-title { color: #a5b4fc; }
+  .n-electron .node-tag { background: #1a1e3d; color: #818cf8; }
+
+  .n-recall {
+    background: #0a1520;
+    border-color: #0f2540;
+  }
+  .n-recall .node-title { color: #7dd3fc; }
+  .n-recall .node-tag { background: #091828; color: #38bdf8; }
+
+  .n-api {
+    background: #0a1509;
+    border-color: #112210;
+  }
+  .n-api .node-title { color: #86efac; }
+  .n-api .node-tag { background: #091208; color: #4ade80; }
+
+  .n-ai {
+    background: #130d1f;
+    border-color: #241545;
+  }
+  .n-ai .node-title { color: #d8b4fe; }
+  .n-ai .node-tag { background: #100c1c; color: #a855f7; }
+
+  .n-hud {
+    background: #091209;
+    border-color: #102210;
+  }
+  .n-hud .node-title { color: #bbf7d0; }
+  .n-hud .node-tag { background: #071008; color: #4ade80; }
+
+  .n-pusher {
+    background: #1a0e0e;
+    border-color: #3d1515;
+  }
+  .n-pusher .node-title { color: #fca5a5; }
+  .n-pusher .node-tag { background: #180c0c; color: #f87171; }
+
+  .n-db {
+    background: #131009;
+    border-color: #2e2210;
+  }
+  .n-db .node-title { color: #fde68a; }
+  .n-db .node-tag { background: #110e07; color: #f59e0b; }
+
+  /* ── Arrows within a lane ── */
+  .down-arrow {
+    font-size: 14px;
+    color: #1e293b;
+    margin: 2px 0 4px;
+    line-height: 1;
+    align-self: center;
+  }
+
+  /* ── Cross-lane arrows (horizontal) ── */
+  .cross-arrow-row {
+    display: contents;
+  }
+
+  /* Phase divider rows */
+  .phase-divider {
+    grid-column: 1 / -1;
+    border-top: 1px solid #1a2235;
+    margin: 12px 0 8px;
+    position: relative;
+  }
+
+  .phase-divider-label {
+    position: absolute;
+    left: 0;
+    top: -9px;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 1.2px;
+    text-transform: uppercase;
+    color: #334155;
+    background: #07080f;
+    padding: 0 8px 0 0;
+  }
+
+  /* ── Horizontal arrow overlay ── */
+  .arrow-overlay {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: 160px 1fr 1fr 1fr 1fr;
+    align-items: center;
+    margin: 4px 0;
+    height: 28px;
+    position: relative;
+  }
+
+  .arrow-skip { /* empty cell */ }
+
+  .h-arrow {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 9px;
+    color: #475569;
+    gap: 4px;
+    grid-column: span 1;
+    position: relative;
+  }
+
+  .h-arrow.span2 { grid-column: span 2; }
+  .h-arrow.span3 { grid-column: span 3; }
+  .h-arrow.span4 { grid-column: span 4; }
+
+  .h-arrow::before {
+    content: '';
+    display: block;
+    height: 1px;
+    background: #1e293b;
+    flex: 1;
+  }
+
+  .h-arrow::after {
+    content: '▶';
+    font-size: 7px;
+    color: #334155;
+    flex-shrink: 0;
+  }
+
+  .arrow-label-text {
+    font-size: 9px;
+    color: #475569;
+    font-family: 'SF Mono', monospace;
+    white-space: nowrap;
+    position: absolute;
+    top: -10px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #07080f;
+    padding: 0 4px;
+  }
+
+  /* Badge */
+  .badge {
+    display: inline-block;
+    font-size: 9px;
+    padding: 1px 5px;
+    border-radius: 10px;
+    font-weight: 600;
+    margin-left: 4px;
+    vertical-align: middle;
+  }
+  .b-green { background: #052e16; color: #4ade80; }
+  .b-blue  { background: #0c1a2e; color: #38bdf8; }
+  .b-purple { background: #1a0f2e; color: #c084fc; }
+  .b-yellow { background: #1c1004; color: #fbbf24; }
+  .b-red { background: #1c0404; color: #f87171; }
+
+  /* spacer */
+  .spacer { height: 8px; }
+  .spacer-lg { height: 16px; }
+
+  /* parallel block */
+  .parallel-label {
+    grid-column: 1 / -1;
+    text-align: center;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: #334155;
+    margin: 8px 0 4px;
+  }
+
+  .parallel-bracket {
+    grid-column: 2 / 5;
+    border: 1px solid #1a2a3a;
+    border-radius: 6px;
+    padding: 8px;
+    margin: 0 4px;
+    position: relative;
+  }
+
+  .parallel-bracket-label {
+    position: absolute;
+    top: -8px;
+    left: 10px;
+    font-size: 8px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    background: #07080f;
+    padding: 0 5px;
+    color: #334155;
+  }
+
+  /* legend */
+  .legend {
+    display: flex;
+    gap: 16px;
+    justify-content: center;
+    flex-wrap: wrap;
+    margin-top: 40px;
+    max-width: 1100px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 10px;
+    color: #475569;
+  }
+  .legend-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 2px;
+  }
+</style>
+</head>
+<body>
+
+<h1>Wingman — System Architecture</h1>
+<p class="subtitle">How data flows from meeting audio to signal card on screen</p>
+
+<div style="max-width:1100px;margin:0 auto;">
+
+  <!-- ── LANE HEADERS ── -->
+  <div style="display:grid;grid-template-columns:160px 1fr 1fr 1fr 1fr;gap:0;margin-bottom:0;">
+    <div></div>
+    <div style="text-align:center;padding:12px 8px;border:1px solid #1e293b;border-right:none;background:#0d0e1f;border-radius:8px 0 0 0;">
+      <div style="font-size:11px;font-weight:700;color:#818cf8;margin-bottom:2px;">Electron Desktop</div>
+      <div style="font-size:9px;color:#475569;">Mac app process</div>
+    </div>
+    <div style="text-align:center;padding:12px 8px;border:1px solid #1e293b;border-right:none;background:#0a1209;">
+      <div style="font-size:11px;font-weight:700;color:#4ade80;margin-bottom:2px;">Railway API</div>
+      <div style="font-size:9px;color:#475569;">Next.js backend</div>
+    </div>
+    <div style="text-align:center;padding:12px 8px;border:1px solid #1e293b;border-right:none;background:#110d1a;">
+      <div style="font-size:11px;font-weight:700;color:#c084fc;margin-bottom:2px;">AI Services</div>
+      <div style="font-size:9px;color:#475569;">Claude · OpenAI · pgvector</div>
+    </div>
+    <div style="text-align:center;padding:12px 8px;border:1px solid #1e293b;background:#090f09;border-radius:0 8px 0 0;">
+      <div style="font-size:11px;font-weight:700;color:#86efac;margin-bottom:2px;">HUD + Dashboard</div>
+      <div style="font-size:9px;color:#475569;">What the rep sees</div>
+    </div>
+  </div>
+
+  <!-- ── MAIN GRID ── -->
+  <div style="display:grid;grid-template-columns:160px 1fr 1fr 1fr 1fr;border:1px solid #1e293b;border-top:none;border-radius:0 0 8px 8px;overflow:hidden;">
+
+    <!-- ════ PHASE 1: DEPLOY ════ -->
+    <div style="grid-column:1;background:#07080f;border-right:1px solid #1e293b;padding:16px 12px 0;display:flex;align-items:flex-start;">
+      <span style="font-size:9px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:#334155;">Deploy</span>
+    </div>
+
+    <!-- Electron col -->
+    <div style="grid-column:2;border-right:1px solid #1e293b;padding:16px 10px 12px;display:flex;flex-direction:column;align-items:center;gap:5px;">
+      <div class="node n-electron" style="width:100%">
+        <div class="node-title">Rep clicks "Deploy"</div>
+        <div class="node-sub">Tray popover button</div>
+        <div class="node-tag">tray-popover/index.html</div>
+      </div>
+      <div class="down-arrow">↓</div>
+      <div class="node n-electron" style="width:100%">
+        <div class="node-title">Main Process</div>
+        <div class="node-sub">Sets callActive · guards double-click · notifies HUD</div>
+        <div class="node-tag">electron/main.ts</div>
+      </div>
+      <div class="down-arrow">↓</div>
+      <div class="node n-recall" style="width:100%">
+        <div class="node-title">Recall SDK starts</div>
+        <div class="node-sub">Joins Zoom / Teams / Meet · isRunning = true only after confirmed</div>
+        <div class="node-tag">electron/recall.ts</div>
+      </div>
+    </div>
+
+    <!-- API col -->
+    <div style="grid-column:3;border-right:1px solid #1e293b;padding:16px 10px 12px;display:flex;flex-direction:column;align-items:center;gap:5px;">
+      <div class="node n-api" style="width:100%">
+        <div class="node-title">Upload Token</div>
+        <div class="node-sub">Recall key lives here only — never in Electron binary</div>
+        <div class="node-tag">api/recall-upload-token</div>
+      </div>
+      <div class="down-arrow">↓</div>
+      <div class="node n-api" style="width:100%">
+        <div class="node-title">Session Created</div>
+        <div class="node-sub">Loads Offer Brain + Flight Plan · stores callId in DB</div>
+        <div class="node-tag">api/wingman/session</div>
+      </div>
+    </div>
+
+    <!-- AI col -->
+    <div style="grid-column:4;border-right:1px solid #1e293b;padding:16px 10px 12px;">
+      <div style="height:100%;display:flex;align-items:center;justify-content:center;">
+        <span style="font-size:10px;color:#1e293b;">—</span>
+      </div>
+    </div>
+
+    <!-- HUD col -->
+    <div style="grid-column:5;padding:16px 10px 12px;display:flex;flex-direction:column;align-items:center;gap:5px;">
+      <div class="node n-hud" style="width:100%">
+        <div class="node-title">HUD Activates</div>
+        <div class="node-sub">Overlay appears · "Listening…" state · stage bar initializes</div>
+        <div class="node-tag">electron/hud/index.html</div>
+      </div>
+    </div>
+
+    <!-- DIVIDER -->
+    <div style="grid-column:1/-1;border-top:1px solid #1a2235;position:relative;">
+      <span style="position:absolute;top:-8px;left:12px;font-size:9px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:#334155;background:#07080f;padding:0 6px;">Live Call</span>
+    </div>
+
+    <!-- ════ PHASE 2: TRANSCRIPT ════ -->
+    <div style="grid-column:1;background:#07080f;border-right:1px solid #1e293b;padding:16px 12px 0;display:flex;align-items:flex-start;">
+      <span style="font-size:9px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:#334155;">Transcript</span>
+    </div>
+
+    <!-- Electron -->
+    <div style="grid-column:2;border-right:1px solid #1e293b;padding:16px 10px 12px;display:flex;flex-direction:column;align-items:center;gap:5px;">
+      <div class="node n-recall" style="width:100%">
+        <div class="node-title">Realtime Events</div>
+        <div class="node-sub">Deepgram streams transcript.data events · per-speaker dedup · IPC to renderer</div>
+        <div class="node-tag">recall.ts → preload.ts</div>
+      </div>
+      <div class="down-arrow">↓</div>
+      <div class="node n-electron" style="width:100%">
+        <div class="node-title">addChunk()</div>
+        <div class="node-sub">Buffer accumulates · rep speaker identified · triggers both paths below</div>
+        <div class="node-tag">useWingmanPoller.ts</div>
+      </div>
+    </div>
+
+    <!-- API -->
+    <div style="grid-column:3;border-right:1px solid #1e293b;padding:16px 10px 12px;">
+      <div style="height:100%;display:flex;align-items:center;justify-content:center;">
+        <span style="font-size:10px;color:#1e293b;">—</span>
+      </div>
+    </div>
+
+    <!-- AI -->
+    <div style="grid-column:4;border-right:1px solid #1e293b;padding:16px 10px 12px;">
+      <div style="height:100%;display:flex;align-items:center;justify-content:center;">
+        <span style="font-size:10px;color:#1e293b;">—</span>
+      </div>
+    </div>
+
+    <!-- HUD -->
+    <div style="grid-column:5;padding:16px 10px 12px;">
+      <div class="node n-hud" style="width:100%">
+        <div class="node-title">Live Transcript View</div>
+        <div class="node-sub">Dashboard shows live text as it arrives</div>
+      </div>
+    </div>
+
+    <!-- DIVIDER -->
+    <div style="grid-column:1/-1;border-top:1px solid #1a2235;position:relative;">
+      <span style="position:absolute;top:-8px;left:12px;font-size:9px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:#334155;background:#07080f;padding:0 6px;">Signal Detection — Two paths fire simultaneously on every chunk</span>
+    </div>
+
+    <!-- ════ PHASE 3: PARALLEL PATHS ════ -->
+    <div style="grid-column:1;background:#07080f;border-right:1px solid #1e293b;padding:16px 12px 0;display:flex;flex-direction:column;gap:60px;align-items:flex-start;">
+      <span style="font-size:9px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:#334155;">Path A<br><br>⚡ Instant</span>
+      <span style="font-size:9px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:#334155;">Path B<br><br>🧠 RAG</span>
+      <span style="font-size:9px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:#334155;">Path C<br><br>📊 Poll</span>
+    </div>
+
+    <!-- Electron -->
+    <div style="grid-column:2;border-right:1px solid #1e293b;padding:16px 10px 12px;display:flex;flex-direction:column;align-items:center;gap:5px;">
+
+      <!-- Path A -->
+      <div class="node n-electron" style="width:100%;border-color:#1e3a50;">
+        <div class="node-title">Keyword Classifier <span class="badge b-blue">&lt;1ms</span></div>
+        <div class="node-sub">Pattern-matches prospect speech. Excludes rep lines. No API call needed.</div>
+        <div class="node-tag">keyword-triggers.ts</div>
+      </div>
+
+      <div style="height:24px;"></div>
+
+      <!-- Path B -->
+      <div class="node n-electron" style="width:100%">
+        <div class="node-title">KB Check Triggered</div>
+        <div class="node-sub">Fires alongside keyword hit. POSTs chunk to Railway for RAG lookup.</div>
+        <div class="node-tag">useWingmanPoller.ts</div>
+      </div>
+
+      <div style="height:24px;"></div>
+
+      <!-- Path C -->
+      <div class="node n-electron" style="width:100%">
+        <div class="node-title">Auto-Poll Timer</div>
+        <div class="node-sub">8–90s interval by stage. Sends buffered transcript to Sonnet for stage tracking.</div>
+        <div class="node-tag">useWingmanPoller.ts</div>
+      </div>
+
+    </div>
+
+    <!-- API -->
+    <div style="grid-column:3;border-right:1px solid #1e293b;padding:16px 10px 12px;display:flex;flex-direction:column;align-items:center;gap:5px;">
+
+      <div style="height:62px;"></div>
+
+      <!-- Path B API -->
+      <div class="node n-api" style="width:100%">
+        <div class="node-title">KB Signal Route</div>
+        <div class="node-sub">Receives chunk · orchestrates embed + search + Haiku</div>
+        <div class="node-tag">api/wingman/kb-signal</div>
+      </div>
+
+      <div style="height:56px;"></div>
+
+      <!-- Path C API -->
+      <div class="node n-api" style="width:100%">
+        <div class="node-title">Poll Route</div>
+        <div class="node-sub">Receives buffer · sends to Sonnet with system prompt + Offer Brain</div>
+        <div class="node-tag">api/wingman/poll</div>
+      </div>
+
+    </div>
+
+    <!-- AI -->
+    <div style="grid-column:4;border-right:1px solid #1e293b;padding:16px 10px 12px;display:flex;flex-direction:column;align-items:center;gap:5px;">
+
+      <div style="height:62px;"></div>
+
+      <!-- Path B AI -->
+      <div class="node n-ai" style="width:100%">
+        <div class="node-title">OpenAI Embed</div>
+        <div class="node-sub">Chunk → 1536-dim vector · ~200ms</div>
+        <div class="node-tag">text-embedding-3-small</div>
+      </div>
+      <div class="down-arrow">↓</div>
+      <div class="node n-ai" style="width:100%">
+        <div class="node-title">pgvector Search</div>
+        <div class="node-sub">Cosine similarity · 6,554 triggers · HNSW index · top 3 techniques</div>
+        <div class="node-tag">kb_prospect_triggers</div>
+      </div>
+      <div class="down-arrow">↓</div>
+      <div class="node n-ai" style="width:100%">
+        <div class="node-title">Claude Haiku <span class="badge b-purple">~480ms</span></div>
+        <div class="node-sub">System prompt + Offer Brain + KB techniques + chunk → headline + subtext. Prompt cached.</div>
+        <div class="node-tag">knowledge-signal.ts</div>
+      </div>
+
+      <div style="height:8px;"></div>
+
+      <!-- Path C AI -->
+      <div class="node n-ai" style="width:100%">
+        <div class="node-title">Claude Sonnet</div>
+        <div class="node-sub">Stage detection · scorecard · flight plan coverage. Prompt cached.</div>
+        <div class="node-tag">api/wingman/poll</div>
+      </div>
+
+    </div>
+
+    <!-- HUD -->
+    <div style="grid-column:5;padding:16px 10px 12px;display:flex;flex-direction:column;align-items:center;gap:5px;">
+
+      <!-- Path A result -->
+      <div class="node n-hud" style="width:100%;border-color:#1e3a50;">
+        <div class="node-title">Keyword Card <span class="badge b-blue">instant</span></div>
+        <div class="node-sub">Pre-written response for detected objection. Bypasses cooldown.</div>
+      </div>
+
+      <div style="height:8px"></div>
+
+      <!-- Pusher -->
+      <div class="node n-pusher" style="width:100%">
+        <div class="node-title">Pusher Push</div>
+        <div class="node-sub">Signal arrives the instant Haiku responds — no polling wait. Private channel per call.</div>
+        <div class="node-tag">private-wingman-{callId}</div>
+      </div>
+      <div class="down-arrow">↓</div>
+      <div class="node n-hud" style="width:100%">
+        <div class="node-title">RAG Signal Card <span class="badge b-purple">~500ms</span></div>
+        <div class="node-sub">KB-sourced card. One at a time. 90s cooldown. Fades in bottom-left. Screen-share safe.</div>
+        <div class="node-tag">electron/hud/index.html</div>
+      </div>
+
+      <div style="height:8px"></div>
+
+      <!-- Stage bar -->
+      <div class="node n-hud" style="width:100%">
+        <div class="node-title">Stage Bar Updates</div>
+        <div class="node-sub">Stage advances · scorecard ticks · poll interval adjusts</div>
+      </div>
+
+    </div>
+
+    <!-- DIVIDER -->
+    <div style="grid-column:1/-1;border-top:1px solid #1a2235;position:relative;">
+      <span style="position:absolute;top:-8px;left:12px;font-size:9px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:#334155;background:#07080f;padding:0 6px;">Call End + Post-Call</span>
+    </div>
+
+    <!-- ════ PHASE 4: POST-CALL ════ -->
+    <div style="grid-column:1;background:#07080f;border-right:1px solid #1e293b;padding:16px 12px;display:flex;align-items:flex-start;">
+      <span style="font-size:9px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:#334155;">Post-Call</span>
+    </div>
+
+    <!-- Electron -->
+    <div style="grid-column:2;border-right:1px solid #1e293b;padding:16px 10px 20px;display:flex;flex-direction:column;align-items:center;gap:5px;">
+      <div class="node n-electron" style="width:100%">
+        <div class="node-title">stopRecallAI()</div>
+        <div class="node-sub">Single function — clears timers, removes listeners, stops SDK. isRunning = false.</div>
+        <div class="node-tag">electron/recall.ts</div>
+      </div>
+    </div>
+
+    <!-- API -->
+    <div style="grid-column:3;border-right:1px solid #1e293b;padding:16px 10px 20px;display:flex;flex-direction:column;align-items:center;gap:5px;">
+      <div class="node n-api" style="width:100%">
+        <div class="node-title">Session Closed</div>
+        <div class="node-sub">PATCH marks call ended · triggers async post-call job</div>
+        <div class="node-tag">api/wingman/session</div>
+      </div>
+    </div>
+
+    <!-- AI -->
+    <div style="grid-column:4;border-right:1px solid #1e293b;padding:16px 10px 20px;display:flex;flex-direction:column;align-items:center;gap:5px;">
+      <div class="node n-ai" style="width:100%">
+        <div class="node-title">Claude Sonnet <span class="badge b-yellow">async</span></div>
+        <div class="node-sub">Full transcript → grade · debrief · 7-pillar coverage · objections · Offer Brain delta</div>
+        <div class="node-tag">api/wingman/post-call</div>
+      </div>
+      <div class="down-arrow">↓</div>
+      <div class="node n-db" style="width:100%">
+        <div class="node-title">Supabase Written</div>
+        <div class="node-sub">Flight Log entry · Offer Brain updated · Objection Vault populated</div>
+        <div class="node-tag">calls · offers · vault_objections</div>
+      </div>
+    </div>
+
+    <!-- HUD -->
+    <div style="grid-column:5;padding:16px 10px 20px;display:flex;flex-direction:column;align-items:center;gap:5px;">
+      <div class="node n-hud" style="width:100%">
+        <div class="node-title">"How'd it go?" Card</div>
+        <div class="node-sub">Outcome picker on HUD. Rep logs result in one tap. Bearer token — no login needed.</div>
+        <div class="node-tag">api/wingman/outcome</div>
+      </div>
+      <div class="down-arrow">↓</div>
+      <div class="node n-hud" style="width:100%">
+        <div class="node-title">Flight Log Entry</div>
+        <div class="node-sub">Transcript · debrief · grade · pillar scorecard. Appears in dashboard when ready.</div>
+        <div class="node-tag">FlightLogTab.tsx</div>
+      </div>
+    </div>
+
+  </div><!-- end main grid -->
+
+</div><!-- end wrapper -->
+
+<!-- Legend -->
+<div class="legend">
+  <div class="legend-item"><div class="legend-dot" style="background:#1e2150"></div>Electron (desktop)</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#0f2540"></div>Recall.ai / Audio</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#112210"></div>Railway API</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#241545"></div>AI (Claude / OpenAI)</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#3d1515"></div>Pusher (WebSocket)</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#102210"></div>HUD overlay</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#2e2210"></div>Supabase (database)</div>
+</div>
+
+</body>
+</html>

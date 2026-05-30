@@ -1,0 +1,555 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Wingman — Live Call Data Flow</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: #0a0a0f;
+    color: #e2e8f0;
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif;
+    padding: 40px 24px 80px;
+    min-height: 100vh;
+  }
+
+  h1 {
+    text-align: center;
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+    color: #fff;
+    margin-bottom: 6px;
+  }
+
+  .subtitle {
+    text-align: center;
+    font-size: 13px;
+    color: #64748b;
+    margin-bottom: 48px;
+  }
+
+  .pipeline {
+    max-width: 960px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+  }
+
+  /* ── Phase headers ── */
+  .phase-label {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: #475569;
+    margin: 32px 0 12px 4px;
+  }
+  .phase-label:first-child { margin-top: 0; }
+
+  /* ── Row layout ── */
+  .row {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    margin-bottom: 4px;
+  }
+
+  .row.split {
+    align-items: stretch;
+  }
+
+  /* ── Node cards ── */
+  .node {
+    border-radius: 10px;
+    padding: 14px 16px;
+    flex: 1;
+    position: relative;
+    border: 1px solid transparent;
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+
+  .node:hover {
+    box-shadow: 0 0 0 1px rgba(255,255,255,0.08), 0 8px 32px rgba(0,0,0,0.4);
+  }
+
+  .node-title {
+    font-size: 13px;
+    font-weight: 600;
+    margin-bottom: 4px;
+    line-height: 1.3;
+  }
+
+  .node-sub {
+    font-size: 11px;
+    color: #94a3b8;
+    line-height: 1.5;
+  }
+
+  .node-file {
+    font-size: 10px;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    margin-top: 7px;
+    padding: 3px 7px;
+    border-radius: 4px;
+    display: inline-block;
+  }
+
+  /* ── Color themes by layer ── */
+  .layer-electron {
+    background: #1a1a2e;
+    border-color: #312e81;
+  }
+  .layer-electron .node-title { color: #a5b4fc; }
+  .layer-electron .node-file { background: #1e1b4b; color: #818cf8; }
+
+  .layer-recall {
+    background: #1a1f2e;
+    border-color: #1e3a5f;
+  }
+  .layer-recall .node-title { color: #7dd3fc; }
+  .layer-recall .node-file { background: #0c2a3e; color: #38bdf8; }
+
+  .layer-api {
+    background: #1a2418;
+    border-color: #1a3a20;
+  }
+  .layer-api .node-title { color: #86efac; }
+  .layer-api .node-file { background: #0f2210; color: #4ade80; }
+
+  .layer-ai {
+    background: #231a2e;
+    border-color: #3b1f5e;
+  }
+  .layer-ai .node-title { color: #d8b4fe; }
+  .layer-ai .node-file { background: #1a0f2e; color: #a855f7; }
+
+  .layer-pusher {
+    background: #2a1a1a;
+    border-color: #5e2020;
+  }
+  .layer-pusher .node-title { color: #fca5a5; }
+  .layer-pusher .node-file { background: #2e0f0f; color: #f87171; }
+
+  .layer-hud {
+    background: #1a211a;
+    border-color: #1f4a1f;
+  }
+  .layer-hud .node-title { color: #bbf7d0; }
+  .layer-hud .node-file { background: #0f2e10; color: #4ade80; }
+
+  .layer-postcall {
+    background: #251f14;
+    border-color: #5e3a10;
+  }
+  .layer-postcall .node-title { color: #fcd34d; }
+  .layer-postcall .node-file { background: #2e1e08; color: #f59e0b; }
+
+  /* ── Arrows ── */
+  .arrow {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 6px 0;
+    color: #334155;
+    font-size: 18px;
+    line-height: 1;
+    flex-shrink: 0;
+    width: 100%;
+  }
+
+  .arrow-label {
+    font-size: 10px;
+    color: #475569;
+    text-align: center;
+    margin: 0 8px;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+  }
+
+  .arrow-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 4px 0 4px;
+  }
+
+  /* ── Split columns (parallel paths) ── */
+  .split-container {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 4px;
+    align-items: start;
+  }
+
+  .split-col {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .split-header {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    padding: 6px 12px;
+    border-radius: 6px;
+    text-align: center;
+    margin-bottom: 4px;
+  }
+
+  .split-header.keyword {
+    background: #1a2a3a;
+    color: #7dd3fc;
+    border: 1px solid #1e3a5f;
+  }
+
+  .split-header.rag {
+    background: #1f1a2e;
+    color: #c4b5fd;
+    border: 1px solid #3b2d6e;
+  }
+
+  /* ── Payload badge ── */
+  .payload {
+    font-size: 10px;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    background: #1e293b;
+    border: 1px solid #334155;
+    border-radius: 5px;
+    padding: 4px 8px;
+    color: #94a3b8;
+    margin-top: 6px;
+    line-height: 1.6;
+  }
+
+  .payload span {
+    color: #cbd5e1;
+  }
+
+  /* ── Three-col merge ── */
+  .merge-arrow {
+    text-align: center;
+    font-size: 22px;
+    color: #334155;
+    padding: 8px 0;
+  }
+
+  /* ── Legend ── */
+  .legend {
+    max-width: 960px;
+    margin: 48px auto 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 11px;
+    color: #64748b;
+  }
+
+  .legend-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 3px;
+    flex-shrink: 0;
+  }
+
+  /* ── Cooldown / timing badges ── */
+  .badge {
+    display: inline-block;
+    font-size: 10px;
+    padding: 2px 7px;
+    border-radius: 20px;
+    margin-left: 6px;
+    font-weight: 600;
+    vertical-align: middle;
+  }
+
+  .badge-green { background: #052e16; color: #4ade80; }
+  .badge-blue  { background: #0c1a2e; color: #38bdf8; }
+  .badge-purple { background: #1a0f2e; color: #c084fc; }
+  .badge-yellow { background: #1c1004; color: #fbbf24; }
+
+  .divider {
+    border: none;
+    border-top: 1px solid #1e293b;
+    margin: 20px 0 4px;
+  }
+
+  .three-col {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 4px;
+  }
+</style>
+</head>
+<body>
+
+<h1>Wingman — Live Call Data Flow</h1>
+<p class="subtitle">What actually happens from "Deploy" click to signal card on screen</p>
+
+<div class="pipeline">
+
+  <!-- ── PHASE 1: DEPLOY ── -->
+  <div class="phase-label">Phase 1 — Deploy</div>
+
+  <div class="row">
+    <div class="node layer-electron">
+      <div class="node-title">Rep clicks "Deploy Wingman"</div>
+      <div class="node-sub">Tray popover button. Triggers the entire pipeline.</div>
+      <div class="node-file">electron/tray-popover/index.html</div>
+    </div>
+  </div>
+
+  <div class="arrow-row">
+    <div style="color:#334155;font-size:20px;">↓</div>
+    <div class="arrow-label">IPC: call:start</div>
+  </div>
+
+  <div class="row">
+    <div class="node layer-electron">
+      <div class="node-title">Electron Main Process</div>
+      <div class="node-sub">Sets <code style="font-size:10px;color:#a5b4fc">callActive = true</code> · Guards against double-click with <code style="font-size:10px;color:#a5b4fc">isStarting</code> flag · Notifies HUD window</div>
+      <div class="node-file">electron/main.ts</div>
+    </div>
+  </div>
+
+  <div class="arrow-row">
+    <div style="color:#334155;font-size:20px;">↓</div>
+    <div class="arrow-label">calls initRecallAI()</div>
+  </div>
+
+  <div class="split-container">
+    <div class="split-col">
+      <div class="node layer-recall">
+        <div class="node-title">Fetch Upload Token</div>
+        <div class="node-sub">Electron calls Railway API — Recall API key never leaves the server. Returns a short-lived token.</div>
+        <div class="node-file">api/wingman/recall-upload-token</div>
+        <div class="payload"><span>→ POST</span> /api/wingman/recall-upload-token<br><span>← token</span> (short-lived, scoped)</div>
+      </div>
+    </div>
+    <div class="split-col">
+      <div class="node layer-recall">
+        <div class="node-title">Session Created in DB</div>
+        <div class="node-sub">Loads Offer Brain + Flight Plan snapshot. Stores call record. Returns callId used for everything downstream.</div>
+        <div class="node-file">api/wingman/session</div>
+        <div class="payload"><span>→ POST</span> /api/wingman/session<br><span>← callId,</span> offerBrain, flightPlan</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="arrow-row">
+    <div style="color:#334155;font-size:20px;">↓</div>
+    <div class="arrow-label">sdk.startRecording() — confirms success before isRunning = true</div>
+  </div>
+
+  <div class="row">
+    <div class="node layer-recall">
+      <div class="node-title">Recall.ai SDK joins the meeting</div>
+      <div class="node-sub">Attaches to the active Zoom / Teams / Google Meet window. Begins capturing audio. Deepgram streaming transcription runs inside Recall's infrastructure — Wingman never touches raw audio.</div>
+      <div class="node-file">electron/recall.ts</div>
+    </div>
+  </div>
+
+  <!-- ── PHASE 2: LIVE TRANSCRIPT ── -->
+  <hr class="divider">
+  <div class="phase-label">Phase 2 — Live Transcript Stream</div>
+
+  <div class="row">
+    <div class="node layer-recall">
+      <div class="node-title">Realtime Transcript Events</div>
+      <div class="node-sub">Recall fires <code style="font-size:10px;color:#7dd3fc">transcript.data</code> events as Deepgram transcribes. Each event has speaker label + text. Same utterance fires multiple times as words are finalized.</div>
+      <div class="payload"><span>evt.event</span> = "transcript.data"<br><span>evt.data.words[].speaker</span> = "0" or "1"<br><span>evt.data.words[].text</span> = transcript text</div>
+    </div>
+  </div>
+
+  <div class="arrow-row">
+    <div style="color:#334155;font-size:20px;">↓</div>
+    <div class="arrow-label">per-speaker dedup (last-text comparison — drops repeats)</div>
+  </div>
+
+  <div class="row">
+    <div class="node layer-electron">
+      <div class="node-title">IPC → Web App Renderer</div>
+      <div class="node-sub">Clean, deduped chunk sent from Electron main process to the Next.js web app running in the renderer window. Format: <code style="font-size:10px;color:#a5b4fc">"Speaker 0: [text]"</code></div>
+      <div class="node-file">electron/main.ts → preload.ts → useWingmanPoller.ts</div>
+    </div>
+  </div>
+
+  <div class="arrow-row">
+    <div style="color:#334155;font-size:20px;">↓</div>
+    <div class="arrow-label">addChunk() — two things happen simultaneously</div>
+  </div>
+
+  <!-- ── PHASE 3: TWO PARALLEL PATHS ── -->
+  <hr class="divider">
+  <div class="phase-label">Phase 3 — Two Parallel Paths (every chunk)</div>
+
+  <div class="split-container">
+
+    <div class="split-col">
+      <div class="split-header keyword">⚡ Path A — Instant Keyword Check</div>
+      <div class="node layer-recall">
+        <div class="node-title">Keyword Trigger Classifier</div>
+        <div class="node-sub">Pattern-matches chunk against objection phrases. Runs in <code style="font-size:10px;color:#7dd3fc">&lt;1ms</code> — no API call. Rep's own lines are excluded.</div>
+        <div class="node-file">lib/wingman/keyword-triggers.ts</div>
+        <div class="payload"><span>checks:</span> price, think about it,<br>talk to spouse, not right time…<br><span>returns:</span> signal card or null</div>
+      </div>
+      <div class="arrow-row"><div style="color:#334155;font-size:18px;">↓</div><div class="arrow-label">if hit → fireSignal() instantly<br>+ triggers Path B in parallel</div></div>
+      <div class="node layer-hud">
+        <div class="node-title">Keyword Card — Instant <span class="badge badge-blue">&lt;1ms</span></div>
+        <div class="node-sub">Fires immediately to HUD. Bypasses 90-second cooldown. Pre-written response for the detected objection.</div>
+      </div>
+    </div>
+
+    <div class="split-col">
+      <div class="split-header rag">🧠 Path B — RAG Pipeline (on keyword hit)</div>
+      <div class="node layer-api">
+        <div class="node-title">KB Signal Route</div>
+        <div class="node-sub">POST to Railway. Embeds the trigger chunk via OpenAI, searches pgvector for matching sales techniques.</div>
+        <div class="node-file">api/wingman/kb-signal</div>
+        <div class="payload"><span>→ chunk,</span> callId, stage<br><span>← signal_header,</span> signal_text</div>
+      </div>
+      <div class="arrow-row"><div style="color:#334155;font-size:18px;">↓</div><div class="arrow-label">OpenAI embed (~200ms) + pgvector search</div></div>
+      <div class="node layer-ai">
+        <div class="node-title">Knowledge Base Search</div>
+        <div class="node-sub">Cosine similarity search against <code style="font-size:10px;color:#d8b4fe">kb_prospect_triggers</code> table (6,554 rows, HNSW index). Returns top 3 matching techniques with exact scripts + why it works.</div>
+        <div class="node-file">lib/wingman/knowledge-search.ts</div>
+        <div class="payload"><span>threshold:</span> 0.65<br><span>returns:</span> situation, exact_script,<br>why_it_works, call_stage</div>
+      </div>
+      <div class="arrow-row"><div style="color:#334155;font-size:18px;">↓</div><div class="arrow-label">~1,300 token prompt assembled</div></div>
+      <div class="node layer-ai">
+        <div class="node-title">Claude Haiku <span class="badge badge-purple">~480ms</span></div>
+        <div class="node-sub">System prompt + Offer Brain + KB techniques + trigger chunk → 5-word headline + 1-sentence subtext. Prompt caching on system prompt (saves 90% on repeat calls).</div>
+        <div class="node-file">lib/wingman/knowledge-signal.ts</div>
+        <div class="payload"><span>returns JSON:</span><br>{ headline, subtext, source }</div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ── PHASE 3C: POLL PATH ── -->
+  <hr class="divider">
+  <div class="phase-label">Phase 3C — Poll Timer (parallel, every 8–90 seconds by stage)</div>
+
+  <div class="row">
+    <div class="node layer-api">
+      <div class="node-title">Auto-Poll Timer → Claude Sonnet</div>
+      <div class="node-sub">Fires on a stage-based interval (fast in Discovery/Close, slow in Rapport). Sends the accumulated transcript buffer. Tracks call stage, updates live scorecard. Does NOT generate signal cards — that's Haiku's job.</div>
+      <div class="node-file">api/wingman/poll → lib/wingman/system-prompt.ts</div>
+      <div class="payload"><span>→ transcript_chunk,</span> callId, current_stage<br><span>← stage,</span> scorecard updates (via Pusher)</div>
+    </div>
+  </div>
+
+  <!-- ── PHASE 4: SIGNAL DELIVERY ── -->
+  <hr class="divider">
+  <div class="phase-label">Phase 4 — Signal Delivery to HUD</div>
+
+  <div class="row">
+    <div class="node layer-pusher">
+      <div class="node-title">Pusher WebSocket Push</div>
+      <div class="node-sub">Both kb-signal and poll routes push results via Pusher instead of making the client poll. Signal arrives the instant it's ready — not on the next poll interval. Channel is private, authenticated per user.</div>
+      <div class="node-file">src/lib/pusher.ts → api/pusher/auth</div>
+      <div class="payload"><span>channel:</span> private-wingman-{callId}<br><span>events:</span> wingman-signal, wingman-update</div>
+    </div>
+  </div>
+
+  <div class="arrow-row">
+    <div style="color:#334155;font-size:20px;">↓</div>
+    <div class="arrow-label">useWingmanPoller Pusher subscription → IPC → hud:signal</div>
+  </div>
+
+  <div class="row">
+    <div class="node layer-hud">
+      <div class="node-title">HUD Signal Card Appears <span class="badge badge-green">bottom-left overlay</span></div>
+      <div class="node-sub">Floating window on top of all apps. Invisible to prospect (screen share protected). Fades in, displays for ~8 seconds, fades out. 90-second cooldown before next card can fire. One card at a time — never queued.</div>
+      <div class="node-file">electron/hud/index.html</div>
+    </div>
+  </div>
+
+  <!-- ── PHASE 5: CALL END ── -->
+  <hr class="divider">
+  <div class="phase-label">Phase 5 — Call End</div>
+
+  <div class="split-container">
+    <div class="split-col">
+      <div class="node layer-electron">
+        <div class="node-title">Call Stops</div>
+        <div class="node-sub">Rep clicks End, or auto-stop triggers (20-min inactivity or 2-hr max). <code style="font-size:10px;color:#a5b4fc">stopRecallAI()</code> is the single function that stops everything — clears timers, removes listeners, calls sdk.stopRecording().</div>
+        <div class="node-file">electron/recall.ts → stopRecallAI()</div>
+      </div>
+    </div>
+    <div class="split-col">
+      <div class="node layer-hud">
+        <div class="node-title">"How'd it go?" HUD Card</div>
+        <div class="node-sub">Outcome picker fires on HUD. Rep selects: Closed / Lost / DQ / No Show / Follow-up. Saved via Bearer token — no login required at this moment.</div>
+        <div class="node-file">api/wingman/outcome</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="arrow-row">
+    <div style="color:#334155;font-size:20px;">↓</div>
+    <div class="arrow-label">async — does not block HUD or rep</div>
+  </div>
+
+  <!-- ── PHASE 6: POST-CALL ── -->
+  <hr class="divider">
+  <div class="phase-label">Phase 6 — Post-Call Job (async, Railway)</div>
+
+  <div class="row">
+    <div class="node layer-postcall">
+      <div class="node-title">Claude Sonnet — Post-Call Analysis <span class="badge badge-yellow">async</span></div>
+      <div class="node-sub">Runs against full transcript. Never runs during a live call. Produces: call grade, debrief summary, one win + one fix, objections detected, framework pillar coverage (7 pillars), Offer Brain delta.</div>
+      <div class="node-file">api/wingman/post-call</div>
+    </div>
+  </div>
+
+  <div class="arrow-row">
+    <div style="color:#334155;font-size:20px;">↓</div>
+  </div>
+
+  <div class="three-col">
+    <div class="node layer-postcall">
+      <div class="node-title">Flight Log Entry</div>
+      <div class="node-sub">Transcript, debrief, grade, pillar scorecard. Visible in dashboard immediately.</div>
+      <div class="node-file">calls table (Supabase)</div>
+    </div>
+    <div class="node layer-postcall">
+      <div class="node-title">Offer Brain Update</div>
+      <div class="node-sub">JSON updated silently. Objection patterns, close timing, prospect archetypes refined. Never shown to rep.</div>
+      <div class="node-file">offers table (Supabase)</div>
+    </div>
+    <div class="node layer-postcall">
+      <div class="node-title">Objection Vault</div>
+      <div class="node-sub">Objections from this call added to vault. Only populated from real calls — never seeded.</div>
+      <div class="node-file">vault_objections table</div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ── Legend ── -->
+<div class="legend">
+  <div class="legend-item"><div class="legend-dot" style="background:#312e81"></div>Electron (desktop process)</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#1e3a5f"></div>Recall.ai / Audio</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#1a3a20"></div>Railway API routes</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#3b1f5e"></div>AI (Claude / OpenAI)</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#5e2020"></div>Pusher (WebSocket)</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#1f4a1f"></div>HUD overlay</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#5e3a10"></div>Post-call / Supabase</div>
+</div>
+
+</body>
+</html>

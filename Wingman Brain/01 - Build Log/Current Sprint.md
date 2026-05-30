@@ -182,6 +182,17 @@ This is the first file Claude reads at session start. It answers: where are we, 
 
 ---
 
+## What Was Just Completed (2026-05-30 — Strategy + Architecture Session)
+
+- **Groq research completed** — 2026 benchmarks confirm: stay on Claude Haiku 4.5. Groq TTFT too high for 30-token outputs. Quality gap confirmed via Arena Elo (Claude 1,404 vs best open-source ~1,380). Cost delta <$1/day at current scale. Revisit post-beta.
+- **Prompt caching gap identified** — `knowledge-signal.ts` has zero caching. Added as item 0i: 1-hour TTL cache + session warm-up at call start. Ready to build.
+- **Pinecone migration decided** — moving from pgvector to Pinecone before beta. "Build for the future, not for demos." Plan scoped. Blocked on: Sebastian creates Pinecone account + index (dim 1536, cosine) + API key.
+- **Architecture visuals built** — 4 HTML files in `tasks/`: `wingman-data-flow.html`, `wingman-architecture.html`, `wingman-investor-visual.html`, `wingman-deep-dive.html`. Investor-ready.
+- **Pre-beta audit framed** — honest assessment of what's solid vs. what needs fixing before real users.
+- **Pusher status clarified** — built April 26, never tested on a real call. Still needs live test.
+
+---
+
 ## What Was Just Completed (2026-04-26 — Pusher WebSocket Push Migration)
 
 - **Background Haiku KB scan removed (#0a)** — `useWingmanPoller.ts` no longer runs KB search every 10 seconds. Only fires on keyword trigger hits. Saves $0.41/call.
@@ -197,6 +208,19 @@ This is the first file Claude reads at session start. It answers: where are we, 
 ---
 
 ## What's Next (Priority Order)
+
+0j. 🗄️ **Pinecone migration** — Replace pgvector with Pinecone for all vector search. One index (`wingman-kb`), two namespaces (`signal-triggers` + `coaching`). Files: `knowledge-search.ts`, new `knowledge-base/pinecone-migrate.js`, `knowledge-base/ingest.js`, `package.json`. **BLOCKED ON:** Sebastian creates Pinecone account → index named `wingman-kb` (dimension 1536, metric cosine) → provides API key. Then ready to build immediately.
+
+0i. ⚡ **Prompt caching upgrade — 1-hour cache + session warm-up** — Two-file change. (1) Add `cache_control: { type: "ephemeral", ttl: "1h" }` to `src/lib/wingman/knowledge-signal.ts` on the system prompt — currently has zero caching. (2) Add a background cache warm-up call to `src/app/api/wingman/session/route.ts` that fires at call start, sends the system prompt + Offer Brain to Claude so the cache is hot before the first signal card trigger lands. Cost impact: 90% reduction on cached tokens for every signal card after the first. Latency impact: first signal card is now fast too (warm cache). Two files, low risk. Do this before JEPA upgrades.
+
+0h. 🧠 **JEPA Intelligence Upgrades — 3 AI improvements (cost + quality + efficiency)** — Derived from Yann LeCun's JEPA research. These three changes will lower AI inference costs, improve signal card accuracy, and make Wingman smarter about what's coming next on a call. Full spec: `00 - Product/JEPA Intelligence Upgrades.md`.
+  1. **Semantic embedding trigger detection** — replace `keyword-triggers.ts` pattern matching with cosine similarity against objection prototype embeddings. Catches paraphrased objections keyword matching misses entirely.
+  2. **Token redundancy reduction** — strip filler words from transcript chunks before sending to Claude, and deduplicate content that appears in both system prompt and Offer Brain. Direct ~10–15% reduction on every inference call.
+  3. **Session memory as lightweight next-state predictor** — track stage + last 2–3 prospect responses and use that to pre-warm the KB search before the objection lands. Turns reactive RAG into predictive RAG.
+
+  > Revisit this after Pusher is tested live and stable (item 0b). Do not attempt these three in the same session as each other.
+
+---
 
 0. 🚨 **Build `/terms` and `/privacy` pages on meetwingman.ai** — P0 before any public beta user signs up. The signup ToS line links to `/terms` — that URL must resolve. Copy direction in `Wingman Brain/03 - GTM/Website Plan.md`. Issue #33 basic posture is now set; these pages are the remaining compliance blocker.
 

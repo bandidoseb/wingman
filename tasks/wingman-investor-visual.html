@@ -1,0 +1,633 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>How Wingman Works</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: #f4f5fb;
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Inter', sans-serif;
+    min-height: 100vh;
+    padding: 56px 48px 80px;
+    color: #1a1a2e;
+  }
+
+  /* ── Header ── */
+  .header {
+    text-align: center;
+    margin-bottom: 72px;
+  }
+
+  .wordmark {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+
+  .wordmark-dot {
+    width: 28px;
+    height: 28px;
+    background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 12px rgba(99,102,241,0.35);
+  }
+
+  .wordmark-dot svg {
+    width: 16px;
+    height: 16px;
+    fill: white;
+  }
+
+  .wordmark-text {
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+    color: #1a1a2e;
+  }
+
+  .header-tagline {
+    font-size: 15px;
+    color: #6b7280;
+    font-weight: 400;
+  }
+
+  /* ── Section headers ── */
+  .section {
+    max-width: 1000px;
+    margin: 0 auto 72px;
+  }
+
+  .section-label {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: #9ca3af;
+    text-align: center;
+    margin-bottom: 8px;
+  }
+
+  .section-title {
+    font-size: 26px;
+    font-weight: 700;
+    text-align: center;
+    letter-spacing: -0.5px;
+    color: #111827;
+    margin-bottom: 48px;
+  }
+
+  .section-title span {
+    color: #6366f1;
+  }
+
+  /* ════════════════════════════════
+     STORY 1 — IN THE MOMENT
+  ════════════════════════════════ */
+
+  .call-flow {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    background: white;
+    border-radius: 20px;
+    padding: 40px 36px;
+    box-shadow: 0 2px 24px rgba(0,0,0,0.06), 0 1px 3px rgba(0,0,0,0.04);
+    border: 1px solid #e5e7eb;
+  }
+
+  .call-step {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 14px;
+    padding: 0 16px;
+  }
+
+  .call-arrow {
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: 0 4px;
+  }
+
+  .arrow-line {
+    width: 48px;
+    height: 2px;
+    background: linear-gradient(to right, #d1d5db, #6366f1);
+    border-radius: 2px;
+    position: relative;
+  }
+
+  .arrow-line::after {
+    content: '';
+    position: absolute;
+    right: -1px;
+    top: 50%;
+    transform: translateY(-50%);
+    border-left: 7px solid #6366f1;
+    border-top: 5px solid transparent;
+    border-bottom: 5px solid transparent;
+  }
+
+  .arrow-time {
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    color: #6366f1;
+    white-space: nowrap;
+  }
+
+  /* Step icons */
+  .step-icon {
+    width: 72px;
+    height: 72px;
+    border-radius: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 30px;
+    flex-shrink: 0;
+  }
+
+  .icon-convo  { background: #f0f9ff; border: 2px solid #bae6fd; }
+  .icon-brain  { background: #f5f3ff; border: 2px solid #c4b5fd; }
+  .icon-card   { background: #f0fdf4; border: 2px solid #bbf7d0; }
+
+  .step-title {
+    font-size: 15px;
+    font-weight: 700;
+    color: #111827;
+    line-height: 1.3;
+  }
+
+  .step-desc {
+    font-size: 12px;
+    color: #6b7280;
+    line-height: 1.5;
+    max-width: 160px;
+  }
+
+  /* The signal card mockup */
+  .signal-card-mock {
+    background: #111827;
+    border-radius: 14px;
+    padding: 14px 16px;
+    text-align: left;
+    width: 100%;
+    max-width: 220px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.18);
+    border: 1px solid #1f2937;
+  }
+
+  .scm-dot {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 8px;
+  }
+
+  .scm-pulse {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: #4ade80;
+    animation: pulse 1.8s ease-in-out infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.5; transform: scale(0.85); }
+  }
+
+  .scm-label {
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: #4b5563;
+  }
+
+  .scm-headline {
+    font-size: 13px;
+    font-weight: 700;
+    color: #f9fafb;
+    line-height: 1.35;
+    margin-bottom: 6px;
+  }
+
+  .scm-subtext {
+    font-size: 11px;
+    color: #6b7280;
+    line-height: 1.4;
+  }
+
+  /* Speech bubbles */
+  .bubbles {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    width: 100%;
+    max-width: 220px;
+  }
+
+  .bubble {
+    padding: 10px 13px;
+    border-radius: 14px;
+    font-size: 11px;
+    line-height: 1.4;
+    font-weight: 500;
+  }
+
+  .bubble-rep {
+    background: #ede9fe;
+    color: #5b21b6;
+    border-radius: 14px 14px 3px 14px;
+    align-self: flex-end;
+    text-align: right;
+  }
+
+  .bubble-prospect {
+    background: #f1f5f9;
+    color: #374151;
+    border-radius: 14px 14px 14px 3px;
+    align-self: flex-start;
+  }
+
+  .bubble-prospect.highlight {
+    background: #fef3c7;
+    color: #92400e;
+    border: 1.5px solid #fcd34d;
+  }
+
+  .bubble-who {
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    opacity: 0.6;
+    margin-bottom: 3px;
+    display: block;
+  }
+
+  /* Wingman brain icon */
+  .brain-visual {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .brain-ring {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #a78bfa 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 0 0 8px rgba(99,102,241,0.08), 0 0 0 16px rgba(99,102,241,0.04);
+    font-size: 34px;
+  }
+
+  .brain-scanning {
+    font-size: 10px;
+    font-weight: 600;
+    color: #6366f1;
+    letter-spacing: 0.5px;
+  }
+
+  /* ════════════════════════════════
+     STORY 2 — THE FLYWHEEL
+  ════════════════════════════════ */
+
+  .flywheel-container {
+    background: white;
+    border-radius: 20px;
+    padding: 48px 36px;
+    box-shadow: 0 2px 24px rgba(0,0,0,0.06), 0 1px 3px rgba(0,0,0,0.04);
+    border: 1px solid #e5e7eb;
+    display: flex;
+    gap: 64px;
+    align-items: center;
+  }
+
+  /* SVG flywheel */
+  .flywheel-svg {
+    flex-shrink: 0;
+    width: 340px;
+    height: 340px;
+  }
+
+  /* Right side — what it means */
+  .flywheel-right {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+  }
+
+  .flywheel-claim {
+    font-size: 22px;
+    font-weight: 700;
+    color: #111827;
+    letter-spacing: -0.4px;
+    line-height: 1.3;
+  }
+
+  .flywheel-claim span {
+    color: #6366f1;
+  }
+
+  .flywheel-points {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .fw-point {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .fw-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    flex-shrink: 0;
+  }
+
+  .fw-icon-purple { background: #f5f3ff; }
+  .fw-icon-green  { background: #f0fdf4; }
+  .fw-icon-blue   { background: #eff6ff; }
+
+  .fw-text-title {
+    font-size: 14px;
+    font-weight: 700;
+    color: #111827;
+    margin-bottom: 3px;
+  }
+
+  .fw-text-desc {
+    font-size: 12px;
+    color: #6b7280;
+    line-height: 1.5;
+  }
+
+  /* Moat badge */
+  .moat-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: #faf5ff;
+    border: 1.5px solid #e9d5ff;
+    border-radius: 10px;
+    padding: 10px 14px;
+    margin-top: 8px;
+  }
+
+  .moat-badge-icon { font-size: 18px; }
+
+  .moat-badge-text {
+    font-size: 12px;
+    color: #7c3aed;
+    font-weight: 600;
+    line-height: 1.4;
+  }
+
+  /* ── Footer ── */
+  .footer {
+    text-align: center;
+    margin-top: 40px;
+    font-size: 12px;
+    color: #9ca3af;
+  }
+
+  .footer strong {
+    color: #6366f1;
+  }
+</style>
+</head>
+<body>
+
+<!-- ── HEADER ── -->
+<div class="header">
+  <div class="wordmark">
+    <div class="wordmark-dot">
+      <svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+    </div>
+    <span class="wordmark-text">Wingman</span>
+  </div>
+  <p class="header-tagline">Real-time AI copilot for high-ticket sales calls</p>
+</div>
+
+
+<!-- ════════════════════════════
+  STORY 1
+════════════════════════════ -->
+<div class="section">
+  <p class="section-label">Story 1 of 2</p>
+  <h2 class="section-title">The right thing to say — in <span>under one second</span></h2>
+
+  <div class="call-flow">
+
+    <!-- Step 1: The conversation -->
+    <div class="call-step">
+      <div class="bubbles">
+        <div class="bubble bubble-rep">
+          <span class="bubble-who">Rep</span>
+          "Does that timeline work for you?"
+        </div>
+        <div class="bubble bubble-prospect highlight">
+          <span class="bubble-who">Prospect</span>
+          "I need to think about it…"
+        </div>
+      </div>
+      <div class="step-title">The moment happens</div>
+      <div class="step-desc">A critical objection or buying signal surfaces in real conversation.</div>
+    </div>
+
+    <!-- Arrow 1 -->
+    <div class="call-arrow">
+      <div class="arrow-line"></div>
+      <div class="arrow-time">instant</div>
+    </div>
+
+    <!-- Step 2: Wingman detects -->
+    <div class="call-step">
+      <div class="brain-visual">
+        <div class="brain-ring">🧠</div>
+        <div class="brain-scanning">Wingman detects it</div>
+      </div>
+      <div class="step-title">Wingman recognizes it</div>
+      <div class="step-desc">AI cross-references 6,500+ proven sales moments to find the best response.</div>
+    </div>
+
+    <!-- Arrow 2 -->
+    <div class="call-arrow">
+      <div class="arrow-line"></div>
+      <div class="arrow-time">&lt; 1 second</div>
+    </div>
+
+    <!-- Step 3: Signal card -->
+    <div class="call-step">
+      <div class="signal-card-mock">
+        <div class="scm-dot">
+          <div class="scm-pulse"></div>
+          <span class="scm-label">Wingman</span>
+        </div>
+        <div class="scm-headline">"If investment wasn't a factor?"</div>
+        <div class="scm-subtext">Reopen desire before addressing hesitation. Don't fight the stall.</div>
+      </div>
+      <div class="step-title">Signal card appears</div>
+      <div class="step-desc">On the rep's screen only. Invisible to the prospect. One card at a time.</div>
+    </div>
+
+  </div>
+</div>
+
+
+<!-- ════════════════════════════
+  STORY 2
+════════════════════════════ -->
+<div class="section">
+  <p class="section-label">Story 2 of 2</p>
+  <h2 class="section-title">Every call makes Wingman <span>smarter</span></h2>
+
+  <div class="flywheel-container">
+
+    <!-- SVG Flywheel -->
+    <svg class="flywheel-svg" viewBox="0 0 340 340" fill="none" xmlns="http://www.w3.org/2000/svg">
+
+      <!-- Outer ring -->
+      <circle cx="170" cy="170" r="148" stroke="#e5e7eb" stroke-width="1.5" stroke-dasharray="6 4"/>
+
+      <!-- Inner ring -->
+      <circle cx="170" cy="170" r="58" fill="#f5f3ff" stroke="#c4b5fd" stroke-width="2"/>
+      <text x="170" y="163" text-anchor="middle" font-family="-apple-system,sans-serif" font-size="11" font-weight="700" fill="#6366f1">Wingman</text>
+      <text x="170" y="178" text-anchor="middle" font-family="-apple-system,sans-serif" font-size="11" font-weight="700" fill="#6366f1">Brain</text>
+      <text x="170" y="193" text-anchor="middle" font-family="-apple-system,sans-serif" font-size="9" fill="#9ca3af">grows every call</text>
+
+      <!-- Curved arrows (arcs between nodes) -->
+      <!-- Top-right arc -->
+      <path d="M 238 90 A 95 95 0 0 1 280 170" stroke="#c4b5fd" stroke-width="2" stroke-linecap="round" fill="none" marker-end="url(#arr-purple)"/>
+      <!-- Right-bottom arc -->
+      <path d="M 280 190 A 95 95 0 0 1 215 260" stroke="#93c5fd" stroke-width="2" stroke-linecap="round" fill="none" marker-end="url(#arr-blue)"/>
+      <!-- Bottom-left arc -->
+      <path d="M 195 275 A 95 95 0 0 1 95 240" stroke="#6ee7b7" stroke-width="2" stroke-linecap="round" fill="none" marker-end="url(#arr-green)"/>
+      <!-- Left-top arc -->
+      <path d="M 68 210 A 95 95 0 0 1 115 85" stroke="#fca5a5" stroke-width="2" stroke-linecap="round" fill="none" marker-end="url(#arr-red)"/>
+
+      <!-- Arrow markers -->
+      <defs>
+        <marker id="arr-purple" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+          <path d="M0,0 L0,6 L8,3 z" fill="#c4b5fd"/>
+        </marker>
+        <marker id="arr-blue" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+          <path d="M0,0 L0,6 L8,3 z" fill="#93c5fd"/>
+        </marker>
+        <marker id="arr-green" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+          <path d="M0,0 L0,6 L8,3 z" fill="#6ee7b7"/>
+        </marker>
+        <marker id="arr-red" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+          <path d="M0,0 L0,6 L8,3 z" fill="#fca5a5"/>
+        </marker>
+      </defs>
+
+      <!-- Node: Call Happens (top) -->
+      <rect x="120" y="20" width="100" height="46" rx="12" fill="#f5f3ff" stroke="#c4b5fd" stroke-width="1.5"/>
+      <text x="170" y="40" text-anchor="middle" font-family="-apple-system,sans-serif" font-size="11" font-weight="700" fill="#6366f1">Sales Call</text>
+      <text x="170" y="55" text-anchor="middle" font-family="-apple-system,sans-serif" font-size="10" fill="#9ca3af">happens live</text>
+
+      <!-- Node: AI Analyzes (right) -->
+      <rect x="271" y="142" width="62" height="46" rx="12" fill="#eff6ff" stroke="#93c5fd" stroke-width="1.5"/>
+      <text x="302" y="162" text-anchor="middle" font-family="-apple-system,sans-serif" font-size="10" font-weight="700" fill="#3b82f6">AI</text>
+      <text x="302" y="176" text-anchor="middle" font-family="-apple-system,sans-serif" font-size="10" fill="#9ca3af">analyzes</text>
+
+      <!-- Node: Brain Updates (bottom) -->
+      <rect x="108" y="278" width="124" height="46" rx="12" fill="#f0fdf4" stroke="#6ee7b7" stroke-width="1.5"/>
+      <text x="170" y="298" text-anchor="middle" font-family="-apple-system,sans-serif" font-size="11" font-weight="700" fill="#059669">Brain updates</text>
+      <text x="170" y="313" text-anchor="middle" font-family="-apple-system,sans-serif" font-size="10" fill="#9ca3af">objections · patterns · timing</text>
+
+      <!-- Node: Next Call (left) -->
+      <rect x="7" y="142" width="78" height="46" rx="12" fill="#fff7ed" stroke="#fca5a5" stroke-width="1.5"/>
+      <text x="46" y="161" text-anchor="middle" font-family="-apple-system,sans-serif" font-size="10" font-weight="700" fill="#ea580c">Next call</text>
+      <text x="46" y="176" text-anchor="middle" font-family="-apple-system,sans-serif" font-size="10" fill="#9ca3af">is smarter</text>
+
+    </svg>
+
+    <!-- Right: What it means -->
+    <div class="flywheel-right">
+
+      <div class="flywheel-claim">
+        The longer a rep uses Wingman,<br>
+        the <span>harder it is to leave.</span>
+      </div>
+
+      <div class="flywheel-points">
+
+        <div class="fw-point">
+          <div class="fw-icon fw-icon-purple">🎯</div>
+          <div>
+            <div class="fw-text-title">Learns your specific offer</div>
+            <div class="fw-text-desc">Wingman builds a model of your deal — objections, pricing, close patterns — unique to your rep.</div>
+          </div>
+        </div>
+
+        <div class="fw-point">
+          <div class="fw-icon fw-icon-green">📈</div>
+          <div>
+            <div class="fw-text-title">Gets sharper with every call</div>
+            <div class="fw-text-desc">Signal cards improve in precision. Dead moments get pruned. High-impact moments get reinforced.</div>
+          </div>
+        </div>
+
+        <div class="fw-point">
+          <div class="fw-icon fw-icon-blue">🔒</div>
+          <div>
+            <div class="fw-text-title">Creates a switching cost</div>
+            <div class="fw-text-desc">After 50 calls, your Wingman brain is irreplaceable. Starting over with any other tool means starting from zero.</div>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="moat-badge">
+        <span class="moat-badge-icon">🏰</span>
+        <span class="moat-badge-text">This is the moat. No competitor can replicate a rep's call history.</span>
+      </div>
+
+    </div>
+
+  </div>
+</div>
+
+<div class="footer">
+  Built for <strong>high-ticket closers</strong> · Works on Zoom, Teams & Google Meet · Apple Silicon Mac
+</div>
+
+<!-- Download button -->
+<div style="position:fixed;bottom:28px;right:28px;">
+  <a href="wingman-investor-visual.html" download="wingman-investor-visual.html"
+     style="display:inline-flex;align-items:center;gap:8px;background:#6366f1;color:white;font-family:-apple-system,sans-serif;font-size:13px;font-weight:600;padding:12px 20px;border-radius:12px;text-decoration:none;box-shadow:0 4px 16px rgba(99,102,241,0.4);letter-spacing:-0.2px;">
+    ↓ Download
+  </a>
+</div>
+
+</body>
+</html>
