@@ -1,8 +1,18 @@
 # Current Sprint
 
-Last updated: 2026-04-25
+Last updated: 2026-05-31
 
 This is the first file Claude reads at session start. It answers: where are we, what's next, and what's blocking us.
+
+---
+
+## What Was Just Completed (2026-05-31 — Strategy Session: Hotkey Pivot, Sales DNA, Pricing)
+
+This was a **decisions/logging session — no app code changed, nothing pushed.** Three major decisions made and fully logged in `Decisions Log.md` (2026-05-31 entries) with enough build context to pick up cold:
+
+- **MAJOR PIVOT — signal cards become hotkey-summoned, not autonomous.** Rep presses a hotkey (default: **Up Arrow**, captured only during live calls, changeable in Settings) → fixed menu of options → Wingman generates the card for the picked option. Kills autonomous pop-ups (distraction + "knows better than the rep" problem). The keyword classifier is **demoted from card-launcher to silent scout** (tags context, never fires). Menu is always visually identical (no greying). Visible **stage bar removed** → ambient presence dot. **Live Sonnet stage polling killed** → stage analysis moves to post-call. Generation = cheapest version first (generate-on-pick). Cost model: **$0 continuous** (buffering + keyword matching, no embeddings), pay only on keypress. Full spec + file map + open questions in Decisions Log. **Not built yet — needs its own Plan Review Loop before touching the live pipeline.**
+- **"Offer Brain" renamed to "Sales DNA."** CLAUDE.md + Wingman skill doc updated this session. **Code + app-wide rename sweep still pending — see What's Next.**
+- **Pricing locked directionally:** 10 free calls → $149/mo, **unlimited, no cap** (price is the margin lever, not caps). The hotkey pivot's near-zero live AI cost is what makes unlimited affordable. Old "free to fly, pay when you win" model is dead.
 
 ---
 
@@ -208,6 +218,11 @@ This is the first file Claude reads at session start. It answers: where are we, 
 ---
 
 ## What's Next (Priority Order)
+
+0k. 🏷️ **App + code-wide rename: "Offer Brain" → "Sales DNA"** — The term is renamed product-wide (decision 2026-05-31). CLAUDE.md and the Wingman skill doc are already updated. **Everything else still says "Offer Brain" and must be changed:**
+  - **User-facing copy first** (highest priority — Sebastian confirmed it shows on the dashboard app): every place the UI says "Offer Brain" → "Sales DNA". Sweep `src/components/dashboard/` (Settings, Home, Intel tabs, reset flow), onboarding components, and any paywall/marketing copy.
+  - **Code identifiers (second, lower urgency — can be its own session):** `src/lib/wingman/rep-profile.ts` (the loader), DB column(s) storing the JSON, JSON keys, TypeScript types in `src/types/index.ts`, API routes referencing it, the post-call job's delta-update logic. A careless code-wide rename can break the live pipeline — do it deliberately with `npx tsc --noEmit` verification, and treat the DB column rename as a schema change (needs Sebastian's explicit yes + a migration).
+  - **Approach:** do the user-facing copy sweep as one task, the code/DB rename as a separate approved task. Verify zero stray "Offer Brain" / "offer_brain" references remain at the end of each (`grep -ri "offer brain\|offer_brain" src/ electron/`).
 
 0j. 🗄️ **Pinecone migration** — Replace pgvector with Pinecone for all vector search. One index (`wingman-kb`), two namespaces (`signal-triggers` + `coaching`). Files: `knowledge-search.ts`, new `knowledge-base/pinecone-migrate.js`, `knowledge-base/ingest.js`, `package.json`. **BLOCKED ON:** Sebastian creates Pinecone account → index named `wingman-kb` (dimension 1536, metric cosine) → provides API key. Then ready to build immediately.
 

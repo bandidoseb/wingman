@@ -2,11 +2,61 @@
 
 A running log of every major architectural or product decision made on Wingman. Append only — never delete. Each entry captures the decision, the date, the reasoning, and any alternatives that were rejected.
 
-Last updated: 2026-04-15
+Last updated: 2026-05-31
 
 ---
 
 ## 2026
+
+### 2026-05-31 — Signal cards become hotkey-summoned, not autonomous (major pivot)
+**Decision:** Wingman no longer decides on its own when to surface a signal card. The rep summons help with a single hotkey. Pressing it opens a small fixed menu of options; Wingman generates the card for the option the rep picks.
+**Why this is the right call:**
+- Autonomous pop-ups assume Wingman knows better than the rep when they need help. It doesn't — and building that judgment to fire *only* at the right moment, *never* at the wrong one, is nearly impossible to do well. A card that fires mid-flow when the rep didn't need it pulls them out of the conversation and makes them resent the product. That reputation damage (closers judging it as "robotic / distracting") kills the business — see Core Product Rules 10 & 11.
+- The rep always knows *when* they're in trouble. They just don't always know *what to say*. So put the trigger in their hands and let Wingman supply the words.
+- It also makes the economics dramatically better (see cost split below).
+**The components of this decision:**
+1. **Hotkey = the Up Arrow by default, captured only while a call is live, changeable in Settings.** Up arrow is universally present and findable by touch without looking. Capturing it only during a live call means Wingman doesn't "steal" the key system-wide. A Settings override covers any rep whose keyboard or habits conflict. (Assumption: closers don't navigate with arrow keys mid-call — they use the trackpad. Validate in beta.) **Dismiss is dead-simple — the same key again, or Esc** — so a reflexive press during a screen-share never leaves a card stuck on screen. (Implementation: register the global shortcut on call start, unregister it in `stopRecallAI()` so capture is scoped to the live call and torn down on every stop path.)
+2. **The keyword classifier (`keyword-triggers.ts`) is demoted from card-launcher to silent scout.** It no longer fires anything. It runs continuously and tags context (objection raised, question asked, topics covered) into session state, ready to enrich a card the instant the hotkey is pressed. Because it can no longer fire anything on its own, false positives are now harmless — so detection can be made aggressive and broad with zero distraction risk. This is the opposite of the old trade-off where broad detection was dangerous.
+3. **The menu is always visually identical and every option is always pressable.** No greying out, no reordering. Reps would misread a greyed option as "unavailable," and a changing menu breaks the eyes-closed muscle memory we want. All contextual intelligence lives in the *backend* (which card gets pre-generated, what context feeds it), never in the menu's appearance. The **candidate fixed slots** (each maps to a number key for blind selection, final set TBD in build):
+   - **Handle objection** — uses the scout's tagged recent pushback as context.
+   - **Answer their question** — surfaces the prospect's actual recent question text so the rep confirms *which* one before generating (this is the one place question text is shown — it does not require changing the other slots).
+   - **Dig deeper** — hands the rep a question to deepen discovery (Sebastian specifically liked this one).
+   - **What am I missing?** — checks the Playbook for uncovered framework items (timeline, budget, decision-maker, etc.).
+   - **Search** — free-text fallback into the rep's KB for anything the fixed slots don't cover.
+4. **The visible Stage Bar is removed during live calls; replaced by an ambient presence indicator** (a single dim/breathing dot — nothing to read). Peripheral motion/text mid-call is the same distraction problem as autonomous pop-ups, just quieter.
+5. **Live, paid stage tracking (the Sonnet poll) is killed.** The recent transcript already reveals the stage to the generation model implicitly, so paying to label it live is paying for information the model already has. Full stage analysis moves to the post-call debrief (computed once, cheap), where reading is the point. A rough, free stage sense (elapsed time + keyword milestones) can feed the menu if needed — no AI cost.
+6. **Generation structure: build the cheapest version first (Option A).** Menu opens free → rep picks → only then generate that one card (~0.5–1s). Measure real latency on live calls. Only escalate to speculative pre-generation of the top option (Option B) if the post-press wait actually feels bad. Never pay tokens to pre-solve a slowness problem we haven't confirmed.
+**The cost split (why this is cheap):**
+- **Continuous layer = $0.** Buffering the last ~60s of transcript in memory + keyword/pattern matching. No AI, no embeddings, no API calls.
+- **On-keypress layer = the only spend.** Embed the recent chunk (fractions of a cent) → vector search → Haiku generation (cheap). A clean call where the rep never reaches for help costs **zero** in live AI.
+**Guiding principle (load-bearing for the whole product):** Wingman's intelligence is *distilled context delivered at the right instant* — not maximum context delivered constantly. Context quality beats context quantity; piling on redundant context costs tokens, adds latency, and can degrade output. The card is built from layered context — recent buffer (the moment) + session state (this call, mostly assembled for free from the scout) + Sales DNA (all past calls, loaded once at call start) + KB retrieval — never from re-sending the raw full transcript.
+**Session state (where the scout's findings live):** in-memory on the active session for speed, ideally mirrored to a small Supabase session row (tags only — never raw transcript bloat) so a dropped/reconnected call doesn't lose context. It feeds the menu and live cards during the call, is handed to the post-call job, then **deleted** — same rule as raw transcripts (Architectural Invariant 6). Nothing scout-related persists long-term.
+**Files this will likely touch when built (for the future plan — not a commitment):** `electron/recall.ts` (register/unregister the global hotkey on call start/stop), `electron/main.ts` (IPC for hotkey press → menu, presence dot, remove stage bar), `electron/hud/index.html` (the fixed menu UI + ambient dot, remove stage bar), `src/hooks/useWingmanPoller.ts` (stop autonomous firing; drive the scout/tagging instead), `src/lib/wingman/keyword-triggers.ts` (demote to tagger), `src/app/api/wingman/kb-signal/route.ts` (generate-on-keypress for the picked slot), `src/app/api/wingman/session/route.ts` (session state). Removing live Sonnet stage polling touches `src/app/api/wingman/poll/route.ts`.
+**Open questions to resolve in the build plan (not yet decided):** final menu slot set + their number-key mapping; exact buffer window (~60s is a starting guess); whether a free heuristic stage sense is worth keeping for menu context or dropped entirely; whether session state needs the Supabase mirror or in-memory is enough for v1.
+**Supersedes / forces re-evaluation of:** autonomous keyword cards (2026-04-07), the 90-second cooldown (no longer needed — cards are rep-summoned), the visible stage bar, live Sonnet stage polling, and the JEPA "predictive RAG / next-state predictor" item (the rep's keypress replaces the prediction problem). Pusher push delivery is still useful for getting the generated card to the HUD.
+**Status:** Decided. Not yet built. This is the new #1 architectural direction for the live-call experience. When picked up: run the Plan Review Loop and present a build plan before touching the live pipeline.
+
+---
+
+### 2026-05-31 — "Offer Brain" renamed to "Sales DNA"
+**Decision:** The per-user intelligence layer is renamed from **Offer Brain** to **Sales DNA**. More neutral, more personal, communicates "this is *you*, learned" rather than a feature name.
+**Scope of rename:** User-facing copy first (dashboard, onboarding, paywall, marketing). Internal code identifiers (`rep-profile.ts`, DB columns, JSON keys) can follow in a dedicated rename task — not urgent, and a code-wide rename touches many files, so it gets its own approved session. CLAUDE.md, the Wingman skill, and brain docs still say "Offer Brain" and need updating.
+**Status:** Decided. User-facing rename pending; code rename is a separate follow-up task.
+
+---
+
+### 2026-05-31 — Pricing: 10 free calls → $149/mo, unlimited (no cap)
+**Decision:** Monetization = **10 free calls**, then **$149/month** to continue, **unlimited calls, no cap.**
+**Framing of the free period (important — don't overbuild this):** The 10 free calls are a *taste / added benefit*, not a gate that has to deliver an "insane" Sales DNA before we're allowed to charge. Sebastian's words: "having that Sales DNA isn't the only thing… it's just an added benefit, so still [10] calls." So Sales DNA richness is *one* reason a rep stays, alongside the live in-call help and the Flight Log/debrief value — not the sole conversion lever. Do not gate the paywall on Sales DNA hitting some quality bar; 10 calls is a clean, simple number and that's the rule.
+**On counting calls:** Counting only *substantive* calls (excluding no-shows / instant DQs) is a sensible fairness + don't-burn-their-trial touch, but it's a nice-to-have now, not load-bearing — the free period is a taste, not a make-or-break "wow" gate. Decide during build; simplest acceptable version is fine.
+**No cap — and why (this reverses the earlier cap idea):**
+- A usage cap is a worse user experience than just paying. Sebastian: "having a cap would suck as a user. it's easier to just pay and not have to worry about hitting a cap… I don't want to cap people, if they want more they can buy more." So: flat $149/mo, unlimited usage, no fair-use ceiling.
+- **The margin lever is price, not caps.** If a cohort of extreme-usage power users ever threatens margin, the response is to raise the price (or introduce a higher tier for heavy users — "if they want more they can buy more"), never to cap usage on the base plan.
+- **What makes unlimited affordable:** the hotkey pivot (above) deletes the live AI cost, leaving Recall.ai transcription (~$0.50/hr) as the dominant cost. Worst-case heavy user (~130 calls × 45 min ≈ 97 hrs ≈ $49 cost) still nets ~67% margin at $149; typical user ~85%. This architecture change is *why* unlimited is safe — and it aligns with the 2026-04-25 finding that 100+-calls/month closers churn on any cap.
+**Conversion lever:** make the switching cost visible at the paywall — show the rep what Sales DNA has learned ("mapped your top 3 objections, your pitch pattern, your close timing across N calls") at the exact moment of the ask. (Reinforces the value; not the sole reason to convert.)
+**Kills:** the old "free to fly, pay when you win" model (free calls until first close) — confirmed dead, wasteful. Tagline still appears in the Wingman skill and CLAUDE.md and needs removing.
+**Supersedes:** the 2026-04-02 "$149/mo" entry (this re-confirms $149 but adds the 10-free-call structure and explicit no-cap) and the 2026-04-25 "$179–$199, unlimited" direction (price reverts to $149; unlimited is kept).
+**Status:** Free-call count locked at 10. Price $149/mo locked directionally — confirm before launch. "Substantive call" definition is a build-time detail, not blocking.
 
 ### 2026-04-15 — Table renamed: kb_entries → kb_signal_card_entries
 **Decision:** Rename the `kb_entries` table to `kb_signal_card_entries` across DB, code, and all references.

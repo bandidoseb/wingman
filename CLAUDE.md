@@ -49,8 +49,8 @@ This must be run in Terminal after moving the app to /Applications. We should do
 | Live audio | Recall.ai | Joins the call, streams transcript |
 | Transcription | Deepgram (inside Recall.ai) | Speech to text |
 | AI — live | Claude Haiku | Signal card generation, target <1 second |
-| AI — post-call | Claude Sonnet | Call grading, debrief, Offer Brain update |
-| Database | Supabase | Users, calls, Offer Brain JSON, KB embeddings |
+| AI — post-call | Claude Sonnet | Call grading, debrief, Sales DNA update |
+| Database | Supabase | Users, calls, Sales DNA JSON, KB embeddings |
 | Vector search | pgvector (in Supabase) | RAG knowledge base retrieval |
 | Hosting | Railway | Backend API |
 | Billing | Stripe | Subscription (routes exist, not fully wired) |
@@ -79,7 +79,7 @@ This must be run in Terminal after moving the app to /Applications. We should do
 │   │       │   ├── session/   # Start/end call session
 │   │       │   ├── poll/      # HUD polls this for signal cards
 │   │       │   ├── kb-signal/ # RAG lookup → signal card generation
-│   │       │   ├── post-call/ # Post-call AI job (grade, debrief, Offer Brain)
+│   │       │   ├── post-call/ # Post-call AI job (grade, debrief, Sales DNA)
 │   │       │   └── outcome/   # User marks call outcome (Closed/Lost/DQ/etc.)
 │   │       ├── ai/chat/       # "Ask Wingman" chatbot (per-call transcript chat)
 │   │       ├── calls/         # Call records CRUD
@@ -102,7 +102,7 @@ This must be run in Terminal after moving the app to /Applications. We should do
 │   │   │   ├── knowledge-signal.ts   # Assembles prompt + calls Claude Haiku
 │   │   │   ├── keyword-triggers.ts   # Fast trigger classifier (fires before RAG)
 │   │   │   ├── system-prompt.ts      # Claude system prompt assembly
-│   │   │   ├── rep-profile.ts        # Offer Brain loader
+│   │   │   ├── rep-profile.ts        # Sales DNA loader
 │   │   │   └── poll-intervals.ts     # HUD polling config
 │   │   └── supabase/                 # Supabase client (client, server, middleware)
 │   │
@@ -131,7 +131,7 @@ This must be run in Terminal after moving the app to /Applications. We should do
 - HUD shows up on screen ✅
 - Signal card UI renders on screen (~80% confident)
 - Supabase connected (~90% confident)
-- Post-call job + Offer Brain updating (~98% confident)
+- Post-call job + Sales DNA updating (~98% confident)
 - Flight Log screen ✅ — includes inline outcome picker, call chat, post-call debrief
 - Mission Intel modal ✅ — staggered multi-bubble chat, daily cap, KB-powered coaching
 - Objection Vault tab ✅ — only populated from real calls, no pre-seeded data
@@ -172,7 +172,7 @@ A user can:
 7. User goes to dashboard → sees Flight Log entry with transcript, debrief, grade, framework coverage
 8. User can chat with "Ask Wingman" (Mission Intel) about any call
 9. Objections from the call appear in their Objection Vault
-10. Offer Brain updates silently in the background
+10. Sales DNA updates silently in the background
 11. Rep can set up their Playbook framework once → Wingman uses it silently every call
 
 **That's the finish line. Everything else is V2.**
@@ -189,7 +189,7 @@ A user can:
 6. **Raw transcripts are deleted immediately** after post-call job runs. Never stored long-term.
 7. **Never store audio or video.** Text only.
 8. **Post-call job never runs during a live call.** Always async.
-9. **Offer Brain updates silently.** User never configures it manually.
+9. **Sales DNA updates silently.** User never configures it manually.
 10. **Wingman is bowling alley bumpers — not a script.** It only activates when a rep is about to go in the gutter. It does NOT tell reps what to say on every exchange. Reps that sound like they're reading AI suggestions are a product failure. Signal cards should be rare, surgical, and feel like intuition — not instructions.
 11. **Never make reps into robots.** If a feature would cause a rep to sound scripted, unnatural, or disconnected from the prospect — don't build it. The highest-performing closers in the industry will judge this product harshly if it produces robotic behavior. That reputation damage kills the business.
 
@@ -204,29 +204,31 @@ Keyword trigger classifier (keyword-triggers.ts) — fast, cheap
          ↓ (only fires on meaningful moments)
 Embed trigger chunk → pgvector search → Sales KB (knowledge-search.ts)
          ↓
-Prompt assembly: system prompt + Offer Brain + session memory + KB results + trigger chunk
+Prompt assembly: system prompt + Sales DNA + session memory + KB results + trigger chunk
          ↓
 Claude Haiku → signal card → HUD (target: <1 second)
          ↓
 [Call ends]
          ↓
 Post-call job (Claude Sonnet) — async:
-  Grade + debrief + one win + one fix + objections + Offer Brain delta
+  Grade + debrief + one win + one fix + objections + Sales DNA delta
          ↓
-Offer Brain JSON updated in Supabase
+Sales DNA JSON updated in Supabase
 Flight Log entry created
 Raw transcript deleted
 ```
 
 ---
 
-## The Offer Brain
+## Sales DNA
+
+*(Renamed from "Offer Brain" on 2026-05-31 — same system, more neutral/personal name. A full app + code-wide rename sweep is still pending; see `Wingman Brain/01 - Build Log/Current Sprint.md`. Old code identifiers like `rep-profile.ts` and DB columns may still say "offer_brain" until that sweep runs.)*
 
 One JSON object per user stored in Supabase. Loads at call start. Updated after every call by post-call job.
 
 Stores: offer details, prospect archetypes, top objections + what handled them, price reveal patterns, average close timing.
 
-Rules: One active Offer Brain per user. Never let the user manually configure it. Reset button exists (with warning). This is the product's #1 moat and switching cost.
+Rules: One active Sales DNA per user. Never let the user manually configure it. Reset button exists (with warning). This is the product's #1 moat and switching cost.
 
 ---
 
@@ -558,7 +560,7 @@ Rules:
 3. Do not end without running `/wrap`. If Sebastian hasn't said "wrap it up" yet, remind him.
 
 ### Planning Rule
-- For any non-trivial feature (anything touching the RAG pipeline, Offer Brain, Recall.ai, or Supabase schema), write out the full implementation plan **before writing any code.** Wait for Sebastian's approval before proceeding.
+- For any non-trivial feature (anything touching the RAG pipeline, Sales DNA, Recall.ai, or Supabase schema), write out the full implementation plan **before writing any code.** Wait for Sebastian's approval before proceeding.
 
 ### Completion Rule
 - When finishing a task, explicitly list every acceptance criterion and confirm each one is met. Do not wrap up until this checklist is complete.
