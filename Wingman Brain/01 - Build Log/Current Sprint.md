@@ -6,6 +6,21 @@ This is the first file Claude reads at session start. It answers: where are we, 
 
 ---
 
+## What Was Just Completed (2026-06-01 — Session 2: Hotkey Model Fully Specified)
+
+Planning/strategy session — **no app code changed.** Produced the hardened, plan-reviewed implementation plan for the #1 build and locked several major product decisions. Working plan in `tasks/todo.md`; full narrative in today's build log (Session 2); decisions in Decisions Log (5 entries dated 2026-06-01).
+
+- **"Offer Brain" investigation → item 0k is MOOT.** Verified 3 ways it was never in the app (full-repo grep + git history; 8 nav tabs; docs only). What Sebastian remembered = the Personalize tab. Nothing to rename; the "offer" strings are the literal offer feature. Saved to Claude memory. **Sales DNA tab deferred** to the real learning build (don't rename the manual Personalize form).
+- **Hotkey model hardened to 6 phases.** `plan-reviewer` caught a CRITICAL hole: `/api/wingman/poll` is the ONLY writer of `call_transcript` — killing it first would have blanked every Flight Log/debrief/Ask-Wingman/Objection Vault. Resequenced so transcript persistence is decoupled FIRST. Stage derivation moves to post-call (keeps IntelTab); summoned cards bypass the 90s cooldown; Pusher dropped from the hot path.
+- **The 4 arrows LOCKED:** ↑ objection · ← answer · ↓ dig deeper · → close. Eyes-free directional pad; silent fade dismiss; Up Arrow default + Settings override (same phase). Research-backed for the high-ticket info-product niche.
+- **Live call memory = rolling Cole Gordon Belief Ladder scorecard** (his 7 Beliefs ≈ our 7 pillars). Read his training docs in full to design the template. Every arrow reasons over the whole call cheaply (~few cents/call).
+- **Right arrow = readiness-aware 3-state close** (🟢 close now / 🟡 lock the gap / 🔴 too early — color + state + the move). Bakes in "what am I missing?" for free.
+- **Premium moat logged:** per-rep YouTube/content ingestion ("Wingman clone") — infra already exists, ~$1–5/2,000 videos with captions; fast-follow after core ships.
+
+**Next:** Hotkey plan is plan-reviewed + approved-in-direction. To build: **restart Claude Code** (harness live) → build **Phase 0** (transcript decouple) on a branch → PR → CI/Security Review → merge. Live-call test gates Phases 3–4 (only Sebastian). D1/D5 resolved (Up Arrow + override). All detail in `tasks/todo.md` + Decisions Log.
+
+---
+
 ## What Was Just Completed (2026-06-01 — Dev Harness + CI/PR Workflow)
 
 Built the *factory* before the build sprint (full detail in `2026-06-01.md`). No app feature code changed.
