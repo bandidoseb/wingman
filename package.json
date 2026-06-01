@@ -7,6 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "electron:compile": "tsc -p tsconfig.electron.json && cp -r electron/hud electron-dist/ && cp -r electron/tray-popover electron-dist/",
     "electron:launch": "electron electron-dist/main.js",
     "electron:dev": "concurrently --kill-others \"npm run dev\" \"npm run electron:wait\"",
@@ -53,6 +55,7 @@
     "postcss": "^8",
     "serve": "^14.2.6",
     "tailwindcss": "^3.4.1",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^4.1.8"
   }
 }

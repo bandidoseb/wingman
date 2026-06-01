@@ -1,0 +1,32 @@
+name: Security Review
+
+# Anthropic's open-source AI security reviewer. On every PR it analyzes the diff with
+# semantic understanding (not regex) for: injection, auth/authz flaws, hardcoded secrets,
+# crypto issues, deserialization/RCE, XSS, and business-logic flaws including race
+# conditions. Findings post as inline PR comments. It does NOT block merge — human review
+# still required (gate yourself on its comments).
+#
+# SETUP REQUIRED (one time): add a repository secret named ANTHROPIC_API_KEY
+#   GitHub repo -> Settings -> Secrets and variables -> Actions -> New repository secret
+#
+# NOTE: This action is not hardened against prompt injection — only run it on trusted PRs
+# (i.e. your own branches, not arbitrary forks).
+
+on:
+  pull_request:
+
+permissions:
+  pull-requests: write
+  contents: read
+
+jobs:
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - uses: anthropics/claude-code-security-review@main
+        with:
+          comment-pr: true
+          claude-api-key: ${{ secrets.ANTHROPIC_API_KEY }}
