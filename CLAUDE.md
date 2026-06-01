@@ -274,7 +274,24 @@ Built on Jeremy Miner (NEPQ) + Cole Gordon methodology. This is the default Wing
 
 ⚠️ **ALWAYS wait for Sebastian's explicit approval before running any push command.** Show changes first, get a "yes", then push.
 
-### Desktop app update:
+**Workflow: branch → PR → review → merge (adopted 2026-05-31).** Never commit feature work directly to `main`. `main` is the live product — merging to it deploys to Railway. So:
+
+### Web/backend change (the normal flow):
+```bash
+git checkout -b descriptive-branch-name
+git add -A
+git commit -m "describe what changed"
+git push -u origin descriptive-branch-name
+gh pr create --fill
+```
+On the PR, two GitHub Actions run automatically:
+- **CI** (`.github/workflows/ci.yml`) — typecheck (web + electron) + unit tests. Must pass.
+- **Security Review** (`.github/workflows/security-review.yml`) — AI security scan, posts inline comments. Does not block; read its findings.
+
+Once green and reviewed, merge the PR → **Railway auto-deploys `main`.**
+
+### Desktop app update (release):
+After the relevant change is merged to `main`:
 ```bash
 cd "/Users/sebastianperez/Desktop/Wingman CC"
 npm version patch
@@ -282,16 +299,12 @@ git push && git push --tags
 ```
 GitHub Actions auto-builds, signs, packages .dmg, uploads to GitHub Releases, auto-updates existing installs.
 
-### Web/backend change:
-```bash
-git add -A
-git commit -m "describe what changed"
-git push
-```
-Railway auto-deploys on push.
-
 ### Database change:
 Paste SQL in Supabase SQL Editor → Run. No code push needed.
+
+### One-time setup for the new workflow (Sebastian):
+- Add a GitHub repo secret `ANTHROPIC_API_KEY` (Settings → Secrets and variables → Actions) so Security Review can run.
+- Optional but recommended: enable branch protection on `main` (require CI to pass before merge).
 
 ---
 
@@ -382,49 +395,11 @@ Before writing the first line of any change, answer these questions:
 
 ### The Review Checklist
 
-Work through this during Pass 2. Each item is a real category of bug that has caused production failures in this codebase.
+The full review checklist now lives in the **`wingman-reviewer`** subagent (`.claude/agents/wingman-reviewer.md`) — moved out of this file so it runs as an automated **fresh-context review on every diff** (more reliable than an always-loaded checklist, and it keeps this file lean per Anthropic's guidance that bloated CLAUDE.md files get ignored).
 
-#### 💸 Cost & Billing Exposure
-- Every `addEventListener` / `ipcRenderer.on()` has a paired remove that uses a **named handler reference** — `removeAllListeners()` is forbidden. Listener stacking means every call after the first multiplies transcript volume, AI token consumption, and signal card firing.
-- Every server endpoint that calls a paid external API (Recall AI, Anthropic, OpenAI) has per-user rate limiting.
-- No polling loop or `setInterval` can outlive the session that started it. Timer references are stored and cleared on stop.
-- Retry logic (if any) has a maximum attempt count and exponential backoff — no infinite loops against paid APIs.
-- Every `fetch()` to an external API has a timeout via `AbortController`. A hung request to Recall AI or Railway with no timeout will leave `isStarting = true` forever, permanently blocking call starts until the app is force-quit. 5–10 seconds is the right timeout for real-time call operations.
+**Pass 2 is now: run the `wingman-reviewer` subagent on the diff before presenting any code change as done.** It covers — in full — cost & billing exposure, security, race conditions & state integrity, silent failures, Electron-specific pitfalls, TypeScript integrity, and completeness/trust-boundary checks.
 
-#### 🔒 Security
-- Zero API keys, service role keys, or secrets in any file that ships in the Electron binary or runs client-side. All secrets live in `.env.local` (Next.js server) or Railway environment variables (server-side only).
-- Every API route that touches Recall AI, Stripe, or Anthropic validates the caller's Supabase session first — `supabase.auth.getUser()`, not just checking a header exists.
-- Auth errors return `401` immediately and log a warning — they never fall through to the actual API call.
-- `token` values are never logged to `console.log` — only their presence/absence.
-
-#### ⚡ Race Conditions & State Integrity
-- Any async function that can be triggered from multiple sources (button, keyboard shortcut, IPC, tray) has a re-entrancy guard (`isStartingRef`, `isEndingRef`, or equivalent) that is set at the top and cleared in ALL exit paths — success, failure, and early return.
-- `isRunning` and any other "session is active" flags are set to `true` only **after** the async operation confirms success — never optimistically before.
-- Any timer that shows/hides a window is stored as a reference so a competing event can cancel it before it fires.
-- State rollback on failure: if an operation sets `callActive = true` and then fails, it sets `callActive = false` before returning. Every flag that gets set in the happy path gets unset in the failure path.
-
-#### 🔇 Silent Failures (The Invisible Bug)
-- No `catch {}` block is empty or comment-only. Every caught error is at minimum `console.error`-logged with enough context to diagnose in production (which function, what was being attempted, what the error was).
-- No early return from an async function leaves a ref (`isEndingRef.current`, `isStarting`) in a stuck `true` state — every early return resets it first.
-- If a `fetch()` to an internal API fails, the calling code handles the failure visibly — not silently. A failed session PATCH should at minimum log; a failed Recall AI token fetch should surface an error to the user.
-- **For every error path, answer: what does the user see right now?** If the answer is "nothing" or "the UI looks frozen" or "I don't know" — the error handling is incomplete regardless of how clean the code is. Every failure must produce a visible outcome: an error banner, a reset to idle state, a log entry, something. Silent failures feel like bugs even when the underlying data is fine.
-
-#### 🏗️ Electron-Specific
-- `ipcRenderer.on()` listeners in `preload.ts` use named references and `removeListener()` — never `removeAllListeners()`.
-- `dialog.showMessageBox()` (async) is always used — never `showMessageBoxSync()` which blocks all IPC including live call events.
-- Windows are never assumed to be ready immediately after `show()` or `loadURL()` — use `did-finish-load` or the preload buffer pattern for messages that must arrive after load.
-- The Electron main process and the Next.js renderer are separate processes. A state change in one (e.g. `callActive = false`) does not automatically update the other — always send an explicit IPC message.
-
-#### 🧩 TypeScript Integrity
-- Types declared in `src/types/index.ts` (`WingmanBridge`, `RecallOptions`, etc.) match what the code actually passes and returns. If an IPC handler returns `{ success: false, error: "no_auth" }`, the type declares `error?: string`.
-- No `as unknown as X` or double-cast to escape type errors — fix the underlying type instead.
-- `any` types on SDK boundaries (Recall AI `evt`) are acceptable with an eslint-disable comment explaining why. `any` everywhere else is a red flag.
-
-#### ✅ Completeness
-- Every new module-level variable introduced in a change is initialized, used, and cleaned up. No variables added "just in case" that are never read.
-- If a new error code is returned from an IPC handler, the web app has a corresponding branch that handles it — it never silently falls through to the generic error.
-- New API routes are registered in the correct Next.js folder (`app/api/`) and match the URL the caller expects.
-- **Trust boundaries are validated on both sides.** IPC handlers and API routes are the boundary between untrusted input and trusted logic. Validate shape and presence of inputs at every IPC handler (`callId` should exist before using it, `token` should be a non-empty string before passing it to auth). Never assume the caller sent what you expect — assume they sent garbage and prove otherwise.
+Backing it up deterministically: a **`tsc` typecheck gate** (Stop hook in `.claude/settings.json` → `.claude/hooks/typecheck-gate.sh`) blocks any coding turn from ending while TypeScript is broken (web + electron). Hooks are enforced; CLAUDE.md is advisory.
 
 ---
 
