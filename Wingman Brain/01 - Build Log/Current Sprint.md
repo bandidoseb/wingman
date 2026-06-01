@@ -1,8 +1,21 @@
 # Current Sprint
 
-Last updated: 2026-05-31
+Last updated: 2026-06-01
 
 This is the first file Claude reads at session start. It answers: where are we, what's next, and what's blocking us.
+
+---
+
+## What Was Just Completed (2026-06-01 — Dev Harness + CI/PR Workflow)
+
+Built the *factory* before the build sprint (full detail in `2026-06-01.md`). No app feature code changed.
+
+- **Dev harness merged (PR #1):** `wingman-reviewer` + `plan-reviewer` subagents (Review Checklist moved out of CLAUDE.md), a Stop hook that blocks ending a coding turn unless `tsc` (web+electron) + `npm test` pass, a PreToolUse hook that blocks `.env` edits, and **Vitest + 28 unit tests** on pure logic.
+- **Branch → PR → review → merge workflow adopted.** CI + Security Review GitHub Actions run on every PR. Branch protection active on `main` (require PR, require `checks`, up-to-date branches, block force pushes). `ANTHROPIC_API_KEY` secret added.
+- **Security:** rotated an exposed GitHub PAT, moved to tokenless remote + keychain, fixed `gh` to the `bandidoseb` account.
+- **Researched** state-of-the-art Claude Code workflows (Boris Cherny / Anthropic team methods) and applied them to the harness.
+
+> ⚠️ **The harness only activates on a fresh Claude Code session.** Restart Claude Code before the next build so the hooks + reviewer agents are live.
 
 ---
 
@@ -218,6 +231,12 @@ This was a **decisions/logging session — no app code changed, nothing pushed.*
 ---
 
 ## What's Next (Priority Order)
+
+**#1 — 🎯 BUILD THE HOTKEY SIGNAL-CARD MODEL + REAL SALES DNA.** This is the next build, decided 2026-05-31 (full spec in `Decisions Log.md`). Two coupled cores:
+  - **Hotkey model:** rep presses Up Arrow → fixed menu → generate-on-pick. Demote keyword classifier to silent scout, remove stage bar → ambient dot, kill live Sonnet stage polling, $0-continuous / pay-on-keypress. Replaces the autonomous pop-up model that's currently built.
+  - **Sales DNA:** the per-user learning JSON that **does not exist yet** (today `rep-profile.ts` only assembles call stats). Needs a schema decision (Sebastian approval) + a post-call delta-update step + a loader.
+  - **How to start:** restart Claude Code (harness must be live) → run the build through the `plan-reviewer` subagent → present the hardened plan for approval → build on a branch (gate + `wingman-reviewer` enforce quality) → PR → CI/Security Review → merge. Do the two cores SERIALLY (shared live-pipeline state); parallelize the backlog below only after.
+  - **Gate to "done" = live testing on a real call** — only Sebastian can do this; no agent can.
 
 0k. 🏷️ **App + code-wide rename: "Offer Brain" → "Sales DNA"** — The term is renamed product-wide (decision 2026-05-31). CLAUDE.md and the Wingman skill doc are already updated. **Everything else still says "Offer Brain" and must be changed:**
   - **User-facing copy first** (highest priority — Sebastian confirmed it shows on the dashboard app): every place the UI says "Offer Brain" → "Sales DNA". Sweep `src/components/dashboard/` (Settings, Home, Intel tabs, reset flow), onboarding components, and any paywall/marketing copy.
