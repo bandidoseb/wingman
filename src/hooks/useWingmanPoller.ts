@@ -11,7 +11,6 @@ import type {
   WingmanPollResponse,  // used in PusherScorecardEvent type below
 } from "@/types";
 import { DEFAULT_SCORECARD } from "@/types";
-import { POLL_INTERVALS } from "@/lib/wingman/poll-intervals";
 import { checkKeywordTriggers } from "@/lib/wingman/keyword-triggers";
 import type { VaultObjection } from "@/types";
 
@@ -371,7 +370,52 @@ export function useWingmanPoller({
     [objections, runKBCheck, fireSignal]
   );
 
-  // ── Auto-poll timer — restarts whenever stage or isActive changes ─────────
+  // Persist current buffer to /transcript (no AI, no Pusher).
+  // Replaces executePoll as the auto-save heartbeat so transcript rows are
+  // written independently of the Sonnet poll (which Phase 1 removes).
+  const executeTranscriptSave = useCallback(async () => {
+    const chunk = chunkBufferRef.current.trim();
+    if (!chunk || !callIdRef.current || isPollingRef.current) return;
+
+    chunkBufferRef.current = "";
+    isPollingRef.current = true;
+
+    const restoreChunk = () => {
+      chunkBufferRef.current = chunkBufferRef.current
+        ? chunk + "\n" + chunkBufferRef.current
+        : chunk;
+    };
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10_000);
+
+    try {
+      const res = await fetch("/api/wingman/transcript", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ call_id: callIdRef.current, transcript_chunk: chunk }),
+        signal: controller.signal,
+      });
+
+      if (!res.ok) {
+        restoreChunk();
+        console.error("[Wingman] Transcript save failed:", (await res.json().catch(() => ({}))).error);
+      }
+    } catch (err) {
+      restoreChunk();
+      if (err instanceof Error && err.name === "AbortError") {
+        console.warn("[Wingman] Transcript save timed out — will retry on next interval.");
+      } else {
+        console.error("[Wingman] Transcript save error:", err);
+      }
+    } finally {
+      clearTimeout(timeoutId);
+      isPollingRef.current = false;
+    }
+  }, []);
+
+  // ── Transcript-save heartbeat — fixed 25s cadence, no AI cost ────────────
+  // Decoupled from stage; Phase 1 removes executePoll entirely.
   useEffect(() => {
     if (intervalRef.current) {
       clearInterval(intervalRef.current);
@@ -380,13 +424,11 @@ export function useWingmanPoller({
 
     if (!isActive || !callId) return;
 
-    const interval = POLL_INTERVALS[stage] ?? 30_000;
-
     intervalRef.current = setInterval(() => {
       if (chunkBufferRef.current.trim()) {
-        executePoll();
+        executeTranscriptSave();
       }
-    }, interval);
+    }, 25_000);
 
     return () => {
       if (intervalRef.current) {
@@ -394,12 +436,12 @@ export function useWingmanPoller({
         intervalRef.current = null;
       }
     };
-  }, [isActive, stage, callId, executePoll]);
+  }, [isActive, callId, executeTranscriptSave]);
 
   /** Flush any buffered transcript chunks immediately — call on call end */
   const flushBuffer = useCallback(async () => {
-    await executePoll();
-  }, [executePoll]);
+    await executeTranscriptSave();
+  }, [executeTranscriptSave]);
 
   return {
     scorecard,
