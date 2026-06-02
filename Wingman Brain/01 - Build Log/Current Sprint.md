@@ -1,8 +1,21 @@
 # Current Sprint
 
-Last updated: 2026-06-01
+Last updated: 2026-06-02
 
 This is the first file Claude reads at session start. It answers: where are we, what's next, and what's blocking us.
+
+---
+
+## What Was Just Completed (2026-06-02 — Phase 0: Transcript Decouple)
+
+**PR #4 merged** (`feat/phase0-transcript-decouple`). Live-tested ✅.
+
+- **New `POST /api/wingman/transcript`** — saves `call_transcript` rows with zero AI cost (no Sonnet, no Pusher). Auth + call ownership check + same parse/insert logic as the poll route.
+- **`useWingmanPoller.ts` rewired** — `executeTranscriptSave` added; timer now runs every 25s (fixed, was stage-dependent 8–90s); `flushBuffer` (called on call end) routes to the new endpoint. `POLL_INTERVALS` import removed. `executePoll` stays as dead code — Phase 1 removes it.
+- **Live-tested** — transcript rows confirmed in Flight Log (exact spoken words), post-call debrief confirmed firing. Phase 0 acceptance criteria met.
+- **Disposition HUD bug observed** (second call of session — buttons unresponsive, HUD auto-dismissed). Pre-existing issue, logged as Known Issue #35. Investigation task spawned.
+
+**Next:** Phase 1 — stages → post-call; retire the live Sonnet poll.
 
 ---
 
@@ -15,9 +28,6 @@ Planning/strategy session — **no app code changed.** Produced the hardened, pl
 - **The 4 arrows LOCKED:** ↑ objection · ← answer · ↓ dig deeper · → close. Eyes-free directional pad; silent fade dismiss; Up Arrow default + Settings override (same phase). Research-backed for the high-ticket info-product niche.
 - **Live call memory = rolling Cole Gordon Belief Ladder scorecard** (his 7 Beliefs ≈ our 7 pillars). Read his training docs in full to design the template. Every arrow reasons over the whole call cheaply (~few cents/call).
 - **Right arrow = readiness-aware 3-state close** (🟢 close now / 🟡 lock the gap / 🔴 too early — color + state + the move). Bakes in "what am I missing?" for free.
-- **Premium moat logged:** per-rep YouTube/content ingestion ("Wingman clone") — infra already exists, ~$1–5/2,000 videos with captions; fast-follow after core ships.
-
-**Next:** Hotkey plan is plan-reviewed + approved-in-direction. To build: **restart Claude Code** (harness live) → build **Phase 0** (transcript decouple) on a branch → PR → CI/Security Review → merge. Live-call test gates Phases 3–4 (only Sebastian). D1/D5 resolved (Up Arrow + override). All detail in `tasks/todo.md` + Decisions Log.
 
 ---
 
