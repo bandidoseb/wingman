@@ -285,7 +285,7 @@ This was a **decisions/logging session — no app code changed, nothing pushed.*
 
 0a. ✅ **Quick win: eliminate background Haiku KB scan** — DONE. Removed 2026-04-26.
 
-0b. ✅ **WebSocket push migration (Pusher)** — DONE. Built 2026-04-26. NOT YET TESTED on a live call — Electron dev window blocked by onboarding issue. Fix: Supabase → profiles → `onboarding_completed = true`. Then test per steps in 2026-04-26.md.
+0b. ⚠️ **WebSocket push migration (Pusher)** — SUPERSEDED 2026-06-02. The hotkey pivot removes the need for server-pushed cards (summoned cards return synchronously in the `/kb-signal` response). Do NOT test/finish Pusher — the hotkey phases remove it (Phase 5 rips out the leftover path). See `05 - Operations/WebSocket Push Migration Plan.md` (marked obsolete).
 
 0c. 📊 **PostHog analytics** — wire up PostHog for product analytics. Free at beta scale. Need to know: which features fire, whether signal cards get dismissed immediately, which stages cause drop-off. Dedicated session. Add `NEXT_PUBLIC_POSTHOG_KEY` to env.
 
