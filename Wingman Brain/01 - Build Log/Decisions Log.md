@@ -8,6 +8,31 @@ Last updated: 2026-05-31
 
 ## 2026
 
+### 2026-06-01 — Hotkey signal cards: input = the 4 arrow keys (directional)
+**Decision:** The hotkey menu is driven by the **4 arrow keys** as an eyes-free directional pad, not number keys. Locked mapping: **↑ Handle objection · ← Answer their question · ↓ Dig deeper · → Close it / ask for the sale.** Up also summons the menu (double-tap Up = instant objection help). Menu = a compass matching the keys; dismiss = silent ~5s fade + small "esc" hint (no ticking countdown). Default key = Up Arrow with a Settings override shipping in the same phase (needs a `profiles.call_hotkey` column — show SQL before running).
+**Why:** Arrows are findable by touch without looking; "never asking for the sale" is the #1 closer failure (research-backed) so Close earns the 4th slot over a generic search bar or a framework-check arrow. "Search" deferred (free-text needs a focusable input). Replaces the earlier "1–5 number keys / 5 slots" idea.
+**Status:** Locked. Detail in `tasks/todo.md`.
+
+### 2026-06-01 — Live call memory = rolling Cole Gordon "Belief Ladder" scorecard
+**Decision:** Every arrow card is built from a **rolling, distilled call summary** (updated in the background by cheap Haiku, ~a few cents/call) + the last ~90s (exact words) + offer/content + the technique KB. The summary is structured as a live **Cole Gordon Belief Ladder** scorecard. KEY INSIGHT: Cole's 7 Beliefs ≈ Wingman's existing 7 pillars (Pain=core_problem, Doubt=cant_diy, Cost=cost_of_waiting, Desire=dream_outcome, Money=investment_readiness, Support=whos_involved, Trust=why_you). Tracks THE GAP (current "hell"/desired "heaven" + $ number + why + final straw + core driver), each belief's status + evidence, the prospect's exact words, open objections, and the WEAKEST LINK.
+**Why:** A 90s window loses earlier context; can't send the full transcript every press (cost/latency/dilution). The rolling summary gives full-call context cheaply and replaces the `prospect_anchors` emotional memory lost when the live Sonnet poll is killed. Structure grounded in Cole Gordon's training docs (read in full this session).
+**Status:** Locked into the core build. Template in `tasks/todo.md`.
+
+### 2026-06-01 — Right arrow (Close) = readiness-aware, 3-state output
+**Decision:** Pressing Right computes a close-readiness score from the live Belief Ladder and shows a **color (red→green) + a 2–3 word state + the move**: 🟢 "Close now" + the assumptive close in the prospect's words/number; 🟡 "Almost — lock <gap>" + the question to close the gap; 🔴 "Too early" + the move to build the missing belief. Pair color with words (never a bare gauge or raw %). Readiness on-demand only (never on the ambient dot).
+**Why:** Protects against the two biggest close mistakes at once — closing too early (red) and never asking (green). The "weakest link" makes the framework-check ("what am I missing?") free, so no separate arrow is needed. The quality of the suggested lines will need live fine-tuning; the architecture is what's locked.
+**Status:** Locked. Detail in `tasks/todo.md`.
+
+### 2026-06-01 — Per-rep content ingestion ("Wingman clone") = premium moat (deferred)
+**Decision:** Build (later, as a premium tier) a per-rep content KB: a rep pastes their YouTube channel/blog → Wingman ingests it → "Answer their question" searches **their own content first** (on-brand, founder-voice), then manual offer fields, then general LLM only as a guarded last resort. Inspired by Delphi.ai (which Sebastian uses live via Mark Podolsky's clone).
+**Why:** General LLMs are generic and wrong on offer-specific/tax/legal questions; the rep's own content is accurate + a switching-cost moat. Infra already exists (`knowledge-base/ingest.js` does YouTube→transcript→embeddings). Cost is low (~$1–5 one-time for ~2,000 videos with free captions; ~$150 if audio must be transcribed).
+**Status:** Logged as a high-priority fast-follow / premium feature AFTER the core hotkey model ships. Not on the v1 critical path.
+
+### 2026-06-01 — "Offer Brain → Sales DNA" rename (Sprint item 0k) is moot
+**Decision:** Item 0k is closed as a phantom task. "Offer Brain" was **never in the app code** — verified via full-repo grep + `git log --all -S "Offer Brain"` across src/ + electron/ (zero hits, any commit). It lived only in docs (CLAUDE.md, this vault, `tasks/*.html`). The 8 nav tabs contain no "Offer Brain"; what Sebastian remembered is the **Personalize** tab (offer URL crawl). The "offer" strings in the app are the literal offer feature and must NOT be renamed.
+**Why:** Nothing says "offer_brain"/"Offer Brain", so there is nothing to sweep; a careless rename would corrupt the real offer feature. A visible "Sales DNA" surface belongs with the real Sales DNA learning build (deferred). Saved to Claude memory (`project_offer_brain_phantom.md`). CLAUDE.md's note that "DB columns may still say offer_brain" is incorrect.
+**Status:** Closed / moot.
+
 ### 2026-05-31 — Signal cards become hotkey-summoned, not autonomous (major pivot)
 **Decision:** Wingman no longer decides on its own when to surface a signal card. The rep summons help with a single hotkey. Pressing it opens a small fixed menu of options; Wingman generates the card for the option the rep picks.
 **Why this is the right call:**
