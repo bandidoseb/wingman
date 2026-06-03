@@ -110,10 +110,12 @@ Idea (Sebastian, inspired by Delphi.ai, which he uses on live calls): let a rep 
 - HUD: hide `#stageBar`, keep `#ambientDot`.
 - **Accept:** call → ambient dot only, no pop-ups → Flight Log complete → IntelTab heatmap populated from post-call stages.
 
-### Phase 2 — Scout + rolling Belief Ladder memory (no UI)
-- `keyword-triggers.ts` — add `scoutTags(chunk, repSpeaker)`; keep `checkKeywordTriggers` shape (tests).
-- Rolling buffer (time+size capped) + scout tags + context loaded once at call start (rep-profile / flight plan / objections).
-- **Rolling Belief Ladder summarizer (the live call memory):** a background Haiku call (~every 90–120s) keeps the structured Belief Ladder scorecard updated ([current summary]+[new transcript]→[updated summary]); the fixed field structure lives in its system prompt. This is the full-call context every arrow reads. **~a few cents/call (D4) — NOT zero.**
+### Phase 2 — Rolling Belief Ladder memory (no UI) — SIMPLIFIED 2026-06-02
+> Full spec: `00 - Product/Phase 2 — Live Call Memory Design.md`. **Scout CUT for v1.**
+- **NO scout.** (`keyword-triggers.ts` autonomous cards removed regardless; the tagger idea is deferred — the timer + live buffer make it unnecessary for v1.)
+- Rolling buffer (time+size capped) + context loaded once at call start (rep-profile / flight plan / objections).
+- **Rolling Belief Ladder summarizer (the live call memory):** a background Haiku call keeps the structured Belief Ladder scorecard updated ([current summary]+[only new transcript]→[updated summary]); fixed field structure lives in its system prompt. **Timer-driven** (at most ~once/60s, at least ~once/2min), **rate-bounded** (pennies/call), and **client-triggered** (the app pings a `/summarize` endpoint — Vercel-safe, no server-side long-lived timer).
+- The summary is the full-call context every arrow reads. At press time the card = ONE call: summary + live ~90s buffer + action, with **"recent transcript OVERRIDES summary"** as a hard precedence rule (lock in the prompt).
 - **Accept:** logs show the Belief Ladder summary filling correctly over a call (gap · 7 beliefs · exact quotes · weakest link); zero UI change.
 
 ### Phase 3 — Hotkey + 4-arrow compass menu + the objection slot end-to-end (highest risk, the milestone)

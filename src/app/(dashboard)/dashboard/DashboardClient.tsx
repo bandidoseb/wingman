@@ -15,7 +15,7 @@ import PersonalizeTab from "@/components/dashboard/PersonalizeTab";
 import FlightPlanTab from "@/components/dashboard/FlightPlanTab";
 import PaywallModal from "@/components/ui/PaywallModal";
 import { FREE_CALL_LIMIT } from "@/lib/constants";
-import { getStagesForRole, getDefaultStage } from "@/lib/wingman/poll-intervals";
+import { getDefaultStage } from "@/lib/wingman/poll-intervals";
 import { useWingmanPoller } from "@/hooks/useWingmanPoller";
 import { useRecallTranscript } from "@/hooks/useRecallTranscript";
 
@@ -43,7 +43,6 @@ export default function DashboardClient({
   userId,
 }: Props) {
   const router = useRouter();
-  const stages      = getStagesForRole();
   const defaultStage = getDefaultStage();
 
   // ── Tab / UI state ─────────────────────────────────────────────────────────
@@ -88,7 +87,6 @@ export default function DashboardClient({
   const {
     scorecard,
     currentSignal,
-    completedStages,
     prospectName,
     addChunk,
     dismissSignal,
@@ -245,11 +243,6 @@ export default function DashboardClient({
           body: JSON.stringify({
             call_id:       callId,
             prospect_name: prospectName ?? undefined,
-            stages: completedStages.map((s, idx) => ({
-              name: s,
-              status: "complete",
-              display_order: idx,
-            })),
           }),
         });
         setSavedMessage("Saved to Flight Log ✓");
@@ -266,7 +259,7 @@ export default function DashboardClient({
       // future calls to handleEndCall must not be permanently blocked.
       isEndingRef.current = false;
     }
-  }, [callId, completedStages, defaultStage, prospectName, flushBuffer, router]);
+  }, [callId, defaultStage, prospectName, flushBuffer, router]);
 
   // ── Auto-ended by Recall AI (meeting lost, inactivity, 2h cap) ────────────
   // Electron already stopped Recall AI before this fires, so we must NOT call
@@ -274,70 +267,86 @@ export default function DashboardClient({
   // so it won't double-stop, but we call endCall() specifically to pass the callId
   // + token to Electron so the HUD outcome card can appear and save correctly.
   const handleAutoEnd = useCallback(async () => {
-    setIsActive(false);
+    // Re-entrancy guard: SHARED with handleEndCall via isEndingRef. If the user
+    // clicks End Call / hits the hotkey at the same instant Recall AI auto-stops
+    // (meeting lost, inactivity, 2h cap), both handlers would otherwise run the
+    // end-flow for the same call — firing two session PATCHes. That double-bills
+    // the post-call Sonnet job, double-charges the user's call quota, and races
+    // the call_stages write. Whichever path sets the guard first wins; the other
+    // bails here. Safe to bail: the winning path stops Recall AI (idempotent) and
+    // shows the HUD outcome card, so nothing is dropped.
+    // NOTE: the check + set MUST stay outside the try below — otherwise a bailed
+    // re-entrant call would run the finally and clear the guard the winner set.
+    if (isEndingRef.current) return;
+    isEndingRef.current = true;
 
-    // If there's no active call session, nothing to process.
-    if (!callId) return;
+    try {
+      setIsActive(false);
 
-    // Only start the skeleton after confirming there's a real call to track.
-    setPendingOutcome(true);
-    pendingCallIdRef.current = callId;
+      // If there's no active call session, nothing to process.
+      if (!callId) return;
 
-    // Capture callId now — it will be cleared by setCallId(null) below
-    const activeCallId = callId;
+      // Only start the skeleton after confirming there's a real call to track.
+      setPendingOutcome(true);
+      pendingCallIdRef.current = callId;
 
-    // Flush any buffered transcript chunks before closing the session.
-    await flushBuffer();
+      // Capture callId now — it will be cleared by setCallId(null) below
+      const activeCallId = callId;
 
-    // Run session PATCH and token fetch in parallel — no reason to wait for one
-    // before starting the other, and doing both at once cuts ~500ms off the delay
-    // before the outcome card appears.
-    const supabase = createClient();
-    const [patchResult, sessionResult] = await Promise.allSettled([
-      fetch("/api/wingman/session", {
-        method: "PATCH",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          call_id:       activeCallId,
-          prospect_name: prospectName ?? undefined,
-          stages: completedStages.map((s, idx) => ({
-            name: s,
-            status: "complete",
-            display_order: idx,
-          })),
+      // Flush any buffered transcript chunks before closing the session.
+      await flushBuffer();
+
+      // Run session PATCH and token fetch in parallel — no reason to wait for one
+      // before starting the other, and doing both at once cuts ~500ms off the delay
+      // before the outcome card appears.
+      const supabase = createClient();
+      const [patchResult, sessionResult] = await Promise.allSettled([
+        fetch("/api/wingman/session", {
+          method: "PATCH",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            call_id:       activeCallId,
+            prospect_name: prospectName ?? undefined,
+          }),
         }),
-      }),
-      supabase.auth.getSession(),
-    ]);
+        supabase.auth.getSession(),
+      ]);
 
-    if (patchResult.status === "fulfilled" && patchResult.value.ok) {
-      setSavedMessage("Saved to Flight Log ✓");
-      setTimeout(() => setSavedMessage(null), 4000);
-      router.refresh();
-    } else {
-      // Non-fatal — call record is already saved, this just updates stage data
-      console.error("[handleAutoEnd] Failed to patch session stages");
-    }
-
-    // Show the HUD outcome card so the rep can log the result.
-    // We pass callId + a fresh token so the HUD can authenticate the save.
-    // stopRecallAI() is already stopped — endCall() here is safe (idempotent guard
-    // inside stopRecallAI prevents any double-stop side effects).
-    if (typeof window !== "undefined" && window.wingman) {
-      const token = sessionResult.status === "fulfilled"
-        ? sessionResult.value.data.session?.access_token
-        : undefined;
-
-      if (sessionResult.status === "rejected") {
-        console.error("[handleAutoEnd] Failed to get Supabase session — outcome card shown without token");
+      if (patchResult.status === "fulfilled" && patchResult.value.ok) {
+        setSavedMessage("Saved to Flight Log ✓");
+        setTimeout(() => setSavedMessage(null), 4000);
+        router.refresh();
+      } else {
+        // Non-fatal — call record is already saved, this just updates stage data
+        console.error("[handleAutoEnd] Failed to patch session stages");
       }
 
-      window.wingman.endCall(activeCallId, token);
-    }
+      // Show the HUD outcome card so the rep can log the result.
+      // We pass callId + a fresh token so the HUD can authenticate the save.
+      // stopRecallAI() is already stopped — endCall() here is safe (idempotent guard
+      // inside stopRecallAI prevents any double-stop side effects).
+      if (typeof window !== "undefined" && window.wingman) {
+        const token = sessionResult.status === "fulfilled"
+          ? sessionResult.value.data.session?.access_token
+          : undefined;
 
-    setCallId(null);
-    setStage(defaultStage);
-  }, [callId, completedStages, defaultStage, prospectName, flushBuffer, router]);
+        if (sessionResult.status === "rejected") {
+          console.error("[handleAutoEnd] Failed to get Supabase session — outcome card shown without token");
+        }
+
+        window.wingman.endCall(activeCallId, token);
+      }
+
+      setCallId(null);
+      setStage(defaultStage);
+    } finally {
+      // Always reset the guard — including the early !callId return and any throw —
+      // so a future call's end-flow (manual or auto) is never permanently blocked.
+      // handleStartCall does not touch isEndingRef, so this finally is the only
+      // thing that clears it on the auto-end path.
+      isEndingRef.current = false;
+    }
+  }, [callId, defaultStage, prospectName, flushBuffer, router]);
 
   // Stable refs so the IPC listener (registered once) always calls latest handlers
   const handleStartCallRef = useRef(handleStartCall);
@@ -414,11 +423,8 @@ export default function DashboardClient({
   }, [pendingOutcome]);
 
   // ── Sync state → floating HUD (Electron only) ─────────────────────────────
-  useEffect(() => {
-    if (!isElectron) return;
-    window.wingman?.sendStage({ current: stage, all: stages, completed: completedStages });
-  }, [stage, stages, completedStages, isElectron]);
-
+  // (Stage bar retired in Phase 1 — stage data is derived post-call now, so the
+  // live stage sync to the HUD was removed. Signal + scorecard sync remain.)
   useEffect(() => {
     if (!isElectron || !currentSignal) return;
     window.wingman?.sendSignal({

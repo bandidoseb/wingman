@@ -8,6 +8,22 @@ Last updated: 2026-05-31
 
 ## 2026
 
+### 2026-06-02 — Scout CUT from v1; live call summary is timer-driven
+**Decision:** The "scout" (demoting `keyword-triggers.ts` to a silent tagger that triggers summary updates) is **removed from the v1 hotkey build.** The rolling Belief Ladder summary instead updates purely **on a timer** (at most once/~60s, at least once/~2min), rate-bounded to pennies/call, written by a background Haiku call that reads [current summary] + [only the new transcript since last update].
+**Why:** The scout was a *responsiveness* optimization, not load-bearing. The summary stays fresh on the timer, and the live ~90s buffer (sent at press time) already covers recency — so a scout miss can't cause a wrong card. It added build + mental complexity for marginal benefit. Revisit only if real calls show the ~2min lag causing a visibly stale card (unlikely). The autonomous keyword *cards* are removed regardless (hotkey model fires nothing unsummoned).
+**Also locked:** the summary updater is **client-triggered** (the app pings a `/summarize` endpoint every ~2min) — never a server-side long-lived timer — so it runs on Railway now AND Vercel later with zero rework.
+**Status:** Locked. Full spec: `00 - Product/Phase 2 — Live Call Memory Design.md`.
+
+### 2026-06-02 — Card generation = ONE call, "recent transcript overrides summary"
+**Decision:** A summoned card is generated in a **single** Haiku call carrying [picked action] + [pre-digested Belief Ladder summary] + [live ~90s raw buffer] + [KB techniques as examples]. A hard precedence rule lives in the prompt: **the recent transcript is the most current truth and OVERRIDES the summary on any conflict.**
+**Why:** Solves speed and correctness together. Speed: the model reads a tiny summary + short clip, not the whole call (heavy work pre-done in the background) → ~1s. Correctness: if a belief was just addressed but the summary lags, the model sees it in the raw clip and trusts the clip → no wrong card. We explicitly do NOT "summarize-then-generate" on press (that doubles the wait); freshness rides in via the buffer inside the one call. The precedence rule is a prompt-design REQUIREMENT — without it, Haiku may over-trust the tidy summary over messy transcript.
+**Status:** Locked. Detail in the Phase 2 design doc.
+
+### 2026-06-02 — Prompt caching: 1-hour TTL + warm + keep-warm, and VERIFY min block size
+**Decision:** Cache the stable per-call block (system prompt + offer/Sales DNA/rep profile) with a **1-hour TTL** (not the 5-min default — presses can be 20+ min apart). **Warm** the cache at call start (tiny request) so even the first press is fast, and run a background **keep-warm** ping every ~50min so it never goes cold mid-call on long calls (Sebastian's idea). Do NOT cache the per-press dynamic parts (live buffer, current summary, retrieved KB, action).
+**⚠️ Hard caveat:** Anthropic only caches a block above a minimum size (~1–2k tokens, model-dependent). If our stable block is under it, **caching silently does nothing and we pay full price every press.** This MUST be verified at build time by reading `cache_creation_input_tokens` / `cache_read_input_tokens` from the API response — measure it, don't assume. Flag loudly in the caching task.
+**Status:** Locked as the caching plan. Speculative pre-generation remains a DEFERRED back-pocket lever (pull only if measured latency is bad AND margins allow).
+
 ### 2026-06-01 — Hotkey signal cards: input = the 4 arrow keys (directional)
 **Decision:** The hotkey menu is driven by the **4 arrow keys** as an eyes-free directional pad, not number keys. Locked mapping: **↑ Handle objection · ← Answer their question · ↓ Dig deeper · → Close it / ask for the sale.** Up also summons the menu (double-tap Up = instant objection help). Menu = a compass matching the keys; dismiss = silent ~5s fade + small "esc" hint (no ticking countdown). Default key = Up Arrow with a Settings override shipping in the same phase (needs a `profiles.call_hotkey` column — show SQL before running).
 **Why:** Arrows are findable by touch without looking; "never asking for the sale" is the #1 closer failure (research-backed) so Close earns the 4th slot over a generic search bar or a framework-check arrow. "Search" deferred (free-text needs a focusable input). Replaces the earlier "1–5 number keys / 5 slots" idea.

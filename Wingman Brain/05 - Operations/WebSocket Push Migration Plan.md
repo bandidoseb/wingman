@@ -1,7 +1,9 @@
 # WebSocket Push Migration Plan
 
 Created: 2026-04-25
-Status: Ready to build — dedicated session needed
+Status: ⚠️ **SUPERSEDED / OBSOLETE (2026-06-02)** — do not build this.
+
+> **Why this is dead:** This plan was written for the *autonomous* signal-card model, where the server decided when a card was ready and pushed it to the HUD over a Pusher WebSocket. The 2026-05-31 hotkey pivot replaces that model entirely: the **rep** now summons a card with a keypress, so the card is returned synchronously in the `/kb-signal` HTTP response — there is no server-initiated push to deliver, and therefore no need for Pusher in the live path. The hotkey phases progressively remove Pusher (Phase 1 drops the poll's scorecard push; Phase 3 makes summoned cards synchronous; Phase 5 rips out the leftover Pusher path). **Sprint item 0b ("test Pusher live") is also moot.** Kept for historical context only. Current direction = Hotkey Model Build Plan + Decisions Log (2026-05-31).
 
 ---
 
