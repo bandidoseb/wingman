@@ -126,7 +126,7 @@ export async function PATCH(req: NextRequest) {
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     const body = await req.json();
-    const { call_id, outcome, summary, duration, stages, prospect_name } = body;
+    const { call_id, outcome, summary, duration, prospect_name } = body;
 
     if (!call_id) {
       return NextResponse.json({ error: "call_id required" }, { status: 400 });
@@ -155,19 +155,9 @@ export async function PATCH(req: NextRequest) {
 
     if (error) throw error;
 
-    // Insert stage records if provided
-    if (stages && Array.isArray(stages) && stages.length > 0) {
-      const stageRows = stages.map(
-        (s: { name: string; status: string; note?: string }, idx: number) => ({
-          call_id,
-          name:          s.name,
-          status:        s.status,
-          note:          s.note ?? null,
-          display_order: idx,
-        })
-      );
-      await supabase.from("call_stages").insert(stageRows);
-    }
+    // NOTE: call_stages are no longer written here. Stage derivation moved to the
+    // post-call Sonnet job (Phase 1), which reads the full transcript and writes
+    // call_stages itself. The client no longer sends `stages` on PATCH.
 
     // ── Increment calls_used counter for free-tier users ──────────────────
     const { data: profile } = await supabase

@@ -507,9 +507,10 @@
       color: #ff3b30;
     }
 
-    /* Stage bar hidden until call actually starts */
-    #stageBar { display: none; }
-    #stageBar.active { display: flex; }
+    /* Stage bar retired in Phase 1 — always hidden. The ambient dot (#ambientDot)
+       is now the only live-call presence indicator. The stage-bar JS still runs
+       harmlessly on this hidden element; it is fully removed in Phase 5 cleanup. */
+    #stageBar { display: none !important; }
 
     /* ══════════════════════════════════════════════════════════════════════
        COMPONENT 4 — POST-CALL OUTCOME CARD

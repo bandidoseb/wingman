@@ -32,7 +32,15 @@ Return valid JSON only with this exact structure:
     "investment_readiness": { "covered": false, "evidence": null },
     "whos_involved":        { "covered": true, "evidence": "short quote ≤100 chars or null" },
     "why_you":              { "covered": false, "evidence": null }
-  }
+  },
+  "stages": [
+    { "name": "Rapport",   "status": "complete", "note": "≤60 chars: what happened, or why it was missed" },
+    { "name": "Discovery", "status": "complete", "note": "≤60 chars" },
+    { "name": "Press",     "status": "skipped",  "note": "≤60 chars" },
+    { "name": "Confirm",   "status": "complete", "note": "≤60 chars" },
+    { "name": "Pitch",     "status": "complete", "note": "≤60 chars" },
+    { "name": "Close",     "status": "skipped",  "note": "≤60 chars" }
+  ]
 }
 
 Rules for pillar_coverage — evaluate each against the full transcript:
@@ -46,6 +54,13 @@ Rules for pillar_coverage — evaluate each against the full transcript:
 * covered: true only if clearly and meaningfully addressed — not just briefly touched on
 * evidence: a short direct quote or paraphrase (≤100 chars) showing it was covered; null if not covered
 If a FLIGHT PLAN is provided, use it to inform how each pillar should have appeared on this specific call.
+
+Rules for stages — evaluate the rep against the 6-stage high-ticket close framework:
+* Output ALL SIX stages, in this exact order, with these EXACT names: Rapport, Discovery, Press, Confirm, Pitch, Close
+* Rapport: built genuine peer-level connection before business · Discovery: excavated the real pain/situation · Press: made the cost of inaction tangible · Confirm: summarized/confirmed understanding before pitching · Pitch: presented the solution tied to their stated pain · Close: asked for the sale and/or handled objections
+* status: exactly "complete" or "skipped" — "complete" only if the rep meaningfully reached and handled that stage; "skipped" if skipped or barely touched
+* note: ≤60 chars, specific to this call — what happened in that stage, or why it was missed
+* Judge only what the transcript supports — do not assume a stage happened off-transcript
 
 Other rules:
 * debrief: plain English, 2-3 sentences, specific to this call, direct and honest
@@ -64,6 +79,43 @@ const PILLAR_KEYS = [
   "whos_involved",
   "why_you",
 ] as const;
+
+// Canonical 6-stage order + exact names. IntelTab/FlightLog/Ask-Wingman all key
+// off these EXACT names — any other name is silently dropped by the heatmap.
+const STAGE_ORDER = ["Rapport", "Discovery", "Press", "Confirm", "Pitch", "Close"] as const;
+// status MUST be one of the DB CHECK-constraint values: complete|partial|skipped|early|lost
+// (001_initial_schema.sql). We use a binary complete/skipped — IntelTab only counts
+// "complete"; FlightLogTab renders "skipped" as a grey "—".
+type StageStatus = "complete" | "skipped";
+type StageRow = { name: string; status: StageStatus; note: string | null };
+
+/**
+ * Validate Sonnet's derived stages into exactly the 6 canonical rows, in order.
+ * Tolerant of partial/garbled output: any stage the model omits defaults to
+ * "skipped". Returns null only if nothing usable came back at all.
+ */
+function validateStages(raw: unknown): StageRow[] | null {
+  if (!Array.isArray(raw)) return null;
+  const byName = new Map<string, { status: StageStatus; note: string | null }>();
+
+  for (const item of raw) {
+    if (!item || typeof item !== "object") continue;
+    const o    = item as Record<string, unknown>;
+    const name = typeof o.name === "string" ? o.name.trim() : "";
+    if (!(STAGE_ORDER as readonly string[]).includes(name)) continue;
+    const status: StageStatus = o.status === "complete" ? "complete" : "skipped";
+    const note   = typeof o.note === "string" && o.note.trim() ? o.note.trim().slice(0, 60) : null;
+    byName.set(name, { status, note });
+  }
+
+  if (byName.size === 0) return null;
+
+  return STAGE_ORDER.map((name) => ({
+    name,
+    status: byName.get(name)?.status ?? "skipped",
+    note:   byName.get(name)?.note   ?? null,
+  }));
+}
 
 function validatePillarCoverage(raw: unknown): PillarCoverage | null {
   if (!raw || typeof raw !== "object") return null;
@@ -267,6 +319,7 @@ export async function POST(req: NextRequest) {
       objections_raised: string[];
       missed_topics:     string[];
       pillar_coverage?:  unknown;
+      stages?:           unknown;
     };
 
     try {
@@ -345,10 +398,43 @@ export async function POST(req: NextRequest) {
       console.warn(`[post-call] pillar_coverage malformed or missing for call ${call_id} — skipping write`);
     }
 
+    // ── 6c. Write call_stages — derived from the transcript by Sonnet ─────────
+    //        Independent step (a failure here never blocks the debrief above).
+    //        Delete-then-insert makes the job idempotent — a re-run (e.g. a
+    //        double End Call) can never create duplicate stage rows.
+    const stageRows = validateStages(analysis.stages);
+    let stagesSaved = false;
+    if (stageRows) {
+      try {
+        // supabase-js does NOT throw on a constraint/DB error — it returns it in
+        // `error`. We must read it explicitly, or a rejected insert (e.g. a bad
+        // status value) fails silently and the heatmap goes blank with no log.
+        const { error: delErr } = await service.from("call_stages").delete().eq("call_id", call_id);
+        if (delErr) console.error(`[post-call] call_stages delete failed for call ${call_id}:`, delErr);
+
+        const { error: insErr } = await service.from("call_stages").insert(
+          stageRows.map((s, idx) => ({
+            call_id,
+            name:          s.name,
+            status:        s.status,
+            note:          s.note,
+            display_order: idx,
+          }))
+        );
+        if (insErr) console.error(`[post-call] call_stages insert failed for call ${call_id}:`, insErr);
+        else        stagesSaved = true;
+      } catch (stageErr) {
+        console.error(`[post-call] call_stages write threw for call ${call_id}:`, stageErr);
+      }
+    } else {
+      console.warn(`[post-call] stages malformed or missing for call ${call_id} — skipping write`);
+    }
+
     console.log(
       `[post-call] ✓ call ${call_id} — debrief written, ` +
       `${detected.length} objection(s) processed, ` +
-      `pillar_coverage ${pillarCoverage ? "saved" : "skipped"}`
+      `pillar_coverage ${pillarCoverage ? "saved" : "skipped"}, ` +
+      `stages ${stagesSaved ? "saved" : "skipped"}`
     );
 
     return NextResponse.json({ ok: true });

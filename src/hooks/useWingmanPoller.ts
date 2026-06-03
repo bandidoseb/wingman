@@ -11,7 +11,6 @@ import type {
   WingmanPollResponse,  // used in PusherScorecardEvent type below
 } from "@/types";
 import { DEFAULT_SCORECARD } from "@/types";
-import { checkKeywordTriggers } from "@/lib/wingman/keyword-triggers";
 import type { VaultObjection } from "@/types";
 
 // ── Pusher event payload types ────────────────────────────────────────────────
@@ -234,33 +233,6 @@ export function useWingmanPoller({
     };
   }, [isActive, callId, fireSignal]);
 
-  /**
-   * RAG-powered KB signal check — fires in parallel with keyword check.
-   * Calls /api/wingman/kb-signal which runs searchKnowledge → generateSignalCard.
-   * Does NOT block addChunk — fire and forget, card appears when ready (~480ms).
-   * Only fires when keyword triggers also fire, to avoid over-triggering.
-   * Passes a scorecard snapshot so Haiku can tailor the card to this specific call.
-   */
-  const runKBCheck = useCallback(
-    (chunk: string) => {
-      const { pain_detail, gold_moment, predicted_next_objection, objection_risk, prospect_anchors } =
-        scorecardRef.current;
-      // Fire and forget — the server pushes the resulting card via Pusher.
-      // No response body processing needed.
-      fetch("/api/wingman/kb-signal", {
-        method:  "POST",
-        headers: { "content-type": "application/json" },
-        body:    JSON.stringify({
-          transcript_chunk:   chunk,
-          call_id:            callIdRef.current,
-          current_stage:      stageRef.current,
-          scorecard_snapshot: { pain_detail, gold_moment, predicted_next_objection, objection_risk, prospect_anchors },
-        }),
-      }).catch(() => { /* KB search failures are non-fatal */ });
-    },
-    []
-  );
-
   /** Send current buffer to the poll API */
   const executePoll = useCallback(async () => {
     const chunk = chunkBufferRef.current.trim();
@@ -359,15 +331,12 @@ export function useWingmanPoller({
 
       chunkBufferRef.current += (chunkBufferRef.current ? "\n" : "") + chunk;
 
-      // Keyword match → fire the signal immediately and run a KB check in
-      // parallel so a richer card can replace it if one is found.
-      const keywordHit = checkKeywordTriggers(chunk, objections, repSpeakerRef.current);
-      if (keywordHit) {
-        fireSignal(keywordHit);
-        runKBCheck(chunk);
-      }
+      // Phase 1: Wingman no longer fires cards autonomously. The keyword + KB
+      // trigger path was removed here — nothing pops up unsummoned (ambient dot
+      // only). The hotkey summon path that replaces it is built in Phase 3.
+      // addChunk now only buffers transcript + detects speaker/prospect names.
     },
-    [objections, runKBCheck, fireSignal]
+    []
   );
 
   // Persist current buffer to /transcript (no AI, no Pusher).
