@@ -178,7 +178,20 @@
       "WebFetch(domain:www.promptquorum.com)",
       "WebFetch(domain:neuraplus-ai.github.io)",
       "WebFetch(domain:docs.anthropic.com)",
-      "Bash(cd \"/Users/sebastianperez/Desktop/Wingman CC\" && echo \"=== CLAUDE.md \\(project\\) ===\" && grep -n \"Offer Brain\\\\|free to fly\\\\|Free to fly\\\\|pay when you win\\\\|Pay when you win\" CLAUDE.md; echo \"\" && echo \"=== Wingman skill SKILL.md ===\" && find ~/Library -path \"*skills/wingman/SKILL.md\" 2>/dev/null | head -5)"
+      "Bash(cd \"/Users/sebastianperez/Desktop/Wingman CC\" && echo \"=== CLAUDE.md \\(project\\) ===\" && grep -n \"Offer Brain\\\\|free to fly\\\\|Free to fly\\\\|pay when you win\\\\|Pay when you win\" CLAUDE.md; echo \"\" && echo \"=== Wingman skill SKILL.md ===\" && find ~/Library -path \"*skills/wingman/SKILL.md\" 2>/dev/null | head -5)",
+      "WebFetch(domain:www.anthropic.com)",
+      "WebFetch(domain:www.lennysnewsletter.com)",
+      "WebFetch(domain:www-cdn.anthropic.com)",
+      "WebFetch(domain:sankalp.bearblog.dev)",
+      "WebFetch(domain:newsletter.pragmaticengineer.com)",
+      "WebFetch(domain:howborisusesclaudecode.com)",
+      "WebFetch(domain:x.com)",
+      "WebFetch(domain:www.datacamp.com)",
+      "WebFetch(domain:blog.devgenius.io)",
+      "WebFetch(domain:claude.com)",
+      "WebFetch(domain:www.letanure.dev)",
+      "WebFetch(domain:www.mindstudio.ai)",
+      "WebFetch(domain:thenewstack.io)"
     ],
     "defaultMode": "bypassPermissions"
   },

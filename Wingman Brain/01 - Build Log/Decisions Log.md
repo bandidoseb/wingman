@@ -2,11 +2,26 @@
 
 A running log of every major architectural or product decision made on Wingman. Append only — never delete. Each entry captures the decision, the date, the reasoning, and any alternatives that were rejected.
 
-Last updated: 2026-05-31
+Last updated: 2026-06-03
 
 ---
 
 ## 2026
+
+### 2026-06-03 — Call framework: show 4 universal stages, coach the elite depth underneath
+**Decision:** The user-facing call structure leads with the 4 stages every closer agrees on — **Rapport · Discovery · Pitch · Close.** The other two beats from the 6-stage model (Press = cost of inaction/urgency; Confirm = the pre-pitch transition) are NOT shown as top-level stages — they're coached as **depth inside Discovery** (Press already maps to the `cost_of_waiting` pillar; Confirm = a transition coaching note). Topic coverage (the 7 pillars) is the universal, flow-agnostic layer; the rigid stage sequence is secondary context.
+**Why:** Avoids the "this isn't how I sell" friction (different schools use different labels/sequences) WITHOUT dumping the elite standard. The concepts are universal; only the jargon labels ("Press"/"Confirm") and the strict order feel imposed. Universal surface ≠ lowered bar — the opinionated standard IS the product; a coach that just mirrors a rep's existing habits is worthless. The beachhead (Cole Gordon / Closers.io) is trained on the full framework, so the depth still serves them.
+**Status:** Locked direction. Framing/copy decision — not a code change yet (Phase 1 produces the data regardless). Shapes the post-call viz redesign + the Playbook build. Detail: `_Inbox/2026-06-03 Framework universality — is the 6-stage model too opinionated.md`.
+
+### 2026-06-03 — Sales DNA personalizes CONTENT, never the framework standard
+**Decision:** Sales DNA adapts to a rep's **content** — their offer, prospect archetypes, real objections, winning language — but it does **NOT** adapt or relax the **framework / coaching standard.** It will never learn "this rep skips the close, so stop grading the close." The bar stays fixed; only the business context personalizes.
+**Why:** Sebastian's catch — if Sales DNA "learns how a rep sells," it risks codifying a *bad* rep's broken process (the student grading their own exam). Splitting **content (personalize)** from **standard (hold firm)** keeps the coaching honest while still making Wingman feel native to their specific business.
+**Status:** Locked architectural rule for the Sales DNA build (deferred — the big #1 learning build). Detail: `_Inbox/2026-06-03 Framework universality — is the 6-stage model too opinionated.md`.
+
+### 2026-06-03 — Post-call scoring visualization + close-readiness hue
+**Decision:** For the **single-call** stage/topic breakdown, use **labeled blocks colored on a continuous green→red "sunset" gradient by exact score** (not flat zone colors, not a scatter plot) — labeled categories are the easiest format for an average person to digest, and the gradient gives the dynamic, varies-every-call feel Sebastian wants. Reserve the **scatter "sunset" heatmap** (dynamically-placed dots) for an **all-calls-over-time TREND view** (x = date, y = score) where dot position actually encodes something. The **right-arrow close-readiness** indicator = a **continuous hue** (red→yellow→green) that flows with the live belief score, always paired with words + the move (never a bare gauge or raw %).
+**Why:** Blocks beat scatter for ~6 labeled categories (a scatter only means something with 2 real axes); the gradient delivers the sunset aesthetic without sacrificing readability. The scatter earns its place only where there are many points + real axes (the trend view).
+**Status:** Locked direction. V1.5 viz polish (single-call breakdown) + Phase 4 (readiness hue). Open detail for build time: what the trend scatter's two axes are. Detail: `_Inbox/2026-06-02 Post-call belief heatmap + readiness hue.md`.
 
 ### 2026-06-02 — Scout CUT from v1; live call summary is timer-driven
 **Decision:** The "scout" (demoting `keyword-triggers.ts` to a silent tagger that triggers summary updates) is **removed from the v1 hotkey build.** The rolling Belief Ladder summary instead updates purely **on a timer** (at most once/~60s, at least once/~2min), rate-bounded to pennies/call, written by a background Haiku call that reads [current summary] + [only the new transcript since last update].

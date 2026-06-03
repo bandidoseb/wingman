@@ -1,6 +1,6 @@
 # Known Issues
 
-Last updated: 2026-04-25
+Last updated: 2026-06-03
 
 A running list of known bugs, limitations, and things that need fixing. Add new issues at the top. Update status when resolved. Never delete — mark as Resolved with the date.
 
@@ -10,6 +10,7 @@ A running list of known bugs, limitations, and things that need fixing. Add new 
 
 | #   | Issue | Impact | Status | Notes |
 | --- | ----- | ------ | ------ | ----- |
+| 36 | Double-end race — `handleAutoEnd` lacks the `isEndingRef` guard | **Medium** | Open | Found by code review 2026-06-03 (Phase 1). `handleEndCall` (manual/hotkey) guards against double-invocation with `isEndingRef`; `handleAutoEnd` (Recall auto-stop) does NOT. A manual End firing at the same instant as the auto-stop → both PATCH the session → **double Sonnet post-call job** (billed twice) + **double `calls_used` decrement** + a `call_stages` delete-then-insert race. Pre-existing; rare; touches the auto-stop chain (Invariant 5). Fix: share `isEndingRef` across both end paths with a `finally` reset (don't let it leak → would block future ends). Task spawned. Optional hardening: unique index on `call_stages(call_id, name)` + upsert. |
 | 35 | Disposition HUD buttons unresponsive on second call of session | **High** | Open | Observed 2026-06-02. After a second call ends in the same app session, the "How'd it go?" outcome card appears but clicking the disposition buttons (~10 taps) has no effect. HUD then auto-dismisses without saving. Call stays stuck as "processing, waiting for outcome" on dashboard. First call of the session worked fine. Suspected cause: stale `pendingOutcomeToken` or `setIgnoreMouseEvents` state not reset between calls. Investigation task spawned — see disposition-bug investigation. |
 | --- | ----- | ------ | ------ | ----- |
 | 34 | CLAUDE.md Core Product Rules still describe the OLD autonomous signal-card model | **Low** | Open | Rules like "one signal card at a time" / "90-second cooldown" / live stage-bar framing predate the 2026-05-31 hotkey pivot. Not wrong to leave until the hotkey model is built, but reconcile during that build so a future session doesn't follow stale rules. Authoritative current direction = 2026-05-31 Decisions Log entry. Also: `security-review.yml` action input (`claude-api-key`) is unverified against the live action — confirm on first PR. |

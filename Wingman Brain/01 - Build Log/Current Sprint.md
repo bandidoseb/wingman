@@ -1,8 +1,22 @@
 # Current Sprint
 
-Last updated: 2026-06-02
+Last updated: 2026-06-03
 
 This is the first file Claude reads at session start. It answers: where are we, what's next, and what's blocking us.
+
+---
+
+## What Was Just Completed (2026-06-03 — Phase 1 shipped + Phase 2 designed)
+
+**Phase 1 merged (PR #5)** and **Phase 2 fully designed + locked.** Full narrative in `2026-06-03.md`.
+
+- **Phase 1 (live):** retired the live Sonnet poll, moved 6-stage derivation to the post-call job (writes `call_stages` — idempotent delete-then-insert + checked insert error), silenced ALL autonomous cards (ambient dot only, no pop-ups), hid the HUD stage bar. `wingman-reviewer` caught a real blocker pre-merge — `status: "incomplete"` violated the `call_stages` CHECK constraint and would have failed silently → switched to `"skipped"` + added insert-error logging. **Live-tested ✅** (ambient dot only; Stage Breakdown + Intel heatmap populated from post-call stages; transcript + debrief intact).
+- **Phase 2 (designed, NOT built):** canonical spec `00 - Product/Phase 2 — Live Call Memory Design.md`. Scout CUT (timer-driven Belief Ladder summary instead); card = ONE Haiku call (summary + live 90s buffer + action) with "recent transcript overrides summary"; summary updater client-triggered (Vercel-safe); caching = 1h TTL + warm + keep-warm w/ a loud min-block-size verify caveat; speculative pre-gen deferred.
+- **Decisions locked (Decisions Log, 2026-06-03):** (1) show 4 universal stages, coach the elite depth underneath; (2) Sales DNA personalizes CONTENT, never the framework standard; (3) post-call viz = gradient-colored labeled blocks + scatter reserved for a multi-call trend view.
+- **2 tasks spawned:** disposition HUD bug (#35), double-end race (#36).
+- **Confirmed:** Pusher migration is obsolete (hotkey removes server-push need — marked superseded); PostHog/Pinecone/Vercel orthogonal, no rebuild risk.
+
+**Next:** Phase 2 build (serial — shared live-pipeline state). Consider clearing tasks #35/#36 first since they touch the same end-call paths.
 
 ---
 
@@ -257,11 +271,15 @@ This was a **decisions/logging session — no app code changed, nothing pushed.*
 
 ## What's Next (Priority Order)
 
-**#1 — 🎯 BUILD THE HOTKEY SIGNAL-CARD MODEL + REAL SALES DNA.** This is the next build, decided 2026-05-31 (full spec in `Decisions Log.md`). Two coupled cores:
-  - **Hotkey model:** rep presses Up Arrow → fixed menu → generate-on-pick. Demote keyword classifier to silent scout, remove stage bar → ambient dot, kill live Sonnet stage polling, $0-continuous / pay-on-keypress. Replaces the autonomous pop-up model that's currently built.
-  - **Sales DNA:** the per-user learning JSON that **does not exist yet** (today `rep-profile.ts` only assembles call stats). Needs a schema decision (Sebastian approval) + a post-call delta-update step + a loader.
-  - **How to start:** restart Claude Code (harness must be live) → run the build through the `plan-reviewer` subagent → present the hardened plan for approval → build on a branch (gate + `wingman-reviewer` enforce quality) → PR → CI/Security Review → merge. Do the two cores SERIALLY (shared live-pipeline state); parallelize the backlog below only after.
-  - **Gate to "done" = live testing on a real call** — only Sebastian can do this; no agent can.
+**🎯 HOTKEY SIGNAL-CARD MODEL — progress: Phase 0 ✅ · Phase 1 ✅ · Phase 2 NEXT.** Phased plan in `tasks/todo.md` + `00 - Product/Hotkey Model Build Plan.md`. Build serially (shared live-pipeline state). Gate to "done" each phase = live test on a real call (only Sebastian).
+
+  - **✅ Phase 0 (shipped):** transcript persistence decoupled to `/api/wingman/transcript`.
+  - **✅ Phase 1 (shipped):** retired the Sonnet poll, stages → post-call, silenced autonomous cards, hid stage bar.
+  - **▶️ Phase 2 (NEXT — designed, not built):** the rolling Belief Ladder live-call memory. Spec: `00 - Product/Phase 2 — Live Call Memory Design.md`. Timer-driven Haiku summarizer, **client-triggered** (Vercel-safe), rate-bounded. No scout. **Consider doing tasks #35 (disposition HUD) + #36 (double-end race) first** — they touch the same end-call paths Phase 2 builds on.
+  - **Phase 3:** hotkey + 4-arrow compass menu + objection slot (highest risk, the milestone) + Settings hotkey override (`profiles.call_hotkey` — show SQL first).
+  - **Phase 4:** the other 3 arrows (← answer · ↓ dig · → close readiness hue).
+  - **Phase 5:** dead-code removal (`/poll` route, `POLL_INTERVALS`, unused components), reconcile CLAUDE.md Core Product Rules (Issue #34).
+  - **Sales DNA** (the real per-user learning JSON — doesn't exist yet, `rep-profile.ts` only assembles call stats) remains the coupled core after the hotkey UI lands. Rule locked 2026-06-03: DNA personalizes CONTENT, never the framework standard.
 
 0k. 🏷️ **App + code-wide rename: "Offer Brain" → "Sales DNA"** — The term is renamed product-wide (decision 2026-05-31). CLAUDE.md and the Wingman skill doc are already updated. **Everything else still says "Offer Brain" and must be changed:**
   - **User-facing copy first** (highest priority — Sebastian confirmed it shows on the dashboard app): every place the UI says "Offer Brain" → "Sales DNA". Sweep `src/components/dashboard/` (Settings, Home, Intel tabs, reset flow), onboarding components, and any paywall/marketing copy.
