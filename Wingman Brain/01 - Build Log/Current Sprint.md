@@ -8,7 +8,7 @@ This is the first file Claude reads at session start. It answers: where are we, 
 
 ## What Was Just Completed (2026-06-05 — Session 2: Phase 2 Step 1 SHIPPED + live-tested + Elapsed fix)
 
-**Phase 2 Step 1 is built, code-complete, and live-tested.** Full narrative in `2026-06-05.md` (Session 2 section). On branch `phase2-belief-ladder-summarizer` → PR open.
+**Phase 2 Step 1 is built, live-tested, and MERGED to `main` (PR #8 → Railway auto-deploying).** Full narrative in `2026-06-05.md` (Session 2 section).
 
 - **Belief Ladder summarizer wired into the live pipeline.** Three pieces: `src/lib/wingman/belief-ladder.ts` (new — locked Sonnet prompt + model + 400-tok cap), `src/app/api/wingman/summarize/route.ts` (new — auth → rate-limit → input caps → ownership → Sonnet w/ prompt caching → persists to `calls.live_summary`), and a **separate 120s timer + buffer** in `useWingmanPoller.ts` (independent of the 25s transcript save; `flushSummarize` on call end; exposes `liveSummary` for Phase 3). **Step 1 + Step 2 collapsed** — persistence is in the route from day one.
 - **`wingman-reviewer` caught 3 real bugs, all fixed:** (1) no input-size cap → unbounded Sonnet cost → added 50K/10K caps; (2) no per-user rate limit on a paid endpoint → added 30s/user throttle; (3) summarize buffer dropped on call end (last ~2 min incl. the close never scored) → `flushSummarize` (force) wired into both end paths.
@@ -292,18 +292,18 @@ This was a **decisions/logging session — no app code changed, nothing pushed.*
 
 ## What's In Progress
 
-- **Phase 2 — code-complete + live-tested, PR open** (branch `phase2-belief-ladder-summarizer`). Summarizer wired in, persists to `calls.live_summary`, caching verified, Elapsed fixed. **Only remaining Phase 2 gate: a real role-play call** (actual sales conversation, 4–5 min) to watch the ladder climb ⬜→🟡→✅ over multiple ticks — needs Sebastian's Zoom time. After merge → **Phase 3** (hotkey + compass menu) in a fresh session.
+- **Phase 2 — MERGED + deployed (PR #8).** Summarizer wired in, persists to `calls.live_summary`, caching verified, Elapsed fixed. **Only remaining Phase 2 gate: a real role-play call** (actual sales conversation, 4–5 min) to watch the ladder climb ⬜→🟡→✅ over multiple ticks — needs Sebastian's Zoom time. **Next build = Phase 3** (hotkey + compass menu), fresh session.
 
 ---
 
 ## What's Next (Priority Order)
 
-**🎯 HOTKEY SIGNAL-CARD MODEL — progress: Phase 0 ✅ · Phase 1 ✅ · #35/#36 ✅ · Phase 2 ✅ (code-complete + live-tested, PR open) · Phase 3 NEXT.** Phased plan in `tasks/todo.md` + `00 - Product/Hotkey Model Build Plan.md`. Build serially (shared live-pipeline state). Gate to "done" each phase = live test on a real call (only Sebastian).
+**🎯 HOTKEY SIGNAL-CARD MODEL — progress: Phase 0 ✅ · Phase 1 ✅ · #35/#36 ✅ · Phase 2 ✅ (merged + deployed, PR #8) · Phase 3 NEXT.** Phased plan in `tasks/todo.md` + `00 - Product/Hotkey Model Build Plan.md`. Build serially (shared live-pipeline state). Gate to "done" each phase = live test on a real call (only Sebastian).
 
   - **✅ Phase 0 (shipped):** transcript persistence decoupled to `/api/wingman/transcript`.
   - **✅ Phase 1 (shipped):** retired the Sonnet poll, stages → post-call, silenced autonomous cards, hid stage bar.
   - **✅ #35 + #36 (resolved 2026-06-05):** disposition HUD card + double-end race — the end-call paths Phase 2 builds on are now solid.
-  - **✅ Phase 2 (code-complete + live-tested 2026-06-05 S2, PR open):** the rolling Belief Ladder live-call memory. Spec: `00 - Product/Phase 2 — Live Call Memory Design.md`. Built `belief-ladder.ts` (locked Sonnet prompt) + `POST /api/wingman/summarize` (rate-limited, input-capped, prompt-cached, persists to `calls.live_summary`) + a separate 120s timer/buffer + `flushSummarize` in `useWingmanPoller.ts`. `wingman-reviewer` caught 3 cost/correctness bugs (input cap, rate limit, end-of-call flush) — all fixed. Live test confirmed: transcript pipeline works, summarizer fires, **caching engaged**, DB persists, model stays honest on an empty call. Elapsed fixed server-side from `call_date`. **Last gate:** a real role-play call to watch the ladder fill over a full conversation (needs Zoom time).
+  - **✅ Phase 2 (merged + deployed 2026-06-05 S2, PR #8):** the rolling Belief Ladder live-call memory. Spec: `00 - Product/Phase 2 — Live Call Memory Design.md`. Built `belief-ladder.ts` (locked Sonnet prompt) + `POST /api/wingman/summarize` (rate-limited, input-capped, prompt-cached, persists to `calls.live_summary`) + a separate 120s timer/buffer + `flushSummarize` in `useWingmanPoller.ts`. `wingman-reviewer` caught 3 cost/correctness bugs (input cap, rate limit, end-of-call flush) — all fixed. Live test confirmed: transcript pipeline works, summarizer fires, **caching engaged**, DB persists, model stays honest on an empty call. Elapsed fixed server-side from `call_date`. **Last gate:** a real role-play call to watch the ladder fill over a full conversation (needs Zoom time).
   - **🆕 PARALLEL TRACK — Call Continuity + Prospect Memory** (`00 - Product/Call Continuity + Prospect Memory Design.md`): drop-resume (CORE) → calendar + cross-call prospect memory (PREMIUM). Phases A–D; each needs its own schema migration (prospects table, prospect_id, calendar_connections) — show SQL + get approval per phase. Sequence after / alongside the hotkey track (shared live pipeline → likely serial).
   - **Phase 3:** hotkey + 4-arrow compass menu + objection slot (highest risk, the milestone) + Settings hotkey override (`profiles.call_hotkey` — show SQL first).
   - **Phase 4:** the other 3 arrows (← answer · ↓ dig · → close readiness hue).
