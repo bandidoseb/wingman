@@ -83,7 +83,7 @@ You receive the CURRENT SCORECARD (everything known so far) + NEW TRANSCRIPT (on
 OUTPUT EXACTLY THIS STRUCTURE (fill the blanks, keep every line tight; use "—" when unknown):
 
 LIVE CALL MEMORY
-Stage: <Rapport|Discovery|Press|Confirm|Pitch|Close> · Elapsed: <—> · Syntax: <problems-first|goals-first|—>
+Stage: <Rapport|Discovery|Press|Confirm|Pitch|Close> · Elapsed: <the CALL ELAPSED value from the input, e.g. 23m; — if not provided> · Syntax: <problems-first|goals-first|—>
 ▸ THE GAP
   Current "hell":   <where they are now — numbers + specifics, or —>
   Desired "heaven": <what they want> · $GOAL <number or —> · why that #: <reason or —>
