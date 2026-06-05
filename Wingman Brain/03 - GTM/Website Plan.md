@@ -30,7 +30,7 @@ Hierarchy locked in `Messaging.md`. Expanding here with build notes.
 **Goal:** Immediately communicate what it is and who it's for. One sentence. One CTA.
 
 **Headline options (from Messaging.md):**
-- *"Free to fly. Pay when you win."* (tagline — punchy, closer-native)
+- ~~*"Free to fly. Pay when you win."*~~ — **RETIRED 2026-05-31** (old free-until-close model is dead; no tagline locked yet — see Messaging.md)
 - *"The AI copilot that tells you exactly what to say — right when you need it."*
 
 **Subhead:** One sentence. Who it's for + the core mechanic.
@@ -130,9 +130,7 @@ Repeat the primary CTA. Keep it identical to the hero CTA so there's no decision
 
 ## Pricing Page
 
-**Current direction:** $179–$199/month, unlimited calls. Final price TBD before public launch.
-
-*(Note: `Stripe and Billing.md` still shows $149/month — that's outdated. Update that file when price is locked.)*
+**Current direction (REVISED 2026-06-05 — now TIERED):** Free 10 calls / **Core $149** (soft-capped ~75 calls + overage) / **Pro $299** (unlimited + calendar / prospect memory / pre-call briefings / deal coach). Final numbers pending sign-off — see `06 - Finance/Tier Pricing Proposal + Unit Economics.md`. *(Was: "$179–199 flat unlimited.")*
 
 **Copy principle:** One plan. One price. No tiers. Closers don't read pricing tables — they make a fast decision based on whether the ROI math works.
 

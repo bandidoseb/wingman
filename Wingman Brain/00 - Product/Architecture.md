@@ -100,7 +100,7 @@ Extracts:
 Offer Brain JSON updated in Supabase
 Flight Log entry created (grade, debrief, win, fix)
 Objections written to vault_objections table
-Raw transcript DELETED immediately
+Raw transcript retained (text only, user-deletable)
 ```
 
 **Model:** Claude Sonnet — quality over speed for post-call analysis.

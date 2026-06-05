@@ -1,4 +1,18 @@
 
+## Session: 2026-06-05
+
+### HUD HTML changes need a full electron:dev restart — and re-stage after EVERY edit
+**What happened:** Fixed the disposition card's mouse capture in `electron/hud/index.html`, told Sebastian to restart, he tested — "didn't work." Root cause: the HUD HTML is not loaded from source. `wait-and-launch.js` (and `electron:compile`) COPY `electron/hud/` → `electron-dist/hud/` on launch, and `main.ts` loads `electron-dist/hud/index.html`. The running app had copied the file at an earlier restart, BEFORE my latest edit, so it silently ran the stale copy. Editing the source again does nothing until the next full launch re-copies it.
+**Rule:** After ANY edit to `electron/hud/`, `electron/tray-popover/`, or any non-.ts asset the app loads from `electron-dist/`, the running app will NOT pick it up — there is no hot reload. (1) Tell Sebastian to fully quit (`Ctrl+C` in the electron:dev terminal — closing the window only hides the app) and re-run `npm run electron:dev`. (2) When iterating across multiple HUD edits in one conversation, proactively run `npm run electron:compile` after the LAST edit and verify with grep that `electron-dist/hud/index.html` contains the change, so the next restart is guaranteed to load it. Never assume a prior restart covers a later edit.
+
+### Cost/economics estimates must be modeled at REAL usage scale, not test-fixture scale
+**What happened:** Quoted the Sonnet summarizer at "~5–6¢/call" — but that was measured on tiny 3–4-tick test transcripts. Sebastian caught it: real 45–60 min calls have ~30–40 update ticks, so the true cost is ~44–59¢/call (~10×). My estimate was off by an order of magnitude because I extrapolated from a fixture, not from real usage.
+**Rule:** Any per-call / per-unit / per-month cost estimate must be built from REAL operating parameters (real call length, real call volume, real tick/request count) — never from the scale of a quick test. State the assumptions inline (e.g. "45-min call = 30 ticks") so the math is auditable, and sanity-check the monthly total at the user's actual usage (here: 3–4 calls/day, not 40/mo) before presenting. A cost number without its usage assumptions is a trap.
+
+### When an architecture decision changes mid-session, update the canonical doc IMMEDIATELY — not just in chat
+**What happened:** We changed Phase 2 from "client-held / ephemeral summary" to "Sonnet + persist to `calls.live_summary`" in conversation, but the canonical Phase 2 design doc still said "Haiku" and implied ephemeral for a while. At wrap, a scan found the doc contradicting our own locked decisions — exactly the "stale plans leak into fresh sessions" risk.
+**Rule:** The moment a decision changes how a system works, edit the canonical doc in the same turn (or the very next), not at session end. Verbal/chat agreement is not persistence — the next session reads the docs, not the transcript. Treat a decision as un-locked until its home doc reflects it.
+
 ## Session: 2026-04-13
 
 ### Self-review of plans has diminishing returns — use an adversarial subagent

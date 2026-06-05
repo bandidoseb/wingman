@@ -82,7 +82,7 @@ Current pricing model, how Stripe is configured, where Price IDs live, how Rewar
 
 When a user is subscribed:
 - `profiles.subscription_status` = `'active'`
-- Access to all Wingman features (unlimited calls)
+- ⚠️ **Tiered as of 2026-06-05 (was "all features / unlimited"):** **Core $149** = live copilot + Flight Log + Sales DNA, soft-capped ~75 calls + overage; **Pro $299** = everything + calendar / prospect memory / briefings / deal coach + unlimited. Billing not yet wired to tiers — update when built. See `06 - Finance/Tier Pricing Proposal + Unit Economics.md`.
 
 When a user is on free tier:
 - `profiles.subscription_status` = `'free'`

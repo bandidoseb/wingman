@@ -540,7 +540,17 @@
 
     #outcomeCard.visible {
       display: flex;
-      animation: slideDown 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+      /* Dedicated slide-in — NOT the shared slideDown (used by the top-right toasts).
+         slideDown's `to` state is `transform: translateY(0)`, which with `forwards`
+         overrides this card's base `transform: translate(-50%, -50%)` and knocks it
+         off-center (down + right). outcomeIn keeps the centering transform in every
+         keyframe so the card stays centered while it slides in. */
+      animation: outcomeIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+
+    @keyframes outcomeIn {
+      from { opacity: 0; transform: translate(-50%, -50%) translateY(-8px); }
+      to   { opacity: 1; transform: translate(-50%, -50%); }
     }
 
     #outcomeCard.fade-out {
@@ -785,19 +795,34 @@
 
     // ── Outcome card ──────────────────────────────────────────────────────
     function showOutcomeCard(callId) {
-      if (outcomeCardShown) return;   // guard against double-show
+      // Self-healing: do NOT early-return when a card is already shown (Issue #35).
+      // If the rep ended call 1 without dispositioning it (its 30s auto-dismiss
+      // still pending) and then ran call 2 within that window, an early return
+      // would leave call 1's STALE card on screen — and because onCallEnd ran
+      // hideSignal() (which re-enables mouse pass-through) just before this call,
+      // the card would sit there with every tap falling through to the app
+      // underneath, then auto-dismiss unsaved. Instead we always (re)initialize
+      // for the new callId so the card is correct and clickable on every call.
       outcomeCardShown = true;
       outcomeCallId = callId;
 
+      // Reset visual state fully — covers a prior save that left pills hidden
+      // (display:'none') or disabled, or a confirm/error message still showing.
       outcomeConfirm.classList.remove('visible');
       outcomeError.classList.remove('visible');
+      outcomePills.style.display = '';
       outcomePills.querySelectorAll('.outcome-pill').forEach(b => b.disabled = false);
 
       outcomeCard.classList.remove('fade-out');
       outcomeCard.classList.add('visible');
-      if (window.hud) window.hud.setMouseIgnore(false);
+      // Capture is HOVER-based (see the outcomeCard mouseenter/mouseleave handlers),
+      // not global. The card no longer freezes the whole screen — the rep can click
+      // elsewhere or start the next call, and clicks only land on the card while the
+      // cursor is over it. Matches every other HUD popup. (Disposition can still be
+      // set later from Flight Log; the card also auto-clears in 30s / on next call.)
 
-      // Auto-dismiss after 30 seconds if user ignores it
+      // Auto-dismiss after 30 seconds if user ignores it. clearTimeout first so a
+      // previous call's pending timer can't fire mid-display and yank this card away.
       clearTimeout(outcomeAutoDismiss);
       outcomeAutoDismiss = setTimeout(() => hideOutcomeCard(), 30000);
     }
@@ -996,6 +1021,11 @@
     function setLive(live) {
       isLive = live;
       if (live) {
+        // Clear any lingering post-call outcome card from the PREVIOUS call before
+        // going live (Issue #35). If the rep ended the last call without picking an
+        // outcome (its 30s auto-dismiss still pending), a dead "How'd it go?" card
+        // would otherwise float over this live call until the timer fired.
+        if (outcomeCardShown) hideOutcomeCard();
         // Hide both toasts — call is now active
         hideDetectionToast(false);
         hideManualTriggerToast(false);
@@ -1229,11 +1259,13 @@
       if (window.hud) window.hud.setMouseIgnore(true);
     });
 
-    // ── Toast hover — enable mouse capture only when cursor is over the toast ──
-    // Toasts appear over a full-screen transparent window. Calling setMouseIgnore(false)
-    // globally when a toast appears blocks ALL clicks on the screen underneath (e.g. Zoom).
+    // ── Toast / outcome-card hover — enable mouse capture only when cursor is over it ──
+    // These appear over a full-screen transparent window. Calling setMouseIgnore(false)
+    // globally when one appears blocks ALL clicks on the screen underneath (e.g. Zoom).
     // Instead, we enable capture only on hover — same pattern as signalBubble + stageBar.
-    [detectionToast, manualTriggerToast, endCallToast, setupRequiredToast].forEach(toast => {
+    // The outcomeCard is included here so picking a disposition no longer freezes the
+    // whole screen — the rep can click elsewhere / deploy the next call (Issue #35).
+    [detectionToast, manualTriggerToast, endCallToast, setupRequiredToast, outcomeCard].forEach(toast => {
       toast.addEventListener('mouseenter', () => {
         if (window.hud) window.hud.setMouseIgnore(false);
       });

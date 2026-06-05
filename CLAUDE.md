@@ -186,7 +186,7 @@ A user can:
 3. **Almost nothing fires during Rapport stage.**
 4. **Signal cards only fire when silence would cost money.** If it's not a clear yes — don't fire.
 5. **Signal cards use the prospect's exact words** (tie-down language).
-6. **Raw transcripts are deleted immediately** after post-call job runs. Never stored long-term.
+6. **Transcripts are retained (text only), user-deletable.** Kept after the post-call job — "Ask Wingman," the Flight Log transcript view, and (planned) follow-up-call prospect memory all rely on them. The rep can delete them per-call or account-wide (compliance — Issue #33). Never auto-deleted. *(Reconciled 2026-06-05 — the old "deleted immediately" line was stale and contradicted the live code, which keeps transcripts.)*
 7. **Never store audio or video.** Text only.
 8. **Post-call job never runs during a live call.** Always async.
 9. **Sales DNA updates silently.** User never configures it manually.
@@ -215,7 +215,7 @@ Post-call job (Claude Sonnet) — async:
          ↓
 Sales DNA JSON updated in Supabase
 Flight Log entry created
-Raw transcript deleted
+Raw transcript retained (text only, user-deletable — Ask Wingman + follow-up memory rely on it)
 ```
 
 ---
@@ -338,7 +338,7 @@ These are the load-bearing walls of Wingman's architecture. They must never be v
 
 5. **Auto-stops always flow through `autoStopFn` → `autoStopCall` → `stopRecallAI()`.** Never shortcut this chain. The chain exists so that the HUD, tray, web app, and Recall AI SDK all get notified in the right order. Adding a direct `stopRecallAI()` call outside this chain skips notifications and creates desync.
 
-6. **Raw transcripts are never stored beyond the active session.** Text only, deleted after the post-call job runs. No audio, no video, no long-term transcript storage. This is a product and legal commitment.
+6. **Audio and video are NEVER stored — text transcripts only.** This half is non-negotiable: no audio, no video, ever. Text transcripts, however, ARE retained after the post-call job — the rep reviews them, "Ask Wingman" reads them, and follow-up-call prospect memory will build on them — and are user-deletable per-call or account-wide (compliance — Issue #33). *(Reconciled 2026-06-05 — the prior "transcripts deleted after post-call" wording was stale; the 2026-04-23 decision keeps them, which the live code already does.)*
 
 ---
 

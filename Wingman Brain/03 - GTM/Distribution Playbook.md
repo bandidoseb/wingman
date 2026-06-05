@@ -35,7 +35,7 @@ The sequence matters: product proof first, distribution second. Affiliates won't
 **The timing is critical:** Don't trigger at call start. Don't trigger based on call count alone. Trigger when the rep is at the Close stage of a free-tier call — the highest emotional moment in the product experience.
 
 **The message (working draft):**
-> "Congrats on the close 🎯 Wingman's been in your corner all day. Ready to unlock unlimited calls? [link]"
+> "Congrats on the close 🎯 Wingman's been in your corner all day. Ready to upgrade and keep Wingman on every call? [link]" *(copy predates 2026-06-05 tiering — "unlimited" is now Pro-only)*
 
 The rep just (likely) closed. They're feeling the high. The conversion moment is emotionally right.
 
