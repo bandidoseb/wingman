@@ -12,7 +12,7 @@ A log of approaches considered and rejected. Every entry represents a real decis
 
 **Rejected because:** Legal and privacy exposure is enormous. A recording of a sales call captures the prospect's voice without their explicit consent for storage — depending on jurisdiction, this may require two-party consent. More practically: our target user (the closer) doesn't want a recording of their call in some startup's database. They want a debrief and they want to move on. Storing audio also multiplies infrastructure costs (storage, processing) for zero product value over text. Text-only was a conscious product and legal positioning decision.
 
-**Rule derived:** Never store audio or video. Text transcripts only, and those get deleted after the post-call job runs.
+**Rule derived:** Never store audio or video — text transcripts only. (Note: the audio/video ban is permanent. Text transcripts themselves ARE retained and user-deletable — reconciled 2026-06-05; an earlier note here said they're deleted after the post-call job, which was stale and never matched the live code.)
 
 ---
 

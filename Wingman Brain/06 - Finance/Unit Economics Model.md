@@ -68,7 +68,7 @@ Margin = (revenue - total) / revenue
 
 ## Pricing Direction
 
-**$179/month, unlimited calls** — current working hypothesis.
+> ⚠️ **SUPERSEDED 2026-06-05 — pricing is now TIERED, not flat-unlimited.** (Was: "$179/mo unlimited.") Current model: **Free** 10 calls → **Core $149** (soft-capped ~75 calls + overage) → **Pro $299** (unlimited + calendar / prospect memory / pre-call briefings / deal coach). Full unit economics + margins: `06 - Finance/Tier Pricing Proposal + Unit Economics.md`. The rationale below is partly historical.
 
 Rationale:
 - Under $200 psychologically — feels like a tool, not a budget line item

@@ -34,11 +34,13 @@ The iMessage fires when ALL of the following are true:
 
 ## The Message (Working Draft)
 
+*(Copy below predates the 2026-06-05 tiering — "unlimited" is now Pro-only; reframe as "upgrade" when finalized.)*
+
 **Scenario A — Rep appears to have closed:**
-> "Hey [first name] 👋 Wingman caught something on your last call. Looks like it went well. Ready to unlock unlimited calls? meetwingman.ai/subscribe"
+> "Hey [first name] 👋 Wingman caught something on your last call. Looks like it went well. Ready to upgrade and keep Wingman on every call? meetwingman.ai/subscribe"
 
 **Scenario B — Rep was in Close stage but unclear outcome:**
-> "You've hit your free call limit with Wingman. Unlock unlimited calls and keep Wingman in your corner on every close. meetwingman.ai/subscribe"
+> "You've hit your free call limit with Wingman. Upgrade to keep Wingman in your corner on every close. meetwingman.ai/subscribe"
 
 **Key principles:**
 - Personal tone, not marketing speak

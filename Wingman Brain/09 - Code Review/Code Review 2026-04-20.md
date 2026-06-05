@@ -3,6 +3,8 @@
 ---
 # Wingman Daily Code Review — 2026-04-20
 
+> ⚠️ **HISTORICAL — one finding is SUPERSEDED.** Issue **H1 ("raw transcripts never deleted")** is no longer valid: per the 2026-04-23 decision, **transcripts are RETAINED and user-deletable.** Deleting them was tried, broke Ask Wingman + the Flight Log transcript view, and was reverted (Known Issue #30). Do NOT act on the "delete transcripts" recommendation below.
+
 ## What Was Pushed
 
 The main code push was the **Flight Plan feature** — a full 5-step implementation built in one session. This added a new "Flight Plan" page to the dashboard where reps fill out their offer context (target market, core problem, dream outcome, price range, etc.) once. That context is then: (1) frozen into each call record at session start, (2) injected into Claude's live poll prompt so it knows what this specific rep sells, and (3) used by the post-call Sonnet job to evaluate whether the rep covered all 7 key conversation pillars. A "Framework Coverage" scorecard was also added to the Flight Log debrief tab. Three vault backup commits and one Obsidian graph restructure commit are also in scope but contain no application code.

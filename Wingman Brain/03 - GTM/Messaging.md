@@ -14,13 +14,7 @@ Positioning, taglines, and copy that converts. This is a living document — upd
 
 ## The Tagline
 
-> **Free to fly. Pay when you win.**
-
-**Why this works:**
-- "Free to fly" — the free tier lets closers run real calls. No trial period, no demo mode. Real calls.
-- "Pay when you win" — the iMessage trigger fires at the moment of a close. The conversion ask comes when the value is highest. You pay when you're already winning.
-- Speaks directly to a commission-based rep who thinks in terms of winning and losing deals.
-- Short enough to stick.
+> ⚠️ **RETIRED 2026-05-31 (reconfirmed 2026-06-05).** "~~Free to fly. Pay when you win.~~" is **dead** — it described the old "free until first close" model, which was killed. Pricing is now **tiered** (Free 10 calls / Core $149 / Pro $299 — see `06 - Finance/Tier Pricing Proposal + Unit Economics.md`). **No new primary tagline is locked yet.** Do NOT use the old line in any website or marketing copy.
 
 **Secondary taglines (testing):**
 - "Your second voice on every call."

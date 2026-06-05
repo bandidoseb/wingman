@@ -1,0 +1,389 @@
+
+█████████████████████████████████████████████████████████████
+█ TRANSCRIPT: scripts/test-transcripts/01-fake-yes.txt
+█████████████████████████████████████████████████████████████
+════════════════════════════════════════════════════════════════════════
+  BELIEF LADDER SUMMARIZER — offline quality test
+  Transcript: /Users/sebastianperez/Desktop/Wingman CC/scripts/test-transcripts/01-fake-yes.txt
+  Simulating 4 live updates (6 lines/tick)
+  Models: Haiku vs Sonnet (side-by-side)
+════════════════════════════════════════════════════════════════════════
+
+════════════════════════════════════════════════════════════════════════
+  ========== HAIKU ==========
+════════════════════════════════════════════════════════════════════════
+LIVE CALL MEMORY
+Stage: Press · Elapsed: — · Syntax: problems-first
+▸ THE GAP
+  Current "hell":   ROAS inconsistent, media buyer departed, manually managing ads (duct-taping); $60k/mo revenue
+  Desired "heaven": Ads dialed in and predictable; scale to $200k/mo · $GOAL $200k/mo · why that #: "who wouldn't"
+  Final straw / emotional why: Media buyer quit
+  Core driver: Growth
+▸ BELIEF LADDER  (✅ locked · 🟡 partial · ⬜ open · ⚠️ at-risk/objection)
+  1 Pain                 ✅ locked — "ROAS is up and down," "duct-taping it myself," "It's a mess"
+  2 Doubt (can't DIY)    🟡 partial — managing ads solo now, hasn't claimed he *can't* fix it alone; "it'd be huge" suggests value but not conviction he's stuck
+  3 Cost (of inaction)   ⬜ open — not addressed
+  4 Desire               ✅ locked — "It'd be huge. Game changer. We'd scale so fast. This is exactly what we need"
+  5 Money                🟡 partial — $8k/mo presented; Jordan: "could work...gotta spend to grow" (soft acceptance, not locked commitment)
+  6 Support (who decides) ⚠️ at-risk/objection — Jordan defers to Dev; callback set for Thursday but no explicit Dev buy-in secured; "really excited" is Jordan's tone, not Dev's commitment
+  7 Trust (why you)      🟡 partial — "heard great things" + "this is great" but no specific proof or case study referenced yet
+▸ THEIR EXACT WORDS (verbatim, for tie-downs)
+  • "our ads are just all over the place"
+  • "It'd be huge. Game changer. We'd scale so fast. This is exactly what we need"
+  • "I'm kind of duct-taping it myself right now. It's a mess"
+  • "Perfect, awesome, really excited about this"
+▸ OPEN OBJECTIONS: ⚠️ Dev's approval is a gate — Jordan will not commit until Dev approves; callback Thursday but no pre-work or Dev alignment requested before follow-up
+▸ WEAKEST LINK → Support/who decides (⚠️ at-risk — Dev not on call, no pre-alignment, callback is passive handoff) → Cost of inaction (⬜ open — urgency never tied to competitive risk or time-bound opportunity) → Doubt (can't DIY) (🟡 partial — needs pressure on unsustainability at scale)
+────────────────────────────────────────────────────────────────────────
+  4 updates · 7254 in / 2516 out tokens · ~$0.0198 for this call (APPROX rates — confirm) · 20.2s total
+
+════════════════════════════════════════════════════════════════════════
+  ========== SONNET ==========
+════════════════════════════════════════════════════════════════════════
+LIVE CALL MEMORY
+Stage: Close (stalled/ghosting risk) · Elapsed: — · Syntax: goals-first
+▸ THE GAP
+  Current "hell":   Supplement brand; ROAS volatile, media buyer quit, Jordan duct-taping ads himself · $60k/mo
+  Desired "heaven": Predictable, dialed-in ads → fast scale · $GOAL $200k/mo · why that #: unstated ("who wouldn't")
+  Final straw / emotional why: Media buyer quit, now doing it himself — no emotional depth pressed; never anchored
+  Core driver: Growth (implied) · —
+▸ BELIEF LADDER  (✅ locked · 🟡 partial · ⬜ open · ⚠️ at-risk/objection)
+  1 Pain                  🟡 partial — "it's a mess" + Q4 urgency signal; cost/weight never pressed or locked
+  2 Doubt (can't DIY)     🟡 partial — "duct-taping it myself" implies struggle; Jordan never owned inability to fix it
+  3 Cost (of inaction)    ⬜ open — $140k/mo gap exists; never quantified, never pressed, Jordan never owned it
+  4 Desire                🟡 partial — "this is exactly what we need" repeated; not anchored to real stakes or timeline
+  5 Money                 🟡 partial — "gotta spend to grow" — soft yes; Dev controls funds, no firm commitment
+  6 Support (who decides) ⚠️ at-risk — Dev approval required; rep accepted "I'll get back to you" with zero 3-way close attempt; call ended on a vague Thursday follow-up with no Dev involvement secured
+  7 Trust (why you)       ⬜ open — enthusiasm is purely relational; no credibility case made, no proof, no anchored reason to choose this rep over anyone else Dev finds
+▸ THEIR EXACT WORDS (verbatim, for tie-downs)
+  • "our ROAS is up and down, my media buyer quit on me, and I'm kind of duct-taping it myself right now. It's a mess."
+  • "this is exactly what we need, so — yeah. Let me get back to you."
+  • "I mean — let me just loop Dev in first. I love it though, seriously, this is great."
+  • "Perfect, awesome, really excited about this. Talk soon!"
+▸ OPEN OBJECTIONS: Dev approval required — hard blocker; rep let call end without scheduling 3-way or extracting a concrete commitment (open, unhandled)
+▸ WEAKEST LINK → Support (⚠️) is the buried landmine — "Perfect, awesome, talk soon!" is social-exit energy, not buying energy. Jordan is a champion with zero authority. Rep accepted a ghost setup by scheduling a unilateral Thursday callback instead of: (1) getting Dev's name/number, (2) offering to run a 3-way intro call, or (3) arming Jordan with a specific internal pitch. Thursday follow-up will reach voicemail or a polite "still working on it." Recovery plan: open Thursday with "Before I dive in — did you get a chance to loop Dev in? I'd love 15 min with both of you so I'm not playing telephone on something this important to your Q4."
+────────────────────────────────────────────────────────────────────────
+  4 updates · 7298 in / 2684 out tokens · ~$0.0622 for this call (APPROX rates — confirm) · 47.0s total
+
+════════════════════════════════════════════════════════════════════════
+  JUDGE THE SCORECARD(S) ON:
+   • Right pain identified?
+   • Honest belief statuses (no inflation — prospect-confirmed = ✅, rep-framed = 🟡)?
+   • Quotes are VERBATIM + actually useful for tie-downs?
+   • Correct WEAKEST LINK?
+   • Stayed consistent + fixed-size across the whole call?
+   • ZERO hallucinated facts?
+   • Is Sonnet's judgment visibly better — enough to justify ~3× cost?
+════════════════════════════════════════════════════════════════════════
+
+█████████████████████████████████████████████████████████████
+█ TRANSCRIPT: scripts/test-transcripts/02-guarded-skeptic.txt
+█████████████████████████████████████████████████████████████
+════════════════════════════════════════════════════════════════════════
+  BELIEF LADDER SUMMARIZER — offline quality test
+  Transcript: /Users/sebastianperez/Desktop/Wingman CC/scripts/test-transcripts/02-guarded-skeptic.txt
+  Simulating 4 live updates (6 lines/tick)
+  Models: Haiku vs Sonnet (side-by-side)
+════════════════════════════════════════════════════════════════════════
+
+════════════════════════════════════════════════════════════════════════
+  ========== HAIKU ==========
+════════════════════════════════════════════════════════════════════════
+LIVE CALL MEMORY
+Stage: Press · Elapsed: — · Syntax: problems-first
+▸ THE GAP
+  Current "hell":   A1C pre-diabetic range; bloodwork "a little off"; failed trainer 3mo ago (stopped going, got busy); Ray minimizing as manageable
+  Desired "heaven": — · $GOAL — · why that #: —
+  Final straw / emotional why: Wife expressing concern; Ray dismissing; now avoiding commitment ("send me info")
+  Core driver: —
+▸ BELIEF LADDER  (✅ locked · 🟡 partial · ⬜ open · ⚠️ at-risk/objection)
+  1 Pain                 ⚠️ at-risk — "a six" priority + "it's not a crisis" — pain actively downgraded; Ray refuses to elevate severity even when asked directly
+  2 Doubt (can't DIY)    ⚠️ at-risk — "I'll just cut some carbs" + failed trainer (stopped, got busy); dismisses coaching value ("what am I actually getting"); self-sufficiency bias unshaken
+  3 Cost (of inaction)   ⚠️ at-risk — dad's heart attack at 55 dismissed as irrelevant; rep pressed ("where does this go?") → Ray: "probably fine" — cost invisible, inaction rationalized
+  4 Desire               ⚠️ at-risk — "it's not a crisis" + "just send info, I'll think about it" — no desire to change affirmed; deflection confirms avoidance of decision
+  5 Money                ⚠️ at-risk — "$5,000? For what exactly" — price objection + value unclear; no budget confirmed
+  6 Support (who decides) 🟡 partial — wife pushed call; Ray primary decision-maker; now deflecting to "I'll look it over" (solo review, no commitment)
+  7 Trust (why you)      ⚠️ at-risk — "most of that stuff is a scam" unaddressed; rep offered no differentiation; Ray sees no reason to trust this is different
+▸ THEIR EXACT WORDS (verbatim, for tie-downs)
+  • "I just stopped going. Got busy. It is what it is."
+  • "Five grand? For what exactly though. Like what am I actually getting for that."
+  • "Eh, like a six? It's not nothing. But it's not a crisis. Just send the info, I'll think about it."
+  • "Most of that stuff is a scam, no offense."
+▸ OPEN OBJECTIONS: Pain minimized to 6/10 priority; inaction ("it's not a crisis"); deflection to info review (avoiding decision); scam belief (unresolved); value still unclear
+▸ WEAKEST LINK → Pain downgraded by prospect's own words — "not a crisis" kills urgency and desire; Cost of inaction remains invisible; Trust fundamentally broken (scam belief unaddressed); Rep allowed escape to info-send without locking ANY belief first — call is stalled and closing is now impossible without rep re-engaging on severity + cost before hanging up
+────────────────────────────────────────────────────────────────────────
+  4 updates · 7206 in / 2590 out tokens · ~$0.0202 for this call (APPROX rates — confirm) · 22.4s total
+
+════════════════════════════════════════════════════════════════════════
+  ========== SONNET ==========
+════════════════════════════════════════════════════════════════════════
+LIVE CALL MEMORY
+Stage: Close (stalled) · Elapsed: — · Syntax: problems-first
+▸ THE GAP
+  Current "hell":   A1C elevated, pre-diabetic range; bloodwork "a little off"; dad had heart attack at 55
+  Desired "heaven": — · $GOAL — · why that #: —
+  Final straw / emotional why: Wife pushed him to call; Ray self-rates urgency a 6/10 — "not a crisis"
+  Core driver: Certainty (minimizing risk) — not yet activated; actively suppressing concern
+▸ BELIEF LADDER  (✅ locked · 🟡 partial · ⬜ open · ⚠️ at-risk/objection)
+  1 Pain                  ⚠️ at-risk — own words: "not nothing" but "not a crisis"; 6/10 is a soft rejection of urgency
+  2 Doubt (can't DIY)     ⚠️ at-risk — trainer "didn't stick" framed as busy, not incapable: "got busy, it is what it is"
+  3 Cost (of inaction)    ⚠️ at-risk — asked "where does this go?" → "probably fine"; urgency rating self-capped at 6
+  4 Desire                ⬜ open — not addressed
+  5 Money                 ⚠️ at-risk — "Five grand? For what exactly" — sticker shock before value built
+  6 Support (who decides) 🟡 partial — wife influential; authority level unknown
+  7 Trust (why you)       ⚠️ at-risk — "most of that stuff is a scam"; price dropped before trust established
+▸ THEIR EXACT WORDS (verbatim, for tie-downs)
+  • "Eh, like a six? It's not nothing. But it's not a crisis."
+  • "Five grand? For what exactly though. Like what am I actually getting for that."
+  • "most of that stuff is a scam, no offense"
+  • "I just stopped going. Got busy. It is what it is."
+▸ OPEN OBJECTIONS: "Send me info / I'll think about it" = active stall (open); 6/10 self-rating caps urgency (open); price shock before value (open); cost-of-inaction rejected twice — "probably fine" + "not a crisis" (open); DIY + industry skepticism both open
+▸ WEAKEST LINK → Pain ⚠️ + Cost of inaction ⚠️ — Ray just self-scored urgency a 6 and called it "not a crisis"; until he raises his own number in his own words, every other belief is irrelevant; rep must ask what would make it a 9 or 10, then tie dad's history to Ray's trajectory — do NOT re-pitch price
+────────────────────────────────────────────────────────────────────────
+  4 updates · 7150 in / 2471 out tokens · ~$0.0585 for this call (APPROX rates — confirm) · 39.2s total
+
+════════════════════════════════════════════════════════════════════════
+  JUDGE THE SCORECARD(S) ON:
+   • Right pain identified?
+   • Honest belief statuses (no inflation — prospect-confirmed = ✅, rep-framed = 🟡)?
+   • Quotes are VERBATIM + actually useful for tie-downs?
+   • Correct WEAKEST LINK?
+   • Stayed consistent + fixed-size across the whole call?
+   • ZERO hallucinated facts?
+   • Is Sonnet's judgment visibly better — enough to justify ~3× cost?
+════════════════════════════════════════════════════════════════════════
+
+█████████████████████████████████████████████████████████████
+█ TRANSCRIPT: scripts/test-transcripts/03-strong-close.txt
+█████████████████████████████████████████████████████████████
+════════════════════════════════════════════════════════════════════════
+  BELIEF LADDER SUMMARIZER — offline quality test
+  Transcript: /Users/sebastianperez/Desktop/Wingman CC/scripts/test-transcripts/03-strong-close.txt
+  Simulating 3 live updates (6 lines/tick)
+  Models: Haiku vs Sonnet (side-by-side)
+════════════════════════════════════════════════════════════════════════
+
+════════════════════════════════════════════════════════════════════════
+  ========== HAIKU ==========
+════════════════════════════════════════════════════════════════════════
+LIVE CALL MEMORY
+Stage: Close · Elapsed: — · Syntax: problems-first
+▸ THE GAP
+  Current "hell":   18% close rate; losing $8–10k/month in commission
+  Desired "heaven": $30k/month consistently · $GOAL $30k · why that #: buy her mom a house in cash (emotional anchor)
+  Final straw / emotional why: "I'm done leaving money on the table, I can't sit in this another quarter" — urgency locked + deep family significance
+  Core driver: Significance (proving herself + honoring her mom) + Growth (hitting benchmark)
+▸ BELIEF LADDER  (✅ locked · 🟡 partial · ⬜ open · ⚠️ at-risk/objection)
+  1 Pain                 ✅ locked — "leaving so much money on the table it's embarrassing" + quantified ($8–10k/month)
+  2 Doubt (can't DIY)    ✅ locked — "I trust the process, I just want in" — explicit admission that the *process* (not solo effort) is the move
+  3 Cost (of inaction)   ✅ locked — $8–10k/month + "can't sit in this another quarter" = time-bound urgency
+  4 Desire               ✅ locked — "$30k months, consistently" + self-directed goal + emotional why (buy mom a house)
+  5 Money                ✅ locked — "Already set it aside...It's sitting there ready" + $12k investment confirmed pre-committed
+  6 Support (who decides) ✅ locked — "All me. I make my own decisions, always have." — solo decision-maker, no gatekeepers
+  7 Trust (why you)      ✅ locked — "Marcus went from where I am to $40k months with you. I've seen it with my own eyes. I trust the process" — direct credibility + proof
+▸ THEIR EXACT WORDS (verbatim, for tie-downs)
+  • "I want $30k months, consistently. And I'll be honest with you why — my mom raised me and my sister alone, worked two jobs. I want to buy her a house. Cash. That's the whole thing for me."
+  • "I'm done leaving money on the table, I can't sit in this another quarter."
+  • "Marcus went from where I am to $40k months with you. I've seen it with my own eyes. I trust the process, I just want in."
+▸ OPEN OBJECTIONS: none
+▸ WEAKEST LINK → all beliefs locked — ready to close.
+────────────────────────────────────────────────────────────────────────
+  3 updates · 5356 in / 1891 out tokens · ~$0.0148 for this call (APPROX rates — confirm) · 15.3s total
+
+════════════════════════════════════════════════════════════════════════
+  ========== SONNET ==========
+════════════════════════════════════════════════════════════════════════
+LIVE CALL MEMORY
+Stage: Close · Elapsed: — · Syntax: problems-first
+▸ THE GAP
+  Current "hell":   18% close rate; self-calculated $8–10k/mo left on the floor
+  Desired "heaven": $30k/mo consistently · $GOAL $30k/mo · why that #: "buy my mom a house, cash — that's the whole thing for me"
+  Final straw / emotional why: "I can't sit in this another quarter" — urgency is now, not someday
+  Core driver: Significance / Contribution (proving herself; honoring mother's sacrifice)
+▸ BELIEF LADDER  (✅ locked · 🟡 partial · ⬜ open · ⚠️ at-risk/objection)
+  1 Pain                  ✅ locked — "I'm leaving $8 to 10k a month on the floor. That's brutal."
+  2 Doubt (can't DIY)     ✅ locked — "Marcus went from where I am to $40k months with you" — social proof implies solo path is inferior; no objection raised
+  3 Cost (of inaction)    ✅ locked — "I can't sit in this another quarter"
+  4 Desire                ✅ locked — "$30k months, consistently" + buy mom a house cash; emotionally grounded
+  5 Money                 ✅ locked — "Already set it aside… it's sitting there ready." ($12k confirmed)
+  6 Support (who decides) ✅ locked — "All me. I make my own decisions, always have."
+  7 Trust (why you)       ✅ locked — "I trust the process, I just want in." + Marcus's $40k result seen firsthand
+▸ THEIR EXACT WORDS (verbatim, for tie-downs)
+  • "I want to buy her a house. Cash. That's the whole thing for me."
+  • "I can't sit in this another quarter."
+  • "Already set it aside… it's sitting there ready."
+  • "Marcus went from where I am to $40k months with you. I've seen it with my own eyes. I trust the process, I just want in."
+▸ OPEN OBJECTIONS: none — "Anything giving you pause?" met with explicit "Honestly no."
+▸ WEAKEST LINK → all beliefs locked — ready to close; agreement sent, verbal commitment given ("Send the agreement, I'll sign right now")
+────────────────────────────────────────────────────────────────────────
+  3 updates · 5221 in / 1718 out tokens · ~$0.0414 for this call (APPROX rates — confirm) · 27.0s total
+
+════════════════════════════════════════════════════════════════════════
+  JUDGE THE SCORECARD(S) ON:
+   • Right pain identified?
+   • Honest belief statuses (no inflation — prospect-confirmed = ✅, rep-framed = 🟡)?
+   • Quotes are VERBATIM + actually useful for tie-downs?
+   • Correct WEAKEST LINK?
+   • Stayed consistent + fixed-size across the whole call?
+   • ZERO hallucinated facts?
+   • Is Sonnet's judgment visibly better — enough to justify ~3× cost?
+════════════════════════════════════════════════════════════════════════
+
+█████████████████████████████████████████████████████████████
+█ TRANSCRIPT: scripts/test-transcripts/04-contradiction-longcall.txt
+█████████████████████████████████████████████████████████████
+════════════════════════════════════════════════════════════════════════
+  BELIEF LADDER SUMMARIZER — offline quality test
+  Transcript: /Users/sebastianperez/Desktop/Wingman CC/scripts/test-transcripts/04-contradiction-longcall.txt
+  Simulating 4 live updates (6 lines/tick)
+  Models: Haiku vs Sonnet (side-by-side)
+════════════════════════════════════════════════════════════════════════
+
+════════════════════════════════════════════════════════════════════════
+  ========== HAIKU ==========
+════════════════════════════════════════════════════════════════════════
+LIVE CALL MEMORY
+Stage: Close · Elapsed: — · Syntax: problems-first
+▸ THE GAP
+  Current "hell":   $90k/month flat × 1 year; ad costs balloon on scale, no email/retention infrastructure, margins collapse
+  Desired "heaven": break through stagnation and scale sustainably this year · $GOAL — · why that #: existential — "kid's college," livelihood at stake
+  Final straw / emotional why: "It would crush us. This is our livelihood. It's our kid's college. It's everything. We can't just let it die on the vine."
+  Core driver: Significance (family security + business survival)
+▸ BELIEF LADDER  (✅ locked · 🟡 partial · ⬜ open · ⚠️ at-risk/objection)
+  1 Pain                 ✅ locked — "Our ad costs balloon and the back end isn't there. No real email flows, no retention. So we spend more to stand still. It's exhausting."
+  2 Doubt (can't DIY)    ✅ locked — "We've been burned before" + past failed attempts + now "doing it ourselves again" = clear pattern they cannot solve alone
+  3 Cost (of inaction)   ✅ locked — "If we don't figure out the next level this year I genuinely don't know what we do." + "It would crush us. This is our livelihood. It's our kid's college."
+  4 Desire               ✅ locked — "break through" + willingness to invest $15–20k if it saves the business — financial commitment tied to outcome
+  5 Money                ✅ locked — "$18k is nothing against losing the whole business"; reframed from "$2–3k scared money" to "$15–20k willing-to-invest money; $18k price accepted
+  6 Support (who decides) ✅ locked — "he's even more stressed about it than me. He'll be on board" + "That's our rule" — husband alignment + veto confirmed; next call with both parties
+  7 Trust (why you)      🟡 partial — "I'd want to see the plan, the case studies" + "If it works" — conditional; will solidify on case-study review + husband alignment
+▸ THEIR EXACT WORDS (verbatim, for tie-downs)
+  • "This is our livelihood. It's our kid's college. It's everything. We can't just let it die on the vine."
+  • "If I knew it would actually save the business and get us unstuck, I'd find $15 to 20k. We have it. I've just been scared to spend it after getting burned."
+  • "He's even more stressed about it than me. He'll be on board. I just wouldn't sign $18k without him in the room. That's our rule."
+▸ OPEN OBJECTIONS: none — budget accepted; support confirmed conditional on case-study + next call with husband
+▸ WEAKEST LINK → Trust (why you) — "I'd want to see the plan, the case studies" must be airtight to overcome past-burned-bet fear; case studies must map to their exact stagnation scenario before husband joint close
+────────────────────────────────────────────────────────────────────────
+  4 updates · 7510 in / 2727 out tokens · ~$0.0211 for this call (APPROX rates — confirm) · 21.6s total
+
+════════════════════════════════════════════════════════════════════════
+  ========== SONNET ==========
+════════════════════════════════════════════════════════════════════════
+LIVE CALL MEMORY
+Stage: Close · Elapsed: — · Syntax: problems-first
+▸ THE GAP
+  Current "hell":   $90k/mo flat 12 months; ad costs balloon, no email flows/retention — "spend more to stand still"
+  Desired "heaven": Save the business, get unstuck · $GOAL — · why that #: —
+  Final straw / emotional why: "It's our kid's college. It's everything. We can't just let it die on the vine."
+  Core driver: Certainty (fear of collapse, livelihood + family on the line)
+▸ BELIEF LADDER  (✅ locked · 🟡 partial · ⬜ open · ⚠️ at-risk/objection)
+  1 Pain                  ✅ locked — "It would crush us. This is our livelihood."
+  2 Doubt (can't DIY)     🟡 partial — prior attempts failed, fear of spending again; no explicit "I can't do this myself"
+  3 Cost (of inaction)    ✅ locked — "We can't just let it die on the vine."
+  4 Desire                ✅ locked — "if I knew it would actually save the business and get us unstuck, I'd find $15–20k"
+  5 Money                 ✅ locked — "$18k is nothing against losing the whole business"; $15–20k capacity confirmed unprompted
+  6 Support (who decides) ✅ locked — "I just wouldn't sign $18k without him in the room. That's our rule." / husband confirmed aligned: "he's even more stressed about it than me. He'll be on board."
+  7 Trust (why you)       ⬜ open — Priya explicitly named case studies + the plan as her confidence criteria; not yet delivered
+▸ THEIR EXACT WORDS (verbatim, for tie-downs)
+  • "It would crush us. This is our livelihood. It's our kid's college. It's everything."
+  • "If I knew it would actually save the business and get us unstuck, I'd find $15 to 20k. We have it."
+  • "I just wouldn't sign $18k without him in the room. That's our rule."
+  • "He's even more stressed about it than me. He'll be on board."
+▸ OPEN OBJECTIONS: Prior bad experience (burn scar) — "scared to spend after getting burned"; open — not yet handled directly. Case studies + plan explicitly requested as the trust bridge.
+▸ WEAKEST LINK → Trust ⬜ (Priya named exactly what she needs: case studies + the plan — deliver both compellingly on the next call or burn scar kills the deal) + Doubt 🟡 (DIY confidence never fully closed — worth one question on the next call with husband present)
+────────────────────────────────────────────────────────────────────────
+  4 updates · 7224 in / 2355 out tokens · ~$0.0570 for this call (APPROX rates — confirm) · 37.9s total
+
+════════════════════════════════════════════════════════════════════════
+  JUDGE THE SCORECARD(S) ON:
+   • Right pain identified?
+   • Honest belief statuses (no inflation — prospect-confirmed = ✅, rep-framed = 🟡)?
+   • Quotes are VERBATIM + actually useful for tie-downs?
+   • Correct WEAKEST LINK?
+   • Stayed consistent + fixed-size across the whole call?
+   • ZERO hallucinated facts?
+   • Is Sonnet's judgment visibly better — enough to justify ~3× cost?
+════════════════════════════════════════════════════════════════════════
+
+█████████████████████████████████████████████████████████████
+█ TRANSCRIPT: scripts/test-transcripts/05-hidden-objection.txt
+█████████████████████████████████████████████████████████████
+════════════════════════════════════════════════════════════════════════
+  BELIEF LADDER SUMMARIZER — offline quality test
+  Transcript: /Users/sebastianperez/Desktop/Wingman CC/scripts/test-transcripts/05-hidden-objection.txt
+  Simulating 3 live updates (6 lines/tick)
+  Models: Haiku vs Sonnet (side-by-side)
+════════════════════════════════════════════════════════════════════════
+
+════════════════════════════════════════════════════════════════════════
+  ========== HAIKU ==========
+════════════════════════════════════════════════════════════════════════
+LIVE CALL MEMORY
+Stage: Press · Elapsed: — · Syntax: goals-first
+▸ THE GAP
+  Current "hell":   $4k/month from course; knows it's underperforming
+  Desired "heaven": Six-figure annual revenue from course · $GOAL $100k/year · why that #: freedom
+  Final straw / emotional why: Fear of repeating past failure; self-doubt about follow-through ("it's me")
+  Core driver: Growth
+▸ BELIEF LADDER  (✅ locked · 🟡 partial · ⬜ open · ⚠️ at-risk/objection)
+  1 Pain                 ✅ locked — "felt like garbage about it"; acute emotional consequence of past incompletion
+  2 Doubt (can't DIY)    ✅ locked — "It's me I'm worried about"; explicitly owns the problem is internal accountability, not external knowledge
+  3 Cost (of inaction)   🟡 partial — implied in "felt like garbage"; shame/self-judgment present, not quantified
+  4 Desire               ✅ locked — "ideally six figures a year"; "more freedom"
+  5 Money               ✅ locked — "The money's fine, I have it set aside"; explicitly removed price as objection
+  6 Support (who decides) ⬜ open — no mention of stakeholders or approval
+  7 Trust (why you)      🟡 partial — rep asserted "accountability is the whole point"; Kevin said "That's what I need to believe" — intellectual agreement but not yet full conviction that THIS program delivers it
+▸ THEIR EXACT WORDS (verbatim, for tie-downs)
+  • "I know it could be way more"
+  • "ideally six figures a year from it"
+  • "I felt like garbage about it"
+  • "It's me I'm worried about"
+  • "That's what I need to believe, I think"
+▸ OPEN OBJECTIONS: Follow-through / self-accountability (acknowledged, partially addressed by rep; Kevin wants to believe but not yet convinced the program solves it)
+▸ WEAKEST LINK → Trust (🟡 Kevin intellectually agrees accountability matters but hasn't locked belief that YOUR program delivers it), Support (⬜ unknown if anyone else needs to approve $9k). Before closing: prove how accountability is baked into the program (not just promised) and confirm solo decision-maker.
+────────────────────────────────────────────────────────────────────────
+  3 updates · 5205 in / 1615 out tokens · ~$0.0133 for this call (APPROX rates — confirm) · 14.7s total
+
+════════════════════════════════════════════════════════════════════════
+  ========== SONNET ==========
+════════════════════════════════════════════════════════════════════════
+LIVE CALL MEMORY
+Stage: Discovery→Press · Elapsed: — · Syntax: goals-first
+
+▸ THE GAP
+  Current "hell":   Course at $4k/month — knows it could be more; bought a $2k course, never finished it, "felt like garbage about it"
+  Desired "heaven": Six figures/year from the course · $GOAL ~$100k/yr · why that #: —
+  Final straw / emotional why: Fear that he is the problem — "if I still don't follow through — it's not the program, it's me"
+  Core driver: Certainty (needs proof he can follow through; identity threat driving the hesitation)
+
+▸ BELIEF LADDER  (✅ locked · 🟡 partial · ⬜ open · ⚠️ at-risk/objection)
+  1 Pain                  ✅ locked — "felt like garbage about it"; owns the cost of the prior failure emotionally
+  2 Doubt (can't DIY)     🟡 partial — fears self-sabotage, not just program quality; DIY risk is real but framed as personal failing, not external gap yet
+  3 Cost (of inaction)    ⬜ open — not addressed; "what does another year at $4k/month cost you?" still unmined
+  4 Desire                🟡 partial — "six figures… more freedom" still soft; emotional charge now exists but hasn't been reconnected to the desire
+  5 Money                 ✅ locked — "the money's fine, I have it set aside, that's not the issue"
+  6 Support (who decides) ⬜ open — not addressed
+  7 Trust (why you)       🟡 partial — refund question dropped; accountability claim landed ("that's what I need to believe, I think") but not yet fully owned
+
+▸ THEIR EXACT WORDS (verbatim, for tie-downs)
+  • "If I drop nine grand on this and I still don't follow through — then it's not the program, it's me. That's the part that scares me."
+  • "The money's fine, I have it set aside, that's not the issue."
+  • "That's what I need to believe, I think."
+  • "I felt like garbage about it."
+
+▸ OPEN OBJECTIONS: Follow-through / self-trust — "it means I'm the problem" (open — rep named accountability but hasn't shown HOW it prevents the repeat; Kevin said "need to believe," not "I believe")
+
+▸ WEAKEST LINK → Trust (7) 🟡 and Doubt (2) 🟡 — Kevin's "I need to believe" is a door, not a yes. Rep must show the specific accountability mechanism concretely (not just assert it), then tie it back to the identity fear he just exposed. Cost of inaction (3) also ⬜ — one question connecting another year of $4k/month to the emotional cost of staying stuck would cement desire before the close.
+────────────────────────────────────────────────────────────────────────
+  3 updates · 5303 in / 1844 out tokens · ~$0.0436 for this call (APPROX rates — confirm) · 34.4s total
+
+════════════════════════════════════════════════════════════════════════
+  JUDGE THE SCORECARD(S) ON:
+   • Right pain identified?
+   • Honest belief statuses (no inflation — prospect-confirmed = ✅, rep-framed = 🟡)?
+   • Quotes are VERBATIM + actually useful for tie-downs?
+   • Correct WEAKEST LINK?
+   • Stayed consistent + fixed-size across the whole call?
+   • ZERO hallucinated facts?
+   • Is Sonnet's judgment visibly better — enough to justify ~3× cost?
+════════════════════════════════════════════════════════════════════════

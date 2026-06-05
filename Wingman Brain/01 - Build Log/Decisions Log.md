@@ -2,11 +2,18 @@
 
 A running log of every major architectural or product decision made on Wingman. Append only — never delete. Each entry captures the decision, the date, the reasoning, and any alternatives that were rejected.
 
-Last updated: 2026-06-03
+Last updated: 2026-06-05
 
 ---
 
 ## 2026
+
+### 2026-06-05 — Summarizer model LOCKED: Claude Sonnet 4.6 (not Haiku)
+**Decision:** The Phase 2 Belief Ladder summarizer (the background live-call memory) runs on **Claude Sonnet 4.6.** The live press-time arrow card (Phase 3) stays on **Haiku** — Sonnet is only for the background judge.
+**Why:** A 5-transcript trap test with a pre-registered answer key (`scripts/test-transcripts/` + `EXPECTED.md`) scored **Sonnet 5/5 vs Haiku 2 slips.** Both nailed extraction + the rolling-memory mechanics (budget-contradiction override, husband-from-line-1 long-call recall); Haiku's only misses were *judgment* calls — it mistook enthusiasm for desire (01) and muddied a hidden objection (05). The Belief Ladder is mostly a judgment task, so Sonnet's edge is load-bearing. The summarizer is **background** (~90s cadence, off the arrow-press hot path), so Sonnet's slower latency costs nothing live. Haiku stays on the press-time card, which IS latency-critical.
+**Cost — and the corrected number:** the earlier "~20¢/call" was measured on tiny test transcripts and was WRONG. Real usage ≈ **1,800 in / 620 out tokens per ~90s tick, flat per tick**; what scales is tick count (~30 on a 45-min call). So un-optimized Sonnet ≈ **44–59¢/call** (Haiku ~15–20¢). Cost levers locked into the build — (1) prompt-cache the system prompt (1h TTL, −90% cached input), (2) cap output ~400 tok (output @ $15/M dominates), (3) ~2-min cadence not 90s, (4) skip silent ticks — bring Sonnet to **~20–25¢/call** with judgment intact.
+**The bigger principle (researched 2026-06-05):** AI-native SaaS gross margins average ~52% (ICONIQ 2026) vs ~80% classic SaaS — so the answer to AI COGS is **pricing/packaging (tiers + caps), NOT a cheaper model.** The model isn't the moat (the Sales DNA / prospect-memory data flywheel is); inference falls ~10×/yr. Build with the best judge; protect margin in pricing. Tier proposal: `06 - Finance/Tier Pricing Proposal + Unit Economics.md`.
+**Status:** Locked. Keep the summarizer model-agnostic (one-line switch) so we can re-evaluate as prices/models move.
 
 ### 2026-06-03 — Call framework: show 4 universal stages, coach the elite depth underneath
 **Decision:** The user-facing call structure leads with the 4 stages every closer agrees on — **Rapport · Discovery · Pitch · Close.** The other two beats from the 6-stage model (Press = cost of inaction/urgency; Confirm = the pre-pitch transition) are NOT shown as top-level stages — they're coached as **depth inside Discovery** (Press already maps to the `cost_of_waiting` pillar; Confirm = a transition coaching note). Topic coverage (the 7 pillars) is the universal, flow-agnostic layer; the rigid stage sequence is secondary context.
@@ -24,7 +31,7 @@ Last updated: 2026-06-03
 **Status:** Locked direction. V1.5 viz polish (single-call breakdown) + Phase 4 (readiness hue). Open detail for build time: what the trend scatter's two axes are. Detail: `_Inbox/2026-06-02 Post-call belief heatmap + readiness hue.md`.
 
 ### 2026-06-02 — Scout CUT from v1; live call summary is timer-driven
-**Decision:** The "scout" (demoting `keyword-triggers.ts` to a silent tagger that triggers summary updates) is **removed from the v1 hotkey build.** The rolling Belief Ladder summary instead updates purely **on a timer** (at most once/~60s, at least once/~2min), rate-bounded to pennies/call, written by a background Haiku call that reads [current summary] + [only the new transcript since last update].
+**Decision:** The "scout" (demoting `keyword-triggers.ts` to a silent tagger that triggers summary updates) is **removed from the v1 hotkey build.** The rolling Belief Ladder summary instead updates purely **on a timer** (at most once/~60s, at least once/~2min), rate-bounded to pennies/call, written by a background Haiku call that reads [current summary] + [only the new transcript since last update]. **→ MODEL UPDATED 2026-06-05: the summarizer is Claude Sonnet 4.6, not Haiku (5-trap test — see that day's entry). It persists to `calls.live_summary`.**
 **Why:** The scout was a *responsiveness* optimization, not load-bearing. The summary stays fresh on the timer, and the live ~90s buffer (sent at press time) already covers recency — so a scout miss can't cause a wrong card. It added build + mental complexity for marginal benefit. Revisit only if real calls show the ~2min lag causing a visibly stale card (unlikely). The autonomous keyword *cards* are removed regardless (hotkey model fires nothing unsummoned).
 **Also locked:** the summary updater is **client-triggered** (the app pings a `/summarize` endpoint every ~2min) — never a server-side long-lived timer — so it runs on Railway now AND Vercel later with zero rework.
 **Status:** Locked. Full spec: `00 - Product/Phase 2 — Live Call Memory Design.md`.
@@ -102,6 +109,8 @@ Last updated: 2026-06-03
 ---
 
 ### 2026-05-31 — Pricing: 10 free calls → $149/mo, unlimited (no cap)
+> ⚠️ **REVISED 2026-06-05 → TIERED.** "Flat $149 unlimited, no cap" (below) is superseded. At real usage (3–4 calls/day ≈ 80 calls/mo) flat-unlimited bleeds margin (~45–62%), so we added a **Pro $299** tier (unlimited + calendar / prospect memory / briefings / deal coach) and a **soft cap** on Core (~75 calls + overage — *never* a hard block). Spirit preserved — it's literally the "higher tier for heavy users / if they want more they can buy more" line below. Full model: `06 - Finance/Tier Pricing Proposal + Unit Economics.md`. (Pending final sign-off on the exact cap + Pro price.)
+
 **Decision:** Monetization = **10 free calls**, then **$149/month** to continue, **unlimited calls, no cap.**
 **Framing of the free period (important — don't overbuild this):** The 10 free calls are a *taste / added benefit*, not a gate that has to deliver an "insane" Sales DNA before we're allowed to charge. Sebastian's words: "having that Sales DNA isn't the only thing… it's just an added benefit, so still [10] calls." So Sales DNA richness is *one* reason a rep stays, alongside the live in-call help and the Flight Log/debrief value — not the sole conversion lever. Do not gate the paywall on Sales DNA hitting some quality bar; 10 calls is a clean, simple number and that's the rule.
 **On counting calls:** Counting only *substantive* calls (excluding no-shows / instant DQs) is a sensible fairness + don't-burn-their-trial touch, but it's a nice-to-have now, not load-bearing — the free period is a taste, not a make-or-break "wow" gate. Decide during build; simplest acceptable version is fine.
@@ -197,6 +206,8 @@ Last updated: 2026-06-03
 ---
 
 ### 2026-04-02 — Delete raw transcripts after post-call processing
+> ⚠️ **SUPERSEDED 2026-04-23 → transcripts are RETAINED, user-deletable.** The deletion below was implemented, broke "Ask Wingman" + the Flight Log transcript view, and was reverted (Known Issue #30). Current rule: keep transcripts (text only), user-deletable per-call / account-wide (compliance #33). Audio/video still never stored. Do NOT re-introduce auto-deletion.
+
 **Decision:** Raw transcripts are stored temporarily in Supabase during a call, used by the post-call job, then deleted immediately after the job completes.
 **Reasoning:** Legal exposure (storing call transcripts without prospect consent), privacy commitment to users, and infrastructure cost. The insights extracted (grade, debrief, objections, Offer Brain delta) are stored permanently. The raw text is not needed after extraction. This is a hard rule — see Architectural Invariants in CLAUDE.md.
 **Status:** Active. Non-negotiable.

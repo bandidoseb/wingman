@@ -1,8 +1,22 @@
 # Current Sprint
 
-Last updated: 2026-06-03
+Last updated: 2026-06-05
 
 This is the first file Claude reads at session start. It answers: where are we, what's next, and what's blocking us.
+
+---
+
+## What Was Just Completed (2026-06-05 — Phase 2 prompt-first + Sonnet lock + Call Continuity design + pricing tiers)
+
+Big session. Full narrative in `2026-06-05.md`.
+
+- **Bugs #35 + #36 RESOLVED** — disposition HUD card fixed (self-healing + hover-capture so it no longer freezes the whole screen + centered; live-tested by Sebastian ✅); double-end race confirmed already-guarded in committed code. `wingman-reviewer` approved twice.
+- **Phase 2 prompt-first build + Sonnet LOCKED** — built the offline summarizer harness (`scripts/test-belief-ladder.mjs`) + a 5-trap test with a pre-registered answer key (`scripts/test-transcripts/EXPECTED.md`). **Sonnet 5/5 vs Haiku 2 slips** → summarizer = **Sonnet 4.6** (Haiku stays on the live press-time card). Cost corrected to ~44–59¢/call un-optimized → **~20–25¢ with locked levers**. Schema run: **`calls.live_summary` column is live.**
+- **NEW track — Call Continuity + Prospect Memory** (`00 - Product/Call Continuity + Prospect Memory Design.md`): drop-resume = **CORE**, cross-call deal memory = **PREMIUM**; Recall calendar → prospect identity by **email**; prospect/deal pages + **next-call game plan**; **"Today's Calls"** briefing; deal-level Ask Wingman upsell. Never silently merge; expands compliance #33 (identified PII).
+- **Pricing → tiers (PROPOSAL)** (`06 - Finance/Tier Pricing Proposal + Unit Economics.md`): Free 10 / **Core $149** (soft-capped ~75) / **Pro $299** (unlimited + premium). **Call-counting rule decided:** ≥10 min AND prospect spoke. Strategy research (YC/ICONIQ/Hormozi): build quality, fix margin in pricing.
+- **Brain reconciled** — killed stale "delete transcripts," "flat $149 unlimited," "Haiku summarizer," and the retired "Free to fly" tagline across the vault; corrected this session's mis-date (06-03 → 06-05).
+
+**Next:** Phase 2 Step 1 (summarize route + ~2-min timer + `belief-ladder.ts`), then persistence; then the continuity track; finalize pricing numbers.
 
 ---
 
@@ -265,17 +279,19 @@ This was a **decisions/logging session — no app code changed, nothing pushed.*
 
 ## What's In Progress
 
-- Nothing currently in progress.
+- **Phase 2 build** — prompt-first slice done (harness + Sonnet locked + `calls.live_summary` column live). **Next concrete step: wire the Sonnet summarizer into the live pipeline** — `src/lib/wingman/belief-ladder.ts` + `POST /api/wingman/summarize` + a ~2-min client-triggered timer in `useWingmanPoller.ts` (Step 1, testable via logs), then persist to `calls.live_summary` (Step 2).
 
 ---
 
 ## What's Next (Priority Order)
 
-**🎯 HOTKEY SIGNAL-CARD MODEL — progress: Phase 0 ✅ · Phase 1 ✅ · Phase 2 NEXT.** Phased plan in `tasks/todo.md` + `00 - Product/Hotkey Model Build Plan.md`. Build serially (shared live-pipeline state). Gate to "done" each phase = live test on a real call (only Sebastian).
+**🎯 HOTKEY SIGNAL-CARD MODEL — progress: Phase 0 ✅ · Phase 1 ✅ · #35/#36 ✅ · Phase 2 IN BUILD (prompt + model locked).** Phased plan in `tasks/todo.md` + `00 - Product/Hotkey Model Build Plan.md`. Build serially (shared live-pipeline state). Gate to "done" each phase = live test on a real call (only Sebastian).
 
   - **✅ Phase 0 (shipped):** transcript persistence decoupled to `/api/wingman/transcript`.
   - **✅ Phase 1 (shipped):** retired the Sonnet poll, stages → post-call, silenced autonomous cards, hid stage bar.
-  - **▶️ Phase 2 (NEXT — designed, not built):** the rolling Belief Ladder live-call memory. Spec: `00 - Product/Phase 2 — Live Call Memory Design.md`. Timer-driven Haiku summarizer, **client-triggered** (Vercel-safe), rate-bounded. No scout. **Consider doing tasks #35 (disposition HUD) + #36 (double-end race) first** — they touch the same end-call paths Phase 2 builds on.
+  - **✅ #35 + #36 (resolved 2026-06-05):** disposition HUD card + double-end race — the end-call paths Phase 2 builds on are now solid.
+  - **🔨 Phase 2 (IN BUILD):** the rolling Belief Ladder live-call memory. Spec: `00 - Product/Phase 2 — Live Call Memory Design.md`. **Prompt + model locked (Sonnet 4.6, cost levers); `calls.live_summary` column live; offline harness + 5-trap test passing.** Remaining: **Step 1** — `belief-ladder.ts` (lift the locked prompt) + `POST /api/wingman/summarize` (Sonnet) + ~2-min client-triggered timer in `useWingmanPoller.ts` (testable via logs); **Step 2** — persist to `calls.live_summary`. Then live-test.
+  - **🆕 PARALLEL TRACK — Call Continuity + Prospect Memory** (`00 - Product/Call Continuity + Prospect Memory Design.md`): drop-resume (CORE) → calendar + cross-call prospect memory (PREMIUM). Phases A–D; each needs its own schema migration (prospects table, prospect_id, calendar_connections) — show SQL + get approval per phase. Sequence after / alongside the hotkey track (shared live pipeline → likely serial).
   - **Phase 3:** hotkey + 4-arrow compass menu + objection slot (highest risk, the milestone) + Settings hotkey override (`profiles.call_hotkey` — show SQL first).
   - **Phase 4:** the other 3 arrows (← answer · ↓ dig · → close readiness hue).
   - **Phase 5:** dead-code removal (`/poll` route, `POLL_INTERVALS`, unused components), reconcile CLAUDE.md Core Product Rules (Issue #34).
