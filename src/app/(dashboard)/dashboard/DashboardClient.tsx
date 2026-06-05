@@ -91,6 +91,7 @@ export default function DashboardClient({
     addChunk,
     dismissSignal,
     flushBuffer,
+    flushSummarize,
   } = useWingmanPoller({
     callId,
     stage,
@@ -232,8 +233,10 @@ export default function DashboardClient({
     pendingCallIdRef.current = callId;
 
     try {
-      // Flush any buffered transcript chunks before closing the session so the
-      // last N seconds of the call aren't silently discarded between poll intervals.
+      // Flush transcript + fire final Belief Ladder update before closing the session.
+      // flushSummarize is fire-and-forget (no await) — Sonnet takes 2-5s and the rep
+      // shouldn't wait for the background scorer before the UI resets.
+      flushSummarize();
       await flushBuffer();
 
       try {
@@ -259,7 +262,7 @@ export default function DashboardClient({
       // future calls to handleEndCall must not be permanently blocked.
       isEndingRef.current = false;
     }
-  }, [callId, defaultStage, prospectName, flushBuffer, router]);
+  }, [callId, defaultStage, prospectName, flushBuffer, flushSummarize, router]);
 
   // ── Auto-ended by Recall AI (meeting lost, inactivity, 2h cap) ────────────
   // Electron already stopped Recall AI before this fires, so we must NOT call
@@ -293,7 +296,9 @@ export default function DashboardClient({
       // Capture callId now — it will be cleared by setCallId(null) below
       const activeCallId = callId;
 
-      // Flush any buffered transcript chunks before closing the session.
+      // Flush transcript + fire final Belief Ladder update before closing the session.
+      // flushSummarize is fire-and-forget (no await) — same reasoning as handleEndCall.
+      flushSummarize();
       await flushBuffer();
 
       // Run session PATCH and token fetch in parallel — no reason to wait for one
@@ -346,7 +351,7 @@ export default function DashboardClient({
       // thing that clears it on the auto-end path.
       isEndingRef.current = false;
     }
-  }, [callId, defaultStage, prospectName, flushBuffer, router]);
+  }, [callId, defaultStage, prospectName, flushBuffer, flushSummarize, router]);
 
   // Stable refs so the IPC listener (registered once) always calls latest handlers
   const handleStartCallRef = useRef(handleStartCall);

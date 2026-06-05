@@ -26,7 +26,9 @@ interface PusherScorecardEvent {
   signal_type:      SignalType;
 }
 
-const NON_ALERT_COOLDOWN_MS = 90_000; // 90 seconds
+const NON_ALERT_COOLDOWN_MS = 90_000;  // 90 seconds
+const SUMMARIZE_INTERVAL_MS = 120_000; // 2 minutes — rolling Belief Ladder update cadence
+const SUMMARIZE_MIN_CHARS   = 80;      // skip tick if fewer chars of new speech accumulated
 
 interface UseWingmanPollerOptions {
   callId: string | null;
@@ -44,9 +46,11 @@ interface UseWingmanPollerReturn {
   pollError: string | null;
   completedStages: CallStageLabel[];
   prospectName: string | null;
+  liveSummary: string | null;
   addChunk: (chunk: string) => void;
   dismissSignal: () => void;
   flushBuffer: () => Promise<void>;
+  flushSummarize: () => Promise<void>;
 }
 
 export function useWingmanPoller({
@@ -66,6 +70,8 @@ export function useWingmanPoller({
   const [pollError, setPollError] = useState<string | null>(null);
   const [completedStages, setCompletedStages] = useState<CallStageLabel[]>([]);
   const [prospectName, setProspectName] = useState<string | null>(null);
+  // Rolling Belief Ladder scorecard — updated by the ~2-min summarize timer
+  const [liveSummary, setLiveSummary] = useState<string | null>(null);
 
   // Pusher client — created once on mount, persists for the lifetime of the hook.
   // Initialized in a useEffect so it only runs in the browser (never during SSR).
@@ -80,6 +86,11 @@ export function useWingmanPoller({
   const stageRef = useRef<CallStageLabel>(stage);
   const callIdRef = useRef<string | null>(callId);
   const isPollingRef = useRef(false);
+  // Belief Ladder summarizer refs — independent of the transcript-save buffer/timer
+  const summarizeBufferRef = useRef<string>("");      // transcript since last summarize tick
+  const currentSummaryRef  = useRef<string | null>(null); // in-memory copy for fast press-time reads
+  const isSummarizingRef   = useRef(false);           // mutex — one in-flight request at a time
+  const summarizeIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   // The rep's Zoom display name — seeded from Settings, falls back to auto-detection.
   // Used to exclude the rep's lines from keyword trigger matching so cards
   // only fire when the prospect says an objection phrase, not the rep.
@@ -101,14 +112,18 @@ export function useWingmanPoller({
     repNameRef.current = repName ?? null;
     repSpeakerRef.current = repName ?? null;
   }, [repName]);
-  // Reset per-call speaker detection when a new call starts.
-  // Seeds from Settings if available; otherwise null triggers auto-detection.
-  // Prevents a stale auto-detected name from a previous call carrying into the next.
+  // Reset per-call state when a new call starts.
+  // Seeds speaker from Settings if available; otherwise null triggers auto-detection.
+  // Prevents stale speaker name / Belief Ladder from a previous call carrying forward.
   useEffect(() => {
     if (callId) {
-      repSpeakerRef.current      = repNameRef.current;
+      repSpeakerRef.current       = repNameRef.current;
       prospectDetectedRef.current = false;
       setProspectName(null);
+      // Reset Belief Ladder state for the new call
+      currentSummaryRef.current  = null;
+      summarizeBufferRef.current = "";
+      setLiveSummary(null);
     }
   }, [callId]);
 
@@ -329,7 +344,8 @@ export function useWingmanPoller({
         }
       }
 
-      chunkBufferRef.current += (chunkBufferRef.current ? "\n" : "") + chunk;
+      chunkBufferRef.current     += (chunkBufferRef.current     ? "\n" : "") + chunk;
+      summarizeBufferRef.current += (summarizeBufferRef.current ? "\n" : "") + chunk;
 
       // Phase 1: Wingman no longer fires cards autonomously. The keyword + KB
       // trigger path was removed here — nothing pops up unsummoned (ambient dot
@@ -383,6 +399,89 @@ export function useWingmanPoller({
     }
   }, []);
 
+  // Update the rolling Belief Ladder scorecard via Sonnet (~once per 2 min).
+  // Sends only the transcript accumulated since the last tick — NOT the full call —
+  // so Sonnet reads a small delta each time (cheap + fast).
+  // On failure the buffer is restored so nothing is silently dropped.
+  // force=true bypasses the SUMMARIZE_MIN_CHARS guard — used on call-end flush so a
+  // short but decisive final exchange ("yeah let's do it") still gets scored.
+  const executeSummarize = useCallback(async (force = false) => {
+    const newTranscript = summarizeBufferRef.current.trim();
+    if (!newTranscript || !callIdRef.current || isSummarizingRef.current) return;
+    if (!force && newTranscript.length < SUMMARIZE_MIN_CHARS) return;
+
+    summarizeBufferRef.current = ""; // clear before the async call
+    isSummarizingRef.current   = true;
+
+    const restoreSummarizeChunk = () => {
+      summarizeBufferRef.current = summarizeBufferRef.current
+        ? newTranscript + "\n" + summarizeBufferRef.current
+        : newTranscript;
+    };
+
+    const controller = new AbortController();
+    const timeoutId  = setTimeout(() => controller.abort(), 30_000);
+
+    try {
+      const res = await fetch("/api/wingman/summarize", {
+        method:  "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          call_id:         callIdRef.current,
+          current_summary: currentSummaryRef.current,
+          new_transcript:  newTranscript,
+        }),
+        signal: controller.signal,
+      });
+
+      if (!res.ok) {
+        restoreSummarizeChunk();
+        console.error("[Wingman] Summarize failed:", (await res.json().catch(() => ({}))).error);
+        return;
+      }
+
+      const data = await res.json();
+      if (data.summary) {
+        currentSummaryRef.current = data.summary;
+        setLiveSummary(data.summary);
+        console.log("[Wingman] Belief Ladder updated:\n", data.summary);
+      }
+    } catch (err) {
+      restoreSummarizeChunk();
+      if (err instanceof Error && err.name === "AbortError") {
+        console.warn("[Wingman] Summarize timed out after 30s — will retry on next tick.");
+      } else {
+        console.error("[Wingman] Summarize error:", err);
+      }
+    } finally {
+      clearTimeout(timeoutId);
+      isSummarizingRef.current = false;
+    }
+  }, []);
+
+  // ── Belief Ladder summarizer — ~2-min cadence, separate from transcript save ──
+  useEffect(() => {
+    if (summarizeIntervalRef.current) {
+      clearInterval(summarizeIntervalRef.current);
+      summarizeIntervalRef.current = null;
+    }
+
+    if (!isActive || !callId) return;
+
+    summarizeIntervalRef.current = setInterval(() => {
+      if (summarizeBufferRef.current.trim()) {
+        executeSummarize();
+      }
+    }, SUMMARIZE_INTERVAL_MS);
+
+    return () => {
+      if (summarizeIntervalRef.current) {
+        clearInterval(summarizeIntervalRef.current);
+        summarizeIntervalRef.current = null;
+      }
+    };
+  }, [isActive, callId, executeSummarize]);
+
   // ── Transcript-save heartbeat — fixed 25s cadence, no AI cost ────────────
   // Decoupled from stage; Phase 1 removes executePoll entirely.
   useEffect(() => {
@@ -412,6 +511,11 @@ export function useWingmanPoller({
     await executeTranscriptSave();
   }, [executeTranscriptSave]);
 
+  /** Fire a final Belief Ladder update on call end — bypasses the min-chars guard */
+  const flushSummarize = useCallback(async () => {
+    await executeSummarize(true);
+  }, [executeSummarize]);
+
   return {
     scorecard,
     currentSignal,
@@ -420,8 +524,10 @@ export function useWingmanPoller({
     pollError,
     completedStages,
     prospectName,
+    liveSummary,
     addChunk,
     dismissSignal,
     flushBuffer,
+    flushSummarize,
   };
 }
