@@ -1,8 +1,39 @@
 # Current Sprint
 
-Last updated: 2026-06-05
+Last updated: 2026-06-06
 
 This is the first file Claude reads at session start. It answers: where are we, what's next, and what's blocking us.
+
+---
+
+## What Was Just Completed (2026-06-06 — Phase 2 gate passed + Phase 3 design locked + token cap raised)
+
+**Phase 2 is fully complete.** Sebastian ran a real live sales call with Wingman deployed. All systems worked end-to-end for the first time.
+
+**Live call confirmed working:**
+- Recall AI detected meeting, recording started ✅
+- Transcript streaming: ~85 chunks, all 200 ✅
+- Belief Ladder summarizer: 17 ticks, prompt caching engaged every tick ✅
+- Auto-stop on meeting window close (`meeting_lost`) ✅
+- Post-call job: debrief written, 4 objections processed, pillar coverage + stages saved ✅
+- HUD outcome "Follow Up" saved ✅
+- Cost: **$0.21 for a 31-min call** — confirmed in target range (~$0.40 for 60-min)
+
+**Code change shipped (NOT yet on a branch/PR — goes into Phase 3 PR):**
+- `BELIEF_LADDER_MAX_TOKENS` raised **400 → 600** in `src/lib/wingman/belief-ladder.ts`
+- Reason: live logs showed consistent 397–400 output every tick → scorecard was hitting the ceiling and truncating (Weakest Link + Open Objections likely cut off)
+- Cost impact: +~$0.05/call (negligible)
+
+**New file created:**
+- `Wingman Brain/Beta Tuning Parameters.md` — tracks adjustable beta dials (output cap, live buffer duration, summarizer cadence) with what to watch, code locations, and cost impact per change
+
+**Phase 3 design decisions locked (bring these into the Phase 3 session):**
+1. **Full Belief Ladder scorecard** (the `liveSummary` text, ~600 tok) → Haiku at press time. Replace the current 5-field `scorecard_snapshot` in `kb-signal` / `knowledge-signal.ts`.
+2. **Live transcript buffer = 120 seconds** (raised from original 90s spec). Remove the `.slice(-500)` from `knowledge-signal.ts` — send the full 120s buffer as designed.
+3. **Keep Haiku** for press-time cards. Fix context + prompts first; revisit model only if cards still feel off after real calls.
+4. The two inputs to Haiku at press time are: (a) full scorecard = whole call history; (b) 120s live buffer = raw recency. They cover different time horizons — not duplication.
+
+**Next:** Phase 3 — hotkey + 4-arrow compass + signal card generation (already in progress in a separate session).
 
 ---
 

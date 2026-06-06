@@ -43,6 +43,8 @@ ipcRenderer.on("call:auto-ended", () => {
 let _transcriptChunkHandler:  ((_e: Electron.IpcRendererEvent, chunk: string) => void) | null = null;
 let _signalDismissHandler:    ((_e: Electron.IpcRendererEvent) => void) | null = null;
 let _outcomeUpdatedHandler:   ((_e: Electron.IpcRendererEvent) => void) | null = null;
+// Phase 3: hotkey compass menu — main process sends the direction the rep picked
+let _menuPickHandler:         ((_e: Electron.IpcRendererEvent, direction: string) => void) | null = null;
 
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -141,6 +143,27 @@ contextBridge.exposeInMainWorld("wingman", {
     if (_signalDismissHandler) {
       ipcRenderer.removeListener("signal:dismiss", _signalDismissHandler);
       _signalDismissHandler = null;
+    }
+  },
+
+  // ── Hotkey compass menu — direction picked by rep ────────────────────────
+  /**
+   * Fired by main.ts when the rep presses a direction key after summoning the
+   * compass menu with Up Arrow. Direction is one of: "objection" | "answer" |
+   * "dig" | "close". DashboardClient registers this once and calls the API.
+   */
+  onMenuPick: (callback: (direction: string) => void) => {
+    if (_menuPickHandler) {
+      ipcRenderer.removeListener("wingman:menu-pick", _menuPickHandler);
+    }
+    _menuPickHandler = (_event, direction) => callback(direction);
+    ipcRenderer.on("wingman:menu-pick", _menuPickHandler);
+  },
+
+  offMenuPick: () => {
+    if (_menuPickHandler) {
+      ipcRenderer.removeListener("wingman:menu-pick", _menuPickHandler);
+      _menuPickHandler = null;
     }
   },
 
@@ -258,4 +281,13 @@ contextBridge.exposeInMainWorld("hud", {
 
   // ── Open Settings — tells main to show the dashboard and navigate to Settings ──
   openSettings: () => ipcRenderer.invoke("hud:open-settings"),
+
+  // ── Hotkey compass menu (Phase 3) ────────────────────────────────────────
+  // main.ts sends these when the Up Arrow summon key opens / closes the menu.
+  onMenuOpen: (callback: () => void) => {
+    ipcRenderer.on("wingman:menu-open", () => callback());
+  },
+  onMenuClose: (callback: () => void) => {
+    ipcRenderer.on("wingman:menu-close", () => callback());
+  },
 });

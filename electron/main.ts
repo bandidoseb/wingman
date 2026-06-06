@@ -56,6 +56,109 @@ let zoomNameSet: boolean | null = null;
 // skips the hide and lets Electron destroy the window normally.
 let isQuitting = false;
 
+// ─── Hotkey compass menu state (Phase 3) ──────────────────────────────────────
+// The Up Arrow summon key is registered only while a call is active. The
+// direction keys (← ↓ →) + Esc are additionally registered only while the
+// compass menu is open, so they don't swallow arrow presses in Zoom/Meet
+// at any other time. Both layers are torn down on every call-end path.
+let menuOpen         = false;   // is the compass menu visible on the HUD?
+let hotkeyRegistered = false;   // idempotent guard — prevent double-registration
+let menuAutoFadeTimer: ReturnType<typeof setTimeout> | null = null;
+
+// ─── Hotkey helpers (Phase 3) ─────────────────────────────────────────────────
+
+/** Unregister ← ↓ → Esc and cancel the auto-fade. Called on pick, dismiss, timeout, or call-end. */
+function teardownMenuKeys(): void {
+  globalShortcut.unregister("Left");
+  globalShortcut.unregister("Down");
+  globalShortcut.unregister("Right");
+  globalShortcut.unregister("Escape");
+  if (menuAutoFadeTimer) { clearTimeout(menuAutoFadeTimer); menuAutoFadeTimer = null; }
+}
+
+/** Hide the compass menu and tear down its direction shortcuts. */
+function closeCompassMenu(): void {
+  if (!menuOpen) return;
+  menuOpen = false;
+  teardownMenuKeys();
+  hudWindow?.webContents.send("wingman:menu-close");
+}
+
+/**
+ * Show the compass menu and register the 4 direction shortcuts.
+ * - ← ↓ → each close the menu and send a "menu-pick" with their direction to
+ *   the web app. Phase 3 only implements "objection" (↑). The other three are
+ *   wired so their keys are captured (not swallowed by Zoom/Meet), and the
+ *   dashboard handler will no-op for unimplemented slots until Phase 4.
+ * - Esc closes the menu without picking.
+ * - Auto-fades after 5 s (silent — no visible countdown, per spec).
+ */
+function openCompassMenu(): void {
+  menuOpen = true;
+  hudWindow?.webContents.send("wingman:menu-open");
+
+  // Helper: register a direction key that picks a slot and closes the menu.
+  const registerPick = (key: string, direction: string) => {
+    globalShortcut.register(key, () => {
+      closeCompassMenu();
+      mainWindow?.webContents.send("wingman:menu-pick", direction);
+    });
+  };
+
+  registerPick("Left",  "answer");
+  registerPick("Down",  "dig");
+  registerPick("Right", "close");
+
+  // Esc — dismiss without picking
+  globalShortcut.register("Escape", () => { closeCompassMenu(); });
+
+  // Silent 5 s auto-fade (no visible countdown, per spec)
+  menuAutoFadeTimer = setTimeout(() => { closeCompassMenu(); }, 5_000);
+}
+
+/**
+ * Register the Up Arrow summon key for the duration of a call.
+ * Idempotent — safe to call even if already registered.
+ * First press: opens the compass menu.
+ * Second press (menu already open): picks "objection" immediately
+ *   (double-tap Up = instant objection help without looking).
+ */
+function registerCallHotkey(): void {
+  if (hotkeyRegistered) return;
+
+  const ok = globalShortcut.register("Up", () => {
+    if (!callActive) return; // safety — shouldn't happen since we unregister on call end
+
+    if (menuOpen) {
+      // Double-tap Up → instant objection pick
+      closeCompassMenu();
+      mainWindow?.webContents.send("wingman:menu-pick", "objection");
+    } else {
+      openCompassMenu();
+    }
+  });
+
+  if (!ok) {
+    console.warn("[Hotkey] Up Arrow registration failed — another app may have claimed it");
+    return;
+  }
+
+  hotkeyRegistered = true;
+  console.log("[Hotkey] Up Arrow registered");
+}
+
+/**
+ * Unregister the Up Arrow summon key and close any open compass menu.
+ * Idempotent — safe to call on every stop path.
+ */
+function unregisterCallHotkey(): void {
+  closeCompassMenu(); // tears down direction keys first
+  if (!hotkeyRegistered) return;
+  globalShortcut.unregister("Up");
+  hotkeyRegistered = false;
+  console.log("[Hotkey] Up Arrow unregistered");
+}
+
 // ─── Auto-stop handler ────────────────────────────────────────────────────────
 // Called by recall.ts when any of the three safeguards fire (meeting-lost,
 // inactivity timeout, or hard cap). Ends the call, notifies both windows,
@@ -63,6 +166,7 @@ let isQuitting = false;
 function autoStopCall(reason: AutoStopReason): void {
   console.log(`[AutoStop] Reason: ${reason}`);
   callActive = false;
+  unregisterCallHotkey(); // close compass + release Up Arrow before anything else
   stopRecallAI();
   hudWindow?.webContents.send("call:ended");
   hudWindow?.webContents.send("hud:auto-stopped", reason);
@@ -341,18 +445,21 @@ function setupIPC(): void {
       // Recording failed to start — roll back Electron state so the web app
       // knows not to create a session. HUD hides cleanly after 600ms.
       callActive = false;
+      unregisterCallHotkey(); // release Up Arrow — nothing to summon during a failed start
       hudWindow?.webContents.send("call:ended", {});  // reset HUD to idle state
       trayPopover?.webContents.send("tray:call-state", false);
       setTimeout(() => hudWindow?.hide(), 600);
       return { success: false, error: "recording_failed" };
     }
 
+    registerCallHotkey(); // Up Arrow live — call is genuinely active
     return { success: true };
   });
 
   ipcMain.handle("call:end", async (_event, callId?: string, token?: string) => {
     console.log("[IPC] call:end", callId ? "(with callId)" : "(no callId)");
     callActive = false;
+    unregisterCallHotkey(); // close compass + release Up Arrow
 
     // Store for use when HUD picks an outcome
     pendingOutcomeCallId = callId ?? null;

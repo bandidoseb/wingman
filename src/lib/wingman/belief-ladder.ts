@@ -12,9 +12,14 @@
 export const BELIEF_LADDER_MODEL = "claude-sonnet-4-6";
 
 // Hard cap on output tokens per summarize tick.
-// The template is fixed-size so 400 tokens fits the full scorecard comfortably.
-// Caps output cost (output @ $15/M is the dominant cost driver for Sonnet).
-export const BELIEF_LADDER_MAX_TOKENS = 400;
+// Raised from 400 → 600 on 2026-06-06 after live call logs showed consistent
+// 397–400 output, meaning Sonnet was hitting the ceiling every tick. The end of
+// the template (Open Objections, Weakest Link) was likely being truncated.
+// 600 gives ~50% breathing room over the observed natural output size.
+// ⚠️  BETA TUNING: after a few live calls, check actual output counts. If still
+//     hitting 580–600 consistently, raise again. See Wingman Brain/Beta Tuning Parameters.md.
+// Cost impact: +$0.05/call vs the old 400-token cap (negligible).
+export const BELIEF_LADDER_MAX_TOKENS = 600;
 
 export const BELIEF_LADDER_SYSTEM_PROMPT = `You are Wingman's live-call memory — an elite high-ticket closing coach (Cole Gordon / Jeremy Miner caliber) silently maintaining a running scorecard of a sales call AS IT HAPPENS.
 

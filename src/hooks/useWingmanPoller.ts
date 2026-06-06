@@ -26,9 +26,13 @@ interface PusherScorecardEvent {
   signal_type:      SignalType;
 }
 
-const NON_ALERT_COOLDOWN_MS = 90_000;  // 90 seconds
-const SUMMARIZE_INTERVAL_MS = 120_000; // 2 minutes — rolling Belief Ladder update cadence
-const SUMMARIZE_MIN_CHARS   = 80;      // skip tick if fewer chars of new speech accumulated
+const NON_ALERT_COOLDOWN_MS       = 90_000;  // 90 seconds
+const SUMMARIZE_INTERVAL_MS       = 120_000; // 2 minutes — rolling Belief Ladder update cadence
+const SUMMARIZE_MIN_CHARS         = 80;      // skip tick if fewer chars of new speech accumulated
+// Rolling recent-transcript window exposed to DashboardClient for hotkey press context.
+// 2,400 chars ≈ 120 s of speech at average rate (~130 words/min).
+// Tunable — see Wingman Brain/Beta Tuning Parameters.md.
+const RECENT_TRANSCRIPT_MAX_CHARS = 2_400;
 
 interface UseWingmanPollerOptions {
   callId: string | null;
@@ -47,6 +51,8 @@ interface UseWingmanPollerReturn {
   completedStages: CallStageLabel[];
   prospectName: string | null;
   liveSummary: string | null;
+  /** Returns the last ~120 s of raw transcript for hotkey press-time context. */
+  getRecentTranscript: () => string;
   addChunk: (chunk: string) => void;
   dismissSignal: () => void;
   flushBuffer: () => Promise<void>;
@@ -91,6 +97,9 @@ export function useWingmanPoller({
   const currentSummaryRef  = useRef<string | null>(null); // in-memory copy for fast press-time reads
   const isSummarizingRef   = useRef(false);           // mutex — one in-flight request at a time
   const summarizeIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // Rolling recent-transcript window for hotkey press-time context.
+  // Never cleared between saves — always holds the last ~120 s of speech.
+  const recentTranscriptRef = useRef<string>("");
   // The rep's Zoom display name — seeded from Settings, falls back to auto-detection.
   // Used to exclude the rep's lines from keyword trigger matching so cards
   // only fire when the prospect says an objection phrase, not the rep.
@@ -121,8 +130,9 @@ export function useWingmanPoller({
       prospectDetectedRef.current = false;
       setProspectName(null);
       // Reset Belief Ladder state for the new call
-      currentSummaryRef.current  = null;
-      summarizeBufferRef.current = "";
+      currentSummaryRef.current   = null;
+      summarizeBufferRef.current  = "";
+      recentTranscriptRef.current = "";
       setLiveSummary(null);
     }
   }, [callId]);
@@ -347,6 +357,16 @@ export function useWingmanPoller({
       chunkBufferRef.current     += (chunkBufferRef.current     ? "\n" : "") + chunk;
       summarizeBufferRef.current += (summarizeBufferRef.current ? "\n" : "") + chunk;
 
+      // Rolling 120 s window for hotkey press-time context.
+      // Trims from the front when it exceeds the char cap so the most recent
+      // speech is always available at the moment the rep presses the hotkey.
+      const combined = recentTranscriptRef.current
+        ? recentTranscriptRef.current + "\n" + chunk
+        : chunk;
+      recentTranscriptRef.current = combined.length > RECENT_TRANSCRIPT_MAX_CHARS
+        ? combined.slice(-RECENT_TRANSCRIPT_MAX_CHARS)
+        : combined;
+
       // Phase 1: Wingman no longer fires cards autonomously. The keyword + KB
       // trigger path was removed here — nothing pops up unsummoned (ambient dot
       // only). The hotkey summon path that replaces it is built in Phase 3.
@@ -525,6 +545,7 @@ export function useWingmanPoller({
     completedStages,
     prospectName,
     liveSummary,
+    getRecentTranscript: () => recentTranscriptRef.current,
     addChunk,
     dismissSignal,
     flushBuffer,

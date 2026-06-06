@@ -88,6 +88,8 @@ export default function DashboardClient({
     scorecard,
     currentSignal,
     prospectName,
+    liveSummary,
+    getRecentTranscript,
     addChunk,
     dismissSignal,
     flushBuffer,
@@ -99,6 +101,9 @@ export default function DashboardClient({
     objections: initialObjections,
     repName: savedZoomName || null,
   });
+
+  // ── In-flight guard — prevents double-billing on rapid hotkey presses ───────
+  const isGeneratingRef = useRef(false);
 
   // Keep stage in sync with what the AI detects so poll intervals adapt
   useEffect(() => {
@@ -450,6 +455,82 @@ export default function DashboardClient({
     window.wingman?.onSignalDismiss(() => dismissSignal());
     return () => { window.wingman?.offSignalDismiss(); };
   }, [isElectron, dismissSignal]);
+
+  // ── Hotkey compass menu — handle direction pick from Electron main ─────────
+  // Called by main.ts when the rep presses a direction key after the Up Arrow
+  // summons the compass. Assembles the full context (Belief Ladder + last 120 s
+  // of transcript + stage), fetches /kb-signal, and forwards the card to the HUD.
+  //
+  // isGeneratingRef prevents double-billing on rapid presses — if a Haiku call
+  // is already in flight, subsequent picks are silently dropped until it settles.
+  const handleMenuPick = useCallback(async (direction: string) => {
+    if (isGeneratingRef.current) {
+      console.log("[Wingman] Menu pick dropped — card generation already in flight");
+      return;
+    }
+    if (!callId || !isActiveRef.current) return;
+
+    // Phase 3 ships only the ↑ objection slot. ← ↓ → are captured by globalShortcut
+    // so they don't fall through to Zoom/Meet, but they produce no card yet.
+    // Phase 4 removes this guard and implements the other three slots.
+    if (direction !== "objection") {
+      console.log(`[Wingman] Slot "${direction}" not yet implemented — Phase 4`);
+      return;
+    }
+
+    isGeneratingRef.current = true;
+
+    try {
+      const recentTranscript = getRecentTranscript();
+
+      const res = await fetch("/api/wingman/kb-signal", {
+        method:  "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          transcript_chunk: recentTranscript,
+          live_summary:     liveSummary ?? undefined,
+          slot:             direction,
+          current_stage:    stage,
+        }),
+      });
+
+      if (!res.ok) {
+        console.error("[Wingman] kb-signal request failed:", res.status);
+        return;
+      }
+
+      const data = await res.json();
+
+      // Forward the card to the HUD. The response always has signal_header when
+      // generation succeeded — an empty ok means both KB + fallback paths failed.
+      if (data.signal_header && typeof window !== "undefined" && window.wingman) {
+        window.wingman.sendSignal({
+          header: data.signal_header,
+          text:   data.signal_text   ?? "",
+          type:   data.signal_type   ?? "Handle",
+        });
+      }
+    } catch (err) {
+      console.error("[Wingman] handleMenuPick error:", err);
+    } finally {
+      isGeneratingRef.current = false;
+    }
+  }, [callId, getRecentTranscript, liveSummary, stage]);
+
+  // Stable ref so the IPC listener (registered once on mount) always calls
+  // the latest handleMenuPick without going stale across renders.
+  const handleMenuPickRef = useRef(handleMenuPick);
+  useEffect(() => { handleMenuPickRef.current = handleMenuPick; }, [handleMenuPick]);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.wingman) return;
+    window.wingman.onMenuPick((direction: string) => {
+      handleMenuPickRef.current(direction);
+    });
+    return () => { window.wingman?.offMenuPick(); };
+  // Registered once — uses ref so it never goes stale. Same pattern as onToggleCall.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // ── Navigation helpers ─────────────────────────────────────────────────────
   const handleTabClick = useCallback((id: DashboardTab) => {
