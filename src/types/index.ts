@@ -160,7 +160,8 @@ export interface WingmanSignal {
   header: string;
   text: string;
   firedAt: number; // Date.now()
-  source: "poll" | "keyword";
+  // "summoned" = rep pressed the hotkey; "poll" / "keyword" are legacy autonomous paths
+  source: "poll" | "keyword" | "summoned";
 }
 
 export interface SignalLogEntry {
@@ -242,6 +243,10 @@ export interface WingmanBridge {
 
   // Navigate to Settings tab (sent by main when HUD "Open Settings" is clicked)
   onNavigateToSettings: (callback: () => void) => void;
+
+  // Hotkey compass menu — main process tells web app which direction the rep picked
+  onMenuPick:  (callback: (direction: string) => void) => void;
+  offMenuPick: () => void;
 
   // Outcome saved from HUD — tells dashboard to refresh so pill appears immediately
   onOutcomeUpdated?:  (callback: () => void) => void;

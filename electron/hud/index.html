@@ -624,6 +624,112 @@
     }
 
     #outcomeError.visible { display: block; }
+
+    /* ══════════════════════════════════════════════════════════════════════
+       COMPONENT 5 — COMPASS MENU (Phase 3 hotkey-summoned)
+       Appears when Up Arrow is pressed during a live call.
+       Pure display — pointer-events: none. Keyboard-only interaction.
+       Positioned above the ambient dot (bottom-left corner).
+    ══════════════════════════════════════════════════════════════════════ */
+    #compassMenu {
+      position: absolute;
+      bottom: 100px;
+      left: 32px;
+      z-index: 110;
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      pointer-events: none;
+    }
+
+    #compassMenu.visible {
+      display: flex;
+      animation: fadeIn 0.15s ease-in forwards;
+    }
+
+    #compassMenu.hiding {
+      animation: fadeOut 0.15s ease-out forwards;
+    }
+
+    .compass-middle-row {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      justify-content: center;
+    }
+
+    .compass-center-dot {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      flex-shrink: 0;
+    }
+
+    .compass-arrow {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 3px;
+      padding: 7px 10px;
+      border-radius: 10px;
+      background: rgba(18, 18, 24, 0.82);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.09);
+      min-width: 76px;
+    }
+
+    /* Up (objection) is the active slot — slightly brighter to signal it's live */
+    .compass-arrow.compass-up {
+      background: rgba(24, 24, 36, 0.92);
+      border-color: rgba(255, 255, 255, 0.20);
+      box-shadow: 0 0 12px rgba(255, 255, 255, 0.04);
+    }
+
+    /* Side arrows are dimmer — not yet active in Phase 3 */
+    .compass-arrow.compass-left,
+    .compass-arrow.compass-right {
+      min-width: 68px;
+      opacity: 0.55;
+    }
+
+    .compass-arrow.compass-down {
+      opacity: 0.55;
+    }
+
+    .compass-key {
+      font-size: 15px;
+      color: rgba(255, 255, 255, 0.9);
+      line-height: 1;
+    }
+
+    .compass-arrow.compass-up .compass-key {
+      color: #ffffff;
+    }
+
+    .compass-label {
+      font-size: 9px;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: rgba(255, 255, 255, 0.28);
+      text-align: center;
+      white-space: nowrap;
+    }
+
+    .compass-arrow.compass-up .compass-label {
+      color: rgba(255, 255, 255, 0.6);
+    }
+
+    .compass-esc-hint {
+      font-size: 9px;
+      color: rgba(255, 255, 255, 0.18);
+      margin-top: 2px;
+      letter-spacing: 0.03em;
+    }
   </style>
 </head>
 <body>
@@ -728,6 +834,33 @@
     <div id="outcomeError">Couldn't save — log it in Flight Log</div>
   </div>
 
+  <!-- COMPONENT 5: Compass Menu (Phase 3 hotkey-summoned) -->
+  <div id="compassMenu">
+    <!-- ↑ Objection (active in Phase 3) -->
+    <div class="compass-arrow compass-up">
+      <span class="compass-key">↑</span>
+      <span class="compass-label">Handle objection</span>
+    </div>
+    <!-- Middle row: ← center → -->
+    <div class="compass-middle-row">
+      <div class="compass-arrow compass-left">
+        <span class="compass-key">←</span>
+        <span class="compass-label">Answer question</span>
+      </div>
+      <div class="compass-center-dot"></div>
+      <div class="compass-arrow compass-right">
+        <span class="compass-key">→</span>
+        <span class="compass-label">Close</span>
+      </div>
+    </div>
+    <!-- ↓ Dig deeper -->
+    <div class="compass-arrow compass-down">
+      <span class="compass-key">↓</span>
+      <span class="compass-label">Dig deeper</span>
+    </div>
+    <div class="compass-esc-hint">esc to dismiss</div>
+  </div>
+
   <!-- COMPONENT 2: Signal Card -->
   <div id="signalBubble">
     <div id="signalTag"></div>
@@ -762,6 +895,23 @@
     let outcomeCallId      = null;
     let outcomeAutoDismiss = null;
 
+    // ── Compass menu state (Phase 3) ──────────────────────────────────────
+    let compassHideTimer = null;
+
+    function showCompassMenu() {
+      clearTimeout(compassHideTimer);
+      compassMenu.classList.remove('hiding');
+      compassMenu.classList.add('visible');
+    }
+
+    function hideCompassMenu() {
+      clearTimeout(compassHideTimer);
+      compassMenu.classList.add('hiding');
+      compassHideTimer = setTimeout(() => {
+        compassMenu.classList.remove('visible', 'hiding');
+      }, 150);
+    }
+
     // ── Element refs ──────────────────────────────────────────────────────
     const stopBtn              = document.getElementById('stopBtn');
     const stageBar             = document.getElementById('stageBar');
@@ -776,6 +926,7 @@
     const gotItBtn             = document.getElementById('gotItBtn');
     const ambientDot           = document.getElementById('ambientDot');
     let   hideSignalTimer      = null;
+    const compassMenu          = document.getElementById('compassMenu');
     const outcomeCard          = document.getElementById('outcomeCard');
     const outcomePills         = document.getElementById('outcomePills');
     const outcomeConfirm       = document.getElementById('outcomeConfirm');
@@ -1313,6 +1464,7 @@
         setLive(false);
         hideSignal();
         hideEndCallConfirmToast();
+        hideCompassMenu(); // always close compass on call end
         // If a callId was passed, show the outcome card
         if (data && data.callId) {
           showOutcomeCard(data.callId);
@@ -1346,6 +1498,10 @@
 
       // 10-minute warning before 2h hard cap
       window.hud.onCapWarning(() => showApproachingLimitToast());
+
+      // Phase 3: compass menu open / close (sent by main.ts hotkey handler)
+      window.hud.onMenuOpen(() => showCompassMenu());
+      window.hud.onMenuClose(() => hideCompassMenu());
     }
 
     // ── Initial render ────────────────────────────────────────────────────

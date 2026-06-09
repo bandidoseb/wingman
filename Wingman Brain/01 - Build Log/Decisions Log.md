@@ -2,11 +2,22 @@
 
 A running log of every major architectural or product decision made on Wingman. Append only — never delete. Each entry captures the decision, the date, the reasoning, and any alternatives that were rejected.
 
-Last updated: 2026-06-05
+Last updated: 2026-06-07
 
 ---
 
 ## 2026
+
+### 2026-06-07 — Objection/question retrieval = query distillation on Groq (Llama 3.1 8B Instant)
+**Decision:** Before searching the KB for a summoned ↑objection (and later ←answer) card, run a **query-distillation step**: a small fast model reads the last ~120s of transcript and extracts ONE short, specific, first-person objection phrase (e.g. "I can't drop $8k without asking my wife, last program flopped"). That distilled phrase — not the raw 120s buffer — is embedded and searched against the KB. It **doubles as a quality gate**: if no real objection is found, Wingman shows a graceful nudge instead of guessing. Model: **Groq `llama-3.1-8b-instant`** (upgrade path: `gpt-oss-20B` low → `Llama 3.3 70B` only if 8B accuracy falls short on real calls).
+**Why:** The current `/kb-signal` embeds the **whole 120s buffer as one vector** → mean-pooling "smoothie" dilution → the sharp short KB triggers (6,554 first-person phrases in `kb_prospect_triggers`) match poorly → low hit rate → too much `generateFallbackCard` *guessing*. Distillation creates **query↔KB symmetry** (search with something shaped like what you're searching for — Sebastian's insight). Groq because for a tiny (~15-token) output, **TTFT dominates**, not throughput — so a fast-provider small model beats a bigger one; 8B is the cheap/fast pick (~$0.05/M ≈ $0.00002/call, free-tier covers beta). Latency: adds ~250–400ms before search → press-to-card ~1.3–1.6s (vs ~1s). **Flattening worry resolved:** distillation drives ONLY the lookup; the card itself is still written from the full 120s transcript + the Belief Ladder's verbatim quotes, so emotion/specificity is never lost. The earlier "Groq too slow for tiny outputs" note is **stale** — 2026 benchmarks put Groq TTFT ~0.18s.
+**Alternatives:** **Option A (chop-by-prospect-turn embeddings + max-pool)** kept as the simpler *fallback* if distillation gets finicky on distributed objections — structurally sound, no extra LLM call, but needs a new batched pgvector RPC and is less legible/controllable. **Option B (reuse the Belief Ladder summary as the query)** = KILLED for objections: the summary updates on a ~2-min timer, so a just-dropped objection isn't in it at press time — the one moment freshness matters most. **Option C** = deferred (next entry).
+**Status:** Chosen. **Phase 3.5 build** (follow-up after the Phase 3 hotkey/compass plumbing). `GROQ_API_KEY` added to `.env.local` + Railway (2026-06-07) — unblocked, ready to build. **Bundle into 3.5 too (Sebastian, 2026-06-07):** a summon-state HUD indicator — on pick, show "Wingman's thinking…", resolving to either the card or "Couldn't pull that — tap ↑ to retry." Covers the ~1s generation gap AND makes the Phase 3 client fetch-timeout's silent recovery visible to the rep (~5 files: HUD pill + IPC channel + DashboardClient wiring). All first-guess numbers (120s window, model, threshold) are adjustable dials → `Wingman Brain/Beta Tuning Parameters.md`; tune on real calls.
+
+### 2026-06-07 — On-device (local) extraction model deferred to first eng hire (Option C)
+**Decision:** Running the objection-extraction step **on-device** (a small ~3B model bundled in the Electron app, inference via Apple MLX / llama.cpp on the rep's Apple Silicon) is **parked** — revisit when Sebastian hires an engineer/dev.
+**Why:** Real upside — **~$0/call** (no API bill), **sub-150ms** (no network trip), and a strong **"objection processing never leaves your Mac" privacy story** that fits the Apple-Silicon-only constraint + the wiretap-compliance posture (#33). But it's a **big build**: ~2–4GB added to the app download, ~2–4GB RAM used during a call (on top of Zoom + Recall SDK), a local inference engine to integrate + warm up, and cross-Mac-model testing + ongoing maintenance — and you'd **still** use the cloud to *write* the card (quality), so it doesn't remove the cloud dependency. Distillation-on-Groq captures most of the speed win now for a fraction of the effort. Worth doing later as a cost + privacy play, not to ship beta.
+**Status:** Deferred / future. Tied to first engineering hire.
 
 ### 2026-06-05 — Summarizer model LOCKED: Claude Sonnet 4.6 (not Haiku)
 **Decision:** The Phase 2 Belief Ladder summarizer (the background live-call memory) runs on **Claude Sonnet 4.6.** The live press-time arrow card (Phase 3) stays on **Haiku** — Sonnet is only for the background judge.
