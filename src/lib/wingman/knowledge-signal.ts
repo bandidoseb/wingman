@@ -38,14 +38,14 @@ Rules:
 - When a SCRIPT is provided in the knowledge base technique, base your headline directly on that script — compress it to ≤5 words that capture its core directive. Do NOT invent an alternative approach if a script is provided.
 - The "Why it works" field gives you the psychological principle — use it to write a more precise subtext, not to replace the script.
 
-Card format rules by stage:
-- Rapport / Confirm / Pitch: headline only (≤4 words). Pure directional nudge. Set subtext to empty string "".
-- Discovery / Press / Close: headline (≤5 words, actionable alone) + subtext (one example sentence the rep can say).
+Card format — ALWAYS two-tier (the rep summoned this card on purpose and needs the line):
+- HEADLINE: ≤5 words, fully actionable on its own.
+- SUBTEXT: one sentence the rep can say out loud. Never leave it empty.
 
 Return JSON only — no markdown, no explanation, no preamble:
 {
   "headline": "≤5 words. Actionable alone. The thing to do right now.",
-  "subtext": "One sentence. Example question or framing. Empty string for Rapport / Confirm / Pitch stages.",
+  "subtext": "One sentence the rep can say out loud. Always provide it.",
   "source": "The KB technique or principle this is based on."
 }`;
 
@@ -82,16 +82,17 @@ export async function generateSignalCard(
 
   const t0 = Date.now();
 
-  // Stage context — always include so Haiku applies the right card format rules
-  const stageLabel = currentStage ?? "Unknown";
-  const stageDesc  = STAGE_DESCRIPTIONS[stageLabel] ?? "Active call stage.";
+  // Stage context — OPTIONAL. Post-Phase-1 there is no live stage tracker, so the
+  // Belief Ladder (liveSummary) is the source of truth for where the call is. Only
+  // print a stage line if a REAL stage was passed — never feed Haiku a stale label.
+  const stageLine = currentStage ? `Call stage: ${currentStage}\n` : "";
+  const stageDesc = currentStage ? (STAGE_DESCRIPTIONS[currentStage] ?? "") : "";
 
-  // Prefer the full Belief Ladder (rich — has Weakest Link, verbatim quotes, all 7 beliefs).
-  // Fall back to stage label + description when Phase 2 hasn't produced a summary yet
-  // (e.g. first few minutes of the call before the first summarize tick fires).
+  // Prefer the full Belief Ladder (rich — Weakest Link, verbatim quotes, all 7 beliefs).
+  // Fall back to a light line when Phase 2 hasn't produced a summary yet (first ~2 min).
   const callContextBlock = liveSummary
-    ? `\nCall stage: ${stageLabel}\n\nLIVE CALL CONTEXT (Belief Ladder — Weakest Link, verbatim quotes, 7 beliefs):\n${liveSummary}`
-    : `\nCall stage: ${stageLabel} — ${stageDesc}`;
+    ? `\n${stageLine}\nLIVE CALL CONTEXT (Belief Ladder — Weakest Link, verbatim quotes, 7 beliefs):\n${liveSummary}`
+    : `\n${stageLine}${stageDesc ? stageDesc + "\n" : ""}Active sales call.`;
 
   // Full 120 s transcript — no slicing. The rolling buffer is already capped at
   // ~2,400 chars upstream. See Wingman Brain/Beta Tuning Parameters.md.
@@ -198,13 +199,14 @@ export async function generateFallbackCard(
 
   const t0 = Date.now();
 
-  const stageLabel    = currentStage ?? "Unknown";
-  const stageDesc     = STAGE_DESCRIPTIONS[stageLabel] ?? "Active call stage.";
   const slotDirective = SLOT_DIRECTIVES[slot] ?? SLOT_DIRECTIVES["objection"];
+  // Stage is OPTIONAL — never feed Haiku a stale label (see generateSignalCard).
+  const stageLine = currentStage ? `Call stage: ${currentStage}\n` : "";
+  const stageDesc = currentStage ? (STAGE_DESCRIPTIONS[currentStage] ?? "") : "";
 
   const callContextBlock = liveSummary
-    ? `\nCall stage: ${stageLabel}\n\nLIVE CALL CONTEXT (Belief Ladder — Weakest Link, verbatim quotes, 7 beliefs):\n${liveSummary}`
-    : `\nCall stage: ${stageLabel} — ${stageDesc}`;
+    ? `\n${stageLine}\nLIVE CALL CONTEXT (Belief Ladder — Weakest Link, verbatim quotes, 7 beliefs):\n${liveSummary}`
+    : `\n${stageLine}${stageDesc ? stageDesc + "\n" : ""}Active sales call.`;
 
   // No KB technique — use the slot directive as the framing instead
   const userMessage =

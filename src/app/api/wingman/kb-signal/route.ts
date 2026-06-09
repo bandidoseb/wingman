@@ -51,6 +51,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: true }); // silently drop — client guard handles UX
     }
     rateLimitMap.set(user.id, now);
+    // Opportunistic prune so the map can't grow unbounded across many users.
+    if (rateLimitMap.size > 500) {
+      for (const [uid, t] of rateLimitMap) {
+        if (now - t > RATE_LIMIT_MS) rateLimitMap.delete(uid);
+      }
+    }
 
     const body = await req.json();
     const {
@@ -77,6 +83,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: true });
     }
 
+    // Cap the Belief Ladder summary defensively. The summarizer caps its OUTPUT at
+    // 600 tokens (~2,400 chars); 4,000 chars is comfortable headroom that never
+    // truncates a real summary but stops an oversized/abusive payload from inflating
+    // the Haiku bill. See Wingman Brain/Beta Tuning Parameters.md. (Fix #2)
+    const summary = typeof live_summary === "string"
+      ? live_summary.slice(0, 4_000)
+      : undefined;
+
     const activeSlot: Slot = VALID_SLOTS.includes(slot as Slot)
       ? (slot as Slot)
       : "objection";
@@ -91,7 +105,7 @@ export async function POST(req: NextRequest) {
       card = await generateSignalCard(
         knowledgeResults,
         transcript_chunk,
-        live_summary,
+        summary,
         current_stage,
       );
     }
@@ -102,7 +116,7 @@ export async function POST(req: NextRequest) {
       card = await generateFallbackCard(
         activeSlot,
         transcript_chunk,
-        live_summary,
+        summary,
         current_stage,
       );
     }

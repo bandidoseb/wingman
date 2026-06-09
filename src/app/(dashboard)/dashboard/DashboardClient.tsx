@@ -459,7 +459,7 @@ export default function DashboardClient({
   // ── Hotkey compass menu — handle direction pick from Electron main ─────────
   // Called by main.ts when the rep presses a direction key after the Up Arrow
   // summons the compass. Assembles the full context (Belief Ladder + last 120 s
-  // of transcript + stage), fetches /kb-signal, and forwards the card to the HUD.
+  // of transcript), fetches /kb-signal, and forwards the card to the HUD.
   //
   // isGeneratingRef prevents double-billing on rapid presses — if a Haiku call
   // is already in flight, subsequent picks are silently dropped until it settles.
@@ -480,6 +480,13 @@ export default function DashboardClient({
 
     isGeneratingRef.current = true;
 
+    // 12s client-side timeout — slightly above the server's 10s Haiku ceiling.
+    // Without it, a stalled connection (mid-call network drop) leaves this fetch
+    // hanging and isGeneratingRef stuck true, silently bricking the compass for the
+    // rest of the call. On abort, catch + finally reset the guard so the next press recovers.
+    const controller = new AbortController();
+    const timeoutId  = setTimeout(() => controller.abort(), 12_000);
+
     try {
       const recentTranscript = getRecentTranscript();
 
@@ -490,8 +497,11 @@ export default function DashboardClient({
           transcript_chunk: recentTranscript,
           live_summary:     liveSummary ?? undefined,
           slot:             direction,
-          current_stage:    stage,
+          // No current_stage: post-Phase-1 the live stage tracker is gone, so this
+          // would be a stale "Rapport". The Belief Ladder (live_summary) carries the
+          // real stage, and summoned cards are always two-tier regardless. (Fix #1)
         }),
+        signal: controller.signal,
       });
 
       if (!res.ok) {
@@ -511,11 +521,16 @@ export default function DashboardClient({
         });
       }
     } catch (err) {
-      console.error("[Wingman] handleMenuPick error:", err);
+      if (err instanceof Error && err.name === "AbortError") {
+        console.warn("[Wingman] kb-signal timed out after 12s — compass freed for next press.");
+      } else {
+        console.error("[Wingman] handleMenuPick error:", err);
+      }
     } finally {
+      clearTimeout(timeoutId);
       isGeneratingRef.current = false;
     }
-  }, [callId, getRecentTranscript, liveSummary, stage]);
+  }, [callId, getRecentTranscript, liveSummary]);
 
   // Stable ref so the IPC listener (registered once on mount) always calls
   // the latest handleMenuPick without going stale across renders.
