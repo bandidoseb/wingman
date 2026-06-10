@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Wingman Compass — Preview</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  html, body {
+    width: 1280px;
+    height: 800px;
+    overflow: hidden;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    -webkit-user-select: none; user-select: none;
+  }
+
+  /* ── Mock video-call backdrop (so the transparent overlay reads in context) ── */
+  .call {
+    position: absolute; inset: 0;
+    background: radial-gradient(120% 120% at 50% 30%, #20242e 0%, #14171d 55%, #0c0e12 100%);
+  }
+  /* prospect tile */
+  .prospect-tile {
+    position: absolute; top: 70px; left: 240px; right: 240px; bottom: 150px;
+    border-radius: 16px;
+    background: linear-gradient(160deg, #2a2f3a 0%, #1c2027 100%);
+    border: 1px solid rgba(255,255,255,0.05);
+    box-shadow: 0 20px 60px rgba(0,0,0,0.45);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .avatar {
+    width: 132px; height: 132px; border-radius: 50%;
+    background: linear-gradient(135deg, #4a5568, #2d3340);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 46px; font-weight: 600; color: rgba(255,255,255,0.82);
+    letter-spacing: 1px;
+  }
+  .name-pill {
+    position: absolute; bottom: 14px; left: 16px;
+    background: rgba(0,0,0,0.5); color: #fff; font-size: 13px; font-weight: 500;
+    padding: 5px 11px; border-radius: 7px;
+  }
+  /* self tile */
+  .self-tile {
+    position: absolute; bottom: 26px; right: 26px;
+    width: 196px; height: 116px; border-radius: 12px;
+    background: linear-gradient(160deg, #323845, #20242c);
+    border: 1px solid rgba(255,255,255,0.06);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .self-tile .avatar { width: 60px; height: 60px; font-size: 22px; }
+  .self-tile .name-pill { font-size: 11px; bottom: 8px; left: 10px; }
+  /* faux toolbar */
+  .toolbar {
+    position: absolute; bottom: 0; left: 0; right: 0; height: 64px;
+    background: rgba(8,9,12,0.92);
+    display: flex; align-items: center; justify-content: center; gap: 22px;
+  }
+  .tb-btn { width: 38px; height: 38px; border-radius: 50%; background: rgba(255,255,255,0.09); }
+  .tb-btn.red { background: #e0392b; width: 64px; border-radius: 19px; }
+
+  /* preview caption (not part of the HUD — just labels the mockup) */
+  .caption {
+    position: absolute; top: 18px; left: 50%; transform: translateX(-50%);
+    background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.7);
+    font-size: 12px; font-weight: 600; letter-spacing: 0.04em;
+    padding: 6px 14px; border-radius: 20px; backdrop-filter: blur(8px);
+  }
+
+  /* ══════════════════════════════════════════════════════════════════════
+     COMPASS MENU — verbatim CSS from electron/hud/index.html
+  ══════════════════════════════════════════════════════════════════════ */
+  #compassMenu {
+    position: absolute;
+    bottom: 100px;
+    left: 32px;
+    z-index: 110;
+    display: flex;            /* forced visible for the preview */
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    pointer-events: none;
+  }
+  .compass-middle-row { display: flex; align-items: center; gap: 4px; justify-content: center; }
+  .compass-center-dot {
+    width: 28px; height: 28px; border-radius: 50%;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    flex-shrink: 0;
+  }
+  .compass-arrow {
+    display: flex; flex-direction: column; align-items: center; gap: 3px;
+    padding: 7px 10px; border-radius: 10px;
+    background: rgba(22, 22, 32, 0.9);
+    backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    min-width: 84px;          /* all four identical size */
+  }
+  /* all four arrows identical — same size, same brightness */
+  .compass-key { font-size: 15px; color: rgba(255, 255, 255, 0.92); line-height: 1; }
+  .compass-label {
+    font-size: 9px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.5); text-align: center; white-space: nowrap;
+  }
+  .compass-esc-hint { font-size: 9px; color: rgba(255, 255, 255, 0.18); margin-top: 2px; letter-spacing: 0.03em; }
+
+  /* ambient presence dot (sits just below the compass during a live call) */
+  #ambientDot {
+    position: absolute; bottom: 80px; left: 32px;
+    width: 8px; height: 8px; border-radius: 50%;
+    background: rgba(255, 255, 255, 0.2); border: 1px solid rgba(255, 255, 255, 0.3);
+  }
+
+  /* ── Zoomed detail inset (top-right) so the small overlay is readable ── */
+  .detail {
+    position: absolute; top: 50px; right: 34px;
+    padding: 18px 22px 16px; border-radius: 16px;
+    background: rgba(10,11,14,0.72); border: 1px solid rgba(255,255,255,0.08);
+  }
+  .detail-label { font-size: 11px; color: rgba(255,255,255,0.45); text-align: center; margin-bottom: 12px; letter-spacing: 0.05em; text-transform: uppercase; }
+  /* zoom (not transform) so the panel background reflows to wrap the scaled compass */
+  .detail .scaler { zoom: 1.9; }
+  .detail #compassMenu { position: static; }
+</style>
+</head>
+<body>
+  <div class="call">
+    <div class="prospect-tile">
+      <div class="avatar">MJ</div>
+      <div class="name-pill">Marcus Johnson</div>
+    </div>
+    <div class="self-tile">
+      <div class="avatar">SP</div>
+      <div class="name-pill">You</div>
+    </div>
+    <div class="toolbar">
+      <div class="tb-btn"></div><div class="tb-btn"></div>
+      <div class="tb-btn"></div><div class="tb-btn"></div>
+      <div class="tb-btn red"></div>
+    </div>
+  </div>
+
+  <div class="caption">Wingman HUD · rep just pressed ↑ on a live call</div>
+
+  <!-- COMPASS at true scale, in its real position (bottom-left) -->
+  <div id="compassMenu">
+    <div class="compass-arrow compass-up">
+      <span class="compass-key">↑</span>
+      <span class="compass-label">Handle objection</span>
+    </div>
+    <div class="compass-middle-row">
+      <div class="compass-arrow compass-left">
+        <span class="compass-key">←</span>
+        <span class="compass-label">Answer question</span>
+      </div>
+      <div class="compass-center-dot"></div>
+      <div class="compass-arrow compass-right">
+        <span class="compass-key">→</span>
+        <span class="compass-label">Close</span>
+      </div>
+    </div>
+    <div class="compass-arrow compass-down">
+      <span class="compass-key">↓</span>
+      <span class="compass-label">Dig deeper</span>
+    </div>
+    <div class="compass-esc-hint">esc to dismiss</div>
+  </div>
+  <div id="ambientDot"></div>
+
+  <!-- Zoomed detail so the small overlay is legible -->
+  <div class="detail">
+    <div class="detail-label">detail · 2× zoom</div>
+    <div class="scaler">
+      <div id="compassMenu">
+        <div class="compass-arrow compass-up">
+          <span class="compass-key">↑</span>
+          <span class="compass-label">Handle objection</span>
+        </div>
+        <div class="compass-middle-row">
+          <div class="compass-arrow compass-left">
+            <span class="compass-key">←</span>
+            <span class="compass-label">Answer question</span>
+          </div>
+          <div class="compass-center-dot"></div>
+          <div class="compass-arrow compass-right">
+            <span class="compass-key">→</span>
+            <span class="compass-label">Close</span>
+          </div>
+        </div>
+        <div class="compass-arrow compass-down">
+          <span class="compass-key">↓</span>
+          <span class="compass-label">Dig deeper</span>
+        </div>
+        <div class="compass-esc-hint">esc to dismiss</div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

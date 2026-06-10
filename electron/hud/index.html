@@ -675,39 +675,19 @@
       gap: 3px;
       padding: 7px 10px;
       border-radius: 10px;
-      background: rgba(18, 18, 24, 0.82);
+      background: rgba(22, 22, 32, 0.9);
       backdrop-filter: blur(16px);
       -webkit-backdrop-filter: blur(16px);
-      border: 1px solid rgba(255, 255, 255, 0.09);
-      min-width: 76px;
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      min-width: 84px;          /* all four identical size */
     }
 
-    /* Up (objection) is the active slot — slightly brighter to signal it's live */
-    .compass-arrow.compass-up {
-      background: rgba(24, 24, 36, 0.92);
-      border-color: rgba(255, 255, 255, 0.20);
-      box-shadow: 0 0 12px rgba(255, 255, 255, 0.04);
-    }
-
-    /* Side arrows are dimmer — not yet active in Phase 3 */
-    .compass-arrow.compass-left,
-    .compass-arrow.compass-right {
-      min-width: 68px;
-      opacity: 0.55;
-    }
-
-    .compass-arrow.compass-down {
-      opacity: 0.55;
-    }
-
+    /* All four arrows are identical — same size, same brightness. Every slot
+       ships working, so there is no "active vs inactive" visual distinction. */
     .compass-key {
       font-size: 15px;
-      color: rgba(255, 255, 255, 0.9);
+      color: rgba(255, 255, 255, 0.92);
       line-height: 1;
-    }
-
-    .compass-arrow.compass-up .compass-key {
-      color: #ffffff;
     }
 
     .compass-label {
@@ -715,13 +695,9 @@
       font-weight: 600;
       letter-spacing: 0.04em;
       text-transform: uppercase;
-      color: rgba(255, 255, 255, 0.28);
+      color: rgba(255, 255, 255, 0.5);
       text-align: center;
       white-space: nowrap;
-    }
-
-    .compass-arrow.compass-up .compass-label {
-      color: rgba(255, 255, 255, 0.6);
     }
 
     .compass-esc-hint {
