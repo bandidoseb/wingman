@@ -1,8 +1,20 @@
 # Current Sprint
 
-Last updated: 2026-06-06
+Last updated: 2026-06-09
 
 This is the first file Claude reads at session start. It answers: where are we, what's next, and what's blocking us.
+
+---
+
+## What Was Just Completed (2026-06-09 — Phase 3 reviewed + hardened → PR #10; live-test findings)
+
+Full narrative in `2026-06-09.md`.
+
+- **Phase 3 was already built + committed + pushed by a parallel session** (`cc836b5`). Independently reviewed it (typecheck + 28 tests green; manual + `wingman-reviewer` fresh-context pass — teardown/IPC/buffer/cost all clean), then **hardened + opened PR #10** (commit `e890dc1`): always-two-tier cards, dropped the stale "Rapport" stage, capped `live_summary` (4k), and — the reviewer's catch — a **12s client fetch timeout** so a mid-call network drop can't brick the compass. Plus the **equal-arrows CSS** (all 4 identical, no dimming — Sebastian's call) and a faithful `tasks/compass-preview.html`.
+- **Decisions (Decisions Log 2026-06-07):** 3.5 retrieval = **query distillation on Groq `llama-3.1-8b-instant`** (`GROQ_API_KEY` now in .env.local + Railway); **Option C (on-device) deferred**; **"thinking/oops" indicator bundled into 3.5.**
+- **Live tests surfaced 2 real bugs (logged):** **#39 — the compass does NOT render** even on a single Up press (confirmed, not the double-tap flash); **#38 — ~7.4s latency** (search alone 4.8s, mostly cold start). Also **#37** — no autonomous code is firing, but 3 ghosts remain → Phase 5. (Two red herrings ruled out: a too-short call with no transcript, and a corrupted `.next` cache fixed by `rm -rf .next`.)
+
+**Next:** Phase 3.5 — Groq distillation + the indicator + **fix compass render (#39)** + **latency (#38)**. PR #10 holds (no live users) until #39 is fixed or it's bundled with 3.5.
 
 ---
 
