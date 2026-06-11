@@ -68,6 +68,16 @@ contextBridge.exposeInMainWorld("wingman", {
   sendSignal: (signal: { header: string; text: string; type: string }) =>
     ipcRenderer.invoke("hud:signal", signal),
 
+  /**
+   * Phase 3.5 — report summoned-card progress to the HUD's thinking pill.
+   * "thinking"    → generation started (pill + live seconds counter)
+   * "error"       → failed / timed out ("Couldn't pull that — tap ↑ to retry")
+   * "unsupported" → arrow not built yet ("Not ready yet — coming soon")
+   * Card arrival itself clears the pill (sendSignal → HUD showSignal).
+   */
+  sendSummonState: (payload: { state: "thinking" | "error" | "unsupported"; slot?: string }) =>
+    ipcRenderer.invoke("hud:summon-state", payload),
+
   /** Send scorecard state to HUD so it can display the live scoring */
   sendScorecard: (scorecard: Record<string, unknown>) =>
     ipcRenderer.invoke("hud:scorecard", scorecard),
@@ -292,5 +302,17 @@ contextBridge.exposeInMainWorld("hud", {
   },
   onMenuClose: (callback: () => void) => {
     ipcRenderer.on("wingman:menu-close", () => callback());
+  },
+
+  // ── Phase 3.5: pick feedback + summon-state pill ──────────────────────────
+  // pick-flash: main sends the picked direction the instant a menu key is hit.
+  // The HUD flashes that arrow green and owns the compass teardown on the pick
+  // path (main suppresses its menu-close send there).
+  onPickFlash: (callback: (direction: string) => void) => {
+    ipcRenderer.on("wingman:pick-flash", (_event, direction: string) => callback(direction));
+  },
+  // summon-state: relayed from DashboardClient via main — drives the pill.
+  onSummonState: (callback: (payload: { state: string; slot?: string }) => void) => {
+    ipcRenderer.on("wingman:summon-state", (_event, payload: { state: string; slot?: string }) => callback(payload));
   },
 });

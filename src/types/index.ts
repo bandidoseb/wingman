@@ -248,6 +248,11 @@ export interface WingmanBridge {
   onMenuPick:  (callback: (direction: string) => void) => void;
   offMenuPick: () => void;
 
+  // Phase 3.5 — summoned-card progress for the HUD thinking pill.
+  // "thinking" = generation started · "error" = failed/timed out (retry hint)
+  // · "unsupported" = arrow not built yet. Card arrival clears the pill.
+  sendSummonState: (payload: { state: "thinking" | "error" | "unsupported"; slot?: string }) => Promise<void>;
+
   // Outcome saved from HUD — tells dashboard to refresh so pill appears immediately
   onOutcomeUpdated?:  (callback: () => void) => void;
   offOutcomeUpdated?: () => void;

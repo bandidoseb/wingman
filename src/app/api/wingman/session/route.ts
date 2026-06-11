@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { PLANS } from "@/lib/stripe";
 import { FREE_CALL_LIMIT } from "@/lib/constants";
+import { warmUpPipeline } from "@/lib/wingman/pipeline-warmup";
 
 // ─── POST /api/wingman/session — start a new call session ──────────────────
 export async function POST(req: NextRequest) {
@@ -110,6 +111,13 @@ export async function POST(req: NextRequest) {
       .single();
 
     if (error) throw error;
+
+    // Phase 3.5 (#38): fire-and-forget pipeline warm-up — opens TLS/connection
+    // pools to OpenAI/Anthropic/Groq and wakes the pgvector index so the rep's
+    // FIRST hotkey press isn't the cold sample. Never awaited (call start is
+    // unaffected), never throws, <$0.001/call. Fired only after the call row
+    // insert succeeds. Railway = persistent Node, so it completes post-response.
+    void warmUpPipeline().catch(() => {});
 
     return NextResponse.json({ call_id: call.id, call });
   } catch (err) {

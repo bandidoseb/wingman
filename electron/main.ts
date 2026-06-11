@@ -76,13 +76,28 @@ function teardownMenuKeys(): void {
   if (menuAutoFadeTimer) { clearTimeout(menuAutoFadeTimer); menuAutoFadeTimer = null; }
 }
 
-/** Hide the compass menu and tear down its direction shortcuts. */
-function closeCompassMenu(reason = "unspecified"): void {
+/** Hide the compass menu and tear down its direction shortcuts.
+ *  suppressHudSend (pick path only): the HUD's pick-flash animation owns the
+ *  compass teardown there — sending menu-close too would stomp the flash
+ *  mid-animation. main-side state (menuOpen, keys, auto-fade timer) ALWAYS
+ *  resets regardless of the flag, so the two processes can never desync. */
+function closeCompassMenu(reason = "unspecified", opts: { suppressHudSend?: boolean } = {}): void {
   if (!menuOpen) return;
   menuOpen = false;
   teardownMenuKeys();
   console.log(`[Compass] close (${reason})`); // debug #39
-  hudWindow?.webContents.send("wingman:menu-close");
+  if (!opts.suppressHudSend) {
+    hudWindow?.webContents.send("wingman:menu-close");
+  }
+}
+
+/** Phase 3.5 — tell the HUD which arrow was picked. The HUD plays the green
+ *  flash on that arrow and then tears the compass down itself (menu-close is
+ *  suppressed on the pick path — see closeCompassMenu). */
+function sendPickFlash(direction: string): void {
+  if (hudWindow && !hudWindow.isDestroyed()) {
+    hudWindow.webContents.send("wingman:pick-flash", direction);
+  }
 }
 
 /**
@@ -106,9 +121,12 @@ function openCompassMenu(): void {
   }
 
   // Helper: register a direction key that picks a slot and closes the menu.
+  // Flash first (instant visual ack on the HUD), then close with the HUD send
+  // suppressed — the flash animation owns the compass teardown on this path.
   const registerPick = (key: string, direction: string) => {
     globalShortcut.register(key, () => {
-      closeCompassMenu(`pick:${direction}`);
+      sendPickFlash(direction);
+      closeCompassMenu(`pick:${direction}`, { suppressHudSend: true });
       mainWindow?.webContents.send("wingman:menu-pick", direction);
     });
   };
@@ -139,8 +157,9 @@ function registerCallHotkey(): void {
     if (!callActive) return; // safety — shouldn't happen since we unregister on call end
 
     if (menuOpen) {
-      // Double-tap Up → instant objection pick
-      closeCompassMenu("double-tap-objection");
+      // Double-tap Up → instant objection pick (same flash-then-close as registerPick)
+      sendPickFlash("objection");
+      closeCompassMenu("double-tap-objection", { suppressHudSend: true });
       mainWindow?.webContents.send("wingman:menu-pick", "objection");
     } else {
       openCompassMenu();
@@ -599,6 +618,14 @@ function setupIPC(): void {
   // ── Signal → HUD ───────────────────────────────────────────────────────────
   ipcMain.handle("hud:signal", (_event, signal: { header: string; text: string; type: string }) => {
     hudWindow?.webContents.send("hud:update-signal", signal);
+  });
+
+  // ── Summon state → HUD (Phase 3.5 thinking pill) ────────────────────────────
+  // DashboardClient reports card-generation progress ("thinking" | "error" |
+  // "unsupported"); the HUD renders the pill. The pill's lifecycle contract
+  // lives in the HUD (single owner of its timers).
+  ipcMain.handle("hud:summon-state", (_event, payload: { state: string; slot?: string }) => {
+    hudWindow?.webContents.send("wingman:summon-state", payload);
   });
 
   // ── Stage → HUD (richer payload: current + all stages + completed) ──────────

@@ -1,3 +1,86 @@
+# Plan — Phase 3.5: Distillation + Thinking Pill + Latency (FINAL — reviewed)
+
+**Status:** PLANNING. Awaiting Sebastian's approval. No code written.
+**Reviewed by:** `plan-reviewer` (fresh context) — initial verdict NEEDS REVISION, 3 BLOCKERS + 4 MAJOR + 4 MINOR; **all findings folded in below.**
+**Branch:** `feat/phase-3.5-distill-pill` — one PR. **No DB schema changes.**
+**Gate to done:** Sebastian's live Zoom call (script at the bottom). Diagnostics (hudLog + DevTools auto-open) stay in through the live test; stripped in a separate tiny follow-up PR.
+
+## Sebastian's locked answers (2026-06-11)
+1. **Empty ↑ press** → honest card: fixed headline ("No objection caught") + ONE pointer grounded in the recent conversation. **The word "belief" (or any Cole Gordon / internal framework term) must NEVER appear in on-screen card text** — new hard prompt rule, applies to ALL cards.
+2. **Slow cards deliver late** (up to the existing 12s client timeout). The thinking pill shows a **live seconds counter** ("Handling objection… 3s").
+3. **Pill copy is action-specific:** "Handling objection…" / "Answering that…" / "Digging deeper…" / "Reading the close…".
+4. **Warm latency goal: 1.5–2s** press-to-card (measured on 2nd+ press; the FIRST press after warm-up may still run ~2.5–3s — don't read the first sample as failure).
+
+## Decisions baked in (from plan review — not re-litigating)
+- **Prompt cache (`cache_control`) is OUT of 3.5.** The kb-signal system prompt is ~350 tokens; Haiku's minimum cacheable block is 2048 — it physically cannot engage. Evaluated and removed, not forgotten. The real latency levers are connection warm-up + the short distilled query. (The Belief Ladder summarizer's caching is already live and unaffected.)
+- **←/↓/→ presses show a brief "Not ready yet — coming soon" pill (~2s)** instead of today's silent nothing. Dead air = the bug class 3.5 kills. (Sebastian can veto — one-line change.)
+- **Groq-down degraded mode skips the 60s search cache** (the raw-chunk cache key can serve a previous objection's technique for a new objection within 60s — skip it rather than compound wrongness).
+
+---
+
+## STEP 1 — Offline distiller harness (prompt-first; no app code)
+- New `scripts/test-distill.mjs` (mirrors `test-belief-ladder.mjs`) + new pre-registered answer key `scripts/test-transcripts/EXPECTED-DISTILL.md` (per transcript: the objection it should extract, or NONE).
+- Distiller: `POST https://api.groq.com/openai/v1/chat/completions`, model `llama-3.1-8b-instant`, temperature 0, max_tokens 60, strict JSON `{"objection": "<first-person, ≤25 words, prospect's own words>"}` or `{"objection": null}`. Prompt errs toward extraction (pushback/hesitation/concern all count) to minimize false NONEs.
+- **Gate (two parts):** (a) 5/5 vs the answer key (tune prompt until clean, document misses); (b) **retrieval comparison** — for each transcript, run KB search with distilled-phrase vs raw-chunk and confirm distillation actually improves top-match quality. This justifies the ~300ms serial hop. If it doesn't, stop and rethink before touching the route.
+
+## STEP 2 — Server: distillation + nudge + prompt hardening
+- New `src/lib/wingman/query-distill.ts`: `distillObjection(chunk)` → `{found:true, phrase}` | `{found:false}` | `null` (Groq error/timeout). AbortController ~1.5s; defensive JSON parse (strip fences). `GROQ_API_KEY` already in .env.local + Railway.
+- `kb-signal/route.ts` — objection slot only:
+  - **found** → `searchKnowledge(distilledPhrase)` (correct cache key = the distilled phrase) → match → `generateSignalCard(results, FULL 120s chunk, summary)` — card still written from the full buffer; **no KB match** → `generateFallbackCard` with the distilled objection injected as known-objection context (grounded, no longer guessing).
+  - **not found** → nudge: fixed headline "No objection caught" + Haiku-written pointer (new `generateNudgeCard`, 3s timeout) grounded in recent transcript + summary; **if Haiku fails → static subtext "Nothing to handle in the last 2 min — keep going."** The nudge branch ALWAYS returns `signal_header` — it can never fall through to a bare `{ok:true}`. `signal_type:"Nudge"` (verify `TYPE_MAP['Nudge']` exists in the HUD — it's referenced as the fallback at hud/index.html:1233).
+  - **null (Groq down)** → today's raw-chunk search path, **with cache skipped** (degraded mode). Card still comes.
+  - Other slots unchanged (Phase 4).
+- `knowledge-signal.ts`: hard rule added to `SIGNAL_CARD_SYSTEM_PROMPT` + the nudge prompt: never output "belief", "Belief Ladder", "pillar", or any internal framework name. `generateFallbackCard` gains optional `distilledObjection` param.
+- `knowledge-search.ts`: optional `skipCache` param (degraded mode only).
+- Structured timing log: `[kb-signal] TIMING distill=Xms embed=Yms search=Zms generate=Wms total=Tms branch=kb|fallback-grounded|nudge|raw-fallback` — the #38 warm-number instrument.
+- Unit tests (Vitest): distill parse / NONE / timeout / fence-stripping; nudge fallback ladder.
+
+## STEP 3 — HUD/IPC: green flash + action pill + counter + error state
+**IPC channel inventory (machine-check with `comm`/`diff` before done — the #39 lesson, never visual scan):**
+
+| Channel | main.ts | preload bridge | consumer | types |
+|---|---|---|---|---|
+| `wingman:pick-flash` (main→HUD) | send in `registerPick` + double-tap-Up branch | `hud.onPickFlash` | HUD | none (HUD is untyped JS) |
+| `wingman:summon-state` (renderer→main) | **`ipcMain.handle("wingman:summon-state")`** relays to HUD | `wingman.sendSummonState` | DashboardClient | **MUST add to `WingmanBridge`** (tsc gate) |
+| `hud:summon-state` (main→HUD) | send from the relay above | `hud.onSummonState` | HUD | none |
+
+- **Flash (main-driven, instant):** on pick, send `pick-flash(direction)` to hudWindow FIRST, then close the menu with a flag that suppresses ONLY the `menu-close` IPC send — `menuOpen=false`, `teardownMenuKeys()`, and `menuAutoFadeTimer` clear STILL run (state must never desync). **The HUD `onPickFlash` handler owns the full compass teardown on the pick path:** green-flash class on the picked arrow ~0.5s, other three hidden, fade, then a full DOM reset (remove flash class, un-hide arrows, remove `visible`/`hiding`) so the 2nd+ summon is pristine. Esc/auto-fade keep the existing plain `menu-close` path (no flash; `hideCompassMenu` unchanged).
+- **Pill (renderer-driven, single source of truth) — explicit HUD state machine:** one `setInterval` (counter) + one `setTimeout` (15s failsafe), both owned by the pill module.
+  - `summon-state:"thinking"` → clear both, start both fresh, show action label + counter.
+  - `hud:signal` (card arrival) → **first action: clear both + hide pill**, then show card — so a deliver-late card replaces an error pill, and a retry's card is never stomped by a stale failsafe.
+  - `summon-state:"error"` → clear both, show "Couldn't pull that — tap ↑ to retry" ~4s fade.
+  - `summon-state:"unsupported"` → "Not ready yet — coming soon" ~2s fade.
+  - `onCallEnd` → clear both, hide pill.
+- **DashboardClient `handleMenuPick` — no silent path after "thinking":** guards unchanged (in-flight → send nothing; existing pill keeps counting). After guards: `sendSummonState("thinking", slot)`. Then EVERY outcome resolves the pill: card (`signal_header` truthy → `sendSignal`) | `!res.ok` → "error" | **`res.ok && !data.signal_header` → "error"** (today this case is a silent no-op — that's BLOCKER 1) | catch/abort → "error". `direction !== "objection"` → `sendSummonState("unsupported")` instead of the silent return.
+
+## STEP 4 — Warm-up (#38)
+- `session/route.ts` POST: **after the call row insert succeeds**, fire-and-forget `warmUpPipeline()` — `Promise.allSettled` of 4 independent pings (each with own timeout + try/catch), whole call wrapped in `.catch(()=>{})`: (1) tiny OpenAI embed, (2) `search_kb_by_trigger` RPC with that embedding, (3) 1-token Haiku ping, (4) 1-token Groq ping. Warms TLS/connection pools + Postgres so the first press isn't the cold sample. Railway persistent Node = safe (same proven pattern as the post-call fire-and-forget); Vercel caveat in a comment. Cost <$0.001/call, once per call start (a session-create retry may warm twice — bounded, acceptable).
+- Latency math to the 1.5–2s goal (warm): distill ~250–400 + embed ~150–300 (short phrase) + pgvector ~100–300 + Haiku ~600–900 ≈ **1.1–1.9s**. Levers if over: MATCH_COUNT down, top-2 KB block, max_tokens 120.
+- **Connection-cooling watch (Sebastian, 2026-06-11):** long quiet stretches may re-cool connections (idle keep-alive closure). MEASURE FIRST: the TIMING line also logs `idleGap=` (seconds since the previous kb-signal request, or since warm-up for the first press). If slow presses correlate with long gaps, that tells us cooling is real AND the threshold — then build the periodic keep-warm ping (re-warm every ~N min during a live call) as a follow-up. Do NOT build the keep-warm in 3.5; instrument only.
+
+## STEP 5 — Verify + ship
+- `npx tsc --noEmit` (web + electron) + `npm test` green (Stop hook enforces). Bridge `comm`/`diff` machine-check. `wingman-reviewer` on the full diff (mandatory Pass 2). Extend `tasks/compass-preview.html` with flash + pill preview.
+- Docs: Beta Tuning Parameters (Groq model/timeout/window + nudge dials), Known Issues #38 update, Current Sprint.
+- PR → CI + Security Review → Sebastian approves → merge.
+
+## LIVE GATE (Sebastian, real Zoom call)
+1. Real objection on the call → ↑↑ → green flash → "Handling objection… 1s 2s…" → grounded card. 2nd+ press TIMING line = **1.5–2s warm**.
+2. Press ↑ with NO recent objection → "No objection caught" + a true pointer; **no "belief" anywhere on screen.**
+3. Press ← / ↓ / → → flash + "coming soon" pill.
+4. Kill Wi-Fi, press ↑ → error pill at ~12s; Wi-Fi back, press ↑ → recovers.
+5. End call mid-generation → pill cleared, arrows released, end-of-call chain clean.
+
+**After the live gate passes:** separate tiny PR strips the #39 diagnostics (hudLog checkpoints + DevTools auto-open).
+
+## Files touched
+`scripts/test-distill.mjs` + `scripts/test-transcripts/EXPECTED-DISTILL.md` (new) · `src/lib/wingman/query-distill.ts` (new) · `src/app/api/wingman/kb-signal/route.ts` · `src/lib/wingman/knowledge-signal.ts` · `src/lib/wingman/knowledge-search.ts` · `src/app/api/wingman/session/route.ts` · `src/app/(dashboard)/dashboard/DashboardClient.tsx` · `electron/main.ts` · `electron/preload.ts` · `electron/hud/index.html` · `src/types/index.ts` · `tests/wingman/query-distill.test.ts` (new) · docs
+
+## Cost
+Groq ~$0.00002/press (free tier covers beta) · nudge Haiku only on empty presses · warm-up <$0.001/call · no new per-minute or unsummoned costs.
+
+---
+---
+
 # Plan — Hotkey Signal-Card Model (#1) — HARDENED
 
 **Status:** PLANNING ONLY. No code written. Awaiting Sebastian's approval.

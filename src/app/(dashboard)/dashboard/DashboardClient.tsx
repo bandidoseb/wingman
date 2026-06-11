@@ -465,20 +465,29 @@ export default function DashboardClient({
   // is already in flight, subsequent picks are silently dropped until it settles.
   const handleMenuPick = useCallback(async (direction: string) => {
     if (isGeneratingRef.current) {
+      // Existing pill keeps counting — sending nothing here is correct (a second
+      // "thinking" would reset the visible counter mid-generation).
       console.log("[Wingman] Menu pick dropped — card generation already in flight");
       return;
     }
     if (!callId || !isActiveRef.current) return;
 
-    // Phase 3 ships only the ↑ objection slot. ← ↓ → are captured by globalShortcut
-    // so they don't fall through to Zoom/Meet, but they produce no card yet.
-    // Phase 4 removes this guard and implements the other three slots.
+    // Phase 3.5 ships only the ↑ objection slot. ← ↓ → are captured by
+    // globalShortcut so they don't fall through to Zoom/Meet; the HUD shows a
+    // brief "coming soon" pill instead of dead air. Phase 4 implements them.
     if (direction !== "objection") {
+      window.wingman?.sendSummonState({ state: "unsupported", slot: direction });
       console.log(`[Wingman] Slot "${direction}" not yet implemented — Phase 4`);
       return;
     }
 
     isGeneratingRef.current = true;
+
+    // Pill contract (Phase 3.5, plan review BLOCKER 1): after "thinking" is
+    // sent, EVERY exit from this function resolves the pill — either a card
+    // (sendSignal → the HUD's showSignal clears it) or an explicit "error"
+    // (→ "Couldn't pull that — tap ↑ to retry"). There is NO silent path.
+    window.wingman?.sendSummonState({ state: "thinking", slot: direction });
 
     // 12s client-side timeout — slightly above the server's 10s Haiku ceiling.
     // Without it, a stalled connection (mid-call network drop) leaves this fetch
@@ -506,19 +515,25 @@ export default function DashboardClient({
 
       if (!res.ok) {
         console.error("[Wingman] kb-signal request failed:", res.status);
+        window.wingman?.sendSummonState({ state: "error", slot: direction });
         return;
       }
 
       const data = await res.json();
 
-      // Forward the card to the HUD. The response always has signal_header when
-      // generation succeeded — an empty ok means both KB + fallback paths failed.
       if (data.signal_header && typeof window !== "undefined" && window.wingman) {
+        // Card arrived — the HUD clears the pill as showSignal's first action.
         window.wingman.sendSignal({
           header: data.signal_header,
           text:   data.signal_text   ?? "",
           type:   data.signal_type   ?? "Handle",
         });
+      } else {
+        // res.ok but NO card: server rate-limit drop, empty/oversized transcript,
+        // or both generation paths failed — all return a bare { ok: true }.
+        // Without this branch the pill would tick to its 15s failsafe (BLOCKER 1).
+        console.warn("[Wingman] kb-signal returned no card — showing retry pill");
+        window.wingman?.sendSummonState({ state: "error", slot: direction });
       }
     } catch (err) {
       if (err instanceof Error && err.name === "AbortError") {
@@ -526,6 +541,7 @@ export default function DashboardClient({
       } else {
         console.error("[Wingman] handleMenuPick error:", err);
       }
+      window.wingman?.sendSummonState({ state: "error", slot: direction });
     } finally {
       clearTimeout(timeoutId);
       isGeneratingRef.current = false;
