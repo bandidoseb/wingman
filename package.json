@@ -9,7 +9,7 @@
     "lint": "next lint",
     "test": "vitest run",
     "test:watch": "vitest",
-    "electron:compile": "tsc -p tsconfig.electron.json && cp -r electron/hud electron-dist/ && cp -r electron/tray-popover electron-dist/",
+    "electron:compile": "tsc -p tsconfig.electron.json && rm -rf electron-dist/hud electron-dist/tray-popover && cp -r electron/hud electron-dist/ && cp -r electron/tray-popover electron-dist/",
     "electron:launch": "electron electron-dist/main.js",
     "electron:dev": "concurrently --kill-others \"npm run dev\" \"npm run electron:wait\"",
     "electron:wait": "node scripts/wait-and-launch.js",

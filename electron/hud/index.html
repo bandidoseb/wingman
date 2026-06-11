@@ -554,10 +554,14 @@
     }
 
     #outcomeCard.fade-out {
-      animation: fadeOut 0.4s ease forwards;
+      animation: outcomeFadeOut 0.4s ease forwards;
     }
 
-    @keyframes fadeOut {
+    /* Uniquely named — this card is centered via translate(-50%,-50%), so its
+       fade must carry that transform. It previously shadowed the global plain
+       fadeOut (duplicate keyframes name — last one wins), which yanked the
+       compass menu and signal bubble up-left by half their size on dismiss. */
+    @keyframes outcomeFadeOut {
       from { opacity: 1; transform: translate(-50%, -50%) scale(1); }
       to   { opacity: 0; transform: translate(-50%, -50%) scale(0.97); }
     }
@@ -743,7 +747,7 @@
   <!-- COMPONENT 3B: Manual Trigger Toast (Ctrl+Shift+W before detection) -->
   <div id="manualTriggerToast" class="wingman-toast">
     <div class="toast-header">
-      <div id="manualIcon"><img src="/Wingman.png" alt="Wingman" /></div>
+      <div id="manualIcon"><img src="Wingman.png" alt="Wingman" /></div>
       <span class="toast-title">Ready to deploy Wingman?</span>
     </div>
     <div id="manualWarning">Only deploy once your prospect has joined the call</div>
@@ -874,13 +878,34 @@
     // ── Compass menu state (Phase 3) ──────────────────────────────────────
     let compassHideTimer = null;
 
+    // Debug helper (#39): relay HUD-side logs to the dev terminal via main.
+    // Guarded so logging can never throw and break the HUD. Remove with #39.
+    function hudLog(msg) {
+      try { if (window.hud && window.hud.log) window.hud.log(msg); } catch (e) {}
+    }
+
     function showCompassMenu() {
       clearTimeout(compassHideTimer);
       compassMenu.classList.remove('hiding');
       compassMenu.classList.add('visible');
+      // debug #39: report what the browser actually thinks is on screen.
+      const cs = getComputedStyle(compassMenu);
+      const r  = compassMenu.getBoundingClientRect();
+      hudLog('compass SHOW — display=' + cs.display + ' opacity=' + cs.opacity +
+             ' rect=' + Math.round(r.left) + ',' + Math.round(r.top) + ' ' +
+             Math.round(r.width) + 'x' + Math.round(r.height) +
+             ' viewport=' + window.innerWidth + 'x' + window.innerHeight +
+             ' pageHidden=' + document.hidden);
+      // Second sample after the 0.15s fade-in finishes — the real paint truth.
+      setTimeout(() => {
+        const cs2 = getComputedStyle(compassMenu);
+        hudLog('compass SHOW+300ms — display=' + cs2.display +
+               ' opacity=' + cs2.opacity + ' classes="' + compassMenu.className + '"');
+      }, 300);
     }
 
     function hideCompassMenu() {
+      hudLog('compass HIDE called'); // debug #39
       clearTimeout(compassHideTimer);
       compassMenu.classList.add('hiding');
       compassHideTimer = setTimeout(() => {
@@ -1466,8 +1491,9 @@
         }
       });
 
-      // Dismiss from main window
-      window.hud.onSignalDismiss(() => hideSignal());
+      // Do NOT register window.hud.onSignalDismiss here — the hud bridge does not
+      // expose it and main never sends a dismiss event to the HUD. A call to it here
+      // threw at load and killed every registration below it (#39 root cause).
 
       // Auto-stopped (inactivity, 2h cap, or meeting window closed)
       window.hud.onAutoStopped(reason => showAutoStopToast(reason));
@@ -1476,8 +1502,12 @@
       window.hud.onCapWarning(() => showApproachingLimitToast());
 
       // Phase 3: compass menu open / close (sent by main.ts hotkey handler)
-      window.hud.onMenuOpen(() => showCompassMenu());
-      window.hud.onMenuClose(() => hideCompassMenu());
+      window.hud.onMenuOpen(() => { hudLog('menu-open RECEIVED'); showCompassMenu(); });
+      window.hud.onMenuClose(() => { hudLog('menu-close RECEIVED'); hideCompassMenu(); });
+
+      // debug #39: confirm this registration block actually completed and the
+      // compass element exists in this loaded page.
+      hudLog('IPC listeners registered — compassMenu element found: ' + !!compassMenu);
     }
 
     // ── Initial render ────────────────────────────────────────────────────

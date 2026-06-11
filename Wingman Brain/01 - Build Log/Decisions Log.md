@@ -2,11 +2,20 @@
 
 A running log of every major architectural or product decision made on Wingman. Append only — never delete. Each entry captures the decision, the date, the reasoning, and any alternatives that were rejected.
 
-Last updated: 2026-06-07
+Last updated: 2026-06-10
 
 ---
 
 ## 2026
+
+### 2026-06-10 — Compass/HUD position stays bottom-left; per-user layout configurator parked for later
+**Decision:** The compass menu (and signal cards) stay **bottom-left** for now. Sebastian's bottom-right instinct ("arrows are on the right side of the keyboard") was considered and set aside: reps don't look at their hands when pressing arrows — what matters is eye placement and screen collision, and bottom-right is where Zoom parks the self-view + meeting controls. Bottom-left also keeps the compass and the card it summons in the same corner. The bigger idea — a **dashboard HUD layout configurator** (mock screen, drag each HUD element or pick preset layouts with live preview) — is captured in `_Inbox/2026-06-10 HUD layout configurator idea.md` and parked until after Phase 3.5. A cheap interim Settings left/right toggle was also rejected for now as premature with the configurator coming.
+**Status:** Locked for beta. Revisit via the configurator build.
+
+### 2026-06-10 — Arrow-pick feedback = green flash on the picked arrow → "thinking" pill
+**Decision:** When the rep picks a compass direction, the picked arrow **flashes green ~0.5s while the other three vanish**, the compass fades, and the already-locked Phase 3.5 **"Wingman's thinking…" indicator** takes over until the card lands (or the "Couldn't pull that — tap ↑ to retry" error state). This replaces the live-test gap where pressing an arrow gave zero acknowledgment. Rejected: keeping the whole compass on screen ~2s with the highlight (holds screen real estate, delays the thinking state, feels slower).
+**Why:** Closes the full feedback loop — input registered (flash) → working (pill) → result (card) — with no dead air, which the 2026-06-10 live test showed is disorienting (Sebastian: "nothing told me the up arrow was pressed").
+**Status:** Locked. Build lands **inside Phase 3.5** as part of the summon-state indicator task (same HUD/IPC surface).
 
 ### 2026-06-07 — Objection/question retrieval = query distillation on Groq (Llama 3.1 8B Instant)
 **Decision:** Before searching the KB for a summoned ↑objection (and later ←answer) card, run a **query-distillation step**: a small fast model reads the last ~120s of transcript and extracts ONE short, specific, first-person objection phrase (e.g. "I can't drop $8k without asking my wife, last program flopped"). That distilled phrase — not the raw 120s buffer — is embedded and searched against the KB. It **doubles as a quality gate**: if no real objection is found, Wingman shows a graceful nudge instead of guessing. Model: **Groq `llama-3.1-8b-instant`** (upgrade path: `gpt-oss-20B` low → `Llama 3.3 70B` only if 8B accuracy falls short on real calls).
