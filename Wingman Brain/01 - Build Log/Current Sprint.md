@@ -1,8 +1,22 @@
 # Current Sprint
 
-Last updated: 2026-06-10
+Last updated: 2026-06-11
 
 This is the first file Claude reads at session start. It answers: where are we, what's next, and what's blocking us.
+
+---
+
+## What Was Just Completed (2026-06-11 — Phase 3.5 BUILT + MERGED, PR #15)
+
+Full narrative in `2026-06-11.md`.
+
+- **Phase 3.5 went plan → build → review → dev-test → merge in one session** (`12bfaec`, CI + Security green, Railway deployed). The full scope: **Groq query distillation** (`query-distill.ts`, prompt locked 5/5 on a pre-registered answer key via `scripts/test-distill.mjs`), **honest nudge card** on empty presses (static-fallback guaranteed — never dead air, never a guess), **green pick-flash + action-specific thinking pill** with live seconds counter + error/coming-soon states (no press can end in silence — every path resolves), **pipeline warm-up at call start** + **`TIMING …branch= idleGap=` instrumentation**, and a "belief/pillar/scorecard"-word ban in all card text.
+- **Root-cause find:** the 0.65 similarity threshold was guillotining real KB matches (natural paraphrases of classic objections score 0.60–0.65; noise ≤0.54) → distilled queries search at **0.60** (`DISTILLED_SIMILARITY_THRESHOLD` in the kb-signal route). Distilled-vs-raw on the 5 test transcripts: correct techniques on 3/4 vs **0/4 for raw**.
+- **Sebastian's dev test: 12 presses, zero dead air, all branches correct.** Distill 227–486ms; fast presses **1,526–1,629ms (inside the 1.5–2s goal)**; 3/8 nudge timeouts → tuned same-session (60-tok cap + 800-char input, reviewer-approved). Groq dashboard spike explained (offline tuning harness, not presses); **scale plan logged** in Beta Tuning Parameters (paid tier before beta ≈ $10/mo @ 1K users; 429s already degrade gracefully).
+- **New decisions logged (Decisions Log 2026-06-11):** provider resilience = **failover-only** — Anthropic direct primary → OpenRouter pinned to the SAME Haiku on Bedrock/Vertex as fallback; circuit breaker (own-traffic = primary signal, status.claude.com JSON = secondary/lagging); warm-up ping doubles as the health probe; **test per-press vs breaker vs both — pick by observed behavior**. Rejected: middleman-for-everything + per-press model bouncing. **HUD card streaming** captured (`_Inbox/2026-06-11 HUD card streaming idea.md`) — hard requirement: super-smooth constant-rate reveal; design together with resilience, after the live gate.
+- `GROQ_API_KEY` documented in CLAUDE.md env list (confirmed present in Railway). `plan-reviewer` caught 3 blockers pre-build (all silent-failure/race holes + the prompt-cache-can't-engage catch); `wingman-reviewer` approved both diffs.
+
+**Next:** the **3.5 live gate** — real role-play call on the deployed build: capture the warm `branch=kb` TIMING number, confirm nudge timeouts gone post-tune, no "belief" leaks on screen. Then the **diagnostics-strip PR** (#39 hudLog + DevTools auto-open), then plan the **resilience + streaming build** (one design, own Plan Review Loop).
 
 ---
 
@@ -350,13 +364,13 @@ This was a **decisions/logging session — no app code changed, nothing pushed.*
 
 ## What's In Progress
 
-- **Phase 2 — MERGED + deployed (PR #8).** Summarizer wired in, persists to `calls.live_summary`, caching verified, Elapsed fixed. **Only remaining Phase 2 gate: a real role-play call** (actual sales conversation, 4–5 min) to watch the ladder climb ⬜→🟡→✅ over multiple ticks — needs Sebastian's Zoom time. **Next build = Phase 3** (hotkey + compass menu), fresh session.
+- Nothing mid-flight in code. **Phase 3.5 is merged + deployed; its live gate (a real role-play call) is the first task of the next session.** That one call closes three things at once: the Phase 2 ladder-climb watch, the 3.5 acceptance script, and the #38 warm `branch=kb` number.
 
 ---
 
 ## What's Next (Priority Order)
 
-**🎯 HOTKEY SIGNAL-CARD MODEL — progress: Phase 0 ✅ · Phase 1 ✅ · #35/#36 ✅ · Phase 2 ✅ (PR #8) · Phase 3 ✅ (PR #10) · #39/#40 ✅ (PR #13, live-verified 2026-06-10) · Phase 3.5 IN PROGRESS** (remaining: Groq distillation + thinking pill + green-flash feedback + #38 latency). Phased plan in `tasks/todo.md` + `00 - Product/Hotkey Model Build Plan.md`. Build serially (shared live-pipeline state). Gate to "done" each phase = live test on a real call (only Sebastian).
+**🎯 HOTKEY SIGNAL-CARD MODEL — progress: Phase 0 ✅ · Phase 1 ✅ · #35/#36 ✅ · Phase 2 ✅ (PR #8) · Phase 3 ✅ (PR #10) · #39/#40 ✅ (PR #13) · Phase 3.5 ✅ MERGED (PR #15, 2026-06-11 — live gate pending)** → next in track: **the live gate**, then the diagnostics-strip PR, then **resilience + streaming build** (Decisions Log 2026-06-11 + `_Inbox/2026-06-11 HUD card streaming idea.md` — needs Sebastian's OpenRouter account), then Phase 4 (← ↓ → arrows) · Phase 5 (dead-code cleanup + #34/#37). Phased plan in `tasks/todo.md` + `00 - Product/Hotkey Model Build Plan.md`. Build serially (shared live-pipeline state). Gate to "done" each phase = live test on a real call (only Sebastian).
 
   - **✅ Phase 0 (shipped):** transcript persistence decoupled to `/api/wingman/transcript`.
   - **✅ Phase 1 (shipped):** retired the Sonnet poll, stages → post-call, silenced autonomous cards, hid stage bar.
