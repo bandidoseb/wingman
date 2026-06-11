@@ -35,6 +35,7 @@ Rules:
 - Use the prospect's exact words when referencing their pain or hesitation.
 - Do NOT tell the rep to "consider" anything. Tell them what to do.
 - Do NOT sound like a training manual. Sound like their inner voice.
+- NEVER use the words "belief", "Belief Ladder", "pillar", "scorecard", or any internal framework or coaching-system name in the headline or subtext. The rep must never see the machinery — plain closer language only.
 - When a SCRIPT is provided in the knowledge base technique, base your headline directly on that script — compress it to ≤5 words that capture its core directive. Do NOT invent an alternative approach if a script is provided.
 - The "Why it works" field gives you the psychological principle — use it to write a more precise subtext, not to replace the script.
 
@@ -186,10 +187,13 @@ export async function generateSignalCard(
  * Latency target: same <1 s (same model, same token budget).
  */
 export async function generateFallbackCard(
-  slot:           string,
-  transcriptChunk: string,
-  liveSummary?:   string,
-  currentStage?:  string,
+  slot:               string,
+  transcriptChunk:    string,
+  liveSummary?:       string,
+  currentStage?:      string,
+  distilledObjection?: string,  // Phase 3.5 — the Groq-extracted objection. When present,
+                                // the card is grounded in a KNOWN objection (the KB just
+                                // had no technique for it) instead of guessing blind.
 ): Promise<SignalCardResult | null> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
@@ -208,9 +212,15 @@ export async function generateFallbackCard(
     ? `\n${stageLine}\nLIVE CALL CONTEXT (Belief Ladder — Weakest Link, verbatim quotes, 7 beliefs):\n${liveSummary}`
     : `\n${stageLine}${stageDesc ? stageDesc + "\n" : ""}Active sales call.`;
 
-  // No KB technique — use the slot directive as the framing instead
+  // No KB technique — use the slot directive as the framing instead.
+  // With a distilled objection, Haiku is told exactly what it's handling —
+  // the card targets that objection instead of guessing from the raw buffer.
+  const objectionLine = distilledObjection
+    ? `\nTHE PROSPECT'S CURRENT OBJECTION (extracted from the call): "${distilledObjection}"\nYour card must handle THIS objection — nothing else.\n`
+    : "";
+
   const userMessage =
-    `SITUATION:\n${slotDirective}\n\n` +
+    `SITUATION:\n${slotDirective}\n${objectionLine}\n` +
     `WHAT THE PROSPECT JUST SAID (last ~120 s):\n${transcriptChunk}` +
     callContextBlock;
 
@@ -270,6 +280,117 @@ export async function generateFallbackCard(
       console.error("[generateFallbackCard] Error:", err);
     }
     return null;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * generateNudgeCard — Phase 3.5. Fires when the distiller confirms there is NO
+ * standing objection in the window (the rep pressed ↑ anyway).
+ *
+ * Honest by design: fixed headline ("No objection caught"), and Haiku writes ONE
+ * true pointer drawn from the recent conversation — what to probe or confirm
+ * next, in plain closer language. It must never invent pushback that wasn't said.
+ *
+ * GUARANTEE: this function ALWAYS returns a card. If Haiku fails or times out
+ * (3s), the static fallback subtext ships instead. The nudge path can never
+ * produce dead air or fall through to an empty response. (Plan review BLOCKER 1.)
+ */
+export const NUDGE_HEADLINE = "No objection caught";
+export const NUDGE_STATIC_SUBTEXT = "Nothing to handle in the last 2 min — keep going.";
+
+const NUDGE_SYSTEM_PROMPT = `You are Wingman — a real-time AI sales coach for high-ticket phone closers.
+The rep asked for objection help, but there is NO standing objection in the last ~2 minutes. Your job is ONE honest pointer: the single most useful thing to probe, confirm, or lock in next, based ONLY on what was actually said.
+
+Rules:
+- One sentence the rep can act on immediately. It may be a question to ask out loud.
+- Ground it in the recent conversation — reference what the prospect actually said.
+- NEVER invent pushback, hesitation, or an objection that was not said.
+- NEVER use the words "belief", "Belief Ladder", "pillar", "scorecard", or any internal framework or coaching-system name. Plain closer language only.
+- Do NOT sound like a training manual. Sound like their inner voice.
+
+Return JSON only — no markdown, no preamble:
+{ "pointer": "One sentence. The most useful next move." }`;
+
+export async function generateNudgeCard(
+  transcriptChunk: string,
+  liveSummary?:    string,
+): Promise<SignalCardResult> {
+  const staticCard: SignalCardResult = {
+    headline: NUDGE_HEADLINE,
+    subtext:  NUDGE_STATIC_SUBTEXT,
+    source:   "nudge-static",
+  };
+
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) {
+    console.error("[generateNudgeCard] ANTHROPIC_API_KEY not set — static nudge");
+    return staticCard;
+  }
+
+  const contextBlock = liveSummary
+    ? `\n\nCALL CONTEXT (internal notes — do not quote labels from this):\n${liveSummary}`
+    : "";
+
+  const userMessage =
+    `WHAT WAS SAID RECENTLY (last ~120 s):\n${transcriptChunk}${contextBlock}`;
+
+  // 3s timeout — the nudge is a bonus, not worth a long wait. Static text beats slow.
+  const controller = new AbortController();
+  const timeoutId  = setTimeout(() => controller.abort(), 3_000);
+
+  try {
+    const resp = await fetch("https://api.anthropic.com/v1/messages", {
+      method:  "POST",
+      headers: {
+        "x-api-key":         apiKey,
+        "anthropic-version": "2023-06-01",
+        "content-type":      "application/json",
+      },
+      body: JSON.stringify({
+        model:      "claude-haiku-4-5-20251001",
+        max_tokens: 100,
+        system:     NUDGE_SYSTEM_PROMPT,
+        messages:   [{ role: "user", content: userMessage }],
+      }),
+      signal: controller.signal,
+    });
+
+    if (!resp.ok) {
+      console.error("[generateNudgeCard] Haiku error:", await resp.text());
+      return staticCard;
+    }
+
+    const data    = await resp.json() as { content: [{ text: string }] };
+    const raw     = data.content?.[0]?.text?.trim() ?? "";
+    const cleaned = raw.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "").trim();
+
+    let pointer = "";
+    try {
+      const parsed = JSON.parse(cleaned) as { pointer?: string };
+      pointer = (parsed.pointer ?? "").trim();
+    } catch {
+      console.error("[generateNudgeCard] Failed to parse JSON:", raw.slice(0, 200));
+      return staticCard;
+    }
+
+    if (!pointer) return staticCard;
+
+    return {
+      headline: NUDGE_HEADLINE,
+      subtext:  pointer,
+      source:   "nudge",
+    };
+  } catch (err) {
+    if (err instanceof Error && err.name === "AbortError") {
+      console.warn("[generateNudgeCard] Timed out after 3s — static nudge");
+    } else {
+      console.error("[generateNudgeCard] Error:", err);
+    }
+    return staticCard;
   } finally {
     clearTimeout(timeoutId);
   }

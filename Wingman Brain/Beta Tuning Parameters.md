@@ -52,6 +52,61 @@ These are educated guesses for v1 beta. None are set in stone. Everything in thi
 
 ---
 
+## 4. Query Distiller — Model, Timeout, Output Cap (Phase 3.5)
+
+| Field | Value |
+|---|---|
+| **Model** | Groq `llama-3.1-8b-instant` (upgrade path: `Llama 3.3 70B` only if 8B misreads real calls) |
+| **Timeout** | 1,500 ms — on timeout the route degrades to the raw-chunk search (card still comes) |
+| **Output cap** | `max_tokens: 100` + a 160-char phrase cap in the parser |
+| **Code location** | `src/lib/wingman/query-distill.ts` (prompt + timeout) · tuning sandbox: `scripts/test-distill.mjs` |
+
+**Why:** Locked 2026-06-11 via the offline harness — 5/5 on the pre-registered answer key (`scripts/test-transcripts/EXPECTED-DISTILL.md`), including the no-objection reverse trap and the hidden-objection judgment test. Measured 137–975 ms per distill (mostly 250–550 ms).
+
+**What to watch:** the `[kb-signal] TIMING distill=` value and the `branch=` field. If `branch=raw-fallback` shows up often, Groq is timing out — raise the timeout or check Groq status. If reps get nudges when a real objection was live (false NONE), the prompt is too strict — tune in the harness FIRST, then lift the prompt verbatim into `query-distill.ts`.
+
+**Cost:** ~$0.00002/press. Free tier covers beta.
+
+---
+
+## 5. Distilled-Query KB Threshold (Phase 3.5)
+
+| Field | Value |
+|---|---|
+| **Current value** | 0.60 (distilled queries only — the raw path keeps 0.65) |
+| **Code location** | `src/app/api/wingman/kb-signal/route.ts` → `DISTILLED_SIMILARITY_THRESHOLD` |
+
+**Why 0.60:** Probes on 2026-06-11 showed honest matches for distilled objection phrases landing at 0.60–0.75 while wrong-technique noise sat at ≤0.54. The old 0.65 guillotined real matches (partner objection 0.648, fear-of-follow-through 0.617). The distilled query has earned a lower bar because it only exists when Groq confirmed a real objection.
+
+**What to watch:** cards built from an off-topic technique → raise to 0.62. Too many `branch=fallback-grounded` (KB misses on objections the KB clearly covers) → consider 0.57, but check the matched technique names in logs first.
+
+---
+
+## 6. Nudge Card — Haiku Pointer Timeout (Phase 3.5)
+
+| Field | Value |
+|---|---|
+| **Current value** | 3,000 ms → on timeout the static text ships ("Nothing to handle in the last 2 min — keep going.") |
+| **Code location** | `src/lib/wingman/knowledge-signal.ts` → `generateNudgeCard` |
+
+**What to watch:** if the Haiku pointer is consistently generic or slow, drop the AI pointer entirely and ship static-only (set the timeout lower or short-circuit) — the nudge's job is honesty, not brilliance.
+
+---
+
+## 7. Pipeline Warm-up + Connection-Cooling Probe (Phase 3.5 / #38)
+
+| Field | Value |
+|---|---|
+| **Warm-up** | At call start: 1 embed ping → 1 pgvector RPC ping, 1 Haiku token, 1 Groq token (parallel, 4s timeouts, <$0.001/call) |
+| **Code location** | `src/lib/wingman/pipeline-warmup.ts`, fired from `session/route.ts` POST |
+| **Cooling probe** | `[kb-signal] TIMING ... idleGap=` — seconds since the user's previous press |
+
+**The open question (Sebastian, 2026-06-11):** do long quiet stretches re-cool connections? **Measure before building.** If TIMING lines show high `total=` correlating with high `idleGap=` (e.g. presses after 20+ min idle are 2–3× slower), build the periodic keep-warm ping and set its interval just under the observed cooling threshold. Until the data says so, do NOT build it.
+
+**Warm latency goal:** 1.5–2s press-to-card on 2nd+ presses. First press after warm-up may still run ~2.5–3s (Groq's first real completion etc.) — don't read one cold sample as failure.
+
+---
+
 ## How to Use This File
 
 After each batch of live calls, revisit the values above. If something feels off — cards are stale, missing context, or the scorecard is being cut short — this is the first place to look. Each entry has the code location and the cost impact so you can make the change in 30 seconds.

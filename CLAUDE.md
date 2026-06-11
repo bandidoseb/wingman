@@ -487,6 +487,7 @@ Required keys (confirm these exist before debugging API issues):
 - `SUPABASE_SERVICE_ROLE_KEY`
 - `ANTHROPIC_API_KEY`
 - `OPENAI_API_KEY` ← required for KB signal cards (embeddings in knowledge-search.ts)
+- `GROQ_API_KEY` ← required for Phase 3.5 query distillation (query-distill.ts). If missing, distillation silently degrades to the raw search path (feature inert, logs only). In .env.local + Railway since 2026-06-07 — verify on Railway before merging Phase 3.5.
 - `RECALL_AI_API_KEY`
 - `STRIPE_SECRET_KEY`
 - `STRIPE_WEBHOOK_SECRET`

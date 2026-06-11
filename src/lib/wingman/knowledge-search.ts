@@ -19,6 +19,18 @@ const MATCH_COUNT          = 5;
 const CACHE_TTL_MS         = 60_000; // 60 seconds
 const EMBED_TIMEOUT_MS     = 5_000;  // abort OpenAI call if it hangs mid-call
 
+// Phase 3.5 — options for the distilled-query path (see kb-signal/route.ts):
+// - threshold: the distilled query is short + objection-shaped and only exists when
+//   Groq confirmed a real objection, so 0.60+ on it is an honest match, not smoothie
+//   noise (probes 2026-06-11: real matches 0.60–0.75, noise ≤0.51). Default stays 0.65.
+// - skipCache: degraded mode (Groq down) embeds the raw 120s buffer, whose cache key
+//   barely changes between presses — a 60s-stale entry can serve the PREVIOUS
+//   objection's technique for a new one. Skip the cache rather than compound wrongness.
+export interface SearchKnowledgeOptions {
+  threshold?: number;
+  skipCache?: boolean;
+}
+
 // ── In-process cache ──────────────────────────────────────────────────────────
 // Works correctly when Next.js runs as a persistent Node.js server (local Electron
 // app or a VPS). On serverless (Vercel), module-level state does not persist between
@@ -49,13 +61,20 @@ interface KBMatch {
 
 // ─────────────────────────────────────────────────────────────────────────────
 
-export async function searchKnowledge(transcriptChunk: string): Promise<string> {
-  const query = transcriptChunk.trim();
+export async function searchKnowledge(
+  transcriptChunk: string,
+  options: SearchKnowledgeOptions = {},
+): Promise<string> {
+  const query     = transcriptChunk.trim();
   if (!query) return "";
 
+  const threshold = options.threshold ?? SIMILARITY_THRESHOLD;
+
   // ── Cache lookup ──────────────────────────────────────────────────────────
-  const key    = fastHash(query);
-  const cached = cache.get(key);
+  // Key includes the threshold so a 0.60 distilled search never serves a result
+  // cached by a 0.65 search of the same text (and vice versa).
+  const key    = fastHash(`${threshold}|${query}`);
+  const cached = options.skipCache ? undefined : cache.get(key);
   if (cached && Date.now() - cached.cachedAt < CACHE_TTL_MS) {
     return cached.result;
   }
@@ -121,7 +140,7 @@ export async function searchKnowledge(transcriptChunk: string): Promise<string> 
   try {
     const { data, error } = await supabase.rpc("search_kb_by_trigger", {
       query_embedding:      embedding,
-      similarity_threshold: SIMILARITY_THRESHOLD,
+      similarity_threshold: threshold,
       match_count:          MATCH_COUNT,
     });
 
@@ -156,7 +175,9 @@ export async function searchKnowledge(transcriptChunk: string): Promise<string> 
   ].join("\n\n");
 
   // ── 4. Cache ──────────────────────────────────────────────────────────────
-  cache.set(key, { result, cachedAt: Date.now() });
+  if (!options.skipCache) {
+    cache.set(key, { result, cachedAt: Date.now() });
+  }
 
   return result;
 }
