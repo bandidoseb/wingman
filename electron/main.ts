@@ -77,10 +77,11 @@ function teardownMenuKeys(): void {
 }
 
 /** Hide the compass menu and tear down its direction shortcuts. */
-function closeCompassMenu(): void {
+function closeCompassMenu(reason = "unspecified"): void {
   if (!menuOpen) return;
   menuOpen = false;
   teardownMenuKeys();
+  console.log(`[Compass] close (${reason})`); // debug #39
   hudWindow?.webContents.send("wingman:menu-close");
 }
 
@@ -95,12 +96,19 @@ function closeCompassMenu(): void {
  */
 function openCompassMenu(): void {
   menuOpen = true;
-  hudWindow?.webContents.send("wingman:menu-open");
+  // debug #39: make the send explicit so a missing/dead HUD window is loud,
+  // not silently skipped by optional chaining.
+  if (hudWindow && !hudWindow.isDestroyed()) {
+    console.log(`[Compass] open → sending menu-open (HUD visible=${hudWindow.isVisible()})`);
+    hudWindow.webContents.send("wingman:menu-open");
+  } else {
+    console.warn(`[Compass] open — menu-open NOT sent: hudWindow is ${hudWindow ? "DESTROYED" : "NULL"}`);
+  }
 
   // Helper: register a direction key that picks a slot and closes the menu.
   const registerPick = (key: string, direction: string) => {
     globalShortcut.register(key, () => {
-      closeCompassMenu();
+      closeCompassMenu(`pick:${direction}`);
       mainWindow?.webContents.send("wingman:menu-pick", direction);
     });
   };
@@ -110,10 +118,10 @@ function openCompassMenu(): void {
   registerPick("Right", "close");
 
   // Esc — dismiss without picking
-  globalShortcut.register("Escape", () => { closeCompassMenu(); });
+  globalShortcut.register("Escape", () => { closeCompassMenu("esc"); });
 
   // Silent 5 s auto-fade (no visible countdown, per spec)
-  menuAutoFadeTimer = setTimeout(() => { closeCompassMenu(); }, 5_000);
+  menuAutoFadeTimer = setTimeout(() => { closeCompassMenu("auto-fade-5s"); }, 5_000);
 }
 
 /**
@@ -127,11 +135,12 @@ function registerCallHotkey(): void {
   if (hotkeyRegistered) return;
 
   const ok = globalShortcut.register("Up", () => {
+    console.log(`[Compass] Up pressed (callActive=${callActive}, menuOpen=${menuOpen})`); // debug #39
     if (!callActive) return; // safety — shouldn't happen since we unregister on call end
 
     if (menuOpen) {
       // Double-tap Up → instant objection pick
-      closeCompassMenu();
+      closeCompassMenu("double-tap-objection");
       mainWindow?.webContents.send("wingman:menu-pick", "objection");
     } else {
       openCompassMenu();
@@ -152,7 +161,7 @@ function registerCallHotkey(): void {
  * Idempotent — safe to call on every stop path.
  */
 function unregisterCallHotkey(): void {
-  closeCompassMenu(); // tears down direction keys first
+  closeCompassMenu("call-end"); // tears down direction keys first
   if (!hotkeyRegistered) return;
   globalShortcut.unregister("Up");
   hotkeyRegistered = false;
@@ -267,6 +276,13 @@ function createHudWindow(): void {
   });
 
   hudWindow.loadFile(path.join(__dirname, "hud/index.html"));
+
+  // TEMP (debug #39): in dev, open detached DevTools for the HUD overlay.
+  // The HUD is frameless + click-through, so there is no other way to inspect
+  // it or run console commands against it. Remove when #39 is closed.
+  if (!app.isPackaged) {
+    hudWindow.webContents.openDevTools({ mode: "detach" });
+  }
 
   // Always above everything — including full-screen Zoom
   hudWindow.setAlwaysOnTop(true, "screen-saver");
@@ -569,6 +585,13 @@ function setupIPC(): void {
   // ── HUD visibility ──────────────────────────────────────────────────────────
   ipcMain.handle("hud:show", () => { hudWindow?.show(); });
   ipcMain.handle("hud:hide", () => { hudWindow?.hide(); });
+
+  // ── HUD log relay (debug #39) — prints HUD-renderer messages in the terminal ─
+  // The HUD window is frameless + click-through, so its console is otherwise
+  // invisible. Remove when #39 is closed.
+  ipcMain.on("hud:log", (_event, msg: string) => {
+    console.log(`[HUD] ${msg}`);
+  });
 
   // ── Detection toast dismissed — hide HUD (call never started) ──────────────
   ipcMain.handle("hud:dismiss-detection", () => { hudWindow?.hide(); });

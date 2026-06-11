@@ -282,6 +282,9 @@ contextBridge.exposeInMainWorld("hud", {
   // ── Open Settings — tells main to show the dashboard and navigate to Settings ──
   openSettings: () => ipcRenderer.invoke("hud:open-settings"),
 
+  // ── Debug log relay (debug #39) — HUD messages print in the dev terminal ──
+  log: (msg: string) => ipcRenderer.send("hud:log", msg),
+
   // ── Hotkey compass menu (Phase 3) ────────────────────────────────────────
   // main.ts sends these when the Up Arrow summon key opens / closes the menu.
   onMenuOpen: (callback: () => void) => {
