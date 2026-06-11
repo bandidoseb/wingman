@@ -2,11 +2,21 @@
 
 A running log of every major architectural or product decision made on Wingman. Append only — never delete. Each entry captures the decision, the date, the reasoning, and any alternatives that were rejected.
 
-Last updated: 2026-06-10
+Last updated: 2026-06-11
 
 ---
 
 ## 2026
+
+### 2026-06-11 — Live-pipeline provider resilience = FAILOVER-ONLY (Anthropic direct primary → OpenRouter same-model fallback) + circuit breaker
+**Decision:** Wingman gets a provider-resilience layer for the live-call AI path, built as **failover, not middleman**:
+1. **Happy path unchanged** — all live-call AI requests go DIRECT to Anthropic, exactly as today. Zero added hops or dependencies when things are healthy.
+2. **Per-request reactive failover** — a tight timeout/error on a live request → immediate retry via OpenRouter pinned to the **same model** (Claude Haiku) on alternate infrastructure (Amazon Bedrock / Google Vertex — same weights, same voice, independent server fleets). The rep gets the card a beat late and never knows.
+3. **Circuit breaker (server-side, shared across users)** — N failures/slow responses in a short window → ALL live traffic routes via OpenRouter for a cooldown; Anthropic is re-probed periodically (the Phase 3.5 call-start warm-up ping doubles as the probe) and traffic flips back when healthy. One user's bad press protects everyone within seconds.
+4. **status.claude.com = SECONDARY signal only** — it has a pollable JSON API, but status pages lag real pain by minutes (human-declared incidents). Own-traffic detection is primary; the status feed may pre-open the breaker during declared incidents + power an ops alert to Sebastian.
+**Why:** Sebastian's requirement is uptime peace of mind — "no single company's bad day reaches my reps" (he's personally felt repeated Anthropic slowdowns). **Rejected alternative:** routing 100% of traffic THROUGH OpenRouter — the middleman becomes the new single point of failure, adds its ~50–150ms tax to every press for the rare-failure case, and forces an API-format rewrite of the whole hot path. Failover-only makes BOTH an Anthropic outage AND an OpenRouter outage non-fatal. (Also rejected earlier same-day: per-press model bouncing Claude/GPT/Gemini — 3× prompt-tuning surface, inconsistent card voice mid-call.)
+**Scope/sequencing:** **Own build, AFTER Phase 3.5 merges + passes its live gate.** Design TOGETHER with the HUD card-streaming idea (`_Inbox/2026-06-11 HUD card streaming idea.md`) — same call sites, and a stream must survive a mid-stream failover. Prereq: Sebastian creates an OpenRouter account + API key (+ small credit balance). Open questions for the build plan: **which mechanism Wingman actually ships — per-press failover, the circuit breaker, or both layered. Do NOT assume the answer: test and play with each against real/simulated failures during the build and pick by observed behavior (Sebastian, 2026-06-11)** — e.g. per-press alone may be enough if failures are rare one-offs, the breaker earns its keep only if degradation comes in sustained waves. Also: which calls get failover first (press-time card + nudge = yes; Belief Ladder summarizer = lower urgency, self-heals next tick; post-call already has retries), breaker thresholds + cooldown, breaker state location (in-memory on Railway now, Redis later), and the OpenRouter request-format translation layer (OpenAI schema vs Anthropic messages API).
+**Status:** Logged, not built. Needs its own Plan Review Loop before any code.
 
 ### 2026-06-10 — Compass/HUD position stays bottom-left; per-user layout configurator parked for later
 **Decision:** The compass menu (and signal cards) stay **bottom-left** for now. Sebastian's bottom-right instinct ("arrows are on the right side of the keyboard") was considered and set aside: reps don't look at their hands when pressing arrows — what matters is eye placement and screen collision, and bottom-right is where Zoom parks the self-view + meeting controls. Bottom-left also keeps the compass and the card it summons in the same corner. The bigger idea — a **dashboard HUD layout configurator** (mock screen, drag each HUD element or pick preset layouts with live preview) — is captured in `_Inbox/2026-06-10 HUD layout configurator idea.md` and parked until after Phase 3.5. A cheap interim Settings left/right toggle was also rejected for now as premature with the configurator coming.
