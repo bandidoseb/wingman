@@ -331,12 +331,18 @@ export async function generateNudgeCard(
     return staticCard;
   }
 
+  // Speed tune (2026-06-11, live dev-test data): 3 of 8 nudges hit the 3s timeout.
+  // The pointer is ONE sentence — it needs neither the full 120s buffer nor 100
+  // output tokens. Last ~800 chars (~60s of speech) grounds it; the 60-token cap
+  // cuts streaming time so slow Haiku runs finish instead of timing out.
+  const recentTail = transcriptChunk.slice(-800);
+
   const contextBlock = liveSummary
     ? `\n\nCALL CONTEXT (internal notes — do not quote labels from this):\n${liveSummary}`
     : "";
 
   const userMessage =
-    `WHAT WAS SAID RECENTLY (last ~120 s):\n${transcriptChunk}${contextBlock}`;
+    `WHAT WAS SAID RECENTLY:\n${recentTail}${contextBlock}`;
 
   // 3s timeout — the nudge is a bonus, not worth a long wait. Static text beats slow.
   const controller = new AbortController();
@@ -352,7 +358,7 @@ export async function generateNudgeCard(
       },
       body: JSON.stringify({
         model:      "claude-haiku-4-5-20251001",
-        max_tokens: 100,
+        max_tokens: 60,
         system:     NUDGE_SYSTEM_PROMPT,
         messages:   [{ role: "user", content: userMessage }],
       }),

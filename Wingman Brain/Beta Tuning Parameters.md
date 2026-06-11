@@ -67,6 +67,8 @@ These are educated guesses for v1 beta. None are set in stone. Everything in thi
 
 **Cost:** ~$0.00002/press. Free tier covers beta.
 
+**Scale plan (2026-06-11):** free tier = 30K tokens/min ≈ **~23 presses/min across ALL users** (one press ≈ 1.3K tokens). Breaks around 100–150 simultaneous live calls. **Flip to Groq's paid dev tier before beta scale** — orders-of-magnitude higher limits, ~$10/mo at 1,000 daily users. A rate-limited press already degrades gracefully (Groq 429 → raw search path → card still comes), so hitting the limit is invisible to reps. The 2026-06-11 dashboard spike to 71% was the offline tuning harness (30 calls in one minute), not live presses.
+
 ---
 
 ## 5. Distilled-Query KB Threshold (Phase 3.5)
@@ -82,14 +84,16 @@ These are educated guesses for v1 beta. None are set in stone. Everything in thi
 
 ---
 
-## 6. Nudge Card — Haiku Pointer Timeout (Phase 3.5)
+## 6. Nudge Card — Haiku Pointer Timeout + Size (Phase 3.5)
 
 | Field | Value |
 |---|---|
-| **Current value** | 3,000 ms → on timeout the static text ships ("Nothing to handle in the last 2 min — keep going.") |
+| **Timeout** | 3,000 ms → on timeout the static text ships ("Nothing to handle in the last 2 min — keep going.") |
+| **Output cap** | 60 tokens (lowered from 100 on 2026-06-11 — dev test showed 3/8 nudges hitting the 3s timeout; less streaming = fewer timeouts) |
+| **Input** | last ~800 chars of transcript (~60s) — a one-sentence pointer doesn't need the full 120s buffer |
 | **Code location** | `src/lib/wingman/knowledge-signal.ts` → `generateNudgeCard` |
 
-**What to watch:** if the Haiku pointer is consistently generic or slow, drop the AI pointer entirely and ship static-only (set the timeout lower or short-circuit) — the nudge's job is honesty, not brilliance.
+**What to watch:** if pointers come back truncated/garbled (JSON cut off at 60 tokens → static fallback ships), nudge quality is degrading silently — check the `[generateNudgeCard]` parse-fail logs. If the pointer is consistently generic or slow even after this tune, drop the AI pointer entirely and ship static-only — the nudge's job is honesty, not brilliance.
 
 ---
 
