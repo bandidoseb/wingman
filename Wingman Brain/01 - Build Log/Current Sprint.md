@@ -1,8 +1,23 @@
 # Current Sprint
 
-Last updated: 2026-06-09
+Last updated: 2026-06-10
 
 This is the first file Claude reads at session start. It answers: where are we, what's next, and what's blocking us.
+
+---
+
+## What Was Just Completed (2026-06-10 — #39 SOLVED + live-verified, PR #13 merged)
+
+Full narrative in `2026-06-10.md`.
+
+- **#39 root cause found and fixed.** Not a compass bug: a dead `window.hud.onSignalDismiss()` call (in the HUD since the **initial commit**, never exposed on the `hud` preload bridge) threw at load and killed every IPC registration below it — compass, auto-stop toast, 2h cap warning, stage-pill init. One deleted line un-broke all four. Found by **instrumenting every hop + auto-opening DevTools on the HUD** (it was un-inspectable before — that's why two prior static-analysis sessions came up empty). Machine-checked it was the only missing bridge method.
+- **#40 fixed (found in re-test):** duplicate `@keyframes fadeOut` (outcome card's transform version, last-declared-wins) was yanking the compass + signal bubble up-left on dismiss → renamed `outcomeFadeOut`. Also fixed the HUD's 404'ing `Wingman.png` + hardened `electron:compile` (rm -rf before cp -r).
+- **Live-verified by Sebastian on a real Zoom call ✅:** full checkpoint chain green, compass rendered + auto-faded, double-tap objection fired, end-of-call chain clean. `wingman-reviewer` approved 3×, CI + Security green → **PR #13 merged** (`115e341`). Diagnostics stay in through 3.5 (#38 work), strip after.
+- **Decisions (logged 2026-06-10):** compass stays **bottom-left** (configurator idea captured in `_Inbox/`); pick feedback = **green flash → "thinking" pill** (builds inside the 3.5 indicator task).
+- **#38 still has no warm number** (today's 6.6s sample was another dev cold-compile); the 0-KB-match → garbage fallback card Sebastian saw live-confirms the distillation quality-gate rationale.
+- **Stale-note correction:** PR #10 was already merged before this session — the "PR #10 holds until #39" line below is obsolete.
+
+**Next:** Phase 3.5 build — **Groq query distillation** (+ no-objection graceful nudge) + **"Wingman's thinking…" pill + green-flash pick feedback** (one HUD/IPC task) + **#38 warm-number capture → optimize** (1h prompt cache + session warm-up). Real-call test = the gate.
 
 ---
 
@@ -341,7 +356,7 @@ This was a **decisions/logging session — no app code changed, nothing pushed.*
 
 ## What's Next (Priority Order)
 
-**🎯 HOTKEY SIGNAL-CARD MODEL — progress: Phase 0 ✅ · Phase 1 ✅ · #35/#36 ✅ · Phase 2 ✅ (merged + deployed, PR #8) · Phase 3 NEXT.** Phased plan in `tasks/todo.md` + `00 - Product/Hotkey Model Build Plan.md`. Build serially (shared live-pipeline state). Gate to "done" each phase = live test on a real call (only Sebastian).
+**🎯 HOTKEY SIGNAL-CARD MODEL — progress: Phase 0 ✅ · Phase 1 ✅ · #35/#36 ✅ · Phase 2 ✅ (PR #8) · Phase 3 ✅ (PR #10) · #39/#40 ✅ (PR #13, live-verified 2026-06-10) · Phase 3.5 IN PROGRESS** (remaining: Groq distillation + thinking pill + green-flash feedback + #38 latency). Phased plan in `tasks/todo.md` + `00 - Product/Hotkey Model Build Plan.md`. Build serially (shared live-pipeline state). Gate to "done" each phase = live test on a real call (only Sebastian).
 
   - **✅ Phase 0 (shipped):** transcript persistence decoupled to `/api/wingman/transcript`.
   - **✅ Phase 1 (shipped):** retired the Sonnet poll, stages → post-call, silenced autonomous cards, hid stage bar.
