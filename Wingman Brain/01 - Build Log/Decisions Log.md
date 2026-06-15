@@ -2,11 +2,27 @@
 
 A running log of every major architectural or product decision made on Wingman. Append only — never delete. Each entry captures the decision, the date, the reasoning, and any alternatives that were rejected.
 
-Last updated: 2026-06-11
+Last updated: 2026-06-15
 
 ---
 
 ## 2026
+
+### 2026-06-15 — Live KB vector search runs IN THE NODE SERVER'S MEMORY (not the Supabase RPC); Pinecone NOT needed
+**Decision:** The live press-path vector search loads the entire eligible KB (6,554 trigger embeddings, ~40MB) into the Railway server's RAM at boot and brute-forces cosine in-process (~10–20ms, exact). The Supabase RPC stays only as a circuit-breaker-guarded fallback for the post-deploy boot window. Shipped as PR #17.
+**Why:** EXPLAIN ANALYZE proved the RPC took **2,091ms** — its `DISTINCT ON (e.id) … ORDER BY e.id, distance` shape structurally cannot use a vector index, so every press seq-scanned all 6,554 vectors on a small shared instance. At 6.5k vectors (40MB) the right move is in-memory brute force, not a faster DB or a vendor. **Rejected: Pinecone migration** (Sprint item 0e/0j) — earns its keep at millions of vectors, not thousands; in-memory is faster, exact, and removes a network hop. Parity gate proved identical retrieval to the RPC (sims within 1e-4). **Scale ceiling honestly documented** in `kb-memory.ts`: brute-force on the event loop is safe to ~100k triggers (~3k entries); past that → in-process ANN (usearch/hnswlib) in a worker thread, then a binary-snapshot boot loader; a >25k-trigger load-time alarm prevents silently outgrowing it.
+
+### 2026-06-15 — Self-hosted local embeddings chosen OVER the cross-user shared cache (build quality/speed before scale)
+**Decision:** To kill the ~500ms OpenAI embedding on the live path, the direction is a **local embedding model running in-process on Railway** (BGE via `fastembed`), NOT an app-wide cross-user objection cache. Self-host is sequenced LAST of the three latency fixes (see sequencing entry). The cross-user cache is deferred to `_Inbox/Future Build - Cross-User Objection Cache.md`.
+**Why (Sebastian):** "You can't build the speed on top of a user base you don't have yet." The shared cache only pays off at thousands of users (0 today) — it does nothing now. A local model helps from user #1, removes OpenAI as a live-path dependency, and (at 384-dim) shrinks the in-memory KB ~4x. **The two are also largely redundant** — local embedding is already ~10–50ms, so the cache would shave an imperceptible ~30ms for real Redis infra. **Caveat (must validate):** switching the query model requires re-embedding the entire KB with that model and a per-objection quality gate — it may not do as well as OpenAI on OUR objections; abort if it regresses (offline, zero prod risk). Hardened plan: `tasks/plan-selfhost-embeddings.md`.
+
+### 2026-06-15 — REJECTED: the "armed objection listener" (rep-armed auto-fire / predictive pre-generation)
+**Decision:** Do NOT build a mode where the rep "arms" objection-listening during the pitch and Wingman auto-fires or speculatively pre-generates objection cards.
+**Why:** It re-opens the autonomous-firing model that Phase 1 deliberately retired (the whole pivot to rep-summoned cards). It's the highest-cost, most failure-prone option (predicting objections → wrong-card risk, extra Haiku calls), and it doesn't even dodge the transcript lag (it still needs the objection text to write the right card). Partials + streaming + (later) self-host get press-to-card to ~1s without that complexity or that philosophical reversal. Captured so a future session doesn't re-propose it.
+
+### 2026-06-15 — Press-to-card latency fix order: partials → streaming → self-host embeddings
+**Decision:** After PR #17, attack the remaining latency in this order: (1) partial transcripts, (2) streaming card reveal, (3) self-hosted embeddings.
+**Why:** Post-PR-17 the budget is generation ~1.5–2s (biggest) > transcript lag 1–3s (makes cards *wrong*) > embedding ~0.2–0.5s (smallest). Partials fixes a *correctness* bug (card fires for the previous objection — Issue #41) and is the cheapest (a measurement first). Streaming kills the dominant generation cost (gated on a Railway SSE-buffering spike). Self-host is the smallest lever and the heaviest build, so it goes last. The plan-reviewer caught that the self-host plan was attacking the 3rd-biggest cost — this sequencing is the correction. **Provider for partials: stay on Deepgram** (lowest-latency streaming specialist, already ours, tunable); AssemblyAI is the accuracy fallback if measured churn is too high.
 
 ### 2026-06-11 — Live-pipeline provider resilience = FAILOVER-ONLY (Anthropic direct primary → OpenRouter same-model fallback) + circuit breaker
 **Decision:** Wingman gets a provider-resilience layer for the live-call AI path, built as **failover, not middleman**:

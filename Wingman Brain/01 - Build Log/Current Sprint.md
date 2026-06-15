@@ -1,8 +1,43 @@
 # Current Sprint
 
-Last updated: 2026-06-11
+Last updated: 2026-06-15
 
 This is the first file Claude reads at session start. It answers: where are we, what's next, and what's blocking us.
+
+---
+
+## 🎯 NEXT SESSION — START HERE (written 2026-06-15, Sebastian in Monaco ~1h/day for 10 days)
+
+**Where we are:** Press-to-card latency. PR #17 (in-memory KB search) is MERGED + deployed — it killed the 2.8s DB search (now `path=mem`, ~20ms). Migration 009 (fast HNSW fallback) is run in Supabase. Full session narrative in `2026-06-15.md`.
+
+**The remaining press-to-card budget (post-PR-17):**
+- Card generation (Haiku) ~1.5–2s ← biggest; fixed by **streaming**
+- Transcript lag 1–3s ← makes cards *wrong* (fires for the PREVIOUS objection); fixed by **partials**
+- Embedding ~0.2–0.5s ← smallest; fixed by **self-host** (last)
+
+**THE NEXT TASK = the partials measurement (Step 1 of the transcript fix).** A DIAGNOSTIC build, light lift:
+1. In `electron/recall.ts`, subscribe to Recall's `transcript.partial_data` events alongside the existing `transcript.data` (finals). Provider config lives where recording starts (check the `recall-upload-token` route / `startRecording` — Recall passes provider config there). Stay on **Deepgram** (already our provider, lowest-latency).
+2. Log partials AND finals side-by-side with timestamps, so we can SEE on one real call: how much do the last 1–2 words churn between a partial and the final, and how fast do they settle?
+3. Sebastian runs ONE short real call (`npm run electron:dev` + Zoom). Then decide: partials safe as-is / need a "trust a word once 2 partials agree" stabilize rule / or just tune Deepgram endpointing for faster *finals*.
+- **WHY measure first:** Groq distills (cleans) the transcript before embedding so gist detection is robust — BUT it can't recover a genuinely-wrong word ("custom"→"customers"), and a rep won't re-press a bad card (they'll think it's trash). "Right the first time" is the bar; don't bet on an assumption about Deepgram's churn. Build design: finals = authoritative buffer, partials = provisional tail reconciled on final.
+
+**Then, in order:**
+- **Streaming card reveal (PR 2)** — GATED on a 1-hour Railway SSE-buffering spike (does Railway flush chunks incrementally or buffer them? If it buffers, PR 2 is dead — attack generation another way). Reviewer's PR 2 blockers are captured in `tasks/todo.md` (keep all 3 generators on JSON; per-chunk + hard-ceiling timeouts + HUD watchdog; IPC delta channel wired both sides in one commit per the #39 lesson).
+- **Self-host embeddings (last)** — hardened plan in `tasks/plan-selfhost-embeddings.md`. Starts with a Phase 0 Railway spike (prove model-load mechanism + latency on Railway's shared CPU, NOT a laptop) + a per-objection quality gate (re-embed needs validation — may not do well on OUR objections). Needs Sebastian's explicit yes on the schema migration + committing ~130MB model to the repo.
+
+**Working docs:** `tasks/todo.md` = live roadmap + PR 2 reviewer fixes. `tasks/plan-selfhost-embeddings.md` = hardened self-host plan. `_Inbox/Future Build - Cross-User Objection Cache.md` = scale-era idea (deferred).
+
+---
+
+## What Was Just Completed (2026-06-15 — in-memory KB search SHIPPED + latency roadmap)
+
+Full narrative in `2026-06-15.md`.
+
+- **PR #17 MERGED → Railway deploying.** Live vector search moved from the Supabase RPC (~2.3s seq-scan, EXPLAIN ANALYZE = 2,091ms — the `DISTINCT ON … ORDER BY e.id, distance` shape can't use a vector index) into the Node server's **memory**: load all 6,554 trigger embeddings at boot, brute-force cosine in-process (~10–20ms, exact). RPC kept as a **circuit-breaker-guarded fallback**. New `kb-memory.ts` + `kb-memory-core.ts` + `instrumentation.ts`; `knowledge-search.ts` + `pipeline-warmup.ts` rewired.
+- **Parity gate 14/14** vs the live RPC (shared sims within 1e-4, identical sets — only exact-tie reorderings from Issue #28/#29 duplicate triggers, tolerated). 20 new unit tests (59 total). `wingman-reviewer` APPROVED (2 should-fixes folded). **Live: `path=mem`, search 2.8s → ~20ms.**
+- **Migration 009 run ✅** — HNSW index + filter-then-rank rewrite of `search_kb_by_trigger` (same signature). Fallback now 2,091ms → 330ms warm.
+- **Discovered the stale-objection bug** (Recall/Deepgram 1–3s finalization lag → card fires for the previous objection). Logged as Known Issue #41. A *correctness* problem — why the partials fix is next, not embedding speed.
+- **Decisions (2026-06-15):** in-memory over Pinecone; self-host embeddings over the cross-user cache (deferred to scale); armed-objection-listener REJECTED; sequencing partials → streaming → self-host.
 
 ---
 
