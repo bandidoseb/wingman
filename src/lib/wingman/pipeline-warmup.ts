@@ -2,11 +2,14 @@
  * pipeline-warmup.ts — Phase 3.5 (#38) connection warm-up.
  *
  * WHY: the first request to each external service pays one-time setup — DNS,
- * TLS handshake, connection-pool open, and (for pgvector) waking the index.
- * Live samples showed that cold cost dominating press-to-card latency
- * (embedding 1.5–1.7s cold vs ~0.2s warm; search 3.9s cold). Firing tiny
- * throwaway requests at CALL START moves that cost to a moment nobody is
- * waiting, so the rep's FIRST hotkey press behaves like a warm one.
+ * TLS handshake, connection-pool open. Live samples showed that cold cost
+ * dominating press-to-card latency (embedding 1.5–1.7s cold vs ~0.2s warm).
+ * Firing tiny throwaway requests at CALL START moves that cost to a moment
+ * nobody is waiting, so the rep's FIRST hotkey press behaves like a warm one.
+ *
+ * As of the in-memory KB work, vector search no longer hits Supabase on the hot
+ * path (see kb-memory.ts), so there is no index to "wake" here — instead we kick
+ * the in-memory KB load so it's `ready` before the first press.
  *
  * Warm goal: 1.5–2s press-to-card (Sebastian, 2026-06-11). Measured by the
  * [kb-signal] TIMING line; idleGap= in that line is the connection-COOLING
@@ -31,7 +34,7 @@
  * if hosting ever moves.
  */
 
-import { createServiceClient } from "@/lib/supabase/server";
+import { ensureKbMemoryLoaded, getKbMemoryState } from "./kb-memory";
 
 const PING_TIMEOUT_MS = 4_000;
 
@@ -45,35 +48,29 @@ async function fetchWithTimeout(url: string, init: RequestInit): Promise<Respons
   }
 }
 
-/** OpenAI embed ping → pgvector RPC ping (chained: the RPC needs a real vector). */
-async function warmEmbedAndSearch(): Promise<string> {
+/**
+ * Kick the in-memory KB load + warm the OpenAI embed connection.
+ *
+ * Search is now in-process (kb-memory.ts), so there is no RPC to "wake" here —
+ * the win is (a) starting the memory load if it isn't already running, and (b)
+ * warming the OpenAI TLS/pool, since embedding the prospect's phrase is still on
+ * the hot path (~200–500ms when warm). We report the KB state so the [warmup]
+ * log line shows whether memory was already ready at call start.
+ */
+async function warmEmbedAndKb(): Promise<string> {
+  // Idempotent: instrumentation.ts kicks this at boot; this covers a load that
+  // errored, or a server that booted before this code existed. Non-blocking.
+  ensureKbMemoryLoaded();
+
   const openaiKey = process.env.OPENAI_API_KEY;
-  if (!openaiKey) return "embed:skipped(no-key)";
+  if (!openaiKey) return `embed:skipped(no-key) kb:${getKbMemoryState()}`;
 
   const resp = await fetchWithTimeout("https://api.openai.com/v1/embeddings", {
     method:  "POST",
     headers: { "Authorization": `Bearer ${openaiKey}`, "Content-Type": "application/json" },
     body:    JSON.stringify({ model: "text-embedding-3-small", input: "warm" }),
   });
-  if (!resp.ok) return `embed:${resp.status}`;
-
-  const data      = await resp.json() as { data: [{ embedding: number[] }] };
-  const embedding = data.data?.[0]?.embedding;
-  if (!embedding) return "embed:ok rpc:skipped(no-vector)";
-
-  // Threshold 0.99 → touches the HNSW index (the part that needs waking) while
-  // returning at most nothing.
-  try {
-    const supabase = createServiceClient();
-    const { error } = await supabase.rpc("search_kb_by_trigger", {
-      query_embedding:      embedding,
-      similarity_threshold: 0.99,
-      match_count:          1,
-    });
-    return error ? `embed:ok rpc:${error.code ?? "error"}` : "embed:ok rpc:ok";
-  } catch {
-    return "embed:ok rpc:failed";
-  }
+  return `${resp.ok ? "embed:ok" : `embed:${resp.status}`} kb:${getKbMemoryState()}`;
 }
 
 /** Anthropic 1-token ping — pure TLS/pool warm (no cache_control; see header note). */
@@ -117,7 +114,7 @@ async function warmGroq(): Promise<string> {
 export async function warmUpPipeline(): Promise<void> {
   const t0 = Date.now();
   const results = await Promise.allSettled([
-    warmEmbedAndSearch(),
+    warmEmbedAndKb(),
     warmAnthropic(),
     warmGroq(),
   ]);
