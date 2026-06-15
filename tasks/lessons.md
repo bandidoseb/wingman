@@ -1,4 +1,14 @@
 
+## Session: 2026-06-15
+
+### Label latency by its REAL component — don't call a number "search" when it's mostly a network embed
+**What happened:** Told Sebastian PR #17 made "search ~10–20ms," but the `[kb-signal] TIMING search=` line swings between `0ms` and `~700ms`, and he rightly asked "which is it?" The `search=` number is actually **embedding (OpenAI) + the in-memory vector search**: the vector search IS ~20ms always, but embedding is ~500ms on a cache miss and 0ms on a 60s cache hit. By calling the whole thing "search" I made a clean win look inconsistent and confused him.
+**Rule:** When reporting latency, name the *component* precisely and break a combined number into its parts (embed vs search vs generate). A figure like "search=505ms" must be explained as "embedding 483ms + memory search ~22ms," not presented as one opaque "search." Imprecise labeling makes a real win look like a bug.
+
+### Before planning a heavy fix, confirm the target is actually the biggest cost — re-rank after every win
+**What happened:** Sebastian was keen on self-hosting embeddings, so I wrote a heavy plan for it (re-embed the whole KB, swap the model). The plan-reviewer caught that **after PR #17, embedding is no longer the dominant press-to-card cost — generation (~1.5–2s) is, and the transcript lag makes cards *wrong*.** I was about to invest the most effort in the *3rd*-biggest lever.
+**Rule:** Each time a fix lands, re-measure and re-rank the remaining costs before committing to the next build. Lead with the honest priority even when the founder is excited about a specific idea (CLAUDE.md: senior engineer pushes back). Fix the biggest/most-painful lever first — correctness (wrong card) and the dominant latency component beat a smaller speed win, regardless of which idea has momentum.
+
 ## Session: 2026-06-05
 
 ### HUD HTML changes need a full electron:dev restart — and re-stage after EVERY edit

@@ -1,7 +1,12 @@
 # Press-to-Card Latency Build — In-Memory KB Search + Streaming Reveal
 
-**Date:** 2026-06-12 · **Status:** PR 1 BUILT + wingman-reviewer APPROVED (2 should-fixes folded in). Awaiting Sebastian's live test + `009` SQL run. PR 2 still gated on the streaming spike.
+**Date:** 2026-06-12 · **Status:** ✅ PR 1 MERGED (#17) → Railway deploying. `009` SQL run in Supabase ✅. Live-tested: `path=mem`, search 2.8s → ~20ms. PR 2 (streaming) still gated on the spike.
 *(Replaces the Phase 3.5 plan — shipped in PR #15.)*
+
+## Remaining latency roadmap (agreed order of impact)
+1. **Partial transcripts** — biggest objection-freshness win. Subscribe to Recall `transcript.partial_data` (interim words, ~hundreds of ms) + `prioritize_low_latency`. Cuts the 1–3s Recall finalization lag → ~0.3s. DESIGN: finals stay the authoritative buffer; partials are a provisional live tail, reconciled when the final lands. The Groq distiller already normalizes messy partials before embedding (error-correction layer), so gist/objection detection is robust to the unstable last 1–2 words. Optional: one-line prompt note that the tail is provisional.
+2. **Streaming card reveal** (PR 2) — gated on the 1h Railway SSE-buffering spike. First words ~0.5–0.8s.
+3. **Embedding latency** — app-wide SHARED cache (Sebastian's idea, 2026-06-12): cache distilled-objection→embedding (and →KB result, KB is global) in Redis across ALL users; first rep fleet-wide pays ~200ms, everyone after = 0ms. PostHog measures real top-~100 objections → keep permanently warm. Cache the GENERIC phrase only (not PII). Also: `encoding_format:"base64"` + warm pooled OpenAI connection. Self-hosted/local embedding model (bge-small on Railway, ~10–50ms) = bigger lever, needs full KB re-embed — likely UNNECESSARY given the shared cache's hit rate. REJECTED: armed/speculative objection listener (re-opens Phase 1 autonomous-firing pivot, high cost, wrong-card risk).
 
 ## Build log (PR 1 — branch `feat/in-memory-kb-search`)
 - ✅ `kb-memory-core.ts` (pure math) + `kb-memory.ts` (I/O/lifecycle) + `instrumentation.ts` (boot load) + `knowledge-search.ts` (mem-first, breaker-guarded RPC fallback) + `pipeline-warmup.ts` (kick load).
