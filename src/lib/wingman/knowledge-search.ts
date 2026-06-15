@@ -13,11 +13,30 @@
  */
 
 import { createServiceClient } from "@/lib/supabase/server";
+import {
+  ensureKbMemoryLoaded,
+  getKbMemoryState,
+  searchInMemory,
+  type InMemoryMatch,
+} from "./kb-memory";
 
 const SIMILARITY_THRESHOLD = 0.65;
 const MATCH_COUNT          = 5;
 const CACHE_TTL_MS         = 60_000; // 60 seconds
 const EMBED_TIMEOUT_MS     = 5_000;  // abort OpenAI call if it hangs mid-call
+
+// ── RPC-fallback circuit breaker ──────────────────────────────────────────────
+// The in-memory path (kb-memory.ts) serves ~all presses. The Supabase RPC is the
+// fallback for the brief window after a deploy before memory is ready — or if the
+// memory load fails. That RPC is the slow (~2.3s) seq-scan. If memory is down
+// FLEET-WIDE, every press across every call would hit that RPC at once, and each
+// slow seq-scan makes the next slower — a self-amplifying stampede. The breaker
+// sheds that load: one slow RPC opens it, and while open we skip the RPC and
+// return "" (the route then writes a grounded fallback card from the live
+// conversation — the rep still gets a card, just without a KB technique).
+const RPC_SLOW_MS              = 4_000;
+const RPC_BREAKER_COOLDOWN_MS  = 30_000;
+let   rpcBreakerOpenUntil      = 0;
 
 // Phase 3.5 — options for the distilled-query path (see kb-signal/route.ts):
 // - threshold: the distilled query is short + objection-shaped and only exists when
@@ -131,33 +150,62 @@ export async function searchKnowledge(
     console.warn(`[searchKnowledge] ⚠️  Embedding took ${embedMs}ms — approaching 200ms latency target`);
   }
 
-  // ── 2. pgvector cosine similarity search (junction table) ─────────────────
-  // search_kb_by_trigger: per-phrase embeddings → best trigger per technique →
-  // top N techniques by similarity. Returns matched_trigger for logging.
-  const supabase = createServiceClient();
+  // ── 2. Vector search — in-memory first, Supabase RPC as fallback ──────────
+  // In-memory (kb-memory.ts) is exact + ~10ms and serves ~all presses. The RPC
+  // is the fallback for the post-deploy window before memory is ready, guarded
+  // by the circuit breaker above.
+  ensureKbMemoryLoaded(); // idempotent backstop (instrumentation.ts kicks at boot)
+
   let matches: KBMatch[] = [];
+  let path: "mem" | "rpc" = "rpc";
 
-  try {
-    const { data, error } = await supabase.rpc("search_kb_by_trigger", {
-      query_embedding:      embedding,
-      similarity_threshold: threshold,
-      match_count:          MATCH_COUNT,
-    });
+  const memMatches: InMemoryMatch[] | null = searchInMemory(embedding, threshold, MATCH_COUNT);
 
-    if (error) throw error;
-    matches = (data as KBMatch[]) ?? [];
-  } catch (err) {
-    console.error("[searchKnowledge] Vector search failed:", err);
+  if (memMatches !== null) {
+    // Memory served it — an empty array is a valid "no match", NOT a fallback.
+    matches = memMatches;
+    path    = "mem";
+  } else if (Date.now() < rpcBreakerOpenUntil) {
+    // Memory not ready AND breaker open → shed load. Returning "" lets the route
+    // fire a grounded fallback card instead of stampeding a struggling Supabase.
+    console.warn(
+      `[searchKnowledge] memory=${getKbMemoryState()} RPC breaker OPEN — returning empty (grounded fallback fires)`,
+    );
     return "";
+  } else {
+    const rpcStart = Date.now();
+    try {
+      const supabase = createServiceClient();
+      const { data, error } = await supabase.rpc("search_kb_by_trigger", {
+        query_embedding:      embedding,
+        similarity_threshold: threshold,
+        match_count:          MATCH_COUNT,
+      });
+      if (error) throw error;
+      matches = (data as KBMatch[]) ?? [];
+    } catch (err) {
+      console.error("[searchKnowledge] RPC vector search failed:", err);
+      return "";
+    }
+    const rpcMs = Date.now() - rpcStart;
+    if (rpcMs > RPC_SLOW_MS) {
+      rpcBreakerOpenUntil = Date.now() + RPC_BREAKER_COOLDOWN_MS;
+      console.warn(
+        `[searchKnowledge] ⚠️  RPC took ${rpcMs}ms (memory=${getKbMemoryState()}) — ` +
+        `opening breaker for ${RPC_BREAKER_COOLDOWN_MS / 1000}s`,
+      );
+    }
+    path = "rpc";
   }
 
   const totalMs = Date.now() - t0;
-  console.log(`[searchKnowledge] ${matches.length} match(es) in ${totalMs}ms`);
+  console.log(`[searchKnowledge] ${matches.length} match(es) in ${totalMs}ms path=${path}`);
   if (matches.length > 0) {
     console.log(`[searchKnowledge] Top match: "${matches[0].technique_name}" (${matches[0].similarity.toFixed(3)}) via trigger: "${matches[0].matched_trigger}"`);
   }
 
-  if (totalMs > 200) {
+  // Latency target applies to the RPC path; the memory path is ~10ms by design.
+  if (path === "rpc" && totalMs > 200) {
     console.warn(`[searchKnowledge] ⚠️  LATENCY EXCEEDED: ${totalMs}ms > 200ms target`);
   }
 
