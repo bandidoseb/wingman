@@ -1,31 +1,51 @@
 # Current Sprint
 
-Last updated: 2026-06-15
+Last updated: 2026-06-21
 
 This is the first file Claude reads at session start. It answers: where are we, what's next, and what's blocking us.
 
 ---
 
-## 🎯 NEXT SESSION — START HERE (written 2026-06-15, Sebastian in Monaco ~1h/day for 10 days)
+## 🎯 NEXT SESSION — START HERE (written 2026-06-21)
 
-**Where we are:** Press-to-card latency. PR #17 (in-memory KB search) is MERGED + deployed — it killed the 2.8s DB search (now `path=mem`, ~20ms). Migration 009 (fast HNSW fallback) is run in Supabase. Full session narrative in `2026-06-15.md`.
+**Big shift this session: the KB is being CUT from live objection cards, replaced by a context-driven
+objection prompt running on Sonnet.** Decided + validated offline; NOT wired yet. Full narrative: `2026-06-21.md`.
 
-**The remaining press-to-card budget (post-PR-17):**
-- Card generation (Haiku) ~1.5–2s ← biggest; fixed by **streaming**
-- Transcript lag 1–3s ← makes cards *wrong* (fires for the PREVIOUS objection); fixed by **partials**
-- Embedding ~0.2–0.5s ← smallest; fixed by **self-host** (last)
+**THE NEXT TASK = wire it.** Read `tasks/wiring-objection-prompt.md` first. In short:
+1. Port the prompt (`scripts/objection-prompt-test.mjs` → `OBJECTION_SYSTEM_PROMPT`, Sonnet) into a prod
+   module `src/lib/wingman/objection-signal.ts`. **Harden the JSON parse** — Sonnet sometimes appends
+   "why this works" commentary that breaks `JSON.parse`.
+2. Rewire the `objection` slot in `kb-signal/route.ts` — drop `searchKnowledge` + the forced-script
+   `generateSignalCard`; call the new generator. Decide the distiller's fate (likely keep its nudge gate,
+   drop the embed/search). **KB stays for the Coach (`searchCoachingKnowledge`) — don't touch it.**
+3. Card-UI change: kill the headline on ALL cards → tiny type-tag + the first-person line. HUD =
+   `electron/hud/index.html` (needs a full `electron:dev` restart + re-stage — lessons 2026-06-05).
+- Plan Review Loop + `plan-reviewer` before code → `wingman-reviewer` on the diff → **live-call gate = done.**
 
-**THE NEXT TASK = the partials measurement (Step 1 of the transcript fix).** A DIAGNOSTIC build, light lift:
-1. In `electron/recall.ts`, subscribe to Recall's `transcript.partial_data` events alongside the existing `transcript.data` (finals). Provider config lives where recording starts (check the `recall-upload-token` route / `startRecording` — Recall passes provider config there). Stay on **Deepgram** (already our provider, lowest-latency).
-2. Log partials AND finals side-by-side with timestamps, so we can SEE on one real call: how much do the last 1–2 words churn between a partial and the final, and how fast do they settle?
-3. Sebastian runs ONE short real call (`npm run electron:dev` + Zoom). Then decide: partials safe as-is / need a "trust a word once 2 partials agree" stabilize rule / or just tune Deepgram endpointing for faster *finals*.
-- **WHY measure first:** Groq distills (cleans) the transcript before embedding so gist detection is robust — BUT it can't recover a genuinely-wrong word ("custom"→"customers"), and a rep won't re-press a bad card (they'll think it's trash). "Right the first time" is the bar; don't bet on an assumption about Deepgram's churn. Build design: finals = authoritative buffer, partials = provisional tail reconciled on final.
+**Why (decided 2026-06-21, Decisions Log):** the KB of public sales advice added no distinguishable value
+on a blind A/B (12 objections) and its forced-script rule hurt cards; the moat is the per-rep Belief
+Ladder context, not the KB. Objection card = **Sonnet** (cleaner tonality; ~0.4s slower than Haiku, budget
+freed by cutting the KB). Prompt distilled from Cole Gordon + Matthew Ryder + 13 live calls
+(`knowledge-base/objection-transcripts/PLAYBOOK-SYNTHESIS.md` + `LIVE-CALL-FINDINGS.md`).
 
-**Then, in order:**
-- **Streaming card reveal (PR 2)** — GATED on a 1-hour Railway SSE-buffering spike (does Railway flush chunks incrementally or buffer them? If it buffers, PR 2 is dead — attack generation another way). Reviewer's PR 2 blockers are captured in `tasks/todo.md` (keep all 3 generators on JSON; per-chunk + hard-ceiling timeouts + HUD watchdog; IPC delta channel wired both sides in one commit per the #39 lesson).
-- **Self-host embeddings (last)** — hardened plan in `tasks/plan-selfhost-embeddings.md`. Starts with a Phase 0 Railway spike (prove model-load mechanism + latency on Railway's shared CPU, NOT a laptop) + a per-objection quality gate (re-embed needs validation — may not do well on OUR objections). Needs Sebastian's explicit yes on the schema migration + committing ~130MB model to the repo.
+**SECONDARY (still live, lower priority now):** the latency roadmap — **partials (Issue #41, the
+stale-objection correctness bug)** still matters, then **streaming** (now doubles as the Sonnet-latency
+mask). **Self-host embeddings is now mostly MOOT for live cards** (objection cards no longer embed — only
+the Coach does). Roadmap detail still in `tasks/todo.md`.
 
-**Working docs:** `tasks/todo.md` = live roadmap + PR 2 reviewer fixes. `tasks/plan-selfhost-embeddings.md` = hardened self-host plan. `_Inbox/Future Build - Cross-User Objection Cache.md` = scale-era idea (deferred).
+**PINNED (own sessions):** multi-turn back-and-forth (`_Inbox/multi-turn objection handling.md`);
+tone-register toggle (`_Inbox/2026-06-21 Tone register toggle (casual vs professional).md`).
+
+---
+
+## What Was Just Completed (2026-06-21 — KB cut from live cards → Sonnet objection prompt)
+
+Full narrative in `2026-06-21.md`. Strategy/prompt session — **no production code shipped** (validated offline; wiring is next).
+
+- **Decided + validated: cut the KB from the live objection path** (blind A/B on 12 objections — KB added no distinguishable value, the forced-script rule hurt cards). KB stays for the Wingman Coach only.
+- **New context-driven objection prompt** built + validated (`scripts/objection-prompt-test.mjs`): diagnose the weak belief (the Belief Ladder already tracks Cole's 7) → uncertainty-first → pace + tie-down anchored to the prospect's own words → one human line. Distilled from 7 training videos + 13 live calls (`PLAYBOOK-SYNTHESIS.md` + `LIVE-CALL-FINDINGS.md`).
+- **Objection card model = Sonnet 4.6** — Haiku had a stubborn tonality tic prompt work couldn't kill; Sonnet follows the rules natively (~0.4s slower, worth it). **Signal cards drop the headline** → type-tag + first-person line.
+- 4 decisions logged (Decisions Log 2026-06-21). Pinned: back-and-forth threading; tone toggle. **Next = wiring** (`tasks/wiring-objection-prompt.md`).
 
 ---
 

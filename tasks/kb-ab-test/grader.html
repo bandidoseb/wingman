@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Wingman — KB A/B Blind Grader</title>
+<style>
+  :root {
+    --bg: #0a0c11; --panel: #12151d; --panel2: #161a24; --line: #232838;
+    --text: #e8ebf2; --muted: #8a93a6; --muted2: #5f6678;
+    --accent: #7c5cff; --accent-soft: rgba(124,92,255,.14); --accent-line: rgba(124,92,255,.55);
+    --good: #34d399; --warn: #f5a524;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--text);
+    font: 15px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, system-ui, sans-serif; }
+  .wrap { max-width: 740px; margin: 0 auto; padding: 28px 20px 80px; }
+  .top { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 6px; }
+  .brand { font-weight: 700; letter-spacing: .2px; }
+  .brand span { color: var(--accent); }
+  .count { color: var(--muted); font-variant-numeric: tabular-nums; font-size: 13px; }
+  .bar { height: 6px; background: var(--panel2); border-radius: 99px; overflow: hidden; margin: 10px 0 22px; }
+  .bar > i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, var(--accent), #a98bff);
+    border-radius: 99px; transition: width .25s ease; }
+  .obj-label { color: var(--muted); font-size: 12.5px; text-transform: uppercase; letter-spacing: .12em; }
+  .obj { font-size: 22px; font-weight: 700; margin: 4px 0 16px; }
+  .setup { background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
+    padding: 14px 16px; margin-bottom: 22px; }
+  .setup .ln { display: flex; gap: 10px; padding: 3px 0; color: var(--text); }
+  .setup .who { color: var(--muted2); min-width: 64px; font-weight: 600; font-size: 13px; padding-top: 1px; }
+  .hint { color: var(--muted); font-size: 13px; margin: 0 0 12px; }
+  .lbl { color: var(--muted2); font-size: 11.5px; text-transform: uppercase; letter-spacing: .12em; margin: 0 0 7px; }
+  .disco { background: var(--panel2); border: 1px solid var(--line); border-left: 3px solid var(--accent-line);
+    border-radius: 10px; padding: 12px 14px; margin-bottom: 18px; font-size: 13.5px; color: var(--muted); }
+  .disco .ln { padding: 2px 0; }
+  .cards { display: grid; gap: 12px; }
+  .card { position: relative; text-align: left; width: 100%; cursor: pointer;
+    background: var(--panel); border: 1.5px solid var(--line); border-radius: 14px;
+    padding: 16px 16px 16px 48px; color: var(--text); transition: border-color .12s, background .12s, transform .06s; }
+  .card:hover { border-color: #36405a; background: var(--panel2); }
+  .card:active { transform: translateY(1px); }
+  .card .num { position: absolute; left: 14px; top: 15px; width: 22px; height: 22px; border-radius: 7px;
+    background: var(--panel2); border: 1px solid var(--line); color: var(--muted);
+    font-size: 12px; font-weight: 700; display: grid; place-items: center; }
+  .card .hl { font-size: 16.5px; font-weight: 700; margin-bottom: 5px; }
+  .card .sub { color: var(--muted); font-size: 14px; }
+  .card.sel { border-color: var(--accent-line); background: var(--accent-soft); }
+  .card.sel .num { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .card.sel::after { content: "✓ preferred"; position: absolute; right: 14px; top: 14px;
+    color: var(--accent); font-size: 12px; font-weight: 700; }
+  .weak { margin-top: 12px; }
+  .weak button { background: none; border: 1px dashed var(--line); color: var(--muted);
+    border-radius: 10px; padding: 9px 12px; cursor: pointer; font-size: 13px; width: 100%; }
+  .weak button:hover { border-color: var(--warn); color: var(--warn); }
+  .weak button.sel { border-style: solid; border-color: var(--warn); color: var(--warn); background: rgba(245,165,36,.08); }
+  .notes { margin-top: 18px; }
+  .notes label { display: block; color: var(--muted); font-size: 13px; margin-bottom: 6px; }
+  textarea { width: 100%; min-height: 60px; resize: vertical; background: var(--panel);
+    border: 1px solid var(--line); border-radius: 10px; color: var(--text); padding: 10px 12px;
+    font: inherit; font-size: 14px; }
+  textarea:focus { outline: none; border-color: var(--accent-line); }
+  .nav { display: flex; justify-content: space-between; gap: 12px; margin-top: 26px; }
+  .btn { border: 1px solid var(--line); background: var(--panel2); color: var(--text);
+    border-radius: 11px; padding: 11px 20px; font-size: 14.5px; font-weight: 600; cursor: pointer; }
+  .btn:hover { border-color: #36405a; }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .btn.primary:hover { filter: brightness(1.07); }
+  .btn:disabled { opacity: .4; cursor: not-allowed; }
+  .kbd { color: var(--muted2); font-size: 12px; text-align: center; margin-top: 14px; }
+  .kbd b { color: var(--muted); background: var(--panel2); border: 1px solid var(--line);
+    border-radius: 5px; padding: 1px 6px; font-weight: 600; }
+  /* summary */
+  .sum h2 { font-size: 22px; margin: 0 0 6px; }
+  .sum p { color: var(--muted); margin: 0 0 18px; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 18px; margin: 0 0 18px; }
+  .row { display: flex; justify-content: space-between; gap: 10px; padding: 7px 0; border-bottom: 1px solid var(--line); font-size: 13.5px; cursor: pointer; }
+  .row:hover { color: #fff; }
+  .row .pk { color: var(--accent); font-weight: 700; }
+  .row .pk.none { color: var(--warn); }
+  .out { width: 100%; min-height: 120px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px; }
+  .miss { color: var(--warn); font-size: 13px; margin: -6px 0 16px; }
+</style>
+</head>
+<body>
+<div class="wrap" id="app"></div>
+<script>
+const DATA = [{"id":1,"objection":"I need to think about it","context":"Prospect: Jenna, solo bookkeeper, ~$6k/mo, turning away clients because she's maxed on hours.\nPain uncovered: no systems to delegate; tried one contractor, micromanaged it, gave up.\nMoney: she has the $9k saved — said plainly \"money's not really the issue.\"\nDecision: solo, entirely her call.\nEmotion: comfortable but stuck; scared to take her hands off the wheel.\nWants: $20k/mo and an actual team.\nWeakest link: she believes it would work and can afford it — the stall is fear of change, not money or logistics.","transcript":"Rep: So that's the full program — six months, weekly coaching, the system to build your team. I think you're exactly who this is for. Want to get started today?\nProspect: It does sound right for me... I think I just need to sit with it and think about it for a bit.","cards":[{"headline":"What specifically would you think about?","subtext":"Is it the delegation part, the investment, or something else — because we can address it right now."},{"headline":"What specifically are you thinking about?","subtext":"Is it the program itself, or are you worried about letting go of the work once you start delegating?"},{"headline":"What specifically are you worried will happen?","subtext":"I'm sensing this isn't about the program itself — you said it sounds right. What's the real concern you're sitting with?"},{"headline":"What specifically are you thinking through?","subtext":"I'm curious — is it the program itself, or is there something about bringing someone in that's making you pause?"}]},{"id":2,"objection":"It's too expensive","context":"Prospect: Andre, owns a 4-person landscaping company, ~$30k/mo, plateaued two years.\nPain uncovered: 70-hour weeks; every job needs him; no time to grow.\nMoney: flinched at $9k — but mentioned they just put $15k into new equipment.\nDecision: his call.\nEmotion: proud, frustrated, a little skeptical of \"coaching.\"\nWants: step back, $50k/mo, a manager running jobs.\nWeakest link: he's framing $9k as an expense, not ROI — hasn't connected it to the cost of two more years stuck at 70-hour weeks.","transcript":"Rep: The investment is $9,000 for the six months, everything included.\nProspect: Yeah... that's a lot of money. Honestly that's more than I pictured — it feels too expensive right now.","cards":[{"headline":"Flip the math on him.","subtext":"Andre, what's the real cost of staying exactly where you are for two more years — 70-hour weeks, every job depending on you, no manager, stuck at $30k?"},{"headline":"What would two more years cost?","subtext":"I hear you — nine grand feels heavy. Walk me through this: if things stay exactly like they are now, what's the real price of that for your business and your life over the next 24 months?"},{"headline":"What's two more years costing you?","subtext":"You just invested $15k in equipment to grow — what's staying stuck at 70 hours a week actually running you in lost time and money over the next 24 months?"},{"headline":"What's two more years costing you?","subtext":"You mentioned wanting to hit $50k a month and get out of every job — at your current pace, what's the real cost of staying stuck for another 24 months?"}]},{"id":3,"objection":"I don't have the money","context":"Prospect: Priya, went full-time as a coach 4 months ago, ~$3k/mo, feast-or-famine.\nPain uncovered: inconsistent leads; no system; savings draining month over month.\nMoney: genuinely tight — she was honest that $9k would be a real stretch right now. This is NOT a smokescreen.\nDecision: her call (single).\nEmotion: anxious, determined, a touch desperate.\nWants: replace her old $7k/mo salary.\nWeakest link: a real cash constraint. The honest question is whether there's a path (entry point / plan) and whether the urgency justifies a stretch — NOT a slick value reframe that ignores her reality.","transcript":"Rep: With everything you've told me, this is the thing that gets you unstuck. It's $9,000 for the six months.\nProspect: I want to, I really do — but I genuinely don't have the money right now. Cash is really tight.","cards":[{"headline":"What if you don't invest?","subtext":"Walk me through what happens to your business in the next 6 months if cash stays tight and you don't have a lead system — does that $9k feel bigger or smaller than what you're losing every month you stay stuck?"},{"headline":"What happens if cash stays tight?","subtext":"I hear you—and I'm asking because in four months, if nothing changes with your lead flow, where does that put you financially?"},{"headline":"Isolate what else is uncertain.","subtext":"Money aside for a second — is there anything else making you hesitant about whether this is actually the right move for you right now?"},{"headline":"What would change if cash weren't tight?","subtext":"I hear you — and I'm genuinely curious: if you had the $9k sitting there right now, would you move forward, or is there something else making you hesitate?"}]},{"id":4,"objection":"I need to talk to my business partner","context":"Prospect: Marcus, co-owns a 6-person marketing agency with his partner Dave.\nPain uncovered: lead flow is inconsistent; stuck at ~$40k/mo for a year; a sales VA hire failed.\nMoney: confirmed $9k is affordable — he said budget isn't the blocker.\nDecision: earlier he said \"big spends, Dave and I decide together\"; Dave runs the finances.\nEmotion: frustrated and a little embarrassed about being stuck.\nWants: $100k/mo and to step back from delivery.\nWeakest link: Marcus is sold; Dave is a real gate who's never been on a call — this is a genuine approval step, not a brush-off.","transcript":"Rep: Sounds like this solves exactly what you've been stuck on. Want to move forward?\nProspect: I do, yeah. The thing is I can't pull the trigger alone — I need to talk to my business partner Dave first.","cards":[{"headline":"Isolate Dave's actual objection now.","subtext":"Talking with Dave aside, is there anything else that's keeping you from being less than 100% certain this is what you need right now?"},{"headline":"Get Dave on the phone now.","subtext":"I get it — Dave handles the finances. Let's loop him in right now so we can walk him through exactly how this gets you both to $100k/mo. Can you call him, or should I send over a quick overview first?"},{"headline":"Get Dave on the phone now.","subtext":"I get it—big decision together makes sense. Here's what I'd suggest: let's loop Dave in right now while you've got the context fresh, so he hears directly from me why this moves the needle on lead flow. Sound fair?"},{"headline":"What would Dave need to hear?","subtext":"Walk me through what matters most to Dave when you two evaluate something like this — is it the ROI timeline, the resource commitment, or something else?"}]},{"id":5,"objection":"I'm too busy","context":"Prospect: Tom, owns an HVAC business, ~$60k/mo, 8 employees.\nPain uncovered: drowning in day-to-day ops; growth stalled; tried delegating, things broke, he took it all back.\nMoney: didn't flinch at $9k — affordability is fine.\nDecision: his call.\nEmotion: overwhelmed, exhausted, skeptical he can add one more thing.\nWants: out of the day-to-day, the business running without him.\nWeakest link: \"too busy\" is the symptom of the exact problem the program fixes. He hasn't seen that this buys time back rather than costing it.","transcript":"Rep: We can get you started this week — first call's Thursday.\nProspect: That's exactly my problem though. I'm slammed, I'm too busy — I don't know how I'd fit the calls in.","cards":[{"headline":"Ask what 'too busy' is costing him.","subtext":"Tom, I hear you — you're slammed right now. What's that busyness costing you in terms of growth, or what aren't you able to focus on because of it?"},{"headline":"Being busy is why you need this.","subtext":"Tom, the fact that you're slammed — that's exactly what we fix. What would it mean for your business if you got even 5 hours back this week?"},{"headline":"This call saves you time.","subtext":"Tom, that's exactly why you need this — you're drowning in day-to-day because nothing's systematized. These calls aren't another task; they're how you get your time back. What's one day next week looking like?"},{"headline":"Reframe busy as the reason, not the obstacle.","subtext":"So the fact that you're slammed right now—that's exactly what this fixes, right? Your guys aren't running calls without you because you're too deep in the weeds. What if this process actually gives you back the time you're worried about losing?"}]},{"id":6,"objection":"What if it doesn't work for me?","context":"Prospect: Dana, fitness coach, ~$8k/mo trading time for money, burning out.\nPain uncovered: capped by hours; tried a cheap course, never implemented it.\nMoney: confirmed fine.\nDecision: hers.\nEmotion: self-doubt — she believes in the program, doubts herself.\nWants: $25k/mo and location freedom.\nWeakest link: the objection is identity/self-belief, not the offer. She already gets clients results offline — capability isn't in question, her self-image is.","transcript":"Rep: This is built for exactly where you are. Shall we get you enrolled?\nProspect: My worry is... what if it doesn't work for me? I've seen it work for other people, but maybe I'm the exception.","cards":[{"headline":"What makes you the exception?","subtext":"I'm curious — you've seen it work for others in your situation, so what's different about you that makes you think you'd be the one it doesn't work for?"},{"headline":"You've already proven it works.","subtext":"You're getting results with clients right now — so the question isn't whether this works, it's whether you'll actually do it. What's making you hesitate on implementation this time?"},{"headline":"Walk me through your last win.","subtext":"When you got results for a client — what did you do differently than you thought you would?"},{"headline":"Ask if she'll do the work.","subtext":"When you commit to this, are you going to put in the work—and when you hit challenges, are you going to reach out for support, or do you tend to struggle alone?"}]},{"id":7,"objection":"What makes you different?","context":"Prospect: Luis, e-commerce store owner, ~$25k/mo, wants to scale ads and ops.\nPain uncovered: plateaued; did two other coaching programs that were \"all theory, no implementation.\"\nMoney: fine.\nDecision: his.\nEmotion: skeptical, guarded, burned by generic gurus.\nWants: $75k/mo.\nWeakest link: he's comparing. A real answer ties the difference to why the last two failed him — implementation and accountability — not a generic feature list.","transcript":"Rep: I really do think this is the right move for you.\nProspect: Maybe. But there are a million of these programs. What actually makes you different from everyone else?","cards":[{"headline":"Dig into what failed before.","subtext":"You mentioned two other programs were all theory—what specifically didn't happen that should have? Who was supposed to make sure you actually did the work?"},{"headline":"What specifically failed in those programs?","subtext":"When you say they were all theory — was it that nobody held you accountable to actually doing the work, or that the work itself didn't match your actual business?"},{"headline":"Why those other two failed you.","subtext":"The last programs were all theory—here's what we actually do different: we lock you into weekly implementation checkpoints with real consequences if you don't execute, and we tie every tactic directly to moving you from $25k to $75k, not just teaching concepts."},{"headline":"Why did those two programs fail you?","subtext":"I'm guessing it wasn't the frameworks — it was that nobody actually held you accountable to use them, right?"}]},{"id":8,"objection":"Send me some information","context":"Prospect: Rachel, agency owner, ~$35k/mo. Warm and interested through the call.\nPain uncovered: hiring/retention chaos; churn eating her growth; tried an SOP course.\nMoney: affordable for her.\nDecision: hers.\nEmotion: conflict-avoidant — uses politeness to avoid saying no directly. She cooled noticeably right after the price reveal.\nWants: $75k/mo without the people-chaos.\nWeakest link: \"send me info\" is cover. A real concern (most likely price or uncertainty) surfaced at the reveal and she's retreating behind materials rather than naming it.","transcript":"Rep: So should we get you signed up today?\nProspect: Can you just send me some information to look over? I'll go through it and circle back.","cards":[{"headline":"Name the real concern, not the material.","subtext":"Rachel, I get it—but walk me through what specifically you want to evaluate in those docs, because price and process are usually what matters most here."},{"headline":"Get specific about what she's thinking.","subtext":"That's completely understandable — what specifically would you like to think about before we talk again?"},{"headline":"Don't let her leave the call.","subtext":"Rachel, I get it—but here's what actually happens: you review it tonight, life gets busy, and this stays on your plate another month. What specifically came up for you when we talked numbers that made you want to pause?"},{"headline":"Ask what's making her hesitate.","subtext":"Rachel, I appreciate that—and I'm curious, when you think about looking it over, what's the main thing you'll be evaluating?"}]},{"id":9,"objection":"I can do this myself","context":"Prospect: Kev, sharp technical founder, ~$20k/mo, loves figuring things out himself.\nPain uncovered: he knows what to do, he just doesn't do it — gets distracted building, no accountability. Started and abandoned two self-directed plans.\nMoney: fine.\nDecision: his.\nEmotion: pride / independence.\nWants: $60k/mo.\nWeakest link: he genuinely could learn it — but his own history (abandoned plans) proves self-directed hasn't worked. The gap is accountability and speed, not knowledge.","transcript":"Rep: This program shortcuts all of that for you.\nProspect: I hear you, but honestly I feel like I could just do this myself if I put my head down. Why pay for it?","cards":[{"headline":"What stopped the last two?","subtext":"You've already proven you know what to do — what actually derailed those two self-directed plans you mentioned?"},{"headline":"You've tried solo twice already.","subtext":"Walk me through what happened with those two plans — where'd they stall, and how long did each take before you stopped?"},{"headline":"You've already tried this twice.","subtext":"The issue isn't whether you *can* do it yourself — your track record shows you won't stick to it alone. What's the cost of another year building without the structure that actually keeps you moving?"},{"headline":"Walk me through what happened before.","subtext":"You mentioned you could do this yourself — and I believe you could. But you've started two self-directed plans before. What was different about those that didn't stick?"}]},{"id":10,"objection":"I've been burned before","context":"Prospect: Marie, owns two salons, ~$45k/mo, wants location #3.\nPain uncovered: expansion stalled; cash flow gets scary at scale.\nMoney: can afford it, but gun-shy.\nDecision: hers.\nEmotion: distrust and fear of repeating a mistake — she paid a $20k \"business mentor\" last year who overpromised and ghosted her.\nWants: open location #3 without the cash-flow terror.\nWeakest link: trust. She believes she needs help but is scared of being burned again. Needs specific de-risking (proof, guarantee, a small first step) anchored to that $20k experience — not a generic \"I understand.\"","transcript":"Rep: I really think we can help you get there. Want to move forward?\nProspect: I'll be honest with you — I've been burned before. Paid a lot for a program that left me hanging. I'm cautious now.","cards":[{"headline":"What specifically went wrong last time?","subtext":"Walk me through what that $20k program promised versus what actually happened — so I know exactly what not to repeat with you."},{"headline":"Isolate past program from this one.","subtext":"Marie, I hear you — that $20k program sounds like a mess. So when you think about what we're offering here, is there something specific about our approach that worries you, or is this more that you're hesitant because of how that last one went?"},{"headline":"What specifically went wrong last time?","subtext":"I'm asking because the $20k you lost with that mentor — was it the system that failed, or was it the support and accountability you didn't get?"},{"headline":"What happened with that program?","subtext":"I'm curious — when you say you got burned, what specifically did they promise versus what actually happened?"}]},{"id":11,"objection":"This sounds too good to be true","context":"Prospect: Sam, trades business owner, ~$30k/mo, a grinder who distrusts \"online stuff.\"\nPain uncovered: capped, no systems, running himself ragged; hasn't tried anything structured.\nMoney: fine.\nDecision: his.\nEmotion: flat disbelief — the result sounds like hype to him.\nWants: $60k/mo and more time with his kids.\nWeakest link: the outcome claim outran his belief. He doesn't believe the result is realistic for HIM specifically. Needs the claim grounded in mechanism + proof for someone like him — and the pressure taken off — not more selling.","transcript":"Rep: So that's genuinely what's possible for you in the next six months.\nProspect: Honestly? That sounds too good to be true. What's the catch?","cards":[{"headline":"Get his certainty number first.","subtext":"On a scale of one to ten, one being you hate this, ten being that's exactly what you need—where do you fall right now?"},{"headline":"Walk me through your concern specifically.","subtext":"When you say 'catch'—are you worried about the time it takes, the cost, or that it won't actually work for a trades business like yours?"},{"headline":"Ground it in the mechanism, not the result.","subtext":"Here's what we actually do: we take you from running everything yourself to having systems that run without you—that's how guys like you hit sixty grand. What part of that process feels unrealistic for your business specifically?"},{"headline":"What specifically feels impossible?","subtext":"I get it—walk me through what part of that doesn't add up for you, because I want to make sure we're only talking about what's actually realistic for your situation."}]},{"id":12,"objection":"The timing isn't right","context":"Prospect: Bianca, e-commerce, ~$18k/mo, with a busy Q4 season approaching.\nPain uncovered: plateaued; knows she needs systems before she can scale; has been winging it.\nMoney: fine.\nDecision: hers.\nEmotion: anxious about adding load before Q4 — but also afraid of missing the window.\nWants: $50k/mo.\nWeakest link: she thinks she should wait until after the busy season, but the program is exactly what makes that season profitable instead of chaotic. \"Later\" costs her the very season she's worried about — she hasn't seen that yet.","transcript":"Rep: So — ready to get going?\nProspect: I love it, I do. I just feel like the timing isn't right to start something this big right now.","cards":[{"headline":"Flip it: Q4 without systems costs what?","subtext":"If you don't have these systems in place before Q4 hits, what's the actual cost of handling that volume the way you're handling it now?"},{"headline":"What makes Q4 the right time?","subtext":"Walk me through what happens in Q4 if you're still winging it like you are now — what does that actually look like for you?"},{"headline":"Make her say what happens if she waits.","subtext":"I get it — Q4 is coming fast. But walk me through this: if you're still winging it when that busy season hits in a few weeks, what does that actually look like for you and the business?"},{"headline":"So waiting costs you Q4?","subtext":"Walk me through what happens to your numbers if you're still winging it when the rush hits — versus having systems locked in before it starts."}]}];
+const BUILD_ID = "1781560568806";
+const LS = "kb-ab-grades-" + BUILD_ID;
+
+let st = { idx: 0, picks: {}, notes: {} };
+try { const s = JSON.parse(localStorage.getItem(LS) || "null"); if (s) st = s; } catch {}
+const save = () => { try { localStorage.setItem(LS, JSON.stringify(st)); } catch {} };
+
+const app = document.getElementById("app");
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+function setPick(id, val) { st.picks[id] = val; save(); render(); }
+
+function renderObjection() {
+  const o = DATA[st.idx];
+  const pick = st.picks[o.id];
+  const done = Object.keys(st.picks).length;
+  const setupLines = o.transcript.split("\n").map((ln) => {
+    const m = ln.match(/^(\w+):\s*(.*)$/);
+    return m ? '<div class="ln"><span class="who">' + esc(m[1]) + '</span><span>' + esc(m[2]) + "</span></div>"
+             : '<div class="ln"><span></span><span>' + esc(ln) + "</span></div>";
+  }).join("");
+  const discoLines = (o.context || "").split("\n").map((ln) => '<div class="ln">' + esc(ln) + "</div>").join("");
+
+  const cards = o.cards.map((c, i) => {
+    const n = i + 1;
+    const sel = pick === n ? " sel" : "";
+    return '<button class="card' + sel + '" data-pick="' + n + '">' +
+      '<span class="num">' + n + "</span>" +
+      '<div class="hl">' + esc(c.headline) + "</div>" +
+      '<div class="sub">' + esc(c.subtext || "") + "</div></button>";
+  }).join("");
+
+  app.innerHTML =
+    '<div class="top"><div class="brand">Wing<span>man</span> · KB A/B</div>' +
+    '<div class="count">' + done + " of " + DATA.length + " graded</div></div>" +
+    '<div class="bar"><i style="width:' + (done / DATA.length * 100) + '%"></i></div>' +
+    '<div class="obj-label">Objection ' + o.id + " of " + DATA.length + "</div>" +
+    '<div class="obj">“' + esc(o.objection) + '”</div>' +
+    (o.context ? '<div class="lbl">Discovery so far</div><div class="disco">' + discoLines + "</div>" : "") +
+    '<div class="lbl">Right now</div><div class="setup">' + setupLines + "</div>" +
+    '<p class="hint">Which card would you most want on screen at that moment? Click to pick.</p>' +
+    '<div class="cards">' + cards + "</div>" +
+    '<div class="weak"><button data-pick="x" class="' + (pick === "x" ? "sel" : "") + '">None of these — all 4 are weak</button></div>' +
+    '<div class="notes"><label>Any thoughts? (optional)</label>' +
+    '<textarea id="note" placeholder="Why this one? What was off about the others?">' + esc(st.notes[o.id] || "") + "</textarea></div>" +
+    '<div class="nav"><button class="btn" id="prev"' + (st.idx === 0 ? " disabled" : "") + ">← Back</button>" +
+    '<button class="btn primary" id="next">' + (st.idx === DATA.length - 1 ? "Review & finish →" : "Next →") + "</button></div>" +
+    '<div class="kbd">Keys: <b>1</b>–<b>4</b> pick · <b>0</b> all-weak · <b>←</b> <b>→</b> move</div>';
+
+  app.querySelectorAll(".card, .weak button").forEach((el) => {
+    el.onclick = () => { const v = el.dataset.pick; setPick(o.id, v === "x" ? "x" : Number(v)); };
+  });
+  const note = document.getElementById("note");
+  note.oninput = () => { st.notes[o.id] = note.value; save(); };
+  document.getElementById("prev").onclick = () => { if (st.idx > 0) { st.idx--; save(); render(); } };
+  document.getElementById("next").onclick = () => { if (st.idx < DATA.length - 1) { st.idx++; save(); render(); } else { st.idx = DATA.length; save(); render(); } };
+}
+
+function renderSummary() {
+  const missing = DATA.filter((o) => !(o.id in st.picks));
+  const rows = DATA.map((o) => {
+    const p = st.picks[o.id];
+    const label = p === "x" ? "all weak" : p ? "Card " + p : "—";
+    return '<div class="row" data-go="' + o.id + '"><span>#' + o.id + " " + esc(o.objection) + '</span>' +
+      '<span class="pk' + (p ? "" : " none") + '">' + label + "</span></div>";
+  }).join("");
+
+  const output = JSON.stringify({
+    build: BUILD_ID,
+    picks: st.picks,
+    notes: Object.fromEntries(Object.entries(st.notes).filter(([, v]) => v && v.trim())),
+  });
+
+  app.innerHTML =
+    '<div class="sum"><h2>Done — ' + Object.keys(st.picks).length + " of " + DATA.length + " graded</h2>" +
+    "<p>Click any row to revisit it. When you're happy, copy the results and paste them back to Claude.</p>" +
+    (missing.length ? '<div class="miss">Still blank: ' + missing.map((m) => "#" + m.id).join(", ") + "</div>" : "") +
+    '<div class="grid2">' + rows + "</div>" +
+    '<button class="btn primary" id="copy" style="width:100%;margin-bottom:12px">📋 Copy results</button>' +
+    '<textarea class="out" id="out" readonly>' + esc(output) + "</textarea>" +
+    '<div class="nav"><button class="btn" id="back">← Back to grading</button></div></div>';
+
+  app.querySelectorAll(".row").forEach((el) => {
+    el.onclick = () => { st.idx = DATA.findIndex((o) => o.id === Number(el.dataset.go)); save(); render(); };
+  });
+  document.getElementById("back").onclick = () => { st.idx = DATA.length - 1; save(); render(); };
+  document.getElementById("copy").onclick = () => {
+    const out = document.getElementById("out");
+    out.select();
+    const ok = () => { const b = document.getElementById("copy"); b.textContent = "✓ Copied — paste it to Claude"; setTimeout(() => (b.textContent = "📋 Copy results"), 2200); };
+    if (navigator.clipboard) navigator.clipboard.writeText(out.value).then(ok).catch(() => { document.execCommand("copy"); ok(); });
+    else { document.execCommand("copy"); ok(); }
+  };
+}
+
+function render() { if (st.idx >= DATA.length) renderSummary(); else renderObjection(); window.scrollTo(0, 0); }
+
+document.addEventListener("keydown", (e) => {
+  if (st.idx >= DATA.length) return;
+  if (e.target.tagName === "TEXTAREA") return;
+  const o = DATA[st.idx];
+  if (["1", "2", "3", "4"].includes(e.key)) { const n = Number(e.key); if (n <= o.cards.length) setPick(o.id, n); }
+  else if (e.key === "0" || e.key.toLowerCase() === "x") setPick(o.id, "x");
+  else if (e.key === "ArrowRight") { st.idx++; save(); render(); }
+  else if (e.key === "ArrowLeft" && st.idx > 0) { st.idx--; save(); render(); }
+});
+
+render();
+</script>
+</body>
+</html>

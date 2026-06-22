@@ -1,5 +1,7 @@
 # Stack Reference
 
+> ⚠️ **Updated 2026-06-21:** the live **objection** card is generated with **Sonnet** (was Haiku); it no longer embeds or hits pgvector. OpenAI embeddings are now for KB ingestion + the **Wingman Coach** search only. See Decisions Log 2026-06-21.
+
 [[API Contracts]] | [[Deploy Runbook]]
 
 Last updated: 2026-04-02

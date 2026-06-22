@@ -1,0 +1,760 @@
+[
+  {
+    "id": 1,
+    "objection": "I need to think about it",
+    "category": "stall",
+    "order": [
+      "A",
+      "D",
+      "B",
+      "C"
+    ],
+    "kbHit": true,
+    "distilled": {
+      "found": true,
+      "phrase": "I need to think about it for a bit"
+    },
+    "grounding": "I need to think about it for a bit",
+    "kbEntries": [
+      {
+        "technique_name": "Think About It Definition",
+        "similarity": 0.91303419374868,
+        "call_stage": "Close",
+        "situation": "The prospect gives a vague think about it objection that needs clarification.",
+        "exact_script": "That's completely understandable. What specifically would you like to think about?",
+        "why_it_works": "Forces them to get specific about what they're actually thinking about, revealing if it's really money, partner, fear, or just a stall tactic.",
+        "matched_trigger": "I need to think about it"
+      },
+      {
+        "technique_name": "Yes No Maybe Frame",
+        "similarity": 0.91303419374868,
+        "call_stage": "Confirm",
+        "situation": "Before pitching, eliminating the 'I need to think about it' objection by setting decision boundaries.",
+        "exact_script": "Beautiful. By the way, at the end of the call, I know there is typically three things you could say. Either Alex, hell yes, let's do this, no, which I want you to know I am a hundred percent okay with a no. The one I do want to avoid is the, uh, let me think about it. Let me talk to my dog about it because, you know, we both know that is usually a nice way of saying no. So is it okay to keep it between either a yes or a no?",
+        "why_it_works": "Pre-frames the decision process and eliminates the think-it-over stall by getting agreement upfront. Makes saying 'I need to think about it' feel awkward since they already agreed not to say that.",
+        "matched_trigger": "I need to think about it"
+      },
+      {
+        "technique_name": "Consequence Question Formula",
+        "similarity": 0.91303419374868,
+        "call_stage": "Press",
+        "situation": "The prospect needs to feel urgency about their situation and understand what happens if they don't take action.",
+        "exact_script": "What happens if nothing changes? What are the consequences if you don't do anything about this? What are the ramifications if your situation stays the same though?",
+        "why_it_works": "Forces the prospect to confront the emotional consequences of inaction by having them verbalize what they'll lose, creating internal pressure to act.",
+        "matched_trigger": "I need to think about it"
+      },
+      {
+        "technique_name": "Curious Tone for Information Gathering",
+        "similarity": 0.91303419374868,
+        "call_stage": "Discovery",
+        "situation": "The rep needs to gather information about the prospect's current situation without sounding interrogating.",
+        "exact_script": "Oh interesting! Walk me through what you have now for [area they mentioned]? I'm curious how that's working for you.",
+        "why_it_works": "A curious tone signals genuine interest rather than interrogation, making prospects more likely to open up and share detailed information because they interpret the intention as helpful rather than pushy.",
+        "matched_trigger": "I need to think about it"
+      },
+      {
+        "technique_name": "Uncertainty Objection Deep Dive",
+        "similarity": 0.91303419374868,
+        "call_stage": "Press",
+        "situation": "The prospect has expressed uncertainty about the solution itself rather than logistics.",
+        "exact_script": "Okay, no problem. Out of curiosity, what specifically is keeping you from being less than 100% certain that this is what you need and now is the right time?",
+        "why_it_works": "Directly addresses uncertainty by getting the prospect to verbalize their specific doubts so you can handle them systematically.",
+        "matched_trigger": "I need to think about it"
+      }
+    ],
+    "latencyMs": {
+      "A": 1675,
+      "B": 1885,
+      "C": 2086,
+      "D": 2267
+    }
+  },
+  {
+    "id": 2,
+    "objection": "It's too expensive",
+    "category": "price",
+    "order": [
+      "A",
+      "C",
+      "B",
+      "D"
+    ],
+    "kbHit": true,
+    "distilled": {
+      "found": true,
+      "phrase": "this feels too expensive right now"
+    },
+    "grounding": "this feels too expensive right now",
+    "kbEntries": [
+      {
+        "technique_name": "Mid-Call Objection Reframe",
+        "similarity": 0.692917296438867,
+        "call_stage": "Discovery",
+        "situation": "The prospect tries to take control of the call or throws objections before the appropriate time in the process.",
+        "exact_script": "I totally understand that, and I'm not here to pressure you into anything. The only way this works is if it's a perfect fit for both of us. But to figure that out, I need to understand your situation first. Can I ask you a couple quick questions, and then I'll give you all the details? Fair enough?",
+        "why_it_works": "Reframes control the conversation flow by redirecting prospects back to the discovery process while addressing their resistance non-confrontationally.",
+        "matched_trigger": "This sounds too expensive"
+      },
+      {
+        "technique_name": "Three Objection Classification",
+        "similarity": 0.685743896770533,
+        "call_stage": "Close",
+        "situation": "The rep encounters resistance and needs to quickly categorize the objection type to respond appropriately.",
+        "exact_script": "I hear you saying [repeat their concern]. Help me understand - is this about the money, or is this something you need to discuss with someone, or are you just not sure this is the right fit for your situation?",
+        "why_it_works": "All objections fall into three categories: money, spouse/partner, or uncertainty. Classifying them allows for targeted responses rather than generic objection handling.",
+        "matched_trigger": "This is too expensive"
+      },
+      {
+        "technique_name": "What If It Wasn't What You Thought",
+        "similarity": 0.685713020872176,
+        "call_stage": "Press",
+        "situation": "The prospect is fixated on their assumptions about cost, risk, or what the offer entails.",
+        "exact_script": "What if everything you think you know about this... is wrong? What if there's something here that you're not seeing yet?",
+        "why_it_works": "Creates confusion and curiosity by triggering a scotoma - making them realize there might be something obvious to everyone else but not to them, which makes them suggestible and receptive to new information.",
+        "matched_trigger": "This is too expensive"
+      },
+      {
+        "technique_name": "Poise Under Pressure",
+        "similarity": 0.659322312547565,
+        "call_stage": "Close",
+        "situation": "The prospect is applying pressure, being aggressive, or trying to rush the rep into concessions.",
+        "exact_script": "I understand you're feeling some pressure around this decision. I have complete resolve that we're going to figure out what's best for you here. Let's take a step back and make sure we're making the right decision based on what's actually best for your situation, not based on emotion or time pressure.",
+        "why_it_works": "Maintains calm certainty under pressure while redirecting focus back to logical decision-making rather than emotional reaction or artificial urgency.",
+        "matched_trigger": "This is way too expensive"
+      },
+      {
+        "technique_name": "D-Frame Opening Questions",
+        "similarity": 0.635928925263992,
+        "call_stage": "Discovery",
+        "situation": "The prospect has defensive frames about being sold to and is thinking about cost before understanding value.",
+        "exact_script": "So help me understand, what's been the biggest challenge you've been facing with [their current situation]? Because if you can't get them to doubt that, it's going to be hard for them to become open to what you're offering.",
+        "why_it_works": "D-framing breaks down defensive belief systems by creating doubt about their current situation rather than pitching solutions, which bypasses their sales resistance.",
+        "matched_trigger": "This sounds expensive"
+      }
+    ],
+    "latencyMs": {
+      "A": 2387,
+      "B": 2256,
+      "C": 2741,
+      "D": 9217
+    }
+  },
+  {
+    "id": 3,
+    "objection": "I don't have the money",
+    "category": "affordability",
+    "order": [
+      "D",
+      "B",
+      "A",
+      "C"
+    ],
+    "kbHit": true,
+    "distilled": {
+      "found": true,
+      "phrase": "I don't have the money right now"
+    },
+    "grounding": "I don't have the money right now",
+    "kbEntries": [
+      {
+        "technique_name": "Same Side Commitment Check",
+        "similarity": 1,
+        "call_stage": "Close",
+        "situation": "The prospect gives a money objection but you need to verify if it's truly logistical or something else.",
+        "exact_script": "Okay, from what I can understand, money might be the issue right now, but if you did have the funds available, would this be the answer for you?",
+        "why_it_works": "This separates desire from logistics by getting them to commit to the solution while removing the financial barrier, revealing if money is the real objection or just a smokescreen.",
+        "matched_trigger": "I don't have the money right now"
+      },
+      {
+        "technique_name": "Financial Objection Isolation",
+        "similarity": 0.918680135626489,
+        "call_stage": "Press",
+        "situation": "The prospect has given a money-related objection and you need to isolate if there are other hidden objections.",
+        "exact_script": "Gotcha, no problem. But just so I can stay organized on my end, money and everything aside, is there anything else that's keeping you from being less than 100% certain that this is really what you need and now is the right time?",
+        "why_it_works": "Isolates whether money is the only objection or if there are deeper concerns about the solution itself that need to be addressed first.",
+        "matched_trigger": "I don't have the funds right now"
+      },
+      {
+        "technique_name": "Earlier Today Association",
+        "similarity": 0.848618541777039,
+        "call_stage": "Press",
+        "situation": "You need to deliver tough feedback or challenge their beliefs without being confrontational.",
+        "exact_script": "It's so funny you asked that because I had someone just earlier today who asked the same questions. Can I share with you what I just shared with them?",
+        "why_it_works": "Creates a neutral third party you can be brutally honest with while the prospect listens, allowing you to deliver tough truths without directly insulting or challenging the prospect.",
+        "matched_trigger": "I don't have the money"
+      },
+      {
+        "technique_name": "Three Objection Classification",
+        "similarity": 0.848618541777039,
+        "call_stage": "Close",
+        "situation": "The rep encounters resistance and needs to quickly categorize the objection type to respond appropriately.",
+        "exact_script": "I hear you saying [repeat their concern]. Help me understand - is this about the money, or is this something you need to discuss with someone, or are you just not sure this is the right fit for your situation?",
+        "why_it_works": "All objections fall into three categories: money, spouse/partner, or uncertainty. Classifying them allows for targeted responses rather than generic objection handling.",
+        "matched_trigger": "I don't have the money"
+      },
+      {
+        "technique_name": "D-Frame Opening Questions",
+        "similarity": 0.742884865639309,
+        "call_stage": "Discovery",
+        "situation": "The prospect has defensive frames about being sold to and is thinking about cost before understanding value.",
+        "exact_script": "So help me understand, what's been the biggest challenge you've been facing with [their current situation]? Because if you can't get them to doubt that, it's going to be hard for them to become open to what you're offering.",
+        "why_it_works": "D-framing breaks down defensive belief systems by creating doubt about their current situation rather than pitching solutions, which bypasses their sales resistance.",
+        "matched_trigger": "I can't afford this right now"
+      }
+    ],
+    "latencyMs": {
+      "A": 1977,
+      "B": 2109,
+      "C": 3000,
+      "D": 5327
+    }
+  },
+  {
+    "id": 4,
+    "objection": "I need to talk to my business partner",
+    "category": "authority",
+    "order": [
+      "A",
+      "D",
+      "B",
+      "C"
+    ],
+    "kbHit": true,
+    "distilled": {
+      "found": true,
+      "phrase": "I need to talk to my business partner Dave first"
+    },
+    "grounding": "I need to talk to my business partner Dave first",
+    "kbEntries": [
+      {
+        "technique_name": "Three Objection Classification",
+        "similarity": 0.792158140757953,
+        "call_stage": "Close",
+        "situation": "The rep encounters resistance and needs to quickly categorize the objection type to respond appropriately.",
+        "exact_script": "I hear you saying [repeat their concern]. Help me understand - is this about the money, or is this something you need to discuss with someone, or are you just not sure this is the right fit for your situation?",
+        "why_it_works": "All objections fall into three categories: money, spouse/partner, or uncertainty. Classifying them allows for targeted responses rather than generic objection handling.",
+        "matched_trigger": "I need to talk to my business partner"
+      },
+      {
+        "technique_name": "Leadership Structure Qualifier",
+        "similarity": 0.792155779788083,
+        "call_stage": "Discovery",
+        "situation": "You need to identify other decision makers without triggering sales resistance.",
+        "exact_script": "Got it. What does your leadership structure look like over there? Do you have a business partner, are you the sole owner, or how does that work exactly?",
+        "why_it_works": "Frames the question as organizational inquiry rather than sales qualification, avoiding resistance while identifying decision-making authority.",
+        "matched_trigger": "I need to talk to my business partner"
+      },
+      {
+        "technique_name": "Spouse Partner Objection Isolation",
+        "similarity": 0.740118330158819,
+        "call_stage": "Press",
+        "situation": "The prospect says they need to consult with someone else before making a decision.",
+        "exact_script": "Talking with your spouse aside, is there anything else that's keeping you from being less than 100% certain that this is really what you need and now is the right time?",
+        "why_it_works": "Separates the consultation requirement from actual doubts about the solution, helping identify if there are deeper uncertainty issues.",
+        "matched_trigger": "I need to consult with my business partner"
+      },
+      {
+        "technique_name": "Support System Assessment",
+        "similarity": 0.731774466012391,
+        "call_stage": "Discovery",
+        "situation": "The prospect needs approval or support from others to move forward with the decision.",
+        "exact_script": "I understand you want to involve your spouse in this decision. That makes total sense. How do these conversations usually go? Are they generally supportive of investments in growing the business? What would need to happen for them to see this as a smart move?",
+        "why_it_works": "Uncovers potential resistance from influencers and helps strategize how to address their concerns before they become obstacles.",
+        "matched_trigger": "I need to consult my business partner"
+      },
+      {
+        "technique_name": "Partner Decision Isolation",
+        "similarity": 0.708353001839663,
+        "call_stage": "Close",
+        "situation": "Prospect says they need to check with a partner or spouse after confirming they personally want to do it.",
+        "exact_script": "Perfect, well, I'll make sure to send everything over. Now, is this something where you sort of made the decision and you're just letting them know? Or are you gonna have to get him or her bought in on this?",
+        "why_it_works": "Determines if this is a notification or collaboration situation, which completely changes your approach to handling the partner dynamic.",
+        "matched_trigger": "I need to check with my business partner"
+      }
+    ],
+    "latencyMs": {
+      "A": 1612,
+      "B": 2086,
+      "C": 2868,
+      "D": 2176
+    }
+  },
+  {
+    "id": 5,
+    "objection": "I'm too busy",
+    "category": "time",
+    "order": [
+      "C",
+      "B",
+      "D",
+      "A"
+    ],
+    "kbHit": true,
+    "distilled": {
+      "found": true,
+      "phrase": "I'm too busy to fit the calls in this week"
+    },
+    "grounding": "I'm too busy to fit the calls in this week",
+    "kbEntries": [
+      {
+        "technique_name": "Time Objection Reframe",
+        "similarity": 0.706073682799393,
+        "call_stage": "Press",
+        "situation": "Prospect claims they don't have time or the timing isn't right.",
+        "exact_script": "Great, totally understand. Timing's kind of tough for you right now. I think it's smart that you're already thinking about implementation. Our biggest success stories are actually people who think through the process the same way you are right now. So what would make it a good time?",
+        "why_it_works": "Validates their concern while reframing timing as a priority issue and associating their objection with successful customers, then redirects to uncover what they'd need to move forward.",
+        "matched_trigger": "I'm too busy"
+      },
+      {
+        "technique_name": "Consequence Question Formula",
+        "similarity": 0.670565406239354,
+        "call_stage": "Press",
+        "situation": "The prospect needs to feel urgency about their situation and understand what happens if they don't take action.",
+        "exact_script": "What happens if nothing changes? What are the consequences if you don't do anything about this? What are the ramifications if your situation stays the same though?",
+        "why_it_works": "Forces the prospect to confront the emotional consequences of inaction by having them verbalize what they'll lose, creating internal pressure to act.",
+        "matched_trigger": "I'm too busy right now"
+      },
+      {
+        "technique_name": "Cost of Inaction Building",
+        "similarity": 0.666452485548192,
+        "call_stage": "Discovery",
+        "situation": "The prospect doesn't feel urgency and is willing to delay their decision.",
+        "exact_script": "I understand you want to wait. Help me understand what you think will be different in three months that isn't true today? What's the cost of doing nothing for another quarter? How much longer can you afford to stay where you are?",
+        "why_it_works": "Makes the pain of inaction greater than the pain of taking action, creating urgency by highlighting that delay only makes the problem worse and more expensive to solve.",
+        "matched_trigger": "I'm too busy now"
+      },
+      {
+        "technique_name": "Time Implementation Isolation",
+        "similarity": 0.606194083921815,
+        "call_stage": "Press",
+        "situation": "The prospect claims they don't have time to implement now and want to start later.",
+        "exact_script": "Yeah, no problem. Totally get that. Just so I can be clear on my end. You one hundred percent believe that it's going to work. This is what you want to do. It's just a matter of you want to do it in two months. What would be your exact start date? So if you were speaking on May 3rd and May 3rd was right now, you'd be one hundred percent moving forward and processing payment?",
+        "why_it_works": "Isolates the timing objection while creating a future commitment date, making it easier to either close now or secure a firm future commitment.",
+        "matched_trigger": "I'm too busy to implement this"
+      }
+    ],
+    "latencyMs": {
+      "A": 3373,
+      "B": 2142,
+      "C": 2555,
+      "D": 2575
+    }
+  },
+  {
+    "id": 6,
+    "objection": "What if it doesn't work for me?",
+    "category": "risk",
+    "order": [
+      "C",
+      "D",
+      "B",
+      "A"
+    ],
+    "kbHit": true,
+    "distilled": {
+      "found": true,
+      "phrase": "I'm worried it won't work for me"
+    },
+    "grounding": "I'm worried it won't work for me",
+    "kbEntries": [
+      {
+        "technique_name": "Three Objection Classification",
+        "similarity": 0.949350701122553,
+        "call_stage": "Close",
+        "situation": "The rep encounters resistance and needs to quickly categorize the objection type to respond appropriately.",
+        "exact_script": "I hear you saying [repeat their concern]. Help me understand - is this about the money, or is this something you need to discuss with someone, or are you just not sure this is the right fit for your situation?",
+        "why_it_works": "All objections fall into three categories: money, spouse/partner, or uncertainty. Classifying them allows for targeted responses rather than generic objection handling.",
+        "matched_trigger": "I'm worried this won't work for me"
+      },
+      {
+        "technique_name": "Uncertainty Objection Deep Dive",
+        "similarity": 0.867540116607447,
+        "call_stage": "Press",
+        "situation": "The prospect has expressed uncertainty about the solution itself rather than logistics.",
+        "exact_script": "Okay, no problem. Out of curiosity, what specifically is keeping you from being less than 100% certain that this is what you need and now is the right time?",
+        "why_it_works": "Directly addresses uncertainty by getting the prospect to verbalize their specific doubts so you can handle them systematically.",
+        "matched_trigger": "I'm worried it won't work"
+      },
+      {
+        "technique_name": "Won't Work For Me Reframe",
+        "similarity": 0.761346037330162,
+        "call_stage": "Press",
+        "situation": "The prospect expresses doubt that the solution will work specifically for them despite evidence of success.",
+        "exact_script": "I hear you, and I appreciate your honesty. What you're saying is, despite all the success stories and results we've shared, you're worried you might be in that small percentage where it doesn't work, right? I totally get that concern. Can I ask you something? When you commit to this, are you going to put in the work? And when you hit challenges - which you will - are you going to reach out for support, or are you someone who tends to struggle alone and hope things work out?",
+        "why_it_works": "Reframes their doubt as statistical improbability and makes success contingent on their commitment to work and ask for help rather than the solution itself.",
+        "matched_trigger": "I'm worried about being the one it doesn't work for"
+      },
+      {
+        "technique_name": "Emotional Word Echo",
+        "similarity": 0.713176448754056,
+        "call_stage": "Discovery",
+        "situation": "The prospect mentions being stressed, frustrated, worried, or concerned about a problem but doesn't elaborate.",
+        "exact_script": "Stress? Frustrated? Concern? Worried?",
+        "why_it_works": "When you repeat back just the emotional word with a confused/concerned tone, their subconscious believes you didn't understand and compels them to explain deeper, causing them to relive their pain.",
+        "matched_trigger": "I'm concerned this won't work"
+      },
+      {
+        "technique_name": "Earlier Today Association",
+        "similarity": 0.70430442035409,
+        "call_stage": "Press",
+        "situation": "You need to deliver tough feedback or challenge their beliefs without being confrontational.",
+        "exact_script": "It's so funny you asked that because I had someone just earlier today who asked the same questions. Can I share with you what I just shared with them?",
+        "why_it_works": "Creates a neutral third party you can be brutally honest with while the prospect listens, allowing you to deliver tough truths without directly insulting or challenging the prospect.",
+        "matched_trigger": "I don't think this will work for me"
+      }
+    ],
+    "latencyMs": {
+      "A": 8913,
+      "B": 2379,
+      "C": 4823,
+      "D": 5657
+    }
+  },
+  {
+    "id": 7,
+    "objection": "What makes you different?",
+    "category": "differentiation",
+    "order": [
+      "A",
+      "C",
+      "D",
+      "B"
+    ],
+    "kbHit": true,
+    "distilled": {
+      "found": true,
+      "phrase": "I'm not convinced you're different from other programs"
+    },
+    "grounding": "I'm not convinced you're different from other programs",
+    "kbEntries": [
+      {
+        "technique_name": "Bridge Destruction Discovery",
+        "similarity": 0.643179044617258,
+        "call_stage": "Discovery",
+        "situation": "You need to identify all the alternative solutions the prospect is considering so you can eliminate them during your presentation.",
+        "exact_script": "Beyond what we've talked about here, what other options have you been considering to solve this problem? What have you tried in the past? Are you looking at any other solutions or working with anyone else on this?",
+        "why_it_works": "Identifies all perceived alternative paths from current to desired situation so you can systematically eliminate each option during your presentation, leaving your solution as the only viable bridge.",
+        "matched_trigger": "I'm comparing different programs"
+      },
+      {
+        "technique_name": "Simultaneous Explanation",
+        "similarity": 0.613168952866146,
+        "call_stage": "Pitch",
+        "situation": "You need to explain your methodology while addressing why past attempts failed.",
+        "exact_script": "You know how earlier you said you worked with that agency and they had you try X methodology? Well, that was really good five years ago, but things have shifted. Here's what's changed, and here's why that doesn't work anymore. So instead, what we do is Y, which works a lot better now for these reasons.",
+        "why_it_works": "Validates their past experience while educating them on market evolution, positioning your solution as the current best practice rather than just different.",
+        "matched_trigger": "I've invested in other programs"
+      },
+      {
+        "technique_name": "Earlier Today Association",
+        "similarity": 0.600536130637722,
+        "call_stage": "Press",
+        "situation": "You need to deliver tough feedback or challenge their beliefs without being confrontational.",
+        "exact_script": "It's so funny you asked that because I had someone just earlier today who asked the same questions. Can I share with you what I just shared with them?",
+        "why_it_works": "Creates a neutral third party you can be brutally honest with while the prospect listens, allowing you to deliver tough truths without directly insulting or challenging the prospect.",
+        "matched_trigger": "I'm different from your other clients"
+      }
+    ],
+    "latencyMs": {
+      "A": 5153,
+      "B": 2184,
+      "C": 2454,
+      "D": 3181
+    }
+  },
+  {
+    "id": 8,
+    "objection": "Send me some information",
+    "category": "deflection",
+    "order": [
+      "B",
+      "A",
+      "D",
+      "C"
+    ],
+    "kbHit": true,
+    "distilled": {
+      "found": true,
+      "phrase": "I need some information to look over before deciding"
+    },
+    "grounding": "I need some information to look over before deciding",
+    "kbEntries": [
+      {
+        "technique_name": "Curious Tone and Expression",
+        "similarity": 0.656305999894717,
+        "call_stage": "Close",
+        "situation": "You're asking the 'before I go' question and need them to open up about their real concerns.",
+        "exact_script": "Now, Sally, before I go, I guess, what were you wanting to go over in your mind? So I know what questions you'll have when we, when we talk on Tuesday.",
+        "why_it_works": "The curious tone causes them to open up because tone is how prospects interpret why you're asking the question, and curiosity feels safe and non-threatening.",
+        "matched_trigger": "I need to evaluate my options"
+      },
+      {
+        "technique_name": "Moment of Decision Question",
+        "similarity": 0.649558825195295,
+        "call_stage": "Discovery",
+        "situation": "You need to uncover the emotional trigger that made them take action now.",
+        "exact_script": "Can I ask you a personal question? After all this time thinking about it, you're finally on the call with me right now actually looking into doing something about it. What shifted for you? What happened that made this a priority now?",
+        "why_it_works": "Creates timeline context then points out behavioral inconsistency to trigger the emotional moment of decision rather than asking generic why questions.",
+        "matched_trigger": "I need to make a decision"
+      },
+      {
+        "technique_name": "Think About It Definition",
+        "similarity": 0.640910247461623,
+        "call_stage": "Close",
+        "situation": "The prospect gives a vague think about it objection that needs clarification.",
+        "exact_script": "That's completely understandable. What specifically would you like to think about?",
+        "why_it_works": "Forces them to get specific about what they're actually thinking about, revealing if it's really money, partner, fear, or just a stall tactic.",
+        "matched_trigger": "I need to consider my options"
+      },
+      {
+        "technique_name": "Vague to Specific Conversion",
+        "similarity": 0.640910247461623,
+        "call_stage": "Press",
+        "situation": "The prospect gives a vague objection like wanting to think about it or needing time.",
+        "exact_script": "No problem. Before we get into that, just so I can stay organized on my end, how do you feel? We covered X, Y, and Z in terms of our process. Do you feel like this is one hundred percent what you need to be able to get to whatever their outcome was? Do you one hundred percent believe this is going to work to get you there?",
+        "why_it_works": "Strong tie-downs with definitive language force prospects to reveal their real specific concerns instead of hiding behind vague stalling tactics.",
+        "matched_trigger": "I need to consider my options"
+      },
+      {
+        "technique_name": "Cashflow and Assets Mapping",
+        "similarity": 0.637418739830138,
+        "call_stage": "Close",
+        "situation": "The prospect has given permission for financial discovery and the salesperson needs to map their complete financial resources.",
+        "exact_script": "So in the next 30 days, how much cashflow do you have coming in total? And how much left do you have over after expenses? And what's your cash on hand right now exactly?",
+        "why_it_works": "Starting with easy questions builds momentum before asking the critical question about cash on hand, and the word 'exactly' demands specificity.",
+        "matched_trigger": "I want to make an informed decision"
+      }
+    ],
+    "latencyMs": {
+      "A": 1125,
+      "B": 2043,
+      "C": 1701,
+      "D": 1793
+    }
+  },
+  {
+    "id": 9,
+    "objection": "I can do this myself",
+    "category": "diy",
+    "order": [
+      "B",
+      "A",
+      "D",
+      "C"
+    ],
+    "kbHit": false,
+    "distilled": {
+      "found": true,
+      "phrase": "I don't think it's worth paying for"
+    },
+    "grounding": "I don't think it's worth paying for",
+    "kbEntries": [],
+    "latencyMs": {
+      "A": 2085,
+      "B": 2084,
+      "C": 1672,
+      "D": 2083
+    }
+  },
+  {
+    "id": 10,
+    "objection": "I've been burned before",
+    "category": "trust",
+    "order": [
+      "B",
+      "A",
+      "D",
+      "C"
+    ],
+    "kbHit": true,
+    "distilled": {
+      "found": true,
+      "phrase": "I've been burned before and I'm cautious about trusting another program"
+    },
+    "grounding": "I've been burned before and I'm cautious about trusting another program",
+    "kbEntries": [
+      {
+        "technique_name": "Past Failure Objection Isolation",
+        "similarity": 0.721705356909124,
+        "call_stage": "Close",
+        "situation": "Prospect expresses doubt based on a previous bad experience with a similar solution.",
+        "exact_script": "Totally get it. Yeah, that's frustrating. So just so I can be clear, is there anything about what I outlined specifically that's keeping you from being less than 100% certain that this is going to work? Or is this purely hesitation based on the fact that you tried something similar in the past and it didn't work and you had a bad experience and it's that giving you pause?",
+        "why_it_works": "Separates current solution concerns from past trauma, allowing you to address the real issue without getting stuck defending your entire industry.",
+        "matched_trigger": "I've been burned before"
+      },
+      {
+        "technique_name": "D-Frame Opening Questions",
+        "similarity": 0.721705356909124,
+        "call_stage": "Discovery",
+        "situation": "The prospect has defensive frames about being sold to and is thinking about cost before understanding value.",
+        "exact_script": "So help me understand, what's been the biggest challenge you've been facing with [their current situation]? Because if you can't get them to doubt that, it's going to be hard for them to become open to what you're offering.",
+        "why_it_works": "D-framing breaks down defensive belief systems by creating doubt about their current situation rather than pitching solutions, which bypasses their sales resistance.",
+        "matched_trigger": "I've been burned before"
+      },
+      {
+        "technique_name": "Expert Association Trigger",
+        "similarity": 0.721705356909124,
+        "call_stage": "Rapport",
+        "situation": "The prospect is showing signs of salesperson resistance or defense mechanisms.",
+        "exact_script": "I totally understand. Look, my behavior should trigger you to associate me as an expert, not a salesperson. I'm here as an advisor to understand your situation and tell you what I would do if I were you. That might be our product, or it might not be.",
+        "why_it_works": "Reframes the interaction from sales to consultation, reducing defensive responses and increasing trust through expert positioning.",
+        "matched_trigger": "I've been burned before"
+      },
+      {
+        "technique_name": "Past Experience Discovery",
+        "similarity": 0.630908800567178,
+        "call_stage": "Discovery",
+        "situation": "The prospect objects that they tried something similar before and it didn't work.",
+        "exact_script": "What did you try in the past? What was the method they were implementing? What would you have changed if you could - what did you feel was missing? Generally when people invest and don't get results, it's one of three things: the methodology was ineffective, the methodology was great but execution and support wasn't there, or you didn't put in the work. Which one do you think it was?",
+        "why_it_works": "Gets specific details about their past experience to identify differentiation points and determine whether the failure was due to method, execution, or their own commitment.",
+        "matched_trigger": "I've been burned by agencies before"
+      },
+      {
+        "technique_name": "Trust and Methodology Validation",
+        "similarity": 0.630465192278242,
+        "call_stage": "Confirm",
+        "situation": "The rep needs to address any concerns about credibility and ensure the prospect believes in their approach before moving to a pitch.",
+        "exact_script": "Do you trust me, my company, and our methodology to actually solve this problem for you? What would you need to see to feel confident that our approach will deliver the results you want?",
+        "why_it_works": "Addressing trust issues directly allows the rep to handle objections about credibility before they become deal-killers in the closing phase.",
+        "matched_trigger": "We've been burned before"
+      }
+    ],
+    "latencyMs": {
+      "A": 2481,
+      "B": 1771,
+      "C": 1770,
+      "D": 1790
+    }
+  },
+  {
+    "id": 11,
+    "objection": "This sounds too good to be true",
+    "category": "skepticism",
+    "order": [
+      "A",
+      "B",
+      "D",
+      "C"
+    ],
+    "kbHit": true,
+    "distilled": {
+      "found": true,
+      "phrase": "I'm worried there's a catch"
+    },
+    "grounding": "I'm worried there's a catch",
+    "kbEntries": [
+      {
+        "technique_name": "Certainty Scale Check",
+        "similarity": 0.669650093964226,
+        "call_stage": "Close",
+        "situation": "You need to measure their commitment level and isolate any remaining concerns before presenting price.",
+        "exact_script": "Just so I can understand on my end here, because what's really important to me is alignment. When you come in and you work with us, we're rolling up the sleeves, we're getting in the trenches with you, and our team is all in on this thing. So on a scale of one to 10, one being like, I hate this guy, I wanna get off the phone. 10 being like, that's exactly what I need. Where do you feel like you fall out exactly?",
+        "why_it_works": "Forces them to give a specific number which reveals their true commitment level and helps you identify any remaining objections to address.",
+        "matched_trigger": "I'm worried"
+      },
+      {
+        "technique_name": "Meaning Shift Reframe",
+        "similarity": 0.625479405466039,
+        "call_stage": "Press",
+        "situation": "You need to reframe a limiting belief by changing what it means to them psychologically.",
+        "exact_script": "This feeling you're having right now? It's exactly what you're supposed to feel. Who do you know who grows inside their comfort zone? We have two choices here. We can either let this hold us back, or we can use this energy to move forward. Which feels right to you?",
+        "why_it_works": "It reframes fear from a stop signal to a go signal by shifting the meaning from 'danger' to 'growth opportunity,' giving them permission to act despite discomfort while maintaining control through choice.",
+        "matched_trigger": "I'm worried about the risk"
+      },
+      {
+        "technique_name": "Scale Certainty Check",
+        "similarity": 0.616818576507069,
+        "call_stage": "Confirm",
+        "situation": "The prospect shows uncertainty about your solution and you need to measure and address their confidence level.",
+        "exact_script": "I hear you, it totally makes sense. What's really important to us is alignment. We're investing a lot of resources into you the same way you're investing resources into us. We want to make sure you're bought in before we start working together. So I'm curious, on a scale of one to ten, one being like I hate this guy I want to get off the phone, ten being like okay that's exactly what I need, where do you feel like you fall exactly?",
+        "why_it_works": "Frames uncertainty as normal while positioning mutual investment, then uses scale to quantify confidence level and identify specific gaps to address.",
+        "matched_trigger": "I'm worried about something"
+      },
+      {
+        "technique_name": "Objection Labeling",
+        "similarity": 0.612909476256475,
+        "call_stage": "Press",
+        "situation": "The prospect gets stuck when pressed for specifics and can't articulate their real concern.",
+        "exact_script": "Hey, look, do you just think it's a little bit of nerves?",
+        "why_it_works": "When prospects can't articulate their objection, suggesting it's nerves gives them a label to claim, which can then be reframed as normal and overcome through coaching.",
+        "matched_trigger": "I'm just worried"
+      }
+    ],
+    "latencyMs": {
+      "A": 8547,
+      "B": 1668,
+      "C": 1672,
+      "D": 3325
+    }
+  },
+  {
+    "id": 12,
+    "objection": "The timing isn't right",
+    "category": "timing",
+    "order": [
+      "B",
+      "C",
+      "A",
+      "D"
+    ],
+    "kbHit": true,
+    "distilled": {
+      "found": true,
+      "phrase": "I don't think the timing is right to start something this big now"
+    },
+    "grounding": "I don't think the timing is right to start something this big now",
+    "kbEntries": [
+      {
+        "technique_name": "Permission-Based Objection Handling",
+        "similarity": 0.648397298435513,
+        "call_stage": "Press",
+        "situation": "You need to challenge a prospect's decision to delay without making them defensive.",
+        "exact_script": "Can I ask you something though? And you can always get back to me later. How can I communicate to you that you might be making a mistake without you getting upset with me?",
+        "why_it_works": "Gets permission to challenge their decision while using a concerned tone that triggers them to defend you rather than get defensive, lowering their guard to reveal the real objection.",
+        "matched_trigger": "This isn't the right timing"
+      },
+      {
+        "technique_name": "Consequence Question Formula",
+        "similarity": 0.622210620418904,
+        "call_stage": "Press",
+        "situation": "The prospect needs to feel urgency about their situation and understand what happens if they don't take action.",
+        "exact_script": "What happens if nothing changes? What are the consequences if you don't do anything about this? What are the ramifications if your situation stays the same though?",
+        "why_it_works": "Forces the prospect to confront the emotional consequences of inaction by having them verbalize what they'll lose, creating internal pressure to act.",
+        "matched_trigger": "I'm not sure if this is the right time"
+      },
+      {
+        "technique_name": "NEPQ Consequence Questions",
+        "similarity": 0.609072372317316,
+        "call_stage": "Press",
+        "situation": "The prospect has indicated they want to delay the decision or go with a different option after initially showing interest.",
+        "exact_script": "Well, I'm concerned because what happens if you don't do anything about this? I mean, if you wait another three, six, nine months and you're still dealing with the same issues we talked about today, how is that going to impact you and your business? What's the cost of staying where you are right now?",
+        "why_it_works": "Forces the prospect to visualize and internalize the negative consequences of inaction, creating emotional urgency while positioning you as concerned for their wellbeing rather than just trying to make a sale.",
+        "matched_trigger": "This isn't the right time"
+      },
+      {
+        "technique_name": "Bullet Firing Timing Contradiction",
+        "similarity": 0.608867785868085,
+        "call_stage": "Close",
+        "situation": "The prospect gives a timing objection after previously expressing urgency during discovery.",
+        "exact_script": "I hear you, but listen, you've been experiencing this problem for the past two years. You told me you want to fix it as soon as possible so you could experience that result - what changed in the past couple of minutes?",
+        "why_it_works": "Creates logical inconsistency between their stated urgency in discovery and current desire to delay, forcing them to confront the contradiction.",
+        "matched_trigger": "Now isn't the right time"
+      },
+      {
+        "technique_name": "Cost of Inaction Building",
+        "similarity": 0.604603346590563,
+        "call_stage": "Discovery",
+        "situation": "The prospect doesn't feel urgency and is willing to delay their decision.",
+        "exact_script": "I understand you want to wait. Help me understand what you think will be different in three months that isn't true today? What's the cost of doing nothing for another quarter? How much longer can you afford to stay where you are?",
+        "why_it_works": "Makes the pain of inaction greater than the pain of taking action, creating urgency by highlighting that delay only makes the problem worse and more expensive to solve.",
+        "matched_trigger": "Not the right time"
+      }
+    ],
+    "latencyMs": {
+      "A": 1878,
+      "B": 5462,
+      "C": 2316,
+      "D": 1877
+    }
+  }
+]

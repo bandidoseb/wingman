@@ -2,11 +2,27 @@
 
 A running log of every major architectural or product decision made on Wingman. Append only — never delete. Each entry captures the decision, the date, the reasoning, and any alternatives that were rejected.
 
-Last updated: 2026-06-15
+Last updated: 2026-06-21
 
 ---
 
 ## 2026
+
+### 2026-06-21 — KB CUT from the live objection/signal-card path (kept for the Wingman Coach only)
+**Decision:** The live press-time objection card no longer uses the KB — no embed, no `searchKnowledge`, no retrieved-script. The KB is retained ONLY for the Wingman Coach / Mission Intel (`searchCoachingKnowledge`).
+**Why:** A blind A/B (12 objections × 4 arms — KB vs Claude-free vs "like Miner" vs "like Gordon"; `scripts/kb-ab-*.mjs` + `grader.html`) showed the KB card indistinguishable from / worse than no-KB, and the KB whiffed on ~1/12 even in test. Worse, `knowledge-signal.ts`'s rule *"base your headline directly on the retrieved script"* actively CONSTRAINED good cards toward mediocre guru scripts. A KB of public YouTube sales advice is not a moat (Claude knows the canon); the real moat is the per-rep **Belief Ladder** context. **Validated, not assumed.** Wiring pending — `tasks/wiring-objection-prompt.md`.
+
+### 2026-06-21 — Objection card = context-driven prompt (belief-diagnosis → tie-down), no retrieval
+**Decision:** Replace KB retrieval for the objection slot with one prompt that diagnoses which of the 7 beliefs is weak → handles uncertainty-first → pace + tie-down anchored to the prospect's own words → ONE first-person line.
+**Why:** Cole Gordon's own teaching: *"every objection traces back to one of the 7 beliefs."* Wingman's live summary (`belief-ladder.ts`) already tracks all 7 + the gap + emotional why + verbatim quotes — the gap was never *capture*, it was *usage* (the old prompt received the summary but never mined it). Distilled from 7 training videos (Cole Gordon + Matthew Ryder) + 13 live-call transcripts → `knowledge-base/objection-transcripts/PLAYBOOK-SYNTHESIS.md` + `LIVE-CALL-FINDINGS.md`. Prompt source: `scripts/objection-prompt-test.mjs`.
+
+### 2026-06-21 — Objection card model = Sonnet 4.6 (not Haiku)
+**Decision:** Generate the live objection card with Claude Sonnet 4.6, not Haiku.
+**Why:** Tonality is the product on an objection card, and Haiku has a stubborn "wind-up" tic (preambles like "real talk" / "here's what I'm asking") that prompt-engineering + few-shot could NOT kill — remove one phrase, it substitutes another. The same prompt on Sonnet is clean and human with no tic (every flagged issue fixed). Latency: Sonnet ~2.1s typical vs Haiku ~1.7s (~0.4s more; one 6.2s tail spike) — the budget was freed by cutting the KB (no embed/search), and the streaming reveal masks the rest. **Rejected:** Haiku + a deterministic wind-up strip (band-aid, wouldn't match Sonnet's phrasing).
+
+### 2026-06-21 — Signal cards drop the headline (type-tag + first-person line)
+**Decision:** Remove the ≤5-word headline from ALL signal cards. New shape: a tiny type-tag (e.g. "Objection handle" / the pressed arrow) + main text = the first-person line the rep says.
+**Why:** Sebastian — the headline + subtext two-tier was confusing to read live, and on an objection the reading-flow IS the tonality. The new objection prompt already outputs a single spoken line. **Supersedes** the "Two-Tier Card Format" in `00 - Product/Signal Card Design Science.md` and the HEADLINE/SUBTEXT prompt in `00 - Product/Prompt Library.md`.
 
 ### 2026-06-15 — Live KB vector search runs IN THE NODE SERVER'S MEMORY (not the Supabase RPC); Pinecone NOT needed
 **Decision:** The live press-path vector search loads the entire eligible KB (6,554 trigger embeddings, ~40MB) into the Railway server's RAM at boot and brute-forces cosine in-process (~10–20ms, exact). The Supabase RPC stays only as a circuit-breaker-guarded fallback for the post-deploy boot window. Shipped as PR #17.
