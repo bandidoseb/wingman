@@ -1,5 +1,7 @@
 # Roadmap
 
+> ⚠️ **Updated 2026-06-21:** "KB/RAG-sourced cards" is no longer a goal — the KB is **cut from live objection cards** (kept for the Wingman Coach). Live objection card = context-driven prompt on Sonnet. Self-host embeddings is now mostly moot for live cards. See Decisions Log 2026-06-21 + Current Sprint.
+
 Last updated: 2026-04-09
 
 ---

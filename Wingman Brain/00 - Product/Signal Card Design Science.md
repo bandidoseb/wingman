@@ -1,5 +1,7 @@
 # Signal Card Design — Scientific Basis
 
+> ⚠️ **UPDATED 2026-06-21 (wiring pending):** the **two-tier ≤5-word headline + subtext** format below is being dropped. New card = a tiny type-tag ("Objection handle" / the pressed arrow) + main text = the single first-person line the rep says. Reason: tonality/reading-flow — the headline was confusing to read live. The glance/contrast/color research below still applies to the *line*. See Decisions Log 2026-06-21.
+
 [[Architecture]] | [[Signal Card Examples]] | [[Bubble Discipline]]
 
 Built from research session on 2026-04-10. Use this when writing website copy, onboarding, or making future UI decisions.

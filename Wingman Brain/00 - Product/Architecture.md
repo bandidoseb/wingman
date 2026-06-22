@@ -1,5 +1,7 @@
 # Wingman Architecture
 
+> ⚠️ **SUPERSEDED in part — 2026-06-21 (wiring pending).** The live **objection** card no longer uses the RAG/KB pipeline (embed → pgvector → KB → Haiku). It's a context-driven prompt (diagnose the weak Belief Ladder belief → tie-down anchored to the prospect's own words → one line) on **Sonnet**, no retrieval. KB = Wingman Coach only. See Decisions Log 2026-06-21 + `tasks/wiring-objection-prompt.md`.
+
 Last updated: 2026-04-02
 
 ---

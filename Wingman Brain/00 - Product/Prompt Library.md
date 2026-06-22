@@ -1,5 +1,7 @@
 # Prompt Library
 
+> ⚠️ **SUPERSEDED for the objection card — 2026-06-21 (wiring pending).** The Haiku signal-card prompt (HEADLINE ≤5 words + SUBTEXT) is replaced for objections by a new **Sonnet** prompt that outputs ONE first-person line, no KB. Source of truth: `scripts/objection-prompt-test.mjs` → `OBJECTION_SYSTEM_PROMPT` (+ `knowledge-base/objection-transcripts/PLAYBOOK-SYNTHESIS.md`). See Decisions Log 2026-06-21.
+
 [[Architecture]] | [[KB Ingestion Spec v2]]
 
 Last updated: 2026-04-02

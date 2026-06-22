@@ -1,5 +1,7 @@
 # Beta Tuning Parameters
 
+> ⚠️ **Updated 2026-06-21:** params below that assume the **objection** card uses Haiku + pgvector + embedding warm-up are superseded — the objection card is now **Sonnet**, no embed/KB search (KB = Coach only). The live-buffer / summarizer dials still apply. See Decisions Log 2026-06-21.
+
 These are educated guesses for v1 beta. None are set in stone. Everything in this file is a lever — it can be turned up or down based on what real call data shows. Each entry documents the current value, why we picked it, what to watch for, and how to change it.
 
 ---

@@ -9,6 +9,10 @@
 **What happened:** Sebastian was keen on self-hosting embeddings, so I wrote a heavy plan for it (re-embed the whole KB, swap the model). The plan-reviewer caught that **after PR #17, embedding is no longer the dominant press-to-card cost — generation (~1.5–2s) is, and the transcript lag makes cards *wrong*.** I was about to invest the most effort in the *3rd*-biggest lever.
 **Rule:** Each time a fix lands, re-measure and re-rank the remaining costs before committing to the next build. Lead with the honest priority even when the founder is excited about a specific idea (CLAUDE.md: senior engineer pushes back). Fix the biggest/most-painful lever first — correctness (wrong card) and the dominant latency component beat a smaller speed win, regardless of which idea has momentum.
 
+### Syntax-check generated code before handing it over — a builder that emits HTML/JS can ship a fatal typo
+**What happened:** Built a blind grading page via a generator script (string-concatenated HTML/JS), opened it for Sebastian, and he got a black screen. Root cause: one innerHTML string opened with `'` but closed with `"` — a single mismatched quote that broke the entire `<script>`, so nothing rendered. I had the verification tooling (extract `<script>` → `node --check` / `new Function`) but only ran it AFTER he reported the failure.
+**Rule:** Any time I generate code I can't watch render — especially HTML/JS emitted by a builder with quote-heavy string concatenation — run a syntax/runtime check on the OUTPUT before calling it ready. Cheap gate: pull the `<script>` and `node --check` it (or `new Function(js)` + a tiny DOM shim to execute it once). "The file wrote successfully" is not "it runs." Verify the artifact, not just that it was written.
+
 ## Session: 2026-06-05
 
 ### HUD HTML changes need a full electron:dev restart — and re-stage after EVERY edit

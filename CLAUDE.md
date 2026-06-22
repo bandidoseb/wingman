@@ -48,10 +48,10 @@ This must be run in Terminal after moving the app to /Applications. We should do
 | Web/dashboard | Next.js (App Router) | Dashboard UI, API routes, auth |
 | Live audio | Recall.ai | Joins the call, streams transcript |
 | Transcription | Deepgram (inside Recall.ai) | Speech to text |
-| AI — live | Claude Haiku | Signal card generation, target <1 second |
+| AI — live | Claude **Sonnet** (objection card — changed from Haiku 2026-06-21; wiring pending) | Signal card generation (objection = context-driven prompt, no KB) |
 | AI — post-call | Claude Sonnet | Call grading, debrief, Sales DNA update |
 | Database | Supabase | Users, calls, Sales DNA JSON, KB embeddings |
-| Vector search | pgvector (in Supabase) | RAG knowledge base retrieval |
+| Vector search | pgvector (in Supabase) | KB retrieval — **Wingman Coach only** since 2026-06-21 (no longer live objection cards) |
 | Hosting | Railway | Backend API |
 | Billing | Stripe | Subscription (routes exist, not fully wired) |
 | iMessage | Project Blue / Blooio | Conversion funnel (not built yet) |
@@ -196,6 +196,8 @@ A user can:
 ---
 
 ## AI Architecture (RAG Pipeline)
+
+> ⚠️ **CHANGING — decided 2026-06-21, wiring pending.** The **objection** card no longer uses this RAG/KB path. It's being replaced by a context-driven prompt — diagnose the weak Belief Ladder belief → uncertainty-first tie-down anchored to the prospect's own words → one line — generated with **Sonnet**, with NO embed/KB retrieval. The KB is kept only for the **Wingman Coach** (Mission Intel). The diagram below still describes the *current code* until the wiring ships (`tasks/wiring-objection-prompt.md` + Decisions Log 2026-06-21).
 
 ```
 Recall.ai transcript stream
@@ -486,7 +488,7 @@ Required keys (confirm these exist before debugging API issues):
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
 - `SUPABASE_SERVICE_ROLE_KEY`
 - `ANTHROPIC_API_KEY`
-- `OPENAI_API_KEY` ← required for KB signal cards (embeddings in knowledge-search.ts)
+- `OPENAI_API_KEY` ← embeddings for KB ingestion + the **Wingman Coach** search (live objection cards no longer embed, since 2026-06-21)
 - `GROQ_API_KEY` ← required for Phase 3.5 query distillation (query-distill.ts). If missing, distillation silently degrades to the raw search path (feature inert, logs only). In .env.local + Railway since 2026-06-07 — verify on Railway before merging Phase 3.5.
 - `RECALL_AI_API_KEY`
 - `STRIPE_SECRET_KEY`
