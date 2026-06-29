@@ -1,4 +1,14 @@
 
+## Session: 2026-06-29
+
+### Centralize model IDs + add a deprecation canary — a retired model silently broke a live feature
+**What happened:** The Coach (`ai/chat/route.ts`) 502'd on every call because it was pinned to `claude-sonnet-4-20250514`, which Anthropic deprecated-with-notice and RETIRED ~June 15. Nobody noticed until Sebastian hit it on a live call — model IDs are scattered as string literals across ~6 routes and this one never moved to `claude-sonnet-4-6` when the others did.
+**Rule:** Never scatter model IDs as literals. Keep ONE source of truth (`models.ts`) every route imports, and run a daily canary that checks each model via Anthropic's Models API (`GET /v1/models`) + alerts on deprecation. Models get months of notice + an email to the account owner — make sure that inbox is watched. When asked about any model/limit/deprecation, consult the claude-api skill (it caught that Sonnet 4.6's cache minimum is 2,048, not the 1,024 I'd misremembered).
+
+### Verify an eval over MULTIPLE runs before trusting a delta — the AI judge is stochastic
+**What happened:** A single eval run made anchors look like a clear win; another run made them look like a loss. Only running it 3× revealed the truth: the arms are tied within judge noise AND anchors carried a fabrication tail one run hid. I'd told Sebastian "anchors, zero downside" off too few runs and had to walk it back.
+**Rule:** Never decide off one eval run when the grader is an LLM. Run N times, look at run-to-run variance, treat small composite deltas as noise. Lead with the honest read even when it corrects an earlier claim. For tonality, per-scenario reads + the human judge beat the aggregate.
+
 ## Session: 2026-06-15
 
 ### Label latency by its REAL component — don't call a number "search" when it's mostly a network embed

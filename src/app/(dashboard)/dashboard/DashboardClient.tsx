@@ -521,10 +521,14 @@ export default function DashboardClient({
 
       const data = await res.json();
 
-      if (data.signal_header && typeof window !== "undefined" && window.wingman) {
+      // Gate on the card CONTENT, not signal_header — the objection card is headless
+      // (signal_header:"" with the line in signal_text), so gating on the header would
+      // treat a real card as a failure and show the retry pill. (Plan review C2/C3.)
+      const cardText = data.signal_text || data.signal_header;
+      if (cardText && typeof window !== "undefined" && window.wingman) {
         // Card arrived — the HUD clears the pill as showSignal's first action.
         window.wingman.sendSignal({
-          header: data.signal_header,
+          header: data.signal_header ?? "",
           text:   data.signal_text   ?? "",
           type:   data.signal_type   ?? "Handle",
         });

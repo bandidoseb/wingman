@@ -9,16 +9,15 @@
  *   - slot              : "objection" | "answer" | "dig" | "close"
  *   - current_stage     : active call stage label
  *
- * Flow (Phase 3.5 — ↑ objection slot):
- *   distillObjection(chunk)                       → Groq llama-3.1-8b-instant, ≤1.5s
- *     found    → searchKnowledge(distilledPhrase, 0.60) → KB match → generateSignalCard
- *                 (card still written from the FULL 120s chunk — the distilled phrase
- *                 is only the search query) · no match → generateFallbackCard grounded
- *                 in the distilled objection
+ * Flow (↑ objection slot — context-driven, NO KB since 2026-06-28):
+ *   distillObjection(chunk)            → Groq llama-3.1-8b-instant, ≤1.5s — NUDGE GATE ONLY
  *     not found → generateNudgeCard — honest "No objection caught" + one true pointer
  *                 (ALWAYS returns a card; quality gate against guess cards)
- *     null      → Groq down/timeout → degraded raw-chunk search (cache skipped)
- *   Other slots (answer/dig/close): raw-chunk path unchanged until Phase 4.
+ *     found / null → generateObjectionCard (Sonnet) — ONE first-person line from the
+ *                 Belief Ladder summary + 120s buffer (+ the distilled objection when
+ *                 found). No embed, no KB. Headless: signal_header:"" + the line in
+ *                 signal_text, signal_type:"Objection".
+ *   Other slots (answer/dig/close): raw-chunk KB path unchanged until Phase 4.
  *   → returns { ok, signal_header, signal_text, signal_type } in the HTTP body
  *
  * The card is delivered synchronously in the response (not via Pusher).
@@ -43,12 +42,7 @@ import { generateSignalCard,
          NUDGE_HEADLINE,
          NUDGE_STATIC_SUBTEXT,
          type SignalCardResult }       from "@/lib/wingman/knowledge-signal";
-
-// Similarity threshold for DISTILLED queries. Lower than the raw path's 0.65 on
-// purpose: the distilled phrase is short + objection-shaped (same shape as the KB
-// triggers) and only exists when Groq confirmed a real objection — probes 2026-06-11
-// put honest matches at 0.60–0.75 and noise at ≤0.51. Dial: Beta Tuning Parameters.md.
-const DISTILLED_SIMILARITY_THRESHOLD = 0.60;
+import { generateObjectionCard }       from "@/lib/wingman/objection-signal";
 
 // Valid slot values — anything else defaults to "objection"
 const VALID_SLOTS = ["objection", "answer", "dig", "close"] as const;
@@ -133,33 +127,19 @@ export async function POST(req: NextRequest) {
     let   distillMs  = 0;
     let   searchMs   = 0;
     let   generateMs = 0;
-    let   branch: "kb" | "fallback-grounded" | "nudge" | "raw-fallback" | "raw-kb" = "raw-kb";
+    let   branch: "objection" | "objection-nogate" | "kb" | "fallback-grounded" | "nudge" | "raw-fallback" | "raw-kb" = "raw-kb";
     let   card: SignalCardResult | null = null;
+    let   objectionLine: string | null = null;   // headless single-line objection card
 
     if (activeSlot === "objection") {
+      // Distiller stays ONLY as the nudge gate — it tells us whether a real objection
+      // is standing. The card itself is now the context-driven Sonnet line, NO KB
+      // (cut 2026-06-28; the KB stays for the Wingman Coach only).
       const t0 = Date.now();
       const distilled = await distillObjection(transcript_chunk);
       distillMs = Date.now() - t0;
 
-      if (distilled === null) {
-        // Groq down/timeout — degrade to the raw-chunk path. Cache is skipped:
-        // the near-static raw-buffer cache key can serve the PREVIOUS objection's
-        // technique for a new one (see knowledge-search.ts).
-        branch = "raw-fallback";
-        const t1 = Date.now();
-        const knowledgeResults = await searchKnowledge(transcript_chunk, { skipCache: true });
-        searchMs = Date.now() - t1;
-
-        const t2 = Date.now();
-        if (knowledgeResults) {
-          card = await generateSignalCard(knowledgeResults, transcript_chunk, summary, current_stage);
-        }
-        if (!card) {
-          card = await generateFallbackCard(activeSlot, transcript_chunk, summary, current_stage);
-        }
-        generateMs = Date.now() - t2;
-
-      } else if (!distilled.found) {
+      if (distilled && !distilled.found) {
         // Quality gate: NO standing objection in the window — honest nudge.
         // generateNudgeCard ALWAYS returns a card (static fallback inside), so
         // this branch can never fall through to an empty response.
@@ -169,25 +149,13 @@ export async function POST(req: NextRequest) {
         generateMs = Date.now() - t2;
 
       } else {
-        // Real objection extracted — search the KB with the distilled phrase.
-        // The card is still WRITTEN from the full 120s chunk + summary.
-        const t1 = Date.now();
-        const knowledgeResults = await searchKnowledge(distilled.phrase, {
-          threshold: DISTILLED_SIMILARITY_THRESHOLD,
-        });
-        searchMs = Date.now() - t1;
-
+        // A real objection (distilled.found) OR Groq down/timeout (distilled === null,
+        // skip the gate and let Sonnet read the buffer). Either way, write the line.
+        branch = distilled ? "objection" : "objection-nogate";
+        const phrase = distilled && distilled.found ? distilled.phrase : undefined;
         const t2 = Date.now();
-        if (knowledgeResults) {
-          branch = "kb";
-          card = await generateSignalCard(knowledgeResults, transcript_chunk, summary, current_stage);
-        }
-        if (!card) {
-          branch = "fallback-grounded";
-          card = await generateFallbackCard(
-            activeSlot, transcript_chunk, summary, current_stage, distilled.phrase,
-          );
-        }
+        const objCard = await generateObjectionCard(transcript_chunk, summary, phrase);
+        objectionLine = objCard?.line ?? null;
         generateMs = Date.now() - t2;
       }
     } else {
@@ -215,11 +183,20 @@ export async function POST(req: NextRequest) {
       `generate=${generateMs}ms total=${totalMs}ms branch=${branch} idleGap=${idleGap}`,
     );
 
+    // Objection slot with a real objection → the headless single-line card.
+    if (objectionLine) {
+      return NextResponse.json({
+        ok:            true,
+        signal_type:   "Objection",
+        signal_text:   objectionLine,
+        signal_header: "",
+      });
+    }
+
     if (!card) {
-      // Both paths failed (e.g. Haiku timeout / API error) — return empty ok.
-      // DashboardClient treats a missing signal_header as an error and shows
-      // the retry pill (never silent dead air).
-      console.error("[kb-signal] Both KB and fallback generation failed");
+      // Generation failed (timeout / API error / unparseable) — return empty ok.
+      // DashboardClient gates on card content and shows the retry pill (never dead air).
+      console.error("[kb-signal] Card generation failed");
       return NextResponse.json({ ok: true });
     }
 

@@ -48,7 +48,7 @@ This must be run in Terminal after moving the app to /Applications. We should do
 | Web/dashboard | Next.js (App Router) | Dashboard UI, API routes, auth |
 | Live audio | Recall.ai | Joins the call, streams transcript |
 | Transcription | Deepgram (inside Recall.ai) | Speech to text |
-| AI — live | Claude **Sonnet** (objection card — changed from Haiku 2026-06-21; wiring pending) | Signal card generation (objection = context-driven prompt, no KB) |
+| AI — live | Claude **Sonnet** (objection card — SHIPPED 2026-06-29; Haiku still on answer/dig/close) | Signal card generation (objection = context-driven prompt, NO KB; KB kept for the Coach) |
 | AI — post-call | Claude Sonnet | Call grading, debrief, Sales DNA update |
 | Database | Supabase | Users, calls, Sales DNA JSON, KB embeddings |
 | Vector search | pgvector (in Supabase) | KB retrieval — **Wingman Coach only** since 2026-06-21 (no longer live objection cards) |
@@ -197,7 +197,7 @@ A user can:
 
 ## AI Architecture (RAG Pipeline)
 
-> ⚠️ **CHANGING — decided 2026-06-21, wiring pending.** The **objection** card no longer uses this RAG/KB path. It's being replaced by a context-driven prompt — diagnose the weak Belief Ladder belief → uncertainty-first tie-down anchored to the prospect's own words → one line — generated with **Sonnet**, with NO embed/KB retrieval. The KB is kept only for the **Wingman Coach** (Mission Intel). The diagram below still describes the *current code* until the wiring ships (`tasks/wiring-objection-prompt.md` + Decisions Log 2026-06-21).
+> ✅ **SHIPPED 2026-06-29.** The **objection** card no longer uses this RAG/KB path — it's a context-driven **Sonnet** prompt (diagnose the weak Belief Ladder belief → uncertainty-first tie-down anchored to the prospect's own words → one spoken line, NO embed/KB) in `src/lib/wingman/objection-signal.ts`, wired in `kb-signal/route.ts` (the Groq distiller is kept only as the "no standing objection → nudge" gate). The KB stays for the **Wingman Coach** (Mission Intel) and the still-KB answer/dig/close slots. The diagram below describes those OTHER slots (Haiku + KB); the objection slot is Sonnet with no retrieval. Full narrative: `Wingman Brain/01 - Build Log/2026-06-29.md` + Decisions Log 2026-06-29.
 
 ```
 Recall.ai transcript stream
