@@ -1,26 +1,33 @@
 # Current Sprint
 
-Last updated: 2026-06-21
+Last updated: 2026-06-29
 
 This is the first file Claude reads at session start. It answers: where are we, what's next, and what's blocking us.
 
 ---
 
-## 🎯 NEXT SESSION — START HERE (written 2026-06-21)
+## 🎯 NEXT SESSION — START HERE (written 2026-06-29)
 
-**Big shift this session: the KB is being CUT from live objection cards, replaced by a context-driven
-objection prompt running on Sonnet.** Decided + validated offline; NOT wired yet. Full narrative: `2026-06-21.md`.
+**Phase 1 SHIPPED + live-tested:** the objection card is wired to the context-driven Sonnet prompt, KB cut
+from the live path (Coach KB untouched), headless card (small type-tag + one spoken line), moved top-center.
+Full narrative: `2026-06-29.md`. Merged to main → Railway deployed. Built with a proper offline eval harness
+(`scripts/objection-eval*.mjs`) — the shipped prompt is a **merge** of v1's tonality + a no-fabrication fence.
 
-**THE NEXT TASK = wire it.** Read `tasks/wiring-objection-prompt.md` first. In short:
-1. Port the prompt (`scripts/objection-prompt-test.mjs` → `OBJECTION_SYSTEM_PROMPT`, Sonnet) into a prod
-   module `src/lib/wingman/objection-signal.ts`. **Harden the JSON parse** — Sonnet sometimes appends
-   "why this works" commentary that breaks `JSON.parse`.
-2. Rewire the `objection` slot in `kb-signal/route.ts` — drop `searchKnowledge` + the forced-script
-   `generateSignalCard`; call the new generator. Decide the distiller's fate (likely keep its nudge gate,
-   drop the embed/search). **KB stays for the Coach (`searchCoachingKnowledge`) — don't touch it.**
-3. Card-UI change: kill the headline on ALL cards → tiny type-tag + the first-person line. HUD =
-   `electron/hud/index.html` (needs a full `electron:dev` restart + re-stage — lessons 2026-06-05).
-- Plan Review Loop + `plan-reviewer` before code → `wingman-reviewer` on the diff → **live-call gate = done.**
+**TWO things queued, each its own session (pick by priority):**
+1. **Streaming card reveal** — the press-to-card wait (~2.5–3s of Sonnet generation) feels awkward live;
+   streaming shows first words in ~0.5–0.8s. Multi-file: route (drop JSON → raw line) → new IPC delta
+   channel → HUD progressive reveal. Build local-first; verify Railway doesn't buffer SSE. Own plan +
+   `plan-reviewer`. (Deliberately deferred 2026-06-29.)
+2. **Model-resilience (NEW — flagged after a Coach outage):** `ai/chat` was calling a RETIRED model
+   (`claude-sonnet-4-20250514`, retired ~June 15) and silently 502'd. Fix shipped, but the root cause is
+   scattered model-ID literals. Build: (a) one source of truth `src/lib/wingman/models.ts` every route
+   imports, (b) a daily **canary** that checks each model via Anthropic's Models API + alerts on
+   deprecation, (c) watch deprecation emails (`sebastian@meetwingman.ai`). Own session — touches ~6 routes.
+
+**Then:** Phase 2 (confidence-aware summarizer — `belief-ladder.ts`; the now-real `scripts/test-belief-ladder.mjs`
+gate must go GREEN) → Phase 3 (anchor library, with the social-proof fence; needs `calls.anchors` schema).
+Partials (#41 stale-objection) still queued. Anchors deferred — the eval showed no aggregate lift + a
+fabrication tail (now fixed via prompt) — revisit when we want the "it remembered me" magic.
 
 **Why (decided 2026-06-21, Decisions Log):** the KB of public sales advice added no distinguishable value
 on a blind A/B (12 objections) and its forced-script rule hurt cards; the moat is the per-rep Belief

@@ -154,9 +154,10 @@
     ══════════════════════════════════════════════════════════════════════ */
     #signalBubble {
       position: absolute;
-      bottom: 80px;
-      left: 32px;
-      width: 340px;
+      top: 64px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 420px;
       z-index: 100;
       display: none;
       flex-direction: column;
@@ -196,6 +197,15 @@
       line-height: 1.2;
       letter-spacing: -0.01em;
       color: rgba(255, 255, 255, 0.93);
+    }
+
+    /* Headless card (objection slot) — a full spoken LINE, not a 5-word headline.
+       Smaller + lighter + more line-height so a ~25-word sentence reads like speech.
+       Dial font-size here to taste. */
+    .signal-card.headless #signalText {
+      font-size: 18px;
+      font-weight: 600;
+      line-height: 1.4;
     }
 
     /* Support text — shown for objection/close cards only, read during pause */
@@ -637,8 +647,9 @@
     ══════════════════════════════════════════════════════════════════════ */
     #compassMenu {
       position: absolute;
-      bottom: 100px;
-      left: 32px;
+      top: 64px;
+      left: 50%;
+      transform: translateX(-50%);
       z-index: 110;
       display: none;
       flex-direction: column;
@@ -728,8 +739,9 @@
        states share the element. Same corner as the compass it replaces. */
     #summonPill {
       position: absolute;
-      bottom: 100px;
-      left: 32px;
+      top: 64px;
+      left: 50%;
+      transform: translateX(-50%);
       z-index: 109;
       display: none;
       align-items: center;
@@ -925,6 +937,7 @@
       'Handle':  { cls: 'suggest', label: 'Suggest' },
       'Topic':   { cls: 'topic',   label: 'Topic'   },
       'Suggest': { cls: 'suggest', label: 'Suggest' },
+      'Objection': { cls: 'suggest', label: 'Objection' },
     };
 
     // ── State ─────────────────────────────────────────────────────────────
@@ -1444,8 +1457,10 @@
         signalSupportEl.classList.remove('visible');
       }
 
-      // Show card, hide ambient dot
+      // Show card, hide ambient dot. Headless cards (objection slot — a full spoken
+      // line, no <=5-word headline) get the smaller conversational text style.
       signalBubble.className = 'signal-card visible';
+      if (!signal.header) signalBubble.classList.add('headless');
       ambientDot.classList.remove('visible');
       signalActive = true;
 

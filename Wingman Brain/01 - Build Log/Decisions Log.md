@@ -2,11 +2,31 @@
 
 A running log of every major architectural or product decision made on Wingman. Append only — never delete. Each entry captures the decision, the date, the reasoning, and any alternatives that were rejected.
 
-Last updated: 2026-06-21
+Last updated: 2026-06-29
 
 ---
 
 ## 2026
+
+### 2026-06-29 — Objection card SHIPPED; production prompt = v1 tonality + a spliced no-fabrication fence (a MERGE)
+**Decision:** Ship the 2026-06-21 objection prompt's TONALITY verbatim, but splice in an explicit accuracy section ("USING THEIR DETAILS — NEVER MAKE ANYTHING UP": no invented/rounded/sharpened numbers, no invented social proof, confidence-gated digits, anchor-only-when-it-sharpens). The fence existed only in a v2 rewrite that was otherwise rejected; the body is v1.
+**Why:** A multi-run offline eval (`scripts/objection-eval.mjs`, AI judge for volume + Sebastian as final tonality judge) showed the v2 rewrite did NOT beat v1 on tonality (tied; v1 edged it) — but v1 lacked any no-fabrication rule. The merge keeps the proven voice and adds the guardrail. Built + validated offline before wiring (zero live risk). **Methodology baked in:** objection-prompt work is now eval-driven — scored rubric, change one variable, re-run for variance — not vibes.
+
+### 2026-06-29 — Anchor library ("it remembered me" store) DEFERRED, not killed
+**Decision:** Do not build the persistent per-prospect anchor library yet. Keep the design; revisit as a guarded Phase 3.
+**Why:** Across eval runs, structured anchors gave NO aggregate quality lift (within judge noise) AND carried a fabrication tail (~1 bad card / 3 runs) until the social-proof fence landed. The real value is per-scenario (a kill-shot detail like "you said you can't go back to a 9-5"), which the AI judge under-measures — that's a live, human call. Build it later WITH the fence (and ideally a deterministic "cite-only-provided-details" check) + a `calls.anchors` schema. The Belief Ladder summary already retains a few verbatim quotes, so little is lost by waiting.
+
+### 2026-06-29 — Objection-card fabrication is prevented at the PROMPT layer, not a runtime validator
+**Decision:** Stop card fabrication with targeted prompt rules; do NOT add a runtime card-validator.
+**Why:** Both observed fabrications were the same move — inventing third-party social proof ("the coaches who hit $X"), not misusing the prospect's own data. One rule ("NEVER invent claims about other people / manufacture social proof") took fabrications from 1/3-runs → 0/3. A deterministic number-validator would NOT have caught it (the leaked figure was a REAL number; the invented part was the *claim*) and would add a latency step. **Rejected:** the validator, on Sebastian's (correct) push that a text rule can fix this.
+
+### 2026-06-29 — No prompt caching on the live objection card
+**Decision:** Do not cache the objection-card system prompt; do not pad it to become cacheable.
+**Why:** Sonnet 4.6's minimum cacheable prefix is **2,048 tokens** (verified via the claude-api skill — the ~1,024 figure is OLDER Sonnet only; an earlier claim of mine was wrong). Our prompt is ~1,700 tok, so caching would never fire. Padding to 2,048 would slow cold-press TTFT, dilute instructions (hurts quality), and save only fractions of a cent. Speed comes from short output + (queued) streaming. Model-coupled — re-check if the model or prompt size changes.
+
+### 2026-06-29 — Model-resilience = central source-of-truth + daily canary (NOT auto-rotate)
+**Decision:** Address model-deprecation risk with (a) one `src/lib/wingman/models.ts` every route imports and (b) a daily **canary** that checks each model via Anthropic's Models API (`GET /v1/models`) and alerts on deprecation — plus watching deprecation emails. Do NOT auto-rotate model IDs.
+**Why:** A retired model (`claude-sonnet-4-20250514`, retired ~June 15) silently 502'd the Coach because model IDs are scattered string literals and one drifted. Auto-rotating to "latest" is risky — new models shift quality/cost and prompts are tuned per-model. Anthropic gives months of notice + emails the account owner, so the fix is: one place to update, automated early warning, and a watched inbox. Own session (touches ~6 routes) — Known Issue #44, Sprint NEXT #2.
 
 ### 2026-06-21 — KB CUT from the live objection/signal-card path (kept for the Wingman Coach only)
 **Decision:** The live press-time objection card no longer uses the KB — no embed, no `searchKnowledge`, no retrieved-script. The KB is retained ONLY for the Wingman Coach / Mission Intel (`searchCoachingKnowledge`).

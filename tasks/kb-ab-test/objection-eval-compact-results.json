@@ -1,0 +1,1952 @@
+{
+  "meta": {
+    "date": "2026-06-28T18:30:53.519Z",
+    "objModel": "claude-sonnet-4-6",
+    "judgeModel": "claude-sonnet-4-6",
+    "dry": false,
+    "compact": true,
+    "n": 30
+  },
+  "agg": {
+    "A": {
+      "tonality": 143,
+      "brevity": 59,
+      "one_beat": 54,
+      "anchored": 53,
+      "right_belief": 59,
+      "no_windup": 60,
+      "composite": 571,
+      "fabrication": 0,
+      "shaky": 0,
+      "n": 30
+    },
+    "B": {
+      "tonality": 146,
+      "brevity": 60,
+      "one_beat": 53,
+      "anchored": 49,
+      "right_belief": 57,
+      "no_windup": 60,
+      "composite": 571,
+      "fabrication": 0,
+      "shaky": 0,
+      "n": 30
+    },
+    "C": {
+      "tonality": 145,
+      "brevity": 59,
+      "one_beat": 55,
+      "anchored": 57,
+      "right_belief": 58,
+      "no_windup": 60,
+      "composite": 579,
+      "fabrication": 0,
+      "shaky": 0,
+      "n": 30
+    },
+    "D": {
+      "tonality": 147,
+      "brevity": 60,
+      "one_beat": 55,
+      "anchored": 54,
+      "right_belief": 57,
+      "no_windup": 60,
+      "composite": 580,
+      "fabrication": 0,
+      "shaky": 0,
+      "n": 30
+    }
+  },
+  "rows": [
+    {
+      "id": 1,
+      "objection": "I need to think about it",
+      "category": "stall",
+      "arms": {
+        "A": {
+          "line": "Jenna, totally — and honestly, what's the part that still feels uncertain? Because it sounds like you already know it's right.",
+          "score": {
+            "tonality": 4,
+            "brevity": 2,
+            "one_beat": 1,
+            "anchored": 1,
+            "right_belief": 2,
+            "no_windup": 2,
+            "fabrication": false,
+            "said_shaky_number": false,
+            "rationale": "Solid human tonality and correctly targets the fear-not-logic stall, but stacks two moves (open question + reframe/tie-down) and misses the chance to anchor to her specific '20k and actual team' quote or the contractor history."
+          }
+        },
+        "B": {
+          "line": "Jenna, totally — and that doesn't quite sound 100%. Be honest with me, what's the part you're actually not sure about?",
+          "score": {
+            "tonality": 5,
+            "brevity": 2,
+            "one_beat": 2,
+            "anchored": 1,
+            "right_belief": 2,
+            "no_windup": 2,
+            "fabrication": false,
+            "said_shaky_number": false,
+            "rationale": "Clean, human, elite closer move — paces then pulls out the real hesitation; loses one anchored point for not tying to a Jenna-specific detail (the contractor story or the 20k goal) but otherwise sharp."
+          }
+        },
+        "C": {
+          "line": "Jenna, I hear you — and that's totally fair. But be honest with me, what's the part you're actually not sure about?",
+          "score": {
+            "tonality": 4,
+            "brevity": 2,
+            "one_beat": 2,
+            "anchored": 1,
+            "right_belief": 1,
+            "no_windup": 2,
+            "fabrication": false,
+            "said_shaky_number": false,
+            "rationale": "Clean human opener and good move to surface the real objection, but misses the known anchor (fear of losing control / contractor history) that could make this land harder instead of fishing generically."
+          }
+        },
+        "D": {
+          "line": "Jenna, totally — and honestly, what part feels uncertain? Because earlier you said money's not the issue and it fits... so what's actually going on?",
+          "score": {
+            "tonality": 4,
+            "brevity": 2,
+            "one_beat": 1,
+            "anchored": 2,
+            "right_belief": 1,
+            "no_windup": 2,
+            "fabrication": false,
+            "said_shaky_number": false,
+            "rationale": "Anchors well to her money comment and sounds human, but stacks two moves — an open question plus a summary push — and asking 'what's actually going on' risks re-opening a resolved objection rather than addressing the known fear of letting g"
+          }
+        }
+      }
+    },
+    {
+      "id": 2,
+      "objection": "It's too expensive",
+      "category": "price",
+      "arms": {
+        "A": {
+          "line": "I hear you — but money aside for a sec, do you actually feel like this gets you past the plateau you've been stuck at?",
+          "score": {
+            "tonality": 5,
+            "brevity": 2,
+            "one_beat": 2,
+            "anchored": 2,
+            "right_belief": 2,
+            "no_windup": 2,
+            "fabrication": false,
+            "said_shaky_number": false,
+            "rationale": "Cleanly sidesteps the price frame and redirects to conviction — anchored to the confirmed two-year plateau with a single commitment question, no fabricated specifics."
+          }
+        },
+        "B": {
+          "line": "Andre, I hear you — money aside for a sec, do you honestly feel like this gets you past the plateau?",
+          "score": {
+            "tonality": 5,
+            "brevity": 2,
+            "one_beat": 2,
+            "anchored": 2,
+            "right_belief": 1,
+            "no_windup": 2,
+            "fabrication": false,
+            "said_shaky_number": false,
+            "rationale": "Sounds elite and human, hits the plateau anchor cleanly, but sidesteps the core weak belief — that $9k is an expense vs. the cost of two more stuck years — so it doesn't fully reframe ROI."
+          }
+        },
+        "C": {
+          "line": "I hear you, Andre — and before we talk numbers, real quick: money aside, do you honestly feel like this gets you out of those 70-hour weeks and stops you being the bottleneck on every job?",
+          "score": {
+            "tonality": 5,
+            "brevity": 2,
+            "one_beat": 2,
+            "anchored": 2,
+            "right_belief": 2,
+            "no_windup": 2,
+            "fabrication": false,
+            "said_shaky_number": false,
+            "rationale": "Textbook value-before-price pivot — pulls Andre's confirmed pain verbatim, isolates the real belief gap (ROI vs. expense), and does it in one clean question with zero fabrication."
+          }
+        },
+        "D": {
+          "line": "Yeah, I hear you — and before we talk price, I gotta ask: money aside, do you honestly feel like this gets you out of the bottleneck and off the tools?",
+          "score": {
+            "tonality": 5,
+            "brevity": 2,
+            "one_beat": 2,
+            "anchored": 2,
+            "right_belief": 2,
+            "no_windup": 2,
+            "fabrication": false,
+            "said_shaky_number": false,
+            "rationale": "Clean permission-ask that sidesteps price to expose the real belief gap — anchored to 'bottleneck' which mirrors Andre's exact pain, natural closer voice throughout."
+          }
+        }
+      }
+    },
+    {
+      "id": 3,
+      "objection": "I don't have the money",
+      "category": "affordability",
+      "arms": {
+        "A": {
+          "line": "Priya, I hear you — so let's figure out if we can actually make the numbers work. What do you have access to right now?",
+          "score": {
+            "tonality": 4,
+            "brevity": 2,
+            "one_beat": 2,
+            "anchored": 1,
+            "right_belief": 2,
+            "no_windup": 2,
+            "fabrication": false,
+            "said_shaky_number": false,
+            "rationale": "Correctly respects the real cash constraint and pivots to problem-solving rather than reframing value, but 'Priya' as opener and 'I hear you' combo is slightly formulaic and the anchor is generic rather than tied to her specific situation."
+          }
+        },
+        "B": {
+          "line": "I hear you, Priya — and I believe you. So let me see what we can actually do on terms, because I don't want that to be what stops you. Can we look at the numbers together?",
+          "score": {
+            "tonality": 5,
+            "brevity": 2,
+            "one_beat": 2,
+            "anchored": 1,
+            "right_belief": 2,
+            "no_windup": 2,
+            "fabrication": false,
+            "said_shaky_number": false,
+            "rationale": "Respects the real constraint, offers terms without slick reframe, sounds human — loses one anchored point for not tying to a confirmed specific like savings draining or $3k/mo reality."
+          }
+        },
+        "C": {
+          "line": "Priya, I hear you — and I believe you. So let's just figure out what's actually possible. What do you have access to right now?",
+          "score": {
+            "tonality": 5,
+            "brevity": 2,
+            "one_beat": 2,
+            "anchored": 2,
+            "right_belief": 2,
+            "no_windup": 2,
+            "fabrication": false,
+            "said_shaky_number": false,
+            "rationale": "Perfectly calibrated to a real cash constraint — validates without dismissing, then opens a practical path forward with one clean question; no fabricated specifics, no reframe that ignores her reality."
+          }
+        },
+        "D": {
+          "line": "Priya, I hear you — and I believe you. So let me ask: is the money the only thing in the way, or is there a part of you that's still not sure this works?",
+          "score": {
+            "tonality": 5,
+            "brevity": 2,
+            "one_beat": 0,
+            "anchored": 1,
+            "right_belief": 0,
+            "no_windup": 2,
+            "fabrication": false,
+            "said_shaky_number": false,
+            "rationale": "The line stacks two moves (confirm money OR reframe to doubt) and worse, it subtly gaslit Priya by implying her real cash objection might just be a belief problem — the ground truth explicitly says this is NOT a smokescreen and must be resp"
+          }
+        }
+      }
+    },
+    {
+      "id": 4,
+      "objection": "I need to talk to my business partner",
+      "category": "authority",
+      "arms": {
+        "A": {
+          "line": "Totally — and is this more of a 'Dave, I'm doing this, heads up' situation, or does he actually need to weigh in before you can move?",
+          "score": {
+            "tonality": 5,
+            "brevity": 2,
+            "one_beat": 2,
+            "anchored": 2,
+            "right_belief": 2,
+            "no_windup": 2,
+            "fabrication": false,
+            "said_shaky_number": false,
+            "rationale": "Nails the real issue — is Dave a true gate or a courtesy call — using Marcus's own dynamic, in a conversational elite-closer frame with no fluff."
+          }
+        },
+        "B": {
+          "line": "Totally — is this you telling Dave what's happening, or does he actually have to approve it?",
+          "score": {
+            "tonality": 5,
+            "brevity": 2,
+            "one_beat": 2,
+            "anchored": 2,
+            "right_belief": 2,
+            "no_windup": 2,
+            "fabrication": false,
+            "said_shaky_number": false,
+            "rationale": "Clean, human, one surgical question that surfaces whether Dave is a formality or a real gate — directly tied to the confirmed 'Dave and I decide together' anchor without fabricating anything."
+          }
+        },
+        "C": {
+          "line": "Totally, I respect that. But real quick — is this you genuinely needing his blessing, or do you already know this is the move and it's more of a heads-up?",
+          "score": {
+            "tonality": 4,
+            "brevity": 2,
+            "one_beat": 1,
+            "anchored": 1,
+            "right_belief": 1,
+            "no_windup": 2,
+            "fabrication": false,
+            "said_shaky_number": false,
+            "rationale": "Clever question but it stacks two framings (blessing vs. heads-up) rather than one clean move, and misreads the ground truth — Dave is a real, legitimate financial decision-maker Marcus himself flagged, so framing it as 'just a heads-up' ri"
+          }
+        },
+        "D": {
+          "line": "Totally — and Marcus, real talk, is Dave gonna tell you no, or is he just gonna want to hear you're confident it's the right call?",
+          "score": {
+            "tonality": 5,
+            "brevity": 2,
+            "one_beat": 2,
+            "anchored": 2,
+            "right_belief": 2,
+            "no_windup": 2,
+            "fabrication": false,
+            "said_shaky_number": false,
+            "rationale": "Nails the real dynamic — Dave as a rubber-stamp vs. a true veto — using Marcus's own words and the confirmed decision structure, delivered in a voice that sounds exactly like an elite closer."
+          }
+        }
+      }
+    },
+    {
+      "id": 5,
+      "objection": "I'm too busy",
+      "category": "time",
+      "arms": {
+        "A": {
+          "line": "Tom, the reason you're slammed right now — that's literally what we're fixing. So what if these calls are what buys you the time back?",
+          "score": {
+            "tonality": 5,
+            "brevity": 2,
+            "one_beat": 2,
+            "anchored": 2,
+            "right_belief": 2,
+            "no_windup": 2,
+            "fabrication": false,
+            "said_shaky_number": false,
+            "rationale": "Nails the core reframe — 'too busy' is the symptom, the program is the cure — in two punchy sentences with a clean tie-down, anchored to Tom's exact situation, zero wind-up."
+          }
+        },
+        "B": {
+          "line": "Tom, the reason you're slammed is exactly what we're fixing — so what if the calls are what buys the time back?",
+          "score": {
+            "tonality": 5,
+            "brevity": 2,
+            "one_beat": 2,
+            "anchored": 2,
+            "right_belief": 2,
+            "no_windup": 2,
+            "fabrication": false,
+            "said_shaky_number": false,
+            "rationale": "Tight, confident reframe that flips 'too busy' into the reason to act, anchored directly to his stated pain — reads like a seasoned closer said it."
+          }
+        },
+        "C": {
+          "line": "Tom, the reason you're slammed is the exact thing we're fixing — so what if a few calls a week are what buy you your time back?",
+          "score": {
+            "tonality": 5,
+            "brevity": 2,
+            "one_beat": 2,
+            "anchored": 2,
+            "right_belief": 2,
+            "no_windup": 2,
+            "fabrication": false,
+            "said_shaky_number": false,
+            "rationale": "Nails the reframe cleanly — uses the objection as proof of the pain, then flips the investment into a time trade, all in one tight beat with zero wind-up."
+          }
+        },
+        "D": {
+          "line": "Tom, the reason you're slammed right now — that's the exact thing we're fixing. So what if the calls are what buy you the time back?",
+          "score": {
+            "tonality": 5,
+            "brevity": 2,
+            "one_beat": 2,
+            "anchored": 2,
+            "right_belief": 2,
+            "no_windup": 2,
+            "fabrication": false,
+            "said_shaky_number": false,
+            "rationale": "Clean reframe that flips the objection into the solution, grounded in Tom's exact situation, tight and natural — reads like a top closer."
+          }
+        }
+      }
+    },
+    {
+      "id": 6,
+      "objection": "What if it doesn't work for me?",
+      "category": "risk",
+      "arms": {
+        "A": {
+          "line": "Yeah — sit in that for a sec, because that's a real feeling. But Dana, you already get your clients results. Why are you the one person you don't believe in?",
+          "score": {
+            "tonality": 5,
+            "brevity": 2,
+            "one_beat": 1,
+            "anchored": 2,
+            "right_belief": 2,
+            "no_windup": 2,
+            "fabrication": false,
+            "said_shaky_number": false,
+            "rationale": "Nails the identity/self-belief core with a razor-sharp reframe anchored to her real proof point, though it stacks a pace + a reframe + a rhetorical question, costing one beat point."
+          }
+        },
+        "B": {
+          "line": "Dana, that's real — and honestly, good that you're nervous, means it matters. But tell me — do you actually believe you can't do this, or are you just scared that you can?",
+          "score": {
+            "tonality": 5,
+            "brevity": 2,
+            "one_beat": 1,
+            "anchored": 1,
+            "right_belief": 2,
+            "no_windup": 2,
+            "fabrication": false,
+            "said_shaky_number": false,
+            "rationale": "Nails the identity/self-belief reframe with a punchy mirror question and human tonality, but stacks a pace + reframe + question making it slightly more than one clean beat, and misses the available anchor (her offline results proving capabi"
+          }
+        },
+        "C": {
+          "line": "Dana, you get your clients results every day — that's not the question. The real thing is, can you do it for yourself?",
+          "score": {
+            "tonality": 5,
+            "brevity": 2,
+            "one_beat": 2,
+            "anchored": 2,
+            "right_belief": 2,
+            "no_windup": 2,
+            "fabrication": false,
+            "said_shaky_number": false,
+            "rationale": "Perfectly names the real objection (self-belief, not capability), anchors to her confirmed offline proof, and lands as one clean mirror — reads exactly like an elite closer."
+          }
+        },
+        "D": {
+          "line": "Yeah — that fear's real, and I'm not gonna brush past it. But Dana, you already get your clients results. So what makes you think you're the one person you can't do it for?",
+          "score": {
+            "tonality": 5,
+            "brevity": 2,
+            "one_beat": 2,
+            "anchored": 2,
+            "right_belief": 2,
+            "no_windup": 2,
+            "fabrication": false,
+            "said_shaky_number": false,
+            "rationale": "Nails the identity reframe with her real proof point; 'I'm not gonna brush past it' is a mild self-narrating wind-up but the rest is elite closer language that directly dismantles her self-doubt anchor."
+          }
+        }
+      }
+    },
+    {
+      "id": 7,
+      "objection": "What makes you different?",
+      "category": "differentiation",
+      "arms": {
+        "A": {
+          "line": "Honestly, Luis — can I flip that? What did the last program not do that you actually needed?",
+          "score": {
+            "tonality": 5,
+            "brevity": 2,
+            "one_beat": 2,
+            "anchored": 2,
+            "right_belief": 2,
+            "no_windup": 2,
+            "fabrication": false,
+            "said_shaky_number": false,
+            "rationale": "Clean permission-ask that redirects to his exact wound — the two failed programs — letting Luis indict them himself instead of the rep claiming differentiation."
+          }
+        },
+        "B": {
+          "line": "Honestly Luis, can I flip that? What did the last program not do that you actually needed — because that's probably the real answer.",
+          "score": {
+            "tonality": 5,
+            "brevity": 2,
+            "one_beat": 2,
+            "anchored": 2,
+            "right_belief": 2,
+            "no_windup": 2,
+            "fabrication": false,
+            "said_shaky_number": false,
+            "rationale": "Textbook redirect that forces Luis to name implementation/accountability himself, directly targeting the weak belief without fabricating anything or over-explaining."
+          }
+        },
+        "C": {
+          "line": "Honestly Luis, can I flip that back on you? The two programs you did — what did they NOT do that you actually needed?",
+          "score": {
+            "tonality": 5,
+            "brevity": 2,
+            "one_beat": 2,
+            "anchored": 2,
+            "right_belief": 2,
+            "no_windup": 2,
+            "fabrication": false,
+            "said_shaky_number": false,
+            "rationale": "Flips to a question that forces Luis to self-identify the implementation gap — exactly the right move, grounded in his confirmed history, no fabrications, sounds like a real closer."
+          }
+        },
+        "D": {
+          "line": "Honestly? Nothing — on paper. Can I ask you something though? Those two programs that were 'all theory, no implementation' — what specifically did they not do that you actually needed?",
+          "score": {
+            "tonality": 5,
+            "brevity": 2,
+            "one_beat": 2,
+            "anchored": 2,
+            "right_belief": 2,
+            "no_windup": 2,
+            "fabrication": false,
+            "said_shaky_number": false,
+            "rationale": "Mirrors his exact quote, disarms with a bold opener, and pivots to a single diagnostic question that forces Luis to articulate the implementation gap himself — textbook elite closer move."
+          }
+        }
+      }
+    },
+    {
+      "id": 8,
+      "objection": "Send me some information",
+      "category": "deflection",
+      "arms": {
+        "A": {
+          "line": "Rachel, totally — but real talk, what's actually going on? Because ten minutes ago you were fired up about this.",
+          "score": {
+            "tonality": 5,
+            "brevity": 2,
+            "one_beat": 2,
+            "anchored": 2,
+            "right_belief": 2,
+            "no_windup": 2,
+            "fabrication": false,
+            "said_shaky_number": false,
+            "rationale": "Nails the conflict-avoidant anchor by reflecting her own energy shift back at her in a warm, direct way — exactly the right move to surface the real concern without pressure."
+          }
+        },
+        "B": {
+          "line": "Rachel, I hear you — but honestly, what's the part you're not feeling 100% on? Because 'send info' usually means something's off.",
+          "score": {
+            "tonality": 4,
+            "brevity": 2,
+            "one_beat": 1,
+            "anchored": 1,
+            "right_belief": 2,
+            "no_windup": 2,
+            "fabrication": false,
+            "said_shaky_number": false,
+            "rationale": "Correctly diagnoses the real issue (something's off post-reveal) and calls it directly in a human tone, but stacks two moves — a permission-ask plus an explicit meta-label of the objection pattern — making it slightly compound; no real anch"
+          }
+        },
+        "C": {
+          "line": "Yeah, totally — and I'll send whatever's helpful. But Rachel, be honest with me, what's the part you're not sure about?",
+          "score": {
+            "tonality": 5,
+            "brevity": 2,
+            "one_beat": 2,
+            "anchored": 1,
+            "right_belief": 2,
+            "no_windup": 2,
+            "fabrication": false,
+            "said_shaky_number": false,
+            "rationale": "Perfectly calibrated for a conflict-avoider — pace + permission disarms the polite deflection and opens the real concern without pressure; slightly generic (no specific anchor to hiring chaos or the price-reveal cool-down) but the move is t"
+          }
+        },
+        "D": {
+          "line": "Yeah, of course — before I do, can I be honest with you? What is it that's actually holding you back right now?",
+          "score": {
+            "tonality": 5,
+            "brevity": 2,
+            "one_beat": 2,
+            "anchored": 1,
+            "right_belief": 2,
+            "no_windup": 2,
+            "fabrication": false,
+            "said_shaky_number": false,
+            "rationale": "Clean permission-ask that surfaces the real objection behind a conflict-avoidant 'send info' deflection — natural, direct, and exactly what a top closer would do here, though it doesn't tie to a specific anchor."
+          }
+        }
+      }
+    },
+    {
+      "id": 9,
+      "objection": "I can do this myself",
+      "category": "diy",
+      "arms": {
+        "A": {
+          "line": "Kev, I believe you — but you could've done it yourself already, right? What's actually stopped you?",
+          "score": {
+            "tonality": 5,
+            "brevity": 2,
+            "one_beat": 1,
+            "anchored": 2,
+            "right_belief": 2,
+            "no_windup": 2,
+            "fabrication": false,
+            "said_shaky_number": false,
+            "rationale": "Nails the anchored history ('could've done it already') and the right belief (self-directed hasn't worked), but stacks two moves — a reframe AND a follow-up question — instead of landing one clean beat."
+          }
+        },
+        "B": {
+          "line": "Kev, I believe you — but you could've done it yourself already. So what's been stopping you?",
+          "score": {
+            "tonality": 5,
+            "brevity": 2,
+            "one_beat": 2,
+            "anchored": 2,
+            "right_belief": 2,
+            "no_windup": 2,
+            "fabrication": false,
+            "said_shaky_number": false,
+            "rationale": "Tight, confident, human — agrees with his pride then immediately flips it using his own confirmed history of abandoned plans; one clean question, no fabrications, no wind-up."
+          }
+        },
+        "C": {
+          "line": "Kev, I get it — and you probably can. But you've started two of these on your own and walked away both times. So what's actually different this time?",
+          "score": {
+            "tonality": 5,
+            "brevity": 2,
+            "one_beat": 2,
+            "anchored": 2,
+            "right_belief": 2,
+            "no_windup": 2,
+            "fabrication": false,
+            "said_shaky_number": false,
+            "rationale": "Textbook pattern-interrupt — validates his pride, then lands his own confirmed history (two abandoned plans) as the reframe, closes with a single question that forces him to confront the gap himself."
+          }
+        },
+        "D": {
+          "line": "Kev, I get it — and you probably could. But you've started two plans on your own and didn't finish them. So what's actually different this time?",
+          "score": {
+            "tonality": 5,
+            "brevity": 2,
+            "one_beat": 2,
+            "anchored": 2,
+            "right_belief": 2,
+            "no_windup": 2,
+            "fabrication": false,
+            "said_shaky_number": false,
+            "rationale": "Textbook elite closer move — paces his pride, then uses his own confirmed history (two abandoned plans) to land a single pointed question that he has to answer honestly."
+          }
+        }
+      }
+    },
+    {
+      "id": 10,
+      "objection": "I've been burned before",
+      "category": "trust",
+      "arms": {
+        "A": {
+          "line": "Marie, I hear you — and that $20k program that left you hanging, what did it not do that you actually needed?",
+          "score": {
+            "tonality": 4,
+            "brevity": 2,
+            "one_beat": 2,
+            "anchored": 2,
+            "right_belief": 2,
+            "no_windup": 2,
+            "fabrication": false,
+            "said_shaky_number": false,
+            "rationale": "Sharp, human, anchored exactly to her $20k ghost experience — opens discovery to surface the unmet need rather than defending; clean single move."
+          }
+        },
+        "B": {
+          "line": "Yeah, that's real — and I respect it. What did that program not do that you actually needed?",
+          "score": {
+            "tonality": 4,
+            "brevity": 2,
+            "one_beat": 2,
+            "anchored": 1,
+            "right_belief": 1,
+            "no_windup": 2,
+            "fabrication": false,
+            "said_shaky_number": false,
+            "rationale": "Solid, human tone and tight delivery, but asking what the program didn't do is a discovery move when the ground truth already told us exactly what went wrong — it sidesteps the $20k ghosting anchor and delays the de-risking that's the actua"
+          }
+        },
+        "C": {
+          "line": "Marie, I'd be scared too — that $20k ghost would make anyone cautious. What did they not do that you actually needed?",
+          "score": {
+            "tonality": 5,
+            "brevity": 2,
+            "one_beat": 2,
+            "anchored": 2,
+            "right_belief": 2,
+            "no_windup": 2,
+            "fabrication": false,
+            "said_shaky_number": false,
+            "rationale": "Perfectly anchored to the confirmed $20k ghost detail, human tone, single diagnostic question — textbook trust-layer opener with no wind-up or fabrication."
+          }
+        },
+        "D": {
+          "line": "Yeah — that $20k and getting ghosted, that's real. What did that mentor not do that you actually needed?",
+          "score": {
+            "tonality": 5,
+            "brevity": 2,
+            "one_beat": 2,
+            "anchored": 2,
+            "right_belief": 2,
+            "no_windup": 2,
+            "fabrication": false,
+            "said_shaky_number": false,
+            "rationale": "Nails the exact confirmed anchor ($20k + ghosted), sounds fully human, asks one clean diagnostic question that opens the trust conversation — textbook elite closer move."
+          }
+        }
+      }
+    },
+    {
+      "id": 11,
+      "objection": "This sounds too good to be true",
+      "category": "skepticism",
+      "arms": {
+        "A": {
+          "line": "Yeah, I hear you — can I ask you something honest? Setting that aside, do you actually believe what we laid out can get you to where you said you wanna be?",
+          "score": {
+            "tonality": 4,
+            "brevity": 2,
+            "one_beat": 1,
+            "anchored": 1,
+            "right_belief": 2,
+            "no_windup": 2,
+            "fabrication": false,
+            "said_shaky_number": false,
+            "rationale": "Smart belief-gap move that correctly targets Sam's disbelief, but it stacks two moves — a dismissal ('setting that aside') plus a conviction-check question — making it slightly compound rather than a clean single beat, and 'where you said y"
+          }
+        },
+        "B": {
+          "line": "Yeah, I'd be skeptical too — so be honest with me, is it that you don't think it's possible at all, or that you don't think it's possible for *you*?",
+          "score": {
+            "tonality": 5,
+            "brevity": 2,
+            "one_beat": 2,
+            "anchored": 1,
+            "right_belief": 2,
+            "no_windup": 2,
+            "fabrication": false,
+            "said_shaky_number": false,
+            "rationale": "Sharp diagnostic question that nails the exact weak belief (possible vs possible for HIM), sounds like a real closer, but doesn't tie to a specific Sam anchor like the trades context or his grinder identity."
+          }
+        },
+        "C": {
+          "line": "Sam, I get it — and that instinct's probably kept you from a lot of BS. Be honest with me though: is it that you don't believe it works, or that you don't believe it works for you specifically?",
+          "score": {
+            "tonality": 5,
+            "brevity": 2,
+            "one_beat": 2,
+            "anchored": 2,
+            "right_belief": 2,
+            "no_windup": 2,
+            "fabrication": false,
+            "said_shaky_number": false,
+            "rationale": "Nails the exact weak belief (it works vs works for HIM), anchors to his grinder/skeptic identity, lands in one clean diagnostic question — textbook elite closer move."
+          }
+        },
+        "D": {
+          "line": "Yeah, I'd say the same thing — so be honest with me, do you actually feel like this can get you to that number and more time with your kids, or does it just sound like noise?",
+          "score": {
+            "tonality": 5,
+            "brevity": 2,
+            "one_beat": 2,
+            "anchored": 2,
+            "right_belief": 2,
+            "no_windup": 2,
+            "fabrication": false,
+            "said_shaky_number": false,
+            "rationale": "Nails the exact weak belief (outcome not realistic for HIM), paces naturally, anchors to his real goal without citing the shaky figure, and flips it back with one clean question."
+          }
+        }
+      }
+    },
+    {
+      "id": 12,
+      "objection": "The timing isn't right",
+      "category": "timing",
+      "arms": {
+        "A": {
+          "line": "Bianca, the busy season you're worried about — isn't that exactly why you came here today?",
+          "score": {
+            "tonality": 5,
+            "brevity": 2,
+            "one_beat": 2,
+            "anchored": 2,
+            "right_belief": 2,
+            "no_windup": 2,
+            "fabrication": false,
+            "said_shaky_number": false,
+            "rationale": "Razor-sharp tie-down that flips her own anxiety into the reason to act now — anchored to Q4 and the real weak belief without a single wasted word."
+          }
+        },
+        "B": {
+          "line": "Bianca, totally hear you — but can I be honest? The season you're worried about missing is exactly what we'd be building for. Starting after it means you already missed it.",
+          "score": {
+            "tonality": 5,
+            "brevity": 2,
+            "one_beat": 2,
+            "anchored": 2,
+            "right_belief": 2,
+            "no_windup": 2,
+            "fabrication": false,
+            "said_shaky_number": false,
+            "rationale": "Hits the exact weakest link from ground truth — 'later' costs her the season — with a clean reframe, grounded in her confirmed timing anchor, and lands in natural closer voice."
+          }
+        },
+        "C": {
+          "line": "Bianca, I hear you — but can I be honest? The reason Q4 feels scary at 18k is exactly what we'd fix. Waiting through it means you hit the same ceiling again.",
+          "score": {
+            "tonality": 5,
+            "brevity": 2,
+            "one_beat": 1,
+            "anchored": 2,
+            "right_belief": 2,
+            "no_windup": 2,
+            "fabrication": false,
+            "said_shaky_number": false,
+            "rationale": "Nails the core reframe (waiting costs her the season) with real anchors and natural closer tone, but slightly stacks two moves — the honest-reframe plus the ceiling consequence — instead of landing one clean beat."
+          }
+        },
+        "D": {
+          "line": "Bianca, totally — and can I be honest with you for a sec? The reason the timing feels off is Q4, right? That season is exactly what this fixes.",
+          "score": {
+            "tonality": 5,
+            "brevity": 2,
+            "one_beat": 2,
+            "anchored": 2,
+            "right_belief": 2,
+            "no_windup": 2,
+            "fabrication": false,
+            "said_shaky_number": false,
+            "rationale": "Clean reframe that flips her Q4 anxiety into the exact reason to move now, with a natural permission-ask opener and no invented specifics."
+          }
+        }
+      }
+    },
+    {
+      "id": 13,
+      "objection": "I need to talk to my spouse",
+      "category": "authority",
+      "arms": {
+        "A": {
+          "line": "Yeah, totally — is that more of a courtesy thing, or do they actually need to weigh in for you to move?",
+          "score": {
+            "tonality": 5,
+            "brevity": 2,
+            "one_beat": 2,
+            "anchored": 2,
+            "right_belief": 2,
+            "no_windup": 2,
+            "fabrication": false,
+            "said_shaky_number": false,
+            "rationale": "Perfectly targets the exact weak link flagged in the ground truth — is the spouse a real gate or courtesy — in natural, elite-closer language with zero fluff."
+          }
+        },
+        "B": {
+          "line": "Yeah, totally — and I'd expect that. Quick question though: is this you needing their blessing, or do you already know this is right and you just wanna loop them in?",
+          "score": {
+            "tonality": 5,
+            "brevity": 2,
+            "one_beat": 2,
+            "anchored": 1,
+            "right_belief": 2,
+            "no_windup": 2,
+            "fabrication": false,
+            "said_shaky_number": false,
+            "rationale": "Nails the real diagnostic — is this a gate or courtesy — with a dead-natural two-option question that real closers use; docks one on anchored since it doesn't tie to any confirmed detail (team-building pain, $22k, their own quote)."
+          }
+        },
+        "C": {
+          "line": "Totally — and is this more of a courtesy call, or do they actually need to weigh in before you decide?",
+          "score": {
+            "tonality": 5,
+            "brevity": 2,
+            "one_beat": 2,
+            "anchored": 2,
+            "right_belief": 2,
+            "no_windup": 2,
+            "fabrication": false,
+            "said_shaky_number": false,
+            "rationale": "Surgically targets the exact weakest link flagged in the ground truth — courtesy vs. real gate — in one clean, human question with no fluff."
+          }
+        },
+        "D": {
+          "line": "Yeah, totally — and I respect that. But real talk, Jordan — is this you genuinely unsure, or do you already know this is the move and just want to loop them in?",
+          "score": {
+            "tonality": 4,
+            "brevity": 2,
+            "one_beat": 1,
+            "anchored": 1,
+            "right_belief": 2,
+            "no_windup": 2,
+            "fabrication": false,
+            "said_shaky_number": false,
+            "rationale": "Sharp belief-diagnosis question that correctly probes whether the spouse consult is a real gate or a courtesy, but stacks two moves (validation pace + binary question) and lacks a specific anchor from Jordan's call facts."
+          }
+        }
+      }
+    },
+    {
+      "id": 14,
+      "objection": "I need to check with my accountant",
+      "category": "authority",
+      "arms": {
+        "A": {
+          "line": "Derek, totally respect that — is this you genuinely needing his sign-off, or is this your call to make and he just handles the paperwork after?",
+          "score": {
+            "tonality": 5,
+            "brevity": 2,
+            "one_beat": 2,
+            "anchored": 2,
+            "right_belief": 2,
+            "no_windup": 2,
+            "fabrication": false,
+            "said_shaky_number": false,
+            "rationale": "Nails the exact weak belief — accountant as logic gate vs. real decision-maker — with a clean binary question that forces Derek to own the call himself, grounded in the ground truth dynamic."
+          }
+        },
+        "B": {
+          "line": "Derek, totally respect that — is that a courtesy call you're making, or does he actually have a say in whether you do this?",
+          "score": {
+            "tonality": 5,
+            "brevity": 2,
+            "one_beat": 2,
+            "anchored": 2,
+            "right_belief": 2,
+            "no_windup": 2,
+            "fabrication": false,
+            "said_shaky_number": false,
+            "rationale": "Nails the real weak belief — accountant is a deferral mechanism, not a real veto — with a sharp, human binary question that forces Derek to own the decision without sounding confrontational."
+          }
+        },
+        "C": {
+          "line": "Totally respect that — and Derek, you literally just said 9 grand isn't the issue. So is this your accountant's call to make, or yours?",
+          "score": {
+            "tonality": 5,
+            "brevity": 2,
+            "one_beat": 2,
+            "anchored": 2,
+            "right_belief": 2,
+            "no_windup": 2,
+            "fabrication": false,
+            "said_shaky_number": false,
+            "rationale": "Nails the real objection — accountant as emotional deferral, not a real financial gate — by quoting Derek's own confirmed words and forcing him to own the decision."
+          }
+        },
+        "D": {
+          "line": "Yeah, totally — and is your accountant gonna tell you whether this gets you to where you wanna be, or is that really your call to make?",
+          "score": {
+            "tonality": 5,
+            "brevity": 2,
+            "one_beat": 2,
+            "anchored": 2,
+            "right_belief": 2,
+            "no_windup": 2,
+            "fabrication": false,
+            "said_shaky_number": false,
+            "rationale": "Nails the exact weak link — accountant as logic gate vs. Derek's real decision — in a conversational, pressure-free question that sounds like a top closer said it."
+          }
+        }
+      }
+    },
+    {
+      "id": 15,
+      "objection": "I tried something like this before and it didn't work",
+      "category": "trust",
+      "arms": {
+        "A": {
+          "line": "Yeah — and that's fair. What did that program not do that you actually needed it to?",
+          "score": {
+            "tonality": 4,
+            "brevity": 2,
+            "one_beat": 2,
+            "anchored": 1,
+            "right_belief": 1,
+            "no_windup": 2,
+            "fabrication": false,
+            "said_shaky_number": false,
+            "rationale": "Tonally solid and clean, but the question opens a rabbit hole about the old program rather than pivoting to her own admitted non-implementation — the real weak link is accountability/her own gap, not what the program failed to deliver."
+          }
+        },
+        "B": {
+          "line": "Yeah, I hear you — what did that program not do that you actually needed it to?",
+          "score": {
+            "tonality": 4,
+            "brevity": 2,
+            "one_beat": 2,
+            "anchored": 1,
+            "right_belief": 1,
+            "no_windup": 2,
+            "fabrication": false,
+            "said_shaky_number": false,
+            "rationale": "Clean, human, one question — but asks what the program lacked rather than surfacing her own admission of non-implementation, which is the real gap and strongest anchor available."
+          }
+        },
+        "C": {
+          "line": "Alyssa, I hear you — and can I be honest for a sec? You mentioned you didn't really implement it last time. So was it that it didn't work, or that it didn't get done?",
+          "score": {
+            "tonality": 5,
+            "brevity": 2,
+            "one_beat": 2,
+            "anchored": 2,
+            "right_belief": 2,
+            "no_windup": 2,
+            "fabrication": false,
+            "said_shaky_number": false,
+            "rationale": "Perfectly anchored to her own admission about non-implementation, one clean reframe question, natural human pace, no fabrications — textbook elite closer move."
+          }
+        },
+        "D": {
+          "line": "Yeah, I hear you — and can I be honest for a sec? You mentioned you didn't really implement it last time. So was it the program, or just that nothing made you actually do it?",
+          "score": {
+            "tonality": 5,
+            "brevity": 2,
+            "one_beat": 2,
+            "anchored": 2,
+            "right_belief": 2,
+            "no_windup": 2,
+            "fabrication": false,
+            "said_shaky_number": false,
+            "rationale": "Perfectly anchored to Alyssa's own admission about non-implementation, one clean reframe that surfaces the accountability gap, and sounds exactly like a top closer would say it live."
+          }
+        }
+      }
+    },
+    {
+      "id": 16,
+      "objection": "Can you do a payment plan or a discount?",
+      "category": "price",
+      "arms": {
+        "A": {
+          "line": "Yeah, Tony, we can work something out — before I do, are you 100% in if we make the numbers work?",
+          "score": {
+            "tonality": 5,
+            "brevity": 2,
+            "one_beat": 2,
+            "anchored": 1,
+            "right_belief": 2,
+            "no_windup": 2,
+            "fabrication": false,
+            "said_shaky_number": false,
+            "rationale": "Textbook commitment-lock before terms — nails the move exactly right for a prospect who's already sold; loses one anchor point for not tying to his specific 'I want to do it' signal or the stepping-back goal."
+          }
+        },
+        "B": {
+          "line": "Yeah, we can work something out on the payment side — if you're fully in, let's lock it and I'll make the numbers work for you.",
+          "score": {
+            "tonality": 5,
+            "brevity": 2,
+            "one_beat": 2,
+            "anchored": 1,
+            "right_belief": 2,
+            "no_windup": 2,
+            "fabrication": false,
+            "said_shaky_number": false,
+            "rationale": "Clean, confident close that correctly reads this as a terms conversation and moves straight to locking the decision — loses one anchored point for not tying to Tony's 'step back' goal or his 'I want to do it' signal."
+          }
+        },
+        "C": {
+          "line": "Yeah, Tony, we can work something out on terms — if you're in, I can split it up. You're good to go?",
+          "score": {
+            "tonality": 4,
+            "brevity": 2,
+            "one_beat": 2,
+            "anchored": 2,
+            "right_belief": 2,
+            "no_windup": 2,
+            "fabrication": false,
+            "said_shaky_number": false,
+            "rationale": "Clean, human, direct — acknowledges terms, uses his name, presupposes the close; no specifics invented and correctly skips the discount ask to move straight to yes."
+          }
+        },
+        "D": {
+          "line": "Yeah, totally — I can work with you on a payment plan. If we split it into two payments, would you be ready to lock it in today?",
+          "score": {
+            "tonality": 5,
+            "brevity": 2,
+            "one_beat": 2,
+            "anchored": 1,
+            "right_belief": 2,
+            "no_windup": 2,
+            "fabrication": false,
+            "said_shaky_number": false,
+            "rationale": "Clean, human, closes correctly on a terms question without re-selling — loses one anchored point for not tying to Tony's 'I want to do it' signal or his step-back goal, but otherwise elite execution."
+          }
+        }
+      }
+    },
+    {
+      "id": 17,
+      "objection": "I'm already working with a coach",
+      "category": "differentiation",
+      "arms": {
+        "A": {
+          "line": "Yeah, totally — and I'm not here to replace anyone. But Nina, you said it's stalled. So is it working?",
+          "score": {
+            "tonality": 5,
+            "brevity": 2,
+            "one_beat": 2,
+            "anchored": 2,
+            "right_belief": 2,
+            "no_windup": 2,
+            "fabrication": false,
+            "said_shaky_number": false,
+            "rationale": "Crisp, elite-closer delivery that disarms loyalty guilt immediately, then lands directly on her own 'stalled' admission with a clean one-beat close question — no fabrications, no shaky numbers, no AI wind-up."
+          }
+        },
+        "B": {
+          "line": "Nina, I hear you — and I respect that. But you said it's stalled. So honestly, is what you're doing right now actually getting you there?",
+          "score": {
+            "tonality": 4,
+            "brevity": 2,
+            "one_beat": 1,
+            "anchored": 2,
+            "right_belief": 2,
+            "no_windup": 2,
+            "fabrication": false,
+            "said_shaky_number": false,
+            "rationale": "Solid anchor to her own 'plateaued' quote and a sharp closing question, but stacks a pace + reframe + question making it slightly more than one beat; 'I respect that' risks sounding slightly formal but overall feels human and on-target."
+          }
+        },
+        "C": {
+          "line": "Yeah, totally — and you said you've kind of plateaued with them. So is that working well enough, or is that why we're talking?",
+          "score": {
+            "tonality": 5,
+            "brevity": 2,
+            "one_beat": 2,
+            "anchored": 2,
+            "right_belief": 2,
+            "no_windup": 2,
+            "fabrication": false,
+            "said_shaky_number": false,
+            "rationale": "Textbook pace-plus-tie-down using her exact words ('kind of plateaued'), lands a single binary question that makes her own the contradiction — clean, human, and fully grounded."
+          }
+        },
+        "D": {
+          "line": "Yeah, totally — and I'm not here to trash that relationship. But you just told me you've plateaued. So honestly, is what you have now actually getting you to that next level?",
+          "score": {
+            "tonality": 5,
+            "brevity": 2,
+            "one_beat": 2,
+            "anchored": 2,
+            "right_belief": 2,
+            "no_windup": 2,
+            "fabrication": false,
+            "said_shaky_number": false,
+            "rationale": "Nails the loyalty guilt with a disarming pace, then pivots straight to her own admitted plateau — clean single-beat question that forces honest self-assessment."
+          }
+        }
+      }
+    },
+    {
+      "id": 18,
+      "objection": "Let me finish my current launch first",
+      "category": "timing",
+      "arms": {
+        "A": {
+          "line": "Greg, totally — can I be honest with you for a sec though? This launch is live right now. Wouldn't you rather have this working for you during it, not after?",
+          "score": {
+            "tonality": 5,
+            "brevity": 2,
+            "one_beat": 2,
+            "anchored": 2,
+            "right_belief": 2,
+            "no_windup": 2,
+            "fabrication": false,
+            "said_shaky_number": false,
+            "rationale": "Tight, human, and directly hits the weakest link — that the program amplifies the live launch rather than competing with it — without inventing any facts."
+          }
+        },
+        "B": {
+          "line": "Greg, real talk — what if this is exactly what makes the launch bigger?",
+          "score": {
+            "tonality": 5,
+            "brevity": 2,
+            "one_beat": 2,
+            "anchored": 2,
+            "right_belief": 2,
+            "no_windup": 2,
+            "fabrication": false,
+            "said_shaky_number": false,
+            "rationale": "Hits the weakest link dead-on — the program amplifies the launch rather than competing with it — in a tight, natural, closer-sounding line with zero fluff."
+          }
+        },
+        "C": {
+          "line": "Greg, real talk — what if this is actually what makes the launch bigger, not something on top of it?",
+          "score": {
+            "tonality": 5,
+            "brevity": 2,
+            "one_beat": 2,
+            "anchored": 2,
+            "right_belief": 2,
+            "no_windup": 2,
+            "fabrication": false,
+            "said_shaky_number": false,
+            "rationale": "Pulls the exact weakest-link reframe from ground truth almost verbatim, delivered conversationally and in a single tight move — near-perfect execution."
+          }
+        },
+        "D": {
+          "line": "Yeah, totally — and can I be honest with you for a sec? What if the thing that makes this launch bigger is exactly what we're talking about right now?",
+          "score": {
+            "tonality": 5,
+            "brevity": 2,
+            "one_beat": 2,
+            "anchored": 2,
+            "right_belief": 2,
+            "no_windup": 2,
+            "fabrication": false,
+            "said_shaky_number": false,
+            "rationale": "Nails the core reframe from the ground truth — the program is what makes the launch bigger, not a competing task — in a natural, human voice with zero fabrication."
+          }
+        }
+      }
+    },
+    {
+      "id": 19,
+      "objection": "I need to see proof or a guarantee",
+      "category": "risk",
+      "arms": {
+        "A": {
+          "line": "Carla, totally fair — can I be honest with you for a sec? The only thing that actually guarantees results is you doing the work. So are you 100% in on that part?",
+          "score": {
+            "tonality": 5,
+            "brevity": 2,
+            "one_beat": 2,
+            "anchored": 1,
+            "right_belief": 2,
+            "no_windup": 2,
+            "fabrication": false,
+            "said_shaky_number": false,
+            "rationale": "Nails the core belief shift — moves guarantee from seller to prospect's control — with clean tonality and a tight commitment question, but misses using Carla's specific risk-averse/wasted-money anchor for a stronger tie-down."
+          }
+        },
+        "B": {
+          "line": "Carla, I hear you — can I be honest for a sec? The only thing that actually guarantees results is you doing the work. So are you in on that part?",
+          "score": {
+            "tonality": 5,
+            "brevity": 2,
+            "one_beat": 2,
+            "anchored": 1,
+            "right_belief": 2,
+            "no_windup": 2,
+            "fabrication": false,
+            "said_shaky_number": false,
+            "rationale": "Nails the weakest link — puts certainty back on what she controls — with elite closer cadence, though it doesn't hook a specific Carla anchor like her fear of wasting money or being capped on time."
+          }
+        },
+        "C": {
+          "line": "Carla, can I be honest? The only thing I can't guarantee is whether you'll actually do the work — so what's really going on, is it the program you're unsure about, or yourself?",
+          "score": {
+            "tonality": 4,
+            "brevity": 2,
+            "one_beat": 1,
+            "anchored": 2,
+            "right_belief": 2,
+            "no_windup": 2,
+            "fabrication": false,
+            "said_shaky_number": false,
+            "rationale": "Nails the trust/risk reframe and ties directly to her fear of a bad bet, but stacks two moves — the work reframe plus a binary question — making it slightly compound."
+          }
+        },
+        "D": {
+          "line": "Carla, can I be honest with you for a sec? The only guarantee that actually matters here is you — so do you genuinely feel like this can get you there?",
+          "score": {
+            "tonality": 5,
+            "brevity": 2,
+            "one_beat": 2,
+            "anchored": 1,
+            "right_belief": 2,
+            "no_windup": 2,
+            "fabrication": false,
+            "said_shaky_number": false,
+            "rationale": "Hits the exact right belief (certainty lives in her doing the work, not an external guarantee) in a natural, elite-closer voice — only misses a point because it doesn't tie to a specific confirmed anchor like her $15k cap or her stated fear"
+          }
+        }
+      }
+    },
+    {
+      "id": 20,
+      "objection": "The economy is too uncertain right now",
+      "category": "timing",
+      "arms": {
+        "A": {
+          "line": "Hassan, I hear you — and can I be honest for a sec? When everyone else pulls back, what happens to the guys who don't?",
+          "score": {
+            "tonality": 5,
+            "brevity": 2,
+            "one_beat": 2,
+            "anchored": 2,
+            "right_belief": 2,
+            "no_windup": 2,
+            "fabrication": false,
+            "said_shaky_number": false,
+            "rationale": "Tight, human, and lands the exact counter-belief — downturns create openings for those who stay in — without inventing any facts."
+          }
+        },
+        "B": {
+          "line": "Hassan, can I be honest? Every competitor you have is saying the exact same thing right now — so who do you think wins when things stabilize?",
+          "score": {
+            "tonality": 5,
+            "brevity": 2,
+            "one_beat": 2,
+            "anchored": 2,
+            "right_belief": 2,
+            "no_windup": 2,
+            "fabrication": false,
+            "said_shaky_number": false,
+            "rationale": "Nails the exact weak belief (fear dressed as macro logic) using the ground-truth gap anchor about competitors pulling back, delivered concisely with a natural permission-ask open and a single rhetorical close."
+          }
+        },
+        "C": {
+          "line": "Hassan, can I be honest? The guys who are gonna eat your market share — they're saying the exact same thing right now.",
+          "score": {
+            "tonality": 5,
+            "brevity": 2,
+            "one_beat": 2,
+            "anchored": 2,
+            "right_belief": 2,
+            "no_windup": 2,
+            "fabrication": false,
+            "said_shaky_number": false,
+            "rationale": "Perfectly calibrated — permission-ask opener, one sharp reframe hitting the exact fear-dressed-as-logic weak belief, anchored to the competitor pullback gap from ground truth, no invented specifics."
+          }
+        },
+        "D": {
+          "line": "Hassan, I hear you — but who do you think gains market share when everyone else pulls back and goes quiet?",
+          "score": {
+            "tonality": 5,
+            "brevity": 2,
+            "one_beat": 2,
+            "anchored": 2,
+            "right_belief": 2,
+            "no_windup": 2,
+            "fabrication": false,
+            "said_shaky_number": false,
+            "rationale": "Hits the exact gap in the ground truth (competitors pulling back = opening) with a single rhetorical question, natural pace, and zero fabrication."
+          }
+        }
+      }
+    },
+    {
+      "id": 21,
+      "objection": "I want to do more research and compare options",
+      "category": "stall",
+      "arms": {
+        "A": {
+          "line": "Beth, can I be honest with you? You've been researching this for a year — at what point does more research become the reason it never happens?",
+          "score": {
+            "tonality": 5,
+            "brevity": 2,
+            "one_beat": 2,
+            "anchored": 2,
+            "right_belief": 2,
+            "no_windup": 2,
+            "fabrication": false,
+            "said_shaky_number": false,
+            "rationale": "Nails the core weak belief (research-as-avoidance) with a direct anchor to her confirmed year of inaction, delivered in a single reframe question with a natural permission-ask opener."
+          }
+        },
+        "B": {
+          "line": "Beth, you've been researching this for a year — at what point does more research become the reason nothing changes?",
+          "score": {
+            "tonality": 5,
+            "brevity": 2,
+            "one_beat": 2,
+            "anchored": 2,
+            "right_belief": 2,
+            "no_windup": 2,
+            "fabrication": false,
+            "said_shaky_number": false,
+            "rationale": "Nails the exact weak belief — research as avoidance — by mirroring her own confirmed anchor back as a rhetorical question, with zero wind-up and elite-level economy."
+          }
+        },
+        "C": {
+          "line": "Beth, you've been researching this for a year — so what's one more option gonna tell you that you don't already know?",
+          "score": {
+            "tonality": 5,
+            "brevity": 2,
+            "one_beat": 2,
+            "anchored": 2,
+            "right_belief": 2,
+            "no_windup": 2,
+            "fabrication": false,
+            "said_shaky_number": false,
+            "rationale": "Nails the exact weak belief (more research = better decision) using her own confirmed anchor (a year of no movement), delivered in one sharp rhetorical question with zero fluff."
+          }
+        },
+        "D": {
+          "line": "Beth, totally — and can I be honest with you for a sec? You've been researching this same problem for a year. At what point does more research become the thing that's keeping you stuck?",
+          "score": {
+            "tonality": 5,
+            "brevity": 2,
+            "one_beat": 2,
+            "anchored": 2,
+            "right_belief": 2,
+            "no_windup": 2,
+            "fabrication": false,
+            "said_shaky_number": false,
+            "rationale": "Textbook elite closer move — warm pace, permission-ask, then one precise reframe nailing her confirmed year-of-researching anchor and the exact fear-of-being-stuck belief; nothing fabricated, perfectly brief."
+          }
+        }
+      }
+    },
+    {
+      "id": 22,
+      "objection": "I've already spent a lot on this kind of thing",
+      "category": "money",
+      "arms": {
+        "A": {
+          "line": "Yeah — and what did those get you that stuck? Like, what was actually missing?",
+          "score": {
+            "tonality": 5,
+            "brevity": 2,
+            "one_beat": 2,
+            "anchored": 2,
+            "right_belief": 2,
+            "no_windup": 2,
+            "fabrication": false,
+            "said_shaky_number": false,
+            "rationale": "Tight, human, elite-closer move — opens with a natural pace then fires a single diagnostic question that leads Omar to name the missing accountability himself, perfectly targeting the weakest link without stating any specifics."
+          }
+        },
+        "B": {
+          "line": "Yeah — and what did all of it have in common that made it not stick?",
+          "score": {
+            "tonality": 5,
+            "brevity": 2,
+            "one_beat": 2,
+            "anchored": 2,
+            "right_belief": 2,
+            "no_windup": 2,
+            "fabrication": false,
+            "said_shaky_number": false,
+            "rationale": "A clean, natural Socratic move that directs Omar to self-discover the missing accountability — exactly the weak belief behind this objection — without stating any unconfirmed specifics."
+          }
+        },
+        "C": {
+          "line": "Omar, I hear you — and what did all of those get you? Be honest.",
+          "score": {
+            "tonality": 4,
+            "brevity": 2,
+            "one_beat": 2,
+            "anchored": 2,
+            "right_belief": 2,
+            "no_windup": 2,
+            "fabrication": false,
+            "said_shaky_number": false,
+            "rationale": "Sharp, direct flip that uses his own name and forces honest self-reflection on the gap — exactly the right belief to attack — though the bluntness of 'be honest' is a slight tonal risk."
+          }
+        },
+        "D": {
+          "line": "Yeah, I hear you — and real talk, can I ask you something? All that stuff you bought... was any of it holding you accountable to actually implement it?",
+          "score": {
+            "tonality": 5,
+            "brevity": 2,
+            "one_beat": 2,
+            "anchored": 2,
+            "right_belief": 2,
+            "no_windup": 2,
+            "fabrication": false,
+            "said_shaky_number": false,
+            "rationale": "Perfectly isolates the accountability gap — the exact missing piece — with a natural human pace and a single surgical question, no fabricated specifics, no shaky numbers."
+          }
+        }
+      }
+    },
+    {
+      "id": 23,
+      "objection": "My niche is unique — a general program won't fit",
+      "category": "skepticism",
+      "arms": {
+        "A": {
+          "line": "Sofia, can I be honest with you for a sec? Every agency owner I've ever talked to says that — and the bottleneck is never the niche. It's always the same thing. Does that feel true to you?",
+          "score": {
+            "tonality": 5,
+            "brevity": 2,
+            "one_beat": 2,
+            "anchored": 2,
+            "right_belief": 2,
+            "no_windup": 2,
+            "fabrication": false,
+            "said_shaky_number": false,
+            "rationale": "Hits the exact weak belief (niche uniqueness vs universal bottleneck), natural permission-ask opener, tight and conversational, ends with a tie-down — textbook elite closer move."
+          }
+        },
+        "B": {
+          "line": "Sofia, every agency owner I've ever talked to says that — and the bottleneck is always the same: it's you in the middle. So be honest, is the niche really the issue, or is it something else?",
+          "score": {
+            "tonality": 5,
+            "brevity": 2,
+            "one_beat": 1,
+            "anchored": 2,
+            "right_belief": 2,
+            "no_windup": 2,
+            "fabrication": false,
+            "said_shaky_number": false,
+            "rationale": "Nails the core reframe (bottleneck is universal, not niche-specific) and uses a sharp tie-down, but stacks two moves — the reframe AND a probing question — making it a hair compound."
+          }
+        },
+        "C": {
+          "line": "Sofia, can I be real with you for a sec? The bottleneck isn't medical billing — it's you doing everything with no systems. That part's the same in every business.",
+          "score": {
+            "tonality": 5,
+            "brevity": 2,
+            "one_beat": 2,
+            "anchored": 2,
+            "right_belief": 2,
+            "no_windup": 2,
+            "fabrication": false,
+            "said_shaky_number": false,
+            "rationale": "Textbook reframe — names her real bottleneck directly, ties to the confirmed ground truth that the constraint is universal, and does it in one clean move with a natural permission-ask opener."
+          }
+        },
+        "D": {
+          "line": "Sofia, can I be honest for a sec? — is it really the niche, or is it that you're the bottleneck and there's no system holding it together without you?",
+          "score": {
+            "tonality": 5,
+            "brevity": 2,
+            "one_beat": 2,
+            "anchored": 2,
+            "right_belief": 2,
+            "no_windup": 2,
+            "fabrication": false,
+            "said_shaky_number": false,
+            "rationale": "Textbook reframe that uses her exact name, permission-asks naturally, then drives straight at the confirmed weakest link — the bottleneck — without inventing a single fact."
+          }
+        }
+      }
+    },
+    {
+      "id": 24,
+      "objection": "I don't want to be locked into a contract",
+      "category": "risk",
+      "arms": {
+        "A": {
+          "line": "Yeah, totally — and honestly, Trent, the lock-in isn't the real thing, is it? It's more like... what if it doesn't work?",
+          "score": {
+            "tonality": 5,
+            "brevity": 2,
+            "one_beat": 2,
+            "anchored": 2,
+            "right_belief": 2,
+            "no_windup": 2,
+            "fabrication": false,
+            "said_shaky_number": false,
+            "rationale": "Perfectly mirrors Trent's actual fear (trapped in something that doesn't work) in natural closer language, with zero fluff and one precise reframe."
+          }
+        },
+        "B": {
+          "line": "Yeah, I get it — but Trent, real talk, six months is exactly why it works. So is the lock-in the issue, or is it that you're not sure it'll actually get you there?",
+          "score": {
+            "tonality": 5,
+            "brevity": 2,
+            "one_beat": 1,
+            "anchored": 2,
+            "right_belief": 2,
+            "no_windup": 2,
+            "fabrication": false,
+            "said_shaky_number": false,
+            "rationale": "Nails the real fear and reframes the commitment correctly, but stacks two moves — a reframe AND a question — where one would be cleaner."
+          }
+        },
+        "C": {
+          "line": "Trent, I get it — so be honest with me, is it the six months, or is it 'what if it doesn't actually work?'",
+          "score": {
+            "tonality": 5,
+            "brevity": 2,
+            "one_beat": 2,
+            "anchored": 2,
+            "right_belief": 2,
+            "no_windup": 2,
+            "fabrication": false,
+            "said_shaky_number": false,
+            "rationale": "Nails the real fear (trapped in something that doesn't work) by splitting it from the surface objection (six months), sounds exactly like an elite closer, and stays tight — no fabrication, no shaky numbers."
+          }
+        },
+        "D": {
+          "line": "Trent, totally — so be honest with me, is it the six months, or is it 'what if it doesn't actually work?'",
+          "score": {
+            "tonality": 5,
+            "brevity": 2,
+            "one_beat": 2,
+            "anchored": 2,
+            "right_belief": 2,
+            "no_windup": 2,
+            "fabrication": false,
+            "said_shaky_number": false,
+            "rationale": "Nails the real fear — being trapped in something that doesn't work — by splitting the objection into its two true components, which is exactly the weak belief exposed in the ground truth."
+          }
+        }
+      }
+    },
+    {
+      "id": 25,
+      "objection": "I want to but I'm scared to invest right now",
+      "category": "affordability",
+      "arms": {
+        "A": {
+          "line": "Yeah — that fear is real, and I'm not gonna brush past it. Can I ask you something honestly though? What scares you more — putting down the investment, or still being here at $5k a month six months from now?",
+          "score": {
+            "tonality": 4,
+            "brevity": 1,
+            "one_beat": 1,
+            "anchored": 2,
+            "right_belief": 2,
+            "no_windup": 2,
+            "fabrication": false,
+            "said_shaky_number": false,
+            "rationale": "Tonally strong and anchored to her confirmed $5k figure, but stacks two moves (validation + question) and runs slightly long; the question itself is a solid reframe of her fear but the wind-up ('I'm not gonna brush past it') edges toward se"
+          }
+        },
+        "B": {
+          "line": "Yeah — Maya, that fear makes total sense, honestly. So be real with me: is it the money that's actually the blocker, or is it fear that it won't work?",
+          "score": {
+            "tonality": 5,
+            "brevity": 2,
+            "one_beat": 1,
+            "anchored": 1,
+            "right_belief": 2,
+            "no_windup": 2,
+            "fabrication": false,
+            "said_shaky_number": false,
+            "rationale": "Smart diagnostic question that earns trust and separates real money concerns from fear — matches the 'honesty and steadiness' mandate — but stacks two distinct moves (validate + binary question) instead of one clean beat."
+          }
+        },
+        "C": {
+          "line": "Yeah — that fear makes sense, and I'm not gonna talk you out of it. Honest question though: what scares you more — this investment, or ending up back at a 9-5?",
+          "score": {
+            "tonality": 5,
+            "brevity": 2,
+            "one_beat": 2,
+            "anchored": 2,
+            "right_belief": 2,
+            "no_windup": 2,
+            "fabrication": false,
+            "said_shaky_number": false,
+            "rationale": "Validates fear without slick-talking, anchors directly to her '9-5' quote, and delivers one clean contrast question — exactly right for this prospect's emotional state and the ground truth's honesty directive."
+          }
+        },
+        "D": {
+          "line": "Yeah — I hear you, and that fear makes total sense. But Maya, you said you can't go back to a 9-5. So what happens if you don't make this move?",
+          "score": {
+            "tonality": 5,
+            "brevity": 2,
+            "one_beat": 2,
+            "anchored": 2,
+            "right_belief": 2,
+            "no_windup": 2,
+            "fabrication": false,
+            "said_shaky_number": false,
+            "rationale": "Validates honestly, quotes her exact words, and lands one clean cost-of-inaction question — textbook elite closer move with no slick reframe."
+          }
+        }
+      }
+    },
+    {
+      "id": 26,
+      "objection": "I need to run it by my team",
+      "category": "authority",
+      "arms": {
+        "A": {
+          "line": "Victor, is this actually your call to make, or do they have veto power over a business decision like this?",
+          "score": {
+            "tonality": 4,
+            "brevity": 2,
+            "one_beat": 2,
+            "anchored": 2,
+            "right_belief": 2,
+            "no_windup": 2,
+            "fabrication": false,
+            "said_shaky_number": false,
+            "rationale": "Cuts straight to the real dynamic — Victor's avoidance pattern — with a clean binary that forces him to own the decision, exactly what the ground truth calls for."
+          }
+        },
+        "B": {
+          "line": "Victor, is this a courtesy thing — like you're gonna tell them — or do they actually have a say in this call?",
+          "score": {
+            "tonality": 5,
+            "brevity": 2,
+            "one_beat": 2,
+            "anchored": 2,
+            "right_belief": 2,
+            "no_windup": 2,
+            "fabrication": false,
+            "said_shaky_number": false,
+            "rationale": "Surgically names the real dynamic — his avoidance of personal accountability — in his own frame, with zero wind-up and exactly one incisive question."
+          }
+        },
+        "C": {
+          "line": "Victor, it's your company — so is this a courtesy heads-up to your team, or do they actually have a vote here?",
+          "score": {
+            "tonality": 5,
+            "brevity": 2,
+            "one_beat": 2,
+            "anchored": 2,
+            "right_belief": 2,
+            "no_windup": 2,
+            "fabrication": false,
+            "said_shaky_number": false,
+            "rationale": "Surgical, human, and directly names the real dynamic — his avoidance pattern — by forcing Victor to own whether this is real consultation or deflection, anchored to his own 'it's my company' reality without inventing any facts."
+          }
+        },
+        "D": {
+          "line": "Victor, it's your company though — so is this you genuinely needing their input, or is this more like you wanting the cover if it doesn't work out?",
+          "score": {
+            "tonality": 5,
+            "brevity": 2,
+            "one_beat": 2,
+            "anchored": 2,
+            "right_belief": 2,
+            "no_windup": 2,
+            "fabrication": false,
+            "said_shaky_number": false,
+            "rationale": "Surgically names his real avoidance pattern (wanting cover if it fails) using his own framing, delivered as a calm direct question — textbook elite close."
+          }
+        }
+      }
+    },
+    {
+      "id": 27,
+      "objection": "I'm just not sure I'm ready",
+      "category": "stall",
+      "arms": {
+        "A": {
+          "line": "Renee, I hear you — and honestly, has there ever been a moment in your life where you felt totally ready before doing something big?",
+          "score": {
+            "tonality": 5,
+            "brevity": 2,
+            "one_beat": 2,
+            "anchored": 2,
+            "right_belief": 2,
+            "no_windup": 2,
+            "fabrication": false,
+            "said_shaky_number": false,
+            "rationale": "Perfectly targets the 'nobody feels ready' weak link with a single rhetorical question that lets Renee's own history close the loop — clean, human, no fabrications."
+          }
+        },
+        "B": {
+          "line": "Renee, can I be honest? Nobody ever feels ready — that's not a real signal. So what's the actual thing you're scared of?",
+          "score": {
+            "tonality": 5,
+            "brevity": 2,
+            "one_beat": 1,
+            "anchored": 2,
+            "right_belief": 2,
+            "no_windup": 2,
+            "fabrication": false,
+            "said_shaky_number": false,
+            "rationale": "Nails the core belief perfectly and sounds like a real closer, but stacks two moves — the reframe ('nobody feels ready') plus a follow-up question ('what's the actual thing you're scared of?') — which costs one_beat."
+          }
+        },
+        "C": {
+          "line": "Renee, I hear you — and honestly? Nobody ever feels ready. The coaches who blew past where you are right now — they all started before they felt ready. So what's the part that's actually scaring you?",
+          "score": {
+            "tonality": 5,
+            "brevity": 1,
+            "one_beat": 0,
+            "anchored": 2,
+            "right_belief": 2,
+            "no_windup": 2,
+            "fabrication": false,
+            "said_shaky_number": false,
+            "rationale": "Nails the core belief and anchors to the exact gap in the ground truth, but stacks two moves — the reframe AND a diagnostic question — instead of landing one clean beat; slightly long for a live read."
+          }
+        },
+        "D": {
+          "line": "Renee, honestly — do you think that feeling ever just shows up on its own?",
+          "score": {
+            "tonality": 5,
+            "brevity": 2,
+            "one_beat": 2,
+            "anchored": 2,
+            "right_belief": 2,
+            "no_windup": 2,
+            "fabrication": false,
+            "said_shaky_number": false,
+            "rationale": "Perfectly targets the core weak belief — readiness as a feeling that arrives — with a single Socratic question, human tone, and no fabricated specifics."
+          }
+        }
+      }
+    },
+    {
+      "id": 28,
+      "objection": "How do I know you're not just another guru?",
+      "category": "trust",
+      "arms": {
+        "A": {
+          "line": "None taken — that's a fair shot. What did the last guy not do that actually would've made the difference for you?",
+          "score": {
+            "tonality": 5,
+            "brevity": 2,
+            "one_beat": 2,
+            "anchored": 2,
+            "right_belief": 2,
+            "no_windup": 2,
+            "fabrication": false,
+            "said_shaky_number": false,
+            "rationale": "Masterfully meets the cynicism head-on without defensiveness, flips it back on Reggie with one clean question that surfaces his real standard — exactly what the ground truth calls for."
+          }
+        },
+        "B": {
+          "line": "Reggie, fair shot — honestly, what did the last guy not do that you actually needed?",
+          "score": {
+            "tonality": 5,
+            "brevity": 2,
+            "one_beat": 2,
+            "anchored": 2,
+            "right_belief": 2,
+            "no_windup": 2,
+            "fabrication": false,
+            "said_shaky_number": false,
+            "rationale": "Meets the cynicism head-on with a calm, confident question that flips it back on Reggie and forces him to articulate the real standard — exactly the right move for a trust/authority gap."
+          }
+        },
+        "C": {
+          "line": "Reggie, fair — I'd ask the same thing. Honestly, what did the last guy not do that you needed him to?",
+          "score": {
+            "tonality": 5,
+            "brevity": 2,
+            "one_beat": 2,
+            "anchored": 2,
+            "right_belief": 2,
+            "no_windup": 2,
+            "fabrication": false,
+            "said_shaky_number": false,
+            "rationale": "Meets the cynicism head-on with calm peer energy, flips it back on Reggie with one clean question, no fabricated specifics, no AI wind-up — textbook elite closer move for this exact trust/authority objection."
+          }
+        },
+        "D": {
+          "line": "Fair question — and honestly, you don't yet. So tell me, what did the last one not do that you actually needed?",
+          "score": {
+            "tonality": 5,
+            "brevity": 2,
+            "one_beat": 2,
+            "anchored": 2,
+            "right_belief": 2,
+            "no_windup": 2,
+            "fabrication": false,
+            "said_shaky_number": false,
+            "rationale": "Disarms cynicism perfectly by admitting uncertainty, then flips to a qualifying question that puts it back on him — exactly what the ground truth calls for."
+          }
+        }
+      }
+    },
+    {
+      "id": 29,
+      "objection": "I need to pray on it",
+      "category": "stall",
+      "arms": {
+        "A": {
+          "line": "Grace, I love that — honestly. Before I let you go, is it purely that, or is there any other part of you that's not fully settled yet?",
+          "score": {
+            "tonality": 5,
+            "brevity": 2,
+            "one_beat": 2,
+            "anchored": 2,
+            "right_belief": 2,
+            "no_windup": 2,
+            "fabrication": false,
+            "said_shaky_number": false,
+            "rationale": "Perfectly executes the ground truth's 'weakest link' directive — respects the prayer anchor without rushing it, then gently surfaces whether anything else is holding her back, all in one clean move."
+          }
+        },
+        "B": {
+          "line": "Grace, I love that — and I'd expect nothing less from you. Honestly though, is it just the prayer, or is there something else sitting with you too?",
+          "score": {
+            "tonality": 5,
+            "brevity": 2,
+            "one_beat": 2,
+            "anchored": 2,
+            "right_belief": 2,
+            "no_windup": 2,
+            "fabrication": false,
+            "said_shaky_number": false,
+            "rationale": "Perfectly respects her faith anchor, stays warm and human, then executes the exact move the ground truth calls for — gently surfacing whether anything else is holding her back — in one clean question."
+          }
+        },
+        "C": {
+          "line": "Grace, I respect that completely — that's real. Can I just ask honestly — is there anything else sitting on your heart, or is it purely just taking it to God?",
+          "score": {
+            "tonality": 5,
+            "brevity": 2,
+            "one_beat": 2,
+            "anchored": 2,
+            "right_belief": 2,
+            "no_windup": 2,
+            "fabrication": false,
+            "said_shaky_number": false,
+            "rationale": "Perfectly respects her faith anchor while executing the exact prescribed move — gently surfacing whether anything else is holding her back — in warm, natural, elite-closer language."
+          }
+        },
+        "D": {
+          "line": "Grace, I love that — and I'd never want you to skip that step. Can I just ask, is there anything besides that, sitting in the back of your mind?",
+          "score": {
+            "tonality": 5,
+            "brevity": 2,
+            "one_beat": 2,
+            "anchored": 2,
+            "right_belief": 2,
+            "no_windup": 2,
+            "fabrication": false,
+            "said_shaky_number": false,
+            "rationale": "Perfectly respects her faith anchor, skips wind-up, lands the one prescribed move — surfacing whether anything else is holding her back — in a natural, human closer voice."
+          }
+        }
+      }
+    },
+    {
+      "id": 30,
+      "objection": "Money's really tight right now, but I want this",
+      "category": "affordability",
+      "arms": {
+        "A": {
+          "line": "Diego, I hear you — and I believe you. So let's figure out the numbers together, because 'want this' is the hardest part, and you're already there.",
+          "score": {
+            "tonality": 5,
+            "brevity": 2,
+            "one_beat": 1,
+            "anchored": 1,
+            "right_belief": 2,
+            "no_windup": 2,
+            "fabrication": false,
+            "said_shaky_number": false,
+            "rationale": "Warm, human, and honest — respects the real cash constraint and pivots to a collaborative path, but 'figure out the numbers together' plus 'want this is the hardest part' is two moves, and it doesn't pull in any of Diego's specific anchors "
+          }
+        },
+        "B": {
+          "line": "Diego, I hear you — and I believe you. So let's figure out what actually works right now, 'cause I'm not letting money be the thing that keeps you in that cycle.",
+          "score": {
+            "tonality": 5,
+            "brevity": 2,
+            "one_beat": 2,
+            "anchored": 2,
+            "right_belief": 2,
+            "no_windup": 2,
+            "fabrication": false,
+            "said_shaky_number": false,
+            "rationale": "Honest, warm, zero manipulation — meets the cash-timing constraint head-on by pivoting to a real path, ties directly to the cycle anchor without inventing any facts."
+          }
+        },
+        "C": {
+          "line": "I hear you — and I'm not gonna pretend that away. So let's make the numbers actually work for where you're at right now. What does cash flow look like over the next 30 days?",
+          "score": {
+            "tonality": 5,
+            "brevity": 2,
+            "one_beat": 2,
+            "anchored": 2,
+            "right_belief": 2,
+            "no_windup": 2,
+            "fabrication": false,
+            "said_shaky_number": false,
+            "rationale": "Honest, human, no tricks — directly addresses the cash-timing constraint and opens a real path forward with one clean question."
+          }
+        },
+        "D": {
+          "line": "I hear you — and I respect that, genuinely. So let's figure out what actually works for your cash right now, and see if we can make this happen.",
+          "score": {
+            "tonality": 4,
+            "brevity": 2,
+            "one_beat": 1,
+            "anchored": 1,
+            "right_belief": 2,
+            "no_windup": 2,
+            "fabrication": false,
+            "said_shaky_number": false,
+            "rationale": "Solid human tone and right belief (cash timing, not value), but 'figure out' + 'make this happen' stacks two micro-moves and stays generic when 'truck repair' or 'job to job' were available anchors."
+          }
+        }
+      }
+    }
+  ]
+}

@@ -135,7 +135,7 @@ export interface Call {
 export type CallStageLabel =
   "Rapport" | "Discovery" | "Press" | "Confirm" | "Pitch" | "Close";
 
-export type SignalType = "Alert" | "Nudge" | "Ready" | "Handle";
+export type SignalType = "Alert" | "Nudge" | "Ready" | "Handle" | "Objection";
 export type AiModelPreference = "smart" | "fast";
 export type ObjectionRisk = "low" | "medium" | "high";
 
