@@ -6,6 +6,36 @@ This is the first file Claude reads at session start. It answers: where are we, 
 
 ---
 
+## 🗺️ MASTER ROADMAP — One Unified Plan (added 2026-06-29)
+
+**Why this exists:** two phase-numbering systems were running in parallel and colliding. The "big" **Hotkey Signal-Card Model** (Phases 0–5) and a "small" **objection-card refinement track** (its own Phase 1/2/3, from the 2026-06-21 → 06-29 sessions). They are now merged into ONE list. The small track was always a *deepening of the ↑ objection arrow inside big-model Phase 3* — it's renumbered **Phase 3.6** below. There is now one plan; nothing lives in a second numbering system.
+
+**The arc:** autonomous pop-up cards → rep presses a hotkey → 4-arrow compass (↑ objection · ← answer · ↓ dig · → close) → Wingman generates that one card.
+
+| Phase | What | Status |
+|---|---|---|
+| 0 | Decouple transcript saving | ✅ PR #4 |
+| 1 | Retire live Sonnet poll, stages → post-call | ✅ PR #5 |
+| 2 | Belief Ladder live-call memory | ✅ PR #8 |
+| 3 | Hotkey + 4-arrow compass + **↑ objection slot** | ✅ PR #10 |
+| 3.5 | Groq query distillation + latency fixes | ✅ PR #15 |
+| **3.6** | **↑ Objection slot deepening** *(was the "small" Phase 1/2/3)* | ◐ in progress |
+| &nbsp;&nbsp;3.6a | Sonnet prompt, KB cut, headless top-center card *(was small "Phase 1")* | ✅ shipped 06-29, PR #20 |
+| &nbsp;&nbsp;3.6b | Confidence-aware summarizer — `belief-ladder.ts`; `test-belief-ladder.mjs` gate must go GREEN *(was small "Phase 2")* | 🔲 next in objection track |
+| &nbsp;&nbsp;3.6c | Anchor library — needs `calls.anchors` schema *(was small "Phase 3")* | 🔲 DEFERRED (eval showed no aggregate lift) |
+| **4** | The other 3 arrows: ← answer · ↓ dig deeper · → close readiness | 🔲 not started |
+| **5** | Dead-code removal (#37) + reconcile stale CLAUDE.md rules (#34) | 🔲 not started |
+
+**Cross-cutting work** (not tied to one arrow — slot in between phases):
+- 🚀 **Desktop release** — ship 3.6a to the *packaged* Mac app (`npm version patch`). IMMEDIATE; needs Sebastian's "yes" (Hard Rule #0). Railway web is already live; only the packaged app lags.
+- 🎬 **Streaming card reveal** — mask the ~2.5–3s Sonnet wait; benefits every arrow. Own session.
+- 🛡️ **Model-resilience (#44)** — one `models.ts` source of truth + a daily deprecation canary. Own session.
+- 🩹 **Partials (#41)** — stale-objection correctness bug; really an ↑ objection-slot fix (transcript finalization lag).
+
+**Collision killed:** when an older build log says "Phase 1 shipped" (06-29), it meant **3.6a**, NOT big-model Phase 1. All future logs use the unified numbers above.
+
+---
+
 ## 🎯 NEXT SESSION — START HERE (written 2026-06-29)
 
 **Phase 1 SHIPPED + live-tested:** the objection card is wired to the context-driven Sonnet prompt, KB cut
