@@ -9,14 +9,13 @@
  *   - slot              : "objection" | "answer" | "dig" | "close"
  *   - current_stage     : active call stage label
  *
- * Flow (↑ objection slot — context-driven, NO KB since 2026-06-28):
- *   distillObjection(chunk)            → Groq llama-3.1-8b-instant, ≤1.5s — NUDGE GATE ONLY
- *     not found → generateNudgeCard — honest "No objection caught" + one true pointer
- *                 (ALWAYS returns a card; quality gate against guess cards)
- *     found / null → generateObjectionCard (Sonnet) — ONE first-person line from the
- *                 Belief Ladder summary + 120s buffer (+ the distilled objection when
- *                 found). No embed, no KB. Headless: signal_header:"" + the line in
- *                 signal_text, signal_type:"Objection".
+ * Flow (↑ objection slot — context-driven, NO KB, NO Groq since 2026-06-30):
+ *   generateObjectionCard(chunk, summary) → Sonnet reads the Belief Ladder summary + 120s
+ *                 buffer, infers the objection itself, and returns ONE of:
+ *     status:"line"    → headless card (signal_header:"" + line in signal_text, type:"Objection")
+ *     status:"abstain" → nothing standing → static "No objection detected" nudge (type:"Nudge").
+ *                        This IS the honesty gate now — Sonnet's own call, no extra paid request.
+ *     status:"error"   → empty { ok:true } → the client shows the retry pill (never dead air).
  *   Other slots (answer/dig/close): raw-chunk KB path unchanged until Phase 4.
  *   → returns { ok, signal_header, signal_text, signal_type } in the HTTP body
  *
@@ -24,7 +23,7 @@
  * DashboardClient awaits the response and calls window.wingman.sendSignal().
  *
  * Instrumentation (#38): every request logs
- *   [kb-signal] TIMING distill= search= generate= total= branch= idleGap=
+ *   [kb-signal] TIMING search= generate= total= branch= idleGap=
  * idleGap = seconds since this user's previous press ("first" if none) — this is the
  * connection-cooling probe: if slow presses correlate with long gaps, build the
  * periodic keep-warm (see tasks/todo.md, Phase 3.5 plan).
@@ -35,10 +34,8 @@
 import { NextRequest, NextResponse }   from "next/server";
 import { createClient }                from "@/lib/supabase/server";
 import { searchKnowledge }             from "@/lib/wingman/knowledge-search";
-import { distillObjection }            from "@/lib/wingman/query-distill";
 import { generateSignalCard,
          generateFallbackCard,
-         generateNudgeCard,
          NUDGE_HEADLINE,
          NUDGE_STATIC_SUBTEXT,
          type SignalCardResult }       from "@/lib/wingman/knowledge-signal";
@@ -124,40 +121,32 @@ export async function POST(req: NextRequest) {
 
     // ── Generate the card (Phase 3.5 branching for the ↑ objection slot) ────
     const tPipeline  = Date.now();
-    let   distillMs  = 0;
     let   searchMs   = 0;
     let   generateMs = 0;
-    let   branch: "objection" | "objection-nogate" | "kb" | "fallback-grounded" | "nudge" | "raw-fallback" | "raw-kb" = "raw-kb";
+    let   branch: "objection" | "objection-error" | "kb" | "fallback-grounded" | "nudge" | "raw-fallback" | "raw-kb" = "raw-kb";
     let   card: SignalCardResult | null = null;
     let   objectionLine: string | null = null;   // headless single-line objection card
 
     if (activeSlot === "objection") {
-      // Distiller stays ONLY as the nudge gate — it tells us whether a real objection
-      // is standing. The card itself is now the context-driven Sonnet line, NO KB
-      // (cut 2026-06-28; the KB stays for the Wingman Coach only).
-      const t0 = Date.now();
-      const distilled = await distillObjection(transcript_chunk);
-      distillMs = Date.now() - t0;
+      // NO Groq, NO KB. Sonnet reads the buffer, infers the objection itself, and either
+      // writes the line, abstains (nothing standing), or errors. The Groq distiller that
+      // used to hand in the objection + gate the nudge was removed 2026-06-30 — the eval
+      // showed the hint added nothing and Sonnet abstains reliably (7/7, 0 false-silence).
+      const t2 = Date.now();
+      const objCard = await generateObjectionCard(transcript_chunk, summary);
+      generateMs = Date.now() - t2;
 
-      if (distilled && !distilled.found) {
-        // Quality gate: NO standing objection in the window — honest nudge.
-        // generateNudgeCard ALWAYS returns a card (static fallback inside), so
-        // this branch can never fall through to an empty response.
+      if (objCard.status === "line") {
+        branch = "objection";
+        objectionLine = objCard.line;
+      } else if (objCard.status === "abstain") {
+        // Honesty gate, now Sonnet's own judgment: nothing to handle → the static
+        // "No objection detected" nudge. Never a guess card, and no extra paid call.
         branch = "nudge";
-        const t2 = Date.now();
-        card = await generateNudgeCard(transcript_chunk, summary);
-        generateMs = Date.now() - t2;
-
-      } else {
-        // A real objection (distilled.found) OR Groq down/timeout (distilled === null,
-        // skip the gate and let Sonnet read the buffer). Either way, write the line.
-        branch = distilled ? "objection" : "objection-nogate";
-        const phrase = distilled && distilled.found ? distilled.phrase : undefined;
-        const t2 = Date.now();
-        const objCard = await generateObjectionCard(transcript_chunk, summary, phrase);
-        objectionLine = objCard?.line ?? null;
-        generateMs = Date.now() - t2;
+        card = { headline: NUDGE_HEADLINE, subtext: NUDGE_STATIC_SUBTEXT, source: "" };
       }
+      // else objCard.status === "error": card + objectionLine stay null → falls through
+      // to the failure return below → the client shows the retry pill (never dead air).
     } else {
       // answer / dig / close — raw-chunk path, unchanged until Phase 4.
       const t1 = Date.now();
@@ -179,7 +168,7 @@ export async function POST(req: NextRequest) {
     const totalMs = Date.now() - tPipeline;
     const idleGap = last === 0 ? "first" : `${Math.round((now - last) / 1000)}s`;
     console.log(
-      `[kb-signal] TIMING distill=${distillMs}ms search=${searchMs}ms ` +
+      `[kb-signal] TIMING search=${searchMs}ms ` +
       `generate=${generateMs}ms total=${totalMs}ms branch=${branch} idleGap=${idleGap}`,
     );
 

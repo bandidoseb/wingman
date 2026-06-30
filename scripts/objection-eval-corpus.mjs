@@ -712,4 +712,110 @@ export const SCENARIOS = [
       { tag: "goal", conf: "shaky", text: "wants steady income year-round (figure not confirmed)" },
     ],
   },
+
+  // ───────────────────────────────────────────────────────────────────────────
+  // NO-OBJECTION scenarios (expectAbstain: true). The rep pressed ↑ but nothing is
+  // actually standing — engaged / agreeing / pure logistics / early rapport. The card
+  // MUST return { "line": null } → the static "No objection detected" nudge. These are
+  // deliberately UNAMBIGUOUS so a correct abstain is clear; the 30 above are the
+  // "must NOT abstain" set. (Added 2026-06-30 with the abstain change.)
+  // ───────────────────────────────────────────────────────────────────────────
+  {
+    id: 31,
+    category: "no-objection",
+    objection: "(none — clear yes, ready to buy)",
+    expectAbstain: true,
+    context:
+      "Prospect: Maya, agency owner, ~$25k/mo, engaged and warm the whole call.\n" +
+      "Money confirmed ready; decision hers; no hesitation shown at any point.\n" +
+      "Weakest link: none standing — she's sold and moving to logistics.",
+    transcript:
+      "Rep: So that's everything — six months, the full system. Want to get started today?\n" +
+      "Prospect: Yeah, honestly let's do it — I'm in. What's the best way to handle payment?",
+    anchors: [{ tag: "current", conf: "confirmed", text: "\"about 25k a month\"" }],
+  },
+  {
+    id: 32,
+    category: "no-objection",
+    objection: "(none — plain logistics question)",
+    expectAbstain: true,
+    context:
+      "Prospect: Tomás, e-com store, ~$40k/mo, nodding along, no pushback.\n" +
+      "Rep is walking through how the program runs; prospect just wants a scheduling detail.\n" +
+      "Weakest link: none — this is a logistics question, no worry underneath it.",
+    transcript:
+      "Rep: You'd get the weekly group coaching plus a monthly 1:1.\n" +
+      "Prospect: Got it, that makes sense. What day of the week are the group calls usually on?",
+    anchors: [{ tag: "current", conf: "confirmed", text: "\"around 40k a month\"" }],
+  },
+  {
+    id: 33,
+    category: "no-objection",
+    objection: "(none — early rapport)",
+    expectAbstain: true,
+    context:
+      "Start of the call, building rapport. Nothing sold yet, nothing objected to.\n" +
+      "Prospect: Priya, consultant; relaxed, friendly small talk.\n" +
+      "Weakest link: none — it's pure rapport, no sales tension at all.",
+    transcript:
+      "Rep: Before we jump in — how's your week been going?\n" +
+      "Prospect: Ha, busy but good — just got back from my daughter's soccer tournament, so I'm running on coffee.",
+    anchors: [],
+  },
+  {
+    id: 34,
+    category: "no-objection",
+    objection: "(none — concern already resolved, moving forward)",
+    expectAbstain: true,
+    context:
+      "Prospect: Nadia, coach, ~$12k/mo. Earlier flinched at price; rep walked the ROI; she accepted it and moved on.\n" +
+      "Now actively asking about next steps — the price concern is DEAD, not standing.\n" +
+      "Weakest link: none standing — she resolved it herself and is moving toward starting.",
+    transcript:
+      "Rep: ...so over six months that's what getting your time back is actually worth.\n" +
+      "Prospect: Yeah, okay — when you put it that way the price totally makes sense. So what's the next step to get going?",
+    anchors: [{ tag: "current", conf: "confirmed", text: "\"about 12k a month\"" }],
+  },
+  {
+    id: 35,
+    category: "no-objection",
+    objection: "(none — answering a discovery question)",
+    expectAbstain: true,
+    context:
+      "Mid-discovery. Rep is fact-finding; prospect is openly answering, no resistance.\n" +
+      "Prospect: Kev, freelancer; cooperative, just describing what he's tried.\n" +
+      "Weakest link: none — he's simply answering, no objection or stall.",
+    transcript:
+      "Rep: What have you tried so far to bring in clients?\n" +
+      "Prospect: I ran some Facebook ads last year — did okay for a while — then I hired a VA to handle outreach for a few months.",
+    anchors: [],
+  },
+  {
+    id: 36,
+    category: "no-objection",
+    objection: "(none — excited buying signal)",
+    expectAbstain: true,
+    context:
+      "Prospect: Renee, course creator, ~$18k/mo, leaning in, visibly excited by the pitch.\n" +
+      "No hesitation — she's pulling forward, asking how soon she can start.\n" +
+      "Weakest link: none — this is eagerness, not an objection.",
+    transcript:
+      "Rep: ...and you'd have the full launch system in place by month two.\n" +
+      "Prospect: Oh that's exactly what I've been missing — can I start before the next cohort kicks off?",
+    anchors: [{ tag: "current", conf: "confirmed", text: "\"about 18k a month\"" }],
+  },
+  {
+    id: 37,
+    category: "no-objection",
+    objection: "(none — strong agreement on a tie-down)",
+    expectAbstain: true,
+    context:
+      "Prospect: Marcus, gym owner, ~$22k/mo. Rep tied the solution to his stated goal; he agreed hard.\n" +
+      "No pushback — he confirmed the core value out loud.\n" +
+      "Weakest link: none standing — clear agreement, not a concern.",
+    transcript:
+      "Rep: So if we get the manager trained and the systems in, that's the bottleneck gone — right?\n" +
+      "Prospect: Yeah, 100% — that's literally the whole thing I've been stuck on for two years.",
+    anchors: [{ tag: "current", conf: "confirmed", text: "\"about 22k a month\"" }],
+  },
 ];

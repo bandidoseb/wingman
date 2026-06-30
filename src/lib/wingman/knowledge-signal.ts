@@ -299,7 +299,7 @@ export async function generateFallbackCard(
  * (3s), the static fallback subtext ships instead. The nudge path can never
  * produce dead air or fall through to an empty response. (Plan review BLOCKER 1.)
  */
-export const NUDGE_HEADLINE = "No objection caught";
+export const NUDGE_HEADLINE = "No objection detected";
 export const NUDGE_STATIC_SUBTEXT = "Nothing to handle in the last 2 min — keep going.";
 
 const NUDGE_SYSTEM_PROMPT = `You are Wingman — a real-time AI sales coach for high-ticket phone closers.

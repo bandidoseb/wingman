@@ -10,6 +10,8 @@
  *   C = V2_SYSTEM_PROMPT  (new prompt, + structured anchor library)
  */
 
+import { OBJECTION_SYSTEM_PROMPT } from "../src/lib/wingman/objection-prompt.mjs";
+
 // ─────────────────────────────────────────────────────────────────────────────
 // V1 — the current objection prompt, copied VERBATIM from objection-prompt-test.mjs
 // (validated 2026-06-21). Frozen here so the eval has a stable baseline to beat.
@@ -126,28 +128,17 @@ Return ONLY this JSON object and NOTHING else — no commentary, no "why this wo
 </output>`;
 
 // ─────────────────────────────────────────────────────────────────────────────
-// V3 — the PRODUCTION CANDIDATE (merge). The eval showed v1 has the best tonality
-// but LACKS an explicit no-fabrication / number-confidence rule (those live only in
-// v2). So we keep v1 VERBATIM and splice in one accuracy section right before the
-// tonality block — v1's tonality is untouched, the safety fence is added. This is
-// the string we port to production if the eval confirms it holds tonality.
+// V3 / PRODUCTION — now imported from the SINGLE SOURCE OF TRUTH
+// (src/lib/wingman/objection-prompt.mjs), so the eval grades EXACTLY the string the
+// app ships. The old local splice (V1 + an accuracy section, computed here) is retired:
+// it was a hand-synced duplicate, which is precisely how the gate silently drifted off
+// production. The merged string now lives in one file, imported by production AND here.
 // ─────────────────────────────────────────────────────────────────────────────
-const ACCURACY_SECTION = `USING THEIR DETAILS — NEVER MAKE ANYTHING UP (as important as tonality):
-- Use ONLY details that actually appear in the CALL MEMORY. NEVER invent, assume, round, sharpen, or extrapolate a number, quote, name, or milestone. If a specific isn't in front of you, don't say a specific — speak to the meaning instead.
-- Do NOT build a "ladder" of numbers they didn't say (never turn one figure into "$30k, $50k, $100k"). One real detail, used straight, beats invented scaffolding.
-- NEVER invent claims about OTHER people — other clients, "the coaches who hit $X", "people like you who...", anyone's results or timelines. You know ONLY this prospect. Never manufacture social proof; speak to THEM and what they actually told you.
-- A number is safe to say ONLY if the CALL MEMORY shows it was confirmed — stated clearly AND echoed or repeated. If a figure is unconfirmed, or you're not sure, do NOT say the digits — lean on what it means to them ("a much bigger month", "real freedom"), which lands harder anyway.
-- When you DO have a real, confirmed detail, anchoring to it is your deadliest move: "earlier you told me ___ — so what's really going on?" But anchor ONLY when a real detail sharpens the move — not every objection needs one. If a clean, simple line lands harder, use that; a forced specific is weaker than a clean question.`;
+export const V3_MERGED_PROMPT = OBJECTION_SYSTEM_PROMPT;
 
-export const V3_MERGED_PROMPT = V1_SYSTEM_PROMPT.replace(
-  "TONALITY & READABILITY — THE MOST IMPORTANT PART.",
-  `${ACCURACY_SECTION}\n\nTONALITY & READABILITY — THE MOST IMPORTANT PART.`,
-);
-
-// Fail loud if the splice anchor ever changes — a silent no-op merge would ship v1
-// WITHOUT the fabrication fence (lessons: verify the generated artifact).
+// Sanity: the production string must still carry the no-fabrication fence.
 if (!V3_MERGED_PROMPT.includes("NEVER MAKE ANYTHING UP")) {
-  throw new Error("[objection-prompts] V3 merge failed — TONALITY anchor not found in V1_SYSTEM_PROMPT");
+  throw new Error("[objection-prompts] production prompt is missing the no-fabrication fence");
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -165,7 +156,10 @@ export function formatAnchors(anchors) {
     .join("\n");
 }
 
-export function buildUserMessage(s, { withAnchors }) {
+// omitObjection=true mirrors PRODUCTION after Groq is removed: Sonnet is NOT handed the
+// objection — it must infer it from the transcript (which ends at the objection moment),
+// exactly like the live card will. omitObjection=false = today's prod (Groq hands it in).
+export function buildUserMessage(s, { withAnchors, omitObjection }) {
   const parts = [];
   parts.push(`CALL MEMORY (what we already know about this prospect — lean on this):\n${s.context}`);
   if (withAnchors) {
@@ -173,7 +167,9 @@ export function buildUserMessage(s, { withAnchors }) {
       `PROSPECT ANCHORS (real details from this call — use ONLY these; [confirmed] numbers are safe to say, [shaky] means lean on the meaning, not the digits):\n${formatAnchors(s.anchors)}`,
     );
   }
-  parts.push(`THE OBJECTION THEY JUST RAISED: "${s.objection}"`);
+  if (!omitObjection) {
+    parts.push(`THE OBJECTION THEY JUST RAISED: "${s.objection}"`);
+  }
   parts.push(`WHAT WAS JUST SAID (last ~120s):\n${s.transcript}`);
   return parts.join("\n\n");
 }
