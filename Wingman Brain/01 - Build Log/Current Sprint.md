@@ -32,6 +32,7 @@ This is the first file Claude reads at session start. It answers: where are we, 
 - 🎬 **Streaming card reveal** — mask the ~2.5–3s Sonnet wait; benefits every arrow. Own session.
 - 🛡️ **Model-resilience (#44)** — one `models.ts` source of truth + a daily deprecation canary. Own session.
 - 🩹 **Partials (#41)** — stale-objection correctness bug; really an ↑ objection-slot fix (transcript finalization lag).
+- 🎛️ **Card Placement Studio + Notch Mode** (NEW 2026-06-30, POST-STREAMING) — let the rep choose notch vs floating window + customize size/width/drop/text color/text size, via a drag-to-place mock-Zoom customizer in the dashboard, saved as a per-user preset. Inspired by Moody; we take its look/placement, NOT the teleprompter scrolling. Notch only on some Macs → graceful fallback to top-center. Spec: `_Inbox/2026-06-30 Card Placement Studio + Notch Mode.md`.
 
 **Collision killed:** when an older build log says "Phase 1 shipped" (06-29), it meant **3.6a**, NOT big-model Phase 1. All future logs use the unified numbers above.
 
