@@ -13,7 +13,7 @@ Wingman is a Mac desktop app (Electron + Next.js) that acts as a real-time AI co
 **Repo:** bandidoseb/wingman  
 **Local path:** `/Users/sebastianperez/Desktop/Wingman CC`  
 **Deployed via:** Railway (web/backend auto-deploys on git push). Desktop app needs a release cut.  
-**Current version:** 0.1.19
+**Current version:** 0.1.22
 
 ---
 
@@ -293,13 +293,28 @@ On the PR, two GitHub Actions run automatically:
 Once green and reviewed, merge the PR → **Railway auto-deploys `main`.**
 
 ### Desktop app update (release):
-After the relevant change is merged to `main`:
+⚠️ **`main` is protected by a GitHub ruleset — you CANNOT push the version bump directly to it** (the old `npm version patch; git push --tags` flow fails with a rule violation). Route the bump through a PR, then tag the *merged* commit:
+
 ```bash
 cd "/Users/sebastianperez/Desktop/Wingman CC"
-npm version patch
-git push && git push --tags
+git checkout -b release/vX.Y.Z
+npm version patch                  # bumps package.json, commits, creates local tag vX.Y.Z
+git push -u origin release/vX.Y.Z
+gh pr create --fill               # wait for CI "checks" to pass, then squash-merge
 ```
-GitHub Actions auto-builds, signs, packages .dmg, uploads to GitHub Releases, auto-updates existing installs.
+After merge, the local tag points at the wrong (pre-merge) commit. Re-tag the merged commit — **the tag push is what triggers the build:**
+```bash
+git fetch origin main
+git tag -f vX.Y.Z origin/main
+git push origin vX.Y.Z
+```
+The `release.yml` Action (triggered by the `v*` tag) builds + signs + packages the `.dmg` — **but uploads it as a GitHub DRAFT.** A draft is invisible to downloads and to auto-update, so you must publish it:
+```bash
+gh release edit vX.Y.Z --draft=false
+```
+🚨 **Auto-update does NOT currently work.** Every release was historically left as a draft, so installed apps never saw new versions — Sebastian has always downloaded `Wingman-X.Y.Z-arm64.dmg` from the Releases page manually. **Fixing the auto-updater is a queued priority session — the app cannot ship to beta users until it works.** Until then: publish the release, then download the `.dmg` manually.
+
+> CI not firing on a fresh PR is a known GitHub hiccup — close + reopen the PR (`gh pr close N; gh pr reopen N`) to re-fire the `pull_request` event.
 
 ### Database change:
 Paste SQL in Supabase SQL Editor → Run. No code push needed.
