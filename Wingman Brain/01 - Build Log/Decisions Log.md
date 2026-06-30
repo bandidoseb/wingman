@@ -2,11 +2,19 @@
 
 A running log of every major architectural or product decision made on Wingman. Append only — never delete. Each entry captures the decision, the date, the reasoning, and any alternatives that were rejected.
 
-Last updated: 2026-06-29
+Last updated: 2026-06-30
 
 ---
 
 ## 2026
+
+### 2026-06-30 — Unified the two phase-numbering systems into ONE master roadmap (objection "Phase 1/2/3" → Phase 3.6)
+**Decision:** Collapse the "small" objection-card refinement numbering (its own Phase 1/2/3, from the 06-21 → 06-29 sessions) into the "big" Hotkey Signal-Card Model (Phases 0–5). The small track is renamed **Phase 3.6** — a deepening of the ↑ objection arrow *inside* big-model Phase 3. 3.6a = shipped (Sonnet prompt/KB cut/headless card), 3.6b = confidence-aware summarizer (next), 3.6c = anchor library (deferred). A MASTER ROADMAP table now lives at the top of `Current Sprint.md`; all future build logs use these unified numbers.
+**Why:** Two live numbering systems collided — last session's "Phase 1 shipped" referred to the *small* track, which read as if the big project had restarted, and Sebastian (correctly) couldn't tell whether the larger 1-through-5/6 project was finished. It is not: done through 3.5; **Phase 4 (← answer · ↓ dig · → close) and Phase 5 (cleanup) are still outstanding.** One list prevents work (and progress) from getting lost.
+
+### 2026-06-30 — Desktop releases go through a PR + must be published manually; auto-update is broken (release-blocking)
+**Decision:** The documented `npm version patch; git push --tags` direct-push release flow is dead — `main` is protected by a GitHub ruleset. Releases now route: branch → `npm version patch` → PR → squash-merge → re-tag the merged commit → push tag → **publish the draft** (`gh release edit vX.Y.Z --draft=false`). CLAUDE.md updated to match. Logged **Issue #45**: the auto-updater has never worked (releases built as drafts; Sebastian downloads the `.dmg` by hand) and is **release-blocking for public beta**.
+**Why:** Discovered while cutting v0.1.22 (the first release since June 5 — 6 PRs had merged un-released). Direct push was rejected by the ruleset; the build uploaded as a draft invisible to `electron-updater`. The pipeline must auto-publish + actually deliver updates before any beta user can be onboarded.
 
 ### 2026-06-29 — Objection card SHIPPED; production prompt = v1 tonality + a spliced no-fabrication fence (a MERGE)
 **Decision:** Ship the 2026-06-21 objection prompt's TONALITY verbatim, but splice in an explicit accuracy section ("USING THEIR DETAILS — NEVER MAKE ANYTHING UP": no invented/rounded/sharpened numbers, no invented social proof, confidence-gated digits, anchor-only-when-it-sharpens). The fence existed only in a v2 rewrite that was otherwise rejected; the body is v1.

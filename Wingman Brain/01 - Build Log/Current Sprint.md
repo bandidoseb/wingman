@@ -1,6 +1,6 @@
 # Current Sprint
 
-Last updated: 2026-06-29
+Last updated: 2026-06-30
 
 This is the first file Claude reads at session start. It answers: where are we, what's next, and what's blocking us.
 
@@ -27,7 +27,8 @@ This is the first file Claude reads at session start. It answers: where are we, 
 | **5** | Dead-code removal (#37) + reconcile stale CLAUDE.md rules (#34) | 🔲 not started |
 
 **Cross-cutting work** (not tied to one arrow — slot in between phases):
-- 🚀 **Desktop release** — ship 3.6a to the *packaged* Mac app (`npm version patch`). IMMEDIATE; needs Sebastian's "yes" (Hard Rule #0). Railway web is already live; only the packaged app lags.
+- ✅ **Desktop release v0.1.22** — DONE 2026-06-30. Shipped all 6 un-released PRs since June 5 (Phase 3.5, in-memory KB, objection card 3.6a) into a built + **published** `.dmg`. (Routed via PR — `main` is ruleset-protected; see corrected CLAUDE.md release flow.)
+- 🚨 **Auto-updater fix (#45)** — RELEASE-BLOCKING for beta. Releases build as GitHub *drafts* → `electron-updater` never sees them; Sebastian downloads the `.dmg` by hand every time. Must auto-publish + verify update-on-second-machine before any public distribution. Own session.
 - 🎬 **Streaming card reveal** — mask the ~2.5–3s Sonnet wait; benefits every arrow. Own session.
 - 🛡️ **Model-resilience (#44)** — one `models.ts` source of truth + a daily deprecation canary. Own session.
 - 🩹 **Partials (#41)** — stale-objection correctness bug; really an ↑ objection-slot fix (transcript finalization lag).
@@ -36,7 +37,30 @@ This is the first file Claude reads at session start. It answers: where are we, 
 
 ---
 
-## 🎯 NEXT SESSION — START HERE (written 2026-06-29)
+## 🎯 NEXT SESSION — START HERE (updated 2026-06-30)
+
+**▶ START HERE: Phase 3.6b — confidence-aware summarizer.** Plan is drafted + approved-pending-Sebastian's-yes.
+Add a **confidence-number rule** to `BELIEF_LADDER_SYSTEM_PROMPT` in `src/lib/wingman/belief-ladder.ts`:
+record a figure as digits ONLY when the prospect stated it plainly AND it's confirmed (echoed/affirmed/
+repeated — not hedged with "maybe / like / someday / I guess"); hedged or vague-once numbers → capture the
+*meaning*, drop the digits; never invent a number. **Why:** the summarizer feeds the objection card, so an
+unconfirmed number stored here leaks into a card as a fake-precise anchor (the fabrication risk from 06-29).
+**Gate = `node scripts/test-belief-ladder.mjs`** (3 fixtures, currently RED on purpose) must go GREEN — run
+**3× for stability** (output is stochastic). One file. Then `wingman-reviewer` + ship via PR. Blast radius
+small (prompt-only; summarizer is background ~2 min, never blocks a card).
+
+**✅ Done 2026-06-30 (this session):** cut + **published desktop release v0.1.22** (first since June 5 — shipped
+all 6 un-released PRs incl. 3.6a to a downloadable `.dmg`); merged the two phase-numbering systems into the
+**MASTER ROADMAP** above; corrected CLAUDE.md release flow (PR-based, draft-publish, auto-update warning);
+logged **Issue #45 (auto-updater broken — release-blocking for beta)**. Full narrative: `2026-06-30.md`.
+
+**Other queued sessions (each its own):** 🚨 **auto-updater fix (#45, release-blocking)** · model-resilience
+(#44) · streaming card reveal · partials (#41) · then Phase 3.6c anchor library (deferred) · then **Phase 4**
+(← answer · ↓ dig · → close) + **Phase 5** (cleanup) to finish the big Hotkey Model.
+
+---
+
+### Prior note (2026-06-29) — kept for context
 
 **Phase 1 SHIPPED + live-tested:** the objection card is wired to the context-driven Sonnet prompt, KB cut
 from the live path (Coach KB untouched), headless card (small type-tag + one spoken line), moved top-center.
@@ -456,7 +480,7 @@ This was a **decisions/logging session — no app code changed, nothing pushed.*
 
 ## What's In Progress
 
-- Nothing mid-flight in code. **Phase 3.5 is merged + deployed; its live gate (a real role-play call) is the first task of the next session.** That one call closes three things at once: the Phase 2 ladder-climb watch, the 3.5 acceptance script, and the #38 warm `branch=kb` number.
+- Nothing mid-flight in code. Session ended clean at the v0.1.22 release. Next task = Phase 3.6b (see "NEXT SESSION — START HERE"). The 3.6b plan is drafted + approved-pending-yes; no edits made to `belief-ladder.ts` yet.
 
 ---
 

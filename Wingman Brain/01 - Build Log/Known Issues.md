@@ -1,6 +1,6 @@
 # Known Issues
 
-Last updated: 2026-06-21
+Last updated: 2026-06-30
 
 A running list of known bugs, limitations, and things that need fixing. Add new issues at the top. Update status when resolved. Never delete — mark as Resolved with the date.
 
@@ -10,6 +10,7 @@ A running list of known bugs, limitations, and things that need fixing. Add new 
 
 | #   | Issue | Impact | Status | Notes |
 | --- | ----- | ------ | ------ | ----- |
+| 45 | Auto-updater does not work — releases left as GitHub drafts | **High (release-blocking for beta)** | Open — own session | Confirmed 2026-06-30 while cutting v0.1.22: `release.yml` (electron-builder) uploads every release as a **draft**, and a draft is invisible to both downloads and `electron-updater`. Both v0.1.21 (June 5) and v0.1.22 built as drafts. Sebastian confirmed he has **always downloaded the `.dmg` manually** — auto-update has never actually worked. **The app cannot ship to beta users until this works.** Fix: (a) make `release.yml` publish the release automatically (electron-builder `releaseType: release` / `gh release edit --draft=false` step, or GH_TOKEN publish config), (b) verify `electron-updater` in `electron/main.ts` actually detects + applies a published release on a second machine. Until fixed: publish manually (`gh release edit vX.Y.Z --draft=false`) + download the `.dmg` by hand. |
 | 44 | No model-ID source of truth + no deprecation canary | **Medium** | Open — own session (Sprint NEXT #2) | A RETIRED model silently broke the Coach (#43). Model IDs are scattered as string literals across ~6 routes (`ai/chat`, `kb-signal`/`objection-signal`, `knowledge-signal`, `belief-ladder`, `query-distill`=Groq) and one drifted. Fix: (a) one `src/lib/wingman/models.ts` every route imports; (b) a daily **canary** that checks each model via Anthropic's Models API (`GET /v1/models`) + emails/pings on deprecation; (c) watch deprecation emails to `sebastian@meetwingman.ai`. Anthropic gives months of notice + emails the account — the miss was an unwatched notice, not a surprise removal. |
 | 43 | Ask Wingman / Coach 502 "Couldn't get a response" — stale model | **High** | Resolved 2026-06-29 | `src/app/api/ai/chat/route.ts` called `claude-sonnet-4-20250514` (Sonnet 4), deprecated-with-notice and **retired ~June 15, 2026** → every Coach call 502'd (`not_found_error`, confirmed in the live log). Swapped to `claude-sonnet-4-6` (the current Sonnet every other route uses). Root cause = scattered model IDs → see #44. |
 | 42 | Live objection card ran the OLD KB/Haiku path | Info | Resolved 2026-06-29 — Phase 1 shipped | Wired the context-driven Sonnet prompt (`src/lib/wingman/objection-signal.ts`), cut KB from the objection slot (Coach KB untouched), headless card (type-tag + one line), distiller kept as nudge-gate only. Built via offline eval (`scripts/objection-eval*.mjs`); shipped prompt = v1 tonality + a no-fabrication fence. `wingman-reviewer` APPROVED; web+electron tsc + 59 tests green; live-tested on a real call (`branch=objection`). Also resolves the card-structure half of #34. |
