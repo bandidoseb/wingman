@@ -24,7 +24,11 @@ Full plan hardened via plan-reviewer (2026-06-30). Build order below. We are on 
 - [x] **GATE PASS:** 7/7 correct abstains · 0/30 false-silence on real objections · tonality 4.93 (held) · 0 fabrications · composite 19.57. Web TS 0, 59/59 tests.
 - [x] **2b (live pipeline):** `objection-signal.ts` now returns `line`/`abstain`/`error` (Groq param dropped); `kb-signal/route.ts` removes Groq + wires abstain → static "No objection detected" nudge (`NUDGE_HEADLINE` reworded). `distillObjection` + `generateNudgeCard` now orphaned (→ Phase 5 #37). **wingman-reviewer: APPROVE (0 bugs).** Web+electron TS 0, 59/59 tests. ← awaiting Sebastian's push approval.
 
-## Step 3 — HUD constant-rate reveal (build against current one-shot card first).
+## Step 3 — HUD constant-rate reveal ✅ (built against current one-shot card)
+- [x] rAF drain loop in `electron/hud/index.html` (`startReveal`/`pushRevealText`/`finishReveal`/`revealTick`); buffer-depth-adaptive (proportional ease + linear floor) so it's smooth for both one-shot AND bursty arrival, and terminates.
+- [x] `showSignal` reveals the headless objection line through it; two-tier cards stay instant; `hideSignal` cancels the loop.
+- [x] Verified: frame-sim (one-shot 142ch→750ms, 38ch→483ms, bursty streaming ≤4 chars/frame smooth + terminates), HUD JS syntax OK, electron TS 0, 59/59 tests. Tunables in Beta Tuning Parameters.md §8.
+- [ ] Real visual confirmation comes with the desktop run / Step 5 live test.
 ## Step 4 — Server streaming (envelope opened on the server as it streams) + IPC delta channel + renderer SSE reader.
 ## Step 5 — Harden (seq guard, mid-stream-drop = wipe+retry, dismiss/call-end cancel, isGeneratingRef lifecycle) + wingman-reviewer + live call.
 

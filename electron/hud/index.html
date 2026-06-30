@@ -1429,6 +1429,63 @@
     }
 
     // ── Show a signal card ────────────────────────────────────────────────
+    // ── Constant-rate text reveal ────────────────────────────────────────
+    // Decouples bursty arrival from a smooth on-screen reveal: text lands in
+    // revealTarget, and an rAF loop paints characters at a steady pace. Built and
+    // tuned here against the one-shot card; true streaming (Step 4) feeds growing
+    // text via pushRevealText()/finishReveal(). Big buffers (a full line arriving at
+    // once) reveal over ~0.8–1s via the proportional ease; the linear floor keeps the
+    // tail from crawling. Tunables mirrored in Wingman Brain/Beta Tuning Parameters.md.
+    const REVEAL_MIN_CPS = 45;     // floor chars/sec — the reveal never crawls
+    const REVEAL_EASE    = 0.08;   // proportional catch-up per frame (~0.8–1s to empty a full line)
+
+    let   revealEl       = null;
+    let   revealTarget   = '';
+    let   revealShown    = 0;       // float; floored for display
+    let   revealComplete = true;    // true once no more text will arrive (one-shot: immediately)
+    let   revealRAF      = null;
+    let   revealLastT    = 0;
+
+    function cancelReveal() {
+      if (revealRAF !== null) { cancelAnimationFrame(revealRAF); revealRAF = null; }
+    }
+
+    function startReveal(el, text, complete) {
+      cancelReveal();
+      revealEl       = el;
+      revealTarget   = text || '';
+      revealShown    = 0;
+      revealComplete = complete !== false;   // default true (one-shot)
+      revealLastT    = 0;
+      el.textContent = '';
+      revealRAF = requestAnimationFrame(revealTick);
+    }
+
+    // Streaming (Step 4): grow the target as deltas arrive, then mark it complete on done.
+    function pushRevealText(fullTextSoFar) { if (typeof fullTextSoFar === 'string') revealTarget = fullTextSoFar; }
+    function finishReveal(fullText)        { if (typeof fullText === 'string') revealTarget = fullText; revealComplete = true; }
+
+    function revealTick(t) {
+      if (revealLastT === 0) revealLastT = t;
+      const dt = Math.min(100, t - revealLastT);   // clamp a big gap (e.g. tab was backgrounded)
+      revealLastT = t;
+
+      const remaining = revealTarget.length - revealShown;
+      if (remaining > 0) {
+        const byTime = (REVEAL_MIN_CPS / 1000) * dt;   // linear floor
+        const byEase = remaining * REVEAL_EASE;        // proportional catch-up (smooth on big buffers)
+        revealShown  = Math.min(revealTarget.length, revealShown + Math.max(byTime, byEase));
+        if (revealEl) revealEl.textContent = revealTarget.slice(0, Math.floor(revealShown));
+      }
+
+      if (revealComplete && revealShown >= revealTarget.length) {
+        if (revealEl) revealEl.textContent = revealTarget;   // ensure the exact final text
+        revealRAF = null;
+        return;                                              // done — stop the loop
+      }
+      revealRAF = requestAnimationFrame(revealTick);          // keep going (more text, or still revealing)
+    }
+
     function showSignal(signal) {
       // Phase 3.5: a card arriving resolves the thinking pill — FIRST action,
       // so a deliver-late card also replaces a stale error pill, and a fresh
@@ -1445,16 +1502,24 @@
       // Stage label: use current call stage if available, fallback to type label
       signalTag.textContent = (currentStage || typeInfo.label).toUpperCase();
 
-      // Headline — signal.header is the short actionable phrase (≤5 words)
-      signalTextEl.textContent = signal.header || signal.text || '';
-
-      // Support text — signal.text shown only when header also exists (two-tier cards)
-      if (signal.header && signal.text) {
-        signalSupportEl.textContent = signal.text;
-        signalSupportEl.classList.add('visible');
-      } else {
+      // Text. Headless cards (objection slot) are a full spoken line in signal.text —
+      // reveal it at a smooth constant rate (this is also the seam where true streaming
+      // feeds progressive text in Step 4). Two-tier cards (header + support) stay instant:
+      // they're short ≤5-word directives, not spoken lines.
+      if (!signal.header) {
         signalSupportEl.textContent = '';
         signalSupportEl.classList.remove('visible');
+        startReveal(signalTextEl, signal.text || '');   // one-shot: complete immediately
+      } else {
+        cancelReveal();
+        signalTextEl.textContent = signal.header;
+        if (signal.text) {
+          signalSupportEl.textContent = signal.text;
+          signalSupportEl.classList.add('visible');
+        } else {
+          signalSupportEl.textContent = '';
+          signalSupportEl.classList.remove('visible');
+        }
       }
 
       // Show card, hide ambient dot. Headless cards (objection slot — a full spoken
@@ -1479,6 +1544,7 @@
 
     function hideSignal() {
       clearTimeout(hideSignalTimer);
+      cancelReveal();   // stop any in-progress text reveal so it can't paint after dismiss
       signalBubble.classList.add('hiding');
       signalActive = false;
       currentSignalType = null;
