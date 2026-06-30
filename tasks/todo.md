@@ -29,8 +29,20 @@ Full plan hardened via plan-reviewer (2026-06-30). Build order below. We are on 
 - [x] `showSignal` reveals the headless objection line through it; two-tier cards stay instant; `hideSignal` cancels the loop.
 - [x] Verified: frame-sim (one-shot 142ch→750ms, 38ch→483ms, bursty streaming ≤4 chars/frame smooth + terminates), HUD JS syntax OK, electron TS 0, 59/59 tests. Tunables in Beta Tuning Parameters.md §8.
 - [ ] Real visual confirmation comes with the desktop run / Step 5 live test.
-## Step 4 — Server streaming (envelope opened on the server as it streams) + IPC delta channel + renderer SSE reader.
-## Step 5 — Harden (seq guard, mid-stream-drop = wipe+retry, dismiss/call-end cancel, isGeneratingRef lifecycle) + wingman-reviewer + live call.
+## Step 4 — Server streaming + wiring ← **NEXT SESSION STARTS HERE**
+- [ ] **Server (`objection-signal.ts`):** add a streaming generator — Anthropic `stream:true`, read `content_block_delta`, and **open the JSON envelope as it streams** (emit only the inner `line` chars, never `{`/`"line"`/the closing `}`). Keep the non-streaming `generateObjectionCard` as the pre-first-delta fallback. Detect `{"line":null}` abstain *before emitting any delta* (buffer until the value is disambiguated — the abstain marker must never paint).
+- [ ] **Route (`kb-signal/route.ts`):** objection slot returns an **SSE `Response`** (`Content-Type: text/event-stream`, `Cache-Control: no-cache`, NO `Content-Length`); **return the stream immediately, don't await** (Next.js buffers otherwise); disable compression for this route. Emit `delta` / `done` / `error` events. Rate-limit / empty-transcript / abstain cases emit as a single SSE frame (one response shape for the slot).
+- [ ] **IPC:** new `window.wingman.sendSignalDelta({ seq, textSoFar, type })` → preload `invoke("hud:signal-delta")` → main relays to HUD → HUD `pushRevealText()` (the Step-3 seam). Final authoritative frame still via `sendSignal()` (carry `seq`).
+- [ ] **Renderer (`DashboardClient.tsx` `handleMenuPick`):** read the SSE stream with a **pure `parseSSEBuffer` helper** (new `src/lib/wingman/sse-parse.ts` + Vitest — split-frame, multi-event, split-sentinel cases); forward deltas with a monotonic `seq`; release `isGeneratingRef` ONLY on done/error (single idempotent `release()`).
+
+## Step 5 — Harden + verify (from the plan-reviewer's findings)
+- [ ] Monotonic `seq` checked **at the HUD paint site** — a stale/late stream (or the final frame of an aborted press) can never paint over a newer card. Final `sendSignal` carries `seq` too.
+- [ ] **Mid-stream drop / no app-level `done` = error → WIPE the partial + show retry pill.** Never let the rep read half a spoken line. Wipe is seq-guarded.
+- [ ] Dismiss / call-end mid-stream cancels the reveal (Step-3 `cancelReveal` already wired into `hideSignal`) + drops further deltas for that seq.
+- [ ] Streaming-aware timeout: guard **time-to-first-byte** (~8s) + an idle-gap timeout, NOT a flat 12s wall that would kill a slow-but-alive stream mid-sentence.
+- [ ] `wingman-reviewer` on the diff + a real Zoom call (the true gate). Verify locally first that Next.js streams in `npm run electron:dev` (watch the words trickle).
+
+> Full reviewer rationale for each item: see the plan-review result in the 2026-06-30 session + this file's Locked decisions.
 
 ---
 
