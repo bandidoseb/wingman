@@ -793,6 +793,14 @@ autoUpdater.on("update-downloaded", () => {
     buttons:   ["Restart Now", "Later"],
     defaultId: 0,
   }).then(({ response }) => {
-    if (response === 0) autoUpdater.quitAndInstall();
+    if (response === 0) {
+      // The main-window "close" handler hides (preventDefault) instead of closing
+      // unless isQuitting is set. Without this, quitAndInstall() closes the window
+      // → it only hides → the process stays alive → Squirrel can't swap the bundle
+      // or auto-relaunch (the "had to fully quit 2-3 times" bug). Set the flag first
+      // so the window truly closes and the app terminates + relaunches cleanly.
+      isQuitting = true;
+      autoUpdater.quitAndInstall();
+    }
   });
 });
