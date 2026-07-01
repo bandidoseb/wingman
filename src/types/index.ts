@@ -217,7 +217,9 @@ export interface WingmanBridge {
   // HUD control
   showHud:       () => Promise<void>;
   hideHud:       () => Promise<void>;
-  sendSignal:    (signal: { header: string; text: string; type: string }) => Promise<void>;
+  sendSignal:    (signal: { header: string; text: string; type: string; seq?: number }) => Promise<void>;
+  // Streaming objection card (Step 4) — feed the HUD's constant-rate reveal loop.
+  sendSignalDelta: (payload: { seq: number; phase: "start" | "delta" | "done" | "abort"; textSoFar?: string; type?: string }) => Promise<void>;
   sendScorecard: (scorecard: Record<string, unknown>) => Promise<void>;
   sendStage:     (data: { current: string; all: string[]; completed: string[] }) => Promise<void>;
 
@@ -251,7 +253,7 @@ export interface WingmanBridge {
   // Phase 3.5 — summoned-card progress for the HUD thinking pill.
   // "thinking" = generation started · "error" = failed/timed out (retry hint)
   // · "unsupported" = arrow not built yet. Card arrival clears the pill.
-  sendSummonState: (payload: { state: "thinking" | "error" | "unsupported"; slot?: string }) => Promise<void>;
+  sendSummonState: (payload: { state: "thinking" | "error" | "unsupported" | "idle"; slot?: string }) => Promise<void>;
 
   // Outcome saved from HUD — tells dashboard to refresh so pill appears immediately
   onOutcomeUpdated?:  (callback: () => void) => void;

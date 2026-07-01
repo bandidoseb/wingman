@@ -138,3 +138,24 @@ not a rewrite.
 3. Run the **Plan Review Loop** (and the `plan-reviewer` subagent) — this touches the firing model +
    state machine + latency, exactly the kind of change that needs the full treatment before any code.
 4. Present the threading design to Sebastian; build only after approval.
+
+---
+
+## 🔝 PRIORITY BUMP — 2026-06-30 (Sebastian, after the streaming Step 4 live test)
+
+Sebastian re-flagged this as **the #1 thing to nail once the current track is ironed out** (not yet —
+streaming just shipped; objection-card polish + Phase 4 arrows + auto-updater #45 still ahead — but
+move this UP the queue, ahead of nice-to-haves). His exact framing:
+
+- **"90% of the time, if I handle an objection with a signal card, the prospect hits me with another
+  rebuttal / response / slight smokescreen."** The first card is rarely the end — it kicks off a
+  **2–3–4–5… up to ~10-turn** exchange. That whole exchange is where reps lose the deal, and where
+  Wingman is currently silent after move one.
+- Reinforces the **re-press threading** direction above (rep-gated, knows the last card + belief + what
+  the prospect said back → returns the NEXT move in pace→tie-down→isolate→handle→trade, not a restart).
+- He's already sent **live-call transcripts** that show closers running these multi-turn handles — mine
+  them when this session starts (`knowledge-base/objection-transcripts/` — `LIVE-CALL-FINDINGS.md` +
+  `PLAYBOOK-SYNTHESIS.md`) to template the turn-by-turn sequences.
+- Now that the objection card **streams** (Step 4) and Sonnet is **warmed at call start**, the
+  "objection mode pre-warm for near-instant re-press" idea (above) is largely already in place — the
+  re-press will be fast. Threading is the remaining piece.

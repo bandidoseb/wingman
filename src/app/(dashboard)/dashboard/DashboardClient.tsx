@@ -16,6 +16,7 @@ import FlightPlanTab from "@/components/dashboard/FlightPlanTab";
 import PaywallModal from "@/components/ui/PaywallModal";
 import { FREE_CALL_LIMIT } from "@/lib/constants";
 import { getDefaultStage } from "@/lib/wingman/poll-intervals";
+import { parseSSEBuffer } from "@/lib/wingman/sse-parse";
 import { useWingmanPoller } from "@/hooks/useWingmanPoller";
 import { useRecallTranscript } from "@/hooks/useRecallTranscript";
 
@@ -104,6 +105,17 @@ export default function DashboardClient({
 
   // ── In-flight guard — prevents double-billing on rapid hotkey presses ───────
   const isGeneratingRef = useRef(false);
+  // Streaming objection card (Step 4): a monotonic press id stamped on every reveal
+  // frame (HUD drops stale ones), and the AbortController for the in-flight SSE stream
+  // so call-end / dismiss can stop Sonnet immediately (don't bill an abandoned card).
+  const seqCounterRef    = useRef(0);
+  const streamAbortRef   = useRef<AbortController | null>(null);
+  // Client-side summon throttle — silently ignore a press within this window of the last
+  // processed one (mirrors the server's 3s cost guard, set slightly higher so a press the
+  // client lets through always clears the server). Prevents rapid-fire presses from firing
+  // a "thinking" pill that then resolves as a misleading "couldn't pull that" error.
+  const lastSummonAtRef  = useRef(0);
+  const SUMMON_THROTTLE_MS = 3_500;
 
   // Keep stage in sync with what the AI detects so poll intervals adapt
   useEffect(() => {
@@ -449,19 +461,27 @@ export default function DashboardClient({
     window.wingman?.sendScorecard(scorecard as unknown as Record<string, unknown>);
   }, [scorecard, isElectron]);
 
-  // Dismiss signal from HUD syncs back to web app
+  // Dismiss signal from HUD syncs back to web app. If the rep dismisses while a card is
+  // still streaming, abort the SSE stream so Sonnet stops generating (don't bill it). (W6)
   useEffect(() => {
     if (!isElectron) return;
-    window.wingman?.onSignalDismiss(() => dismissSignal());
+    window.wingman?.onSignalDismiss(() => { streamAbortRef.current?.abort(); dismissSignal(); });
     return () => { window.wingman?.offSignalDismiss(); };
   }, [isElectron, dismissSignal]);
+
+  // When the call goes inactive (manual end, auto-stop, meeting lost), abort any in-flight
+  // objection stream — the renderer would otherwise keep reading + keep Sonnet billing
+  // after the HUD has torn down (plan review W3/W6). Single point covers every end path.
+  useEffect(() => {
+    if (!isActive) streamAbortRef.current?.abort();
+  }, [isActive]);
 
   // ── Hotkey compass menu — handle direction pick from Electron main ─────────
   // Called by main.ts when the rep presses a direction key after the Up Arrow
   // summons the compass. Assembles the full context (Belief Ladder + last 120 s
   // of transcript), fetches /kb-signal, and forwards the card to the HUD.
   //
-  // isGeneratingRef prevents double-billing on rapid presses — if a Haiku call
+  // isGeneratingRef prevents double-billing on rapid presses — if a card stream
   // is already in flight, subsequent picks are silently dropped until it settles.
   const handleMenuPick = useCallback(async (direction: string) => {
     if (isGeneratingRef.current) {
@@ -481,20 +501,64 @@ export default function DashboardClient({
       return;
     }
 
+    // Throttle rapid re-presses (mirrors the server's 3s cost guard). Silently ignore —
+    // no "thinking" pill — so a too-fast press never resolves as a misleading error.
+    const sinceLast = Date.now() - lastSummonAtRef.current;
+    if (sinceLast < SUMMON_THROTTLE_MS) {
+      console.log(`[Wingman] Menu pick throttled — ${sinceLast}ms since last press (silent)`);
+      return;
+    }
+    lastSummonAtRef.current = Date.now();
+
     isGeneratingRef.current = true;
+    const seq = ++seqCounterRef.current;
 
     // Pill contract (Phase 3.5, plan review BLOCKER 1): after "thinking" is
     // sent, EVERY exit from this function resolves the pill — either a card
-    // (sendSignal → the HUD's showSignal clears it) or an explicit "error"
+    // (sendSignal/start delta → the HUD clears it) or an explicit "error"
     // (→ "Couldn't pull that — tap ↑ to retry"). There is NO silent path.
     window.wingman?.sendSummonState({ state: "thinking", slot: direction });
 
-    // 12s client-side timeout — slightly above the server's 10s Haiku ceiling.
-    // Without it, a stalled connection (mid-call network drop) leaves this fetch
-    // hanging and isGeneratingRef stuck true, silently bricking the compass for the
-    // rest of the call. On abort, catch + finally reset the guard so the next press recovers.
+    // Streaming timeouts (plan review W7): a flat wall would kill a slow-but-alive
+    // stream mid-sentence. Instead guard time-to-first-TOKEN (TTFB) and idle gaps
+    // BETWEEN deltas. Critical: the TTFB clock measures time to the first real DELTA,
+    // NOT the first byte — the server sends a ": ok" flush immediately to open the pipe,
+    // and Sonnet's cold first token can be ~6s, so arming the idle timer on the flush
+    // would abort a healthy stream mid-think (the live bug 2026-06-30). TTFB sits just
+    // above the server's own 12s TTFB so the server's error frame wins over a client abort.
     const controller = new AbortController();
-    const timeoutId  = setTimeout(() => controller.abort(), 12_000);
+    streamAbortRef.current = controller;
+    const TTFB_MS = 14_000;  // cold first-token (~6s, Sonnet un-warmed) + margin
+    const IDLE_MS = 7_000;   // gap between deltas once streaming (deltas are ~ms apart)
+    let ttfbTimer: ReturnType<typeof setTimeout> | null = setTimeout(() => controller.abort(), TTFB_MS);
+    let idleTimer: ReturnType<typeof setTimeout> | null = null;
+    const clearTimers = () => {
+      if (ttfbTimer) { clearTimeout(ttfbTimer); ttfbTimer = null; }
+      if (idleTimer) { clearTimeout(idleTimer); idleTimer = null; }
+    };
+    const armIdle = () => {
+      if (idleTimer) clearTimeout(idleTimer);
+      idleTimer = setTimeout(() => controller.abort(), IDLE_MS);
+    };
+
+    // Single idempotent terminal owner (plan review W2): the ONLY place that clears
+    // timers, drops the stream ref, and frees the in-flight guard. Called exactly once
+    // per press from every exit (done / nudge / error / abort).
+    let released = false;
+    const release = () => {
+      if (released) return;
+      released = true;
+      clearTimers();
+      if (streamAbortRef.current === controller) streamAbortRef.current = null;
+      isGeneratingRef.current = false;
+    };
+
+    // The card arrived (real line via done, or the static nudge) → resolve the pill via
+    // the card itself. An error/abort → show the retry pill + wipe any half-revealed line.
+    const fail = () => {
+      window.wingman?.sendSignalDelta({ seq, phase: "abort" }); // wipe a partial line if any
+      window.wingman?.sendSummonState({ state: "error", slot: direction });
+    };
 
     try {
       const recentTranscript = getRecentTranscript();
@@ -507,48 +571,114 @@ export default function DashboardClient({
           live_summary:     liveSummary ?? undefined,
           slot:             direction,
           // No current_stage: post-Phase-1 the live stage tracker is gone, so this
-          // would be a stale "Rapport". The Belief Ladder (live_summary) carries the
-          // real stage, and summoned cards are always two-tier regardless. (Fix #1)
+          // would be a stale "Rapport". The Belief Ladder (live_summary) carries it. (Fix #1)
         }),
         signal: controller.signal,
       });
 
       if (!res.ok) {
-        console.error("[Wingman] kb-signal request failed:", res.status);
-        window.wingman?.sendSummonState({ state: "error", slot: direction });
+        if (res.status === 429) {
+          // Throttled at the server (edge: slipped past the client throttle). Not a
+          // failure — resolve the pill quietly, no retry error.
+          console.log("[Wingman] kb-signal throttled (429) — resolving pill quietly");
+          window.wingman?.sendSummonState({ state: "idle", slot: direction });
+        } else {
+          console.error("[Wingman] kb-signal request failed:", res.status);
+          fail();
+        }
         return;
       }
 
-      const data = await res.json();
+      // The objection slot streams (text/event-stream); pre-Sonnet cases and other slots
+      // return JSON. Branch on Content-Type so BOTH keep working (plan: additive fallback).
+      const isStream = (res.headers.get("content-type") || "").includes("text/event-stream");
 
-      // Gate on the card CONTENT, not signal_header — the objection card is headless
-      // (signal_header:"" with the line in signal_text), so gating on the header would
-      // treat a real card as a failure and show the retry pill. (Plan review C2/C3.)
-      const cardText = data.signal_text || data.signal_header;
-      if (cardText && typeof window !== "undefined" && window.wingman) {
-        // Card arrived — the HUD clears the pill as showSignal's first action.
-        window.wingman.sendSignal({
-          header: data.signal_header ?? "",
-          text:   data.signal_text   ?? "",
-          type:   data.signal_type   ?? "Handle",
-        });
-      } else {
-        // res.ok but NO card: server rate-limit drop, empty/oversized transcript,
-        // or both generation paths failed — all return a bare { ok: true }.
-        // Without this branch the pill would tick to its 15s failsafe (BLOCKER 1).
-        console.warn("[Wingman] kb-signal returned no card — showing retry pill");
-        window.wingman?.sendSummonState({ state: "error", slot: direction });
+      if (!isStream) {
+        const data = await res.json();
+        const cardText = data.signal_text || data.signal_header;
+        if (cardText && window.wingman) {
+          window.wingman.sendSignal({
+            header: data.signal_header ?? "",
+            text:   data.signal_text   ?? "",
+            type:   data.signal_type   ?? "Handle",
+            seq,
+          });
+        } else {
+          // res.ok but no card (rate-limit drop / empty / oversized) — retry pill.
+          console.warn("[Wingman] kb-signal returned no card — showing retry pill");
+          fail();
+        }
+        return;
+      }
+
+      // ── SSE stream: forward deltas into the HUD's reveal loop ──────────────
+      if (!res.body) { fail(); return; }
+      const reader  = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer    = "";
+      let startedReveal = false;
+      let resolved      = false; // saw a terminal event (done/nudge/error)
+
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const { events, rest } = parseSSEBuffer(buffer);
+        buffer = rest;
+
+        for (const ev of events) {
+          // First real EVENT (not the ": ok" flush — that yields no event) satisfies the
+          // TTFB clock. The idle-gap guard is armed only by deltas, below — so Sonnet's
+          // cold first-token think-time is covered by TTFB, never the idle timer.
+          if (ttfbTimer) { clearTimeout(ttfbTimer); ttfbTimer = null; }
+
+          if (ev.event === "delta") {
+            let textSoFar = "";
+            try { textSoFar = JSON.parse(ev.data)?.textSoFar ?? ""; } catch { /* ignore */ }
+            if (!textSoFar) continue;
+            armIdle(); // a delta landed → reset the between-delta idle guard
+            if (!startedReveal) {
+              startedReveal = true;
+              window.wingman?.sendSignalDelta({ seq, phase: "start", textSoFar, type: "Objection" });
+            } else {
+              window.wingman?.sendSignalDelta({ seq, phase: "delta", textSoFar });
+            }
+          } else if (ev.event === "done") {
+            let line = "";
+            try { line = JSON.parse(ev.data)?.line ?? ""; } catch { /* ignore */ }
+            // If a `done` somehow precedes any delta, open the shell so it paints.
+            window.wingman?.sendSignalDelta({ seq, phase: startedReveal ? "done" : "start", textSoFar: line, type: "Objection" });
+            if (!startedReveal) window.wingman?.sendSignalDelta({ seq, phase: "done", textSoFar: line });
+            resolved = true;
+          } else if (ev.event === "nudge") {
+            let header = "", text = "";
+            try { const d = JSON.parse(ev.data); header = d?.header ?? ""; text = d?.text ?? ""; } catch { /* ignore */ }
+            window.wingman?.sendSignal({ header, text, type: "Nudge", seq });
+            resolved = true;
+          } else if (ev.event === "error") {
+            fail();
+            resolved = true;
+          }
+          if (resolved) break;
+        }
+        if (resolved) break;
+      }
+
+      // Stream ended with no terminal event (mid-stream drop) — wipe + retry pill.
+      if (!resolved) {
+        console.warn("[Wingman] objection stream ended without a terminal event — retry pill");
+        fail();
       }
     } catch (err) {
       if (err instanceof Error && err.name === "AbortError") {
-        console.warn("[Wingman] kb-signal timed out after 12s — compass freed for next press.");
+        console.warn("[Wingman] objection stream aborted (timeout / call-end / dismiss).");
       } else {
         console.error("[Wingman] handleMenuPick error:", err);
       }
-      window.wingman?.sendSummonState({ state: "error", slot: direction });
+      fail();
     } finally {
-      clearTimeout(timeoutId);
-      isGeneratingRef.current = false;
+      release();
     }
   }, [callId, getRecentTranscript, liveSummary]);
 

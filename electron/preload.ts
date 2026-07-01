@@ -64,9 +64,24 @@ contextBridge.exposeInMainWorld("wingman", {
   /** Hide the floating HUD overlay */
   hideHud: () => ipcRenderer.invoke("hud:hide"),
 
-  /** Send the current signal to display in the HUD */
-  sendSignal: (signal: { header: string; text: string; type: string }) =>
+  /**
+   * Send the authoritative signal to display in the HUD.
+   * `seq` (streaming): a monotonic press id so a stale/late frame can't paint over a
+   * newer card — the HUD ignores any signal whose seq is older than the one it's showing.
+   */
+  sendSignal: (signal: { header: string; text: string; type: string; seq?: number }) =>
     ipcRenderer.invoke("hud:signal", signal),
+
+  /**
+   * Streaming objection card (Step 4) — feed the HUD's constant-rate reveal loop.
+   *   phase "start" → open the (headless) card shell + begin the reveal at seq
+   *   phase "delta" → grow the revealed text to `textSoFar` (ignored if seq is stale)
+   *   phase "done"  → mark the reveal complete with the final `textSoFar`
+   *   phase "abort" → wipe a half-revealed line (mid-stream drop / dismiss / call-end)
+   * The authoritative final frame still also arrives via sendSignal (carrying the same seq).
+   */
+  sendSignalDelta: (payload: { seq: number; phase: "start" | "delta" | "done" | "abort"; textSoFar?: string; type?: string }) =>
+    ipcRenderer.invoke("hud:signal-delta", payload),
 
   /**
    * Phase 3.5 — report summoned-card progress to the HUD's thinking pill.
@@ -75,7 +90,7 @@ contextBridge.exposeInMainWorld("wingman", {
    * "unsupported" → arrow not built yet ("Not ready yet — coming soon")
    * Card arrival itself clears the pill (sendSignal → HUD showSignal).
    */
-  sendSummonState: (payload: { state: "thinking" | "error" | "unsupported"; slot?: string }) =>
+  sendSummonState: (payload: { state: "thinking" | "error" | "unsupported" | "idle"; slot?: string }) =>
     ipcRenderer.invoke("hud:summon-state", payload),
 
   /** Send scorecard state to HUD so it can display the live scoring */
@@ -213,8 +228,13 @@ contextBridge.exposeInMainWorld("wingman", {
 // The HUD uses this to receive signals/scorecard from the main window.
 contextBridge.exposeInMainWorld("hud", {
   /** Receive a new signal to display */
-  onSignal: (callback: (signal: { header: string; text: string; type: string }) => void) => {
+  onSignal: (callback: (signal: { header: string; text: string; type: string; seq?: number }) => void) => {
     ipcRenderer.on("hud:update-signal", (_event, signal) => callback(signal));
+  },
+
+  /** Receive a streaming reveal delta (Step 4) — start / delta / done / abort. */
+  onSignalDelta: (callback: (payload: { seq: number; phase: "start" | "delta" | "done" | "abort"; textSoFar?: string; type?: string }) => void) => {
+    ipcRenderer.on("hud:update-signal-delta", (_event, payload) => callback(payload));
   },
 
   /** Receive scorecard update */

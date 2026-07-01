@@ -113,6 +113,20 @@ These are educated guesses for v1 beta. None are set in stone. Everything in thi
 
 ---
 
+## 8. HUD Card Reveal Speed (streaming reveal, 2026-06-30)
+
+The objection line is painted onto the HUD at a **constant rate** by an rAF loop, decoupling
+bursty network arrival from a smooth reveal. Two dials in `electron/hud/index.html`:
+
+| Field | Value | Effect |
+|---|---|---|
+| `REVEAL_MIN_CPS` | `45` | Floor chars/sec — keeps the tail from crawling. Lower = slower finish. |
+| `REVEAL_EASE` | `0.08` | Proportional catch-up per frame — how fast a big buffer reveals. Higher = snappier start (a full one-shot line reveals in ~0.8–1s at 0.08); lower = gentler. |
+
+**Verified (frame sim):** one-shot 142-char line → 750ms; 38-char line → 483ms; bursty streaming stays smooth (≤4 chars/frame) and finishes ~0.5s after the last burst. If the reveal feels too fast/jerky at the start of long lines, lower `REVEAL_EASE` first; if the end drags, raise `REVEAL_MIN_CPS`.
+
+---
+
 ## How to Use This File
 
 After each batch of live calls, revisit the values above. If something feels off — cards are stale, missing context, or the scorecard is being cut short — this is the first place to look. Each entry has the code location and the cost impact so you can make the change in 30 seconds.

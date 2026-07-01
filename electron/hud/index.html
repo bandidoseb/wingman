@@ -1429,46 +1429,127 @@
     }
 
     // ── Show a signal card ────────────────────────────────────────────────
-    function showSignal(signal) {
-      // Phase 3.5: a card arriving resolves the thinking pill — FIRST action,
-      // so a deliver-late card also replaces a stale error pill, and a fresh
-      // card is never stomped by a previous cycle's failsafe timer.
-      hidePill(false);
+    // ── Constant-rate text reveal ────────────────────────────────────────
+    // Decouples bursty arrival from a smooth on-screen reveal: text lands in
+    // revealTarget, and an rAF loop paints characters at a steady pace. Built and
+    // tuned here against the one-shot card; true streaming (Step 4) feeds growing
+    // text via pushRevealText()/finishReveal(). Big buffers (a full line arriving at
+    // once) reveal over ~0.8–1s via the proportional ease; the linear floor keeps the
+    // tail from crawling. Tunables mirrored in Wingman Brain/Beta Tuning Parameters.md.
+    const REVEAL_MIN_CPS = 45;     // floor chars/sec — the reveal never crawls
+    const REVEAL_EASE    = 0.08;   // proportional catch-up per frame (~0.8–1s to empty a full line)
 
-      const typeInfo = TYPE_MAP[signal.type] || TYPE_MAP['Nudge'];
-      currentSignalType = typeInfo.cls;
+    let   revealEl       = null;
+    let   revealTarget   = '';
+    let   revealShown    = 0;       // float; floored for display
+    let   revealComplete = true;    // true once no more text will arrive (one-shot: immediately)
+    let   revealRAF      = null;
+    let   revealLastT    = 0;
 
-      // Cancel any in-progress hide animation
-      clearTimeout(hideSignalTimer);
-      signalBubble.classList.remove('hiding');
+    // Monotonic press id (Step 4). The renderer stamps each press; we ignore any signal or
+    // reveal delta whose seq is older than the one we're showing, so a stale/late stream
+    // (or the final frame of an aborted press) can never paint over a newer card.
+    let   currentRevealSeq = 0;
 
-      // Stage label: use current call stage if available, fallback to type label
-      signalTag.textContent = (currentStage || typeInfo.label).toUpperCase();
+    function cancelReveal() {
+      if (revealRAF !== null) { cancelAnimationFrame(revealRAF); revealRAF = null; }
+    }
 
-      // Headline — signal.header is the short actionable phrase (≤5 words)
-      signalTextEl.textContent = signal.header || signal.text || '';
+    function startReveal(el, text, complete) {
+      cancelReveal();
+      revealEl       = el;
+      revealTarget   = text || '';
+      revealShown    = 0;
+      revealComplete = complete !== false;   // default true (one-shot)
+      revealLastT    = 0;
+      el.textContent = '';
+      revealRAF = requestAnimationFrame(revealTick);
+    }
 
-      // Support text — signal.text shown only when header also exists (two-tier cards)
-      if (signal.header && signal.text) {
-        signalSupportEl.textContent = signal.text;
-        signalSupportEl.classList.add('visible');
-      } else {
-        signalSupportEl.textContent = '';
-        signalSupportEl.classList.remove('visible');
+    // Streaming (Step 4): grow the target as deltas arrive, then mark it complete on done.
+    function pushRevealText(fullTextSoFar) { if (typeof fullTextSoFar === 'string') revealTarget = fullTextSoFar; }
+    function finishReveal(fullText)        { if (typeof fullText === 'string') revealTarget = fullText; revealComplete = true; }
+
+    function revealTick(t) {
+      if (revealLastT === 0) revealLastT = t;
+      const dt = Math.min(100, t - revealLastT);   // clamp a big gap (e.g. tab was backgrounded)
+      revealLastT = t;
+
+      const remaining = revealTarget.length - revealShown;
+      if (remaining > 0) {
+        const byTime = (REVEAL_MIN_CPS / 1000) * dt;   // linear floor
+        const byEase = remaining * REVEAL_EASE;        // proportional catch-up (smooth on big buffers)
+        revealShown  = Math.min(revealTarget.length, revealShown + Math.max(byTime, byEase));
+        if (revealEl) revealEl.textContent = revealTarget.slice(0, Math.floor(revealShown));
       }
 
-      // Show card, hide ambient dot. Headless cards (objection slot — a full spoken
-      // line, no <=5-word headline) get the smaller conversational text style.
-      signalBubble.className = 'signal-card visible';
-      if (!signal.header) signalBubble.classList.add('headless');
+      if (revealComplete && revealShown >= revealTarget.length) {
+        if (revealEl) revealEl.textContent = revealTarget;   // ensure the exact final text
+        revealRAF = null;
+        return;                                              // done — stop the loop
+      }
+      revealRAF = requestAnimationFrame(revealTick);          // keep going (more text, or still revealing)
+    }
+
+    // Open the (headless) card shell WITHOUT painting text — the common setup shared by
+    // the one-shot headless path and the streaming "start" phase (Step 4 / plan review W10),
+    // so the streamed card can never look different from the instant one. The caller starts
+    // the reveal afterward (one-shot vs streaming differ only in the `complete` flag).
+    function openHeadlessShell(type) {
+      hidePill(false);                                   // a card resolves the thinking pill
+      const typeInfo = TYPE_MAP[type] || TYPE_MAP['Nudge'];
+      currentSignalType = typeInfo.cls;
+      clearTimeout(hideSignalTimer);
+      signalBubble.classList.remove('hiding');
+      signalTag.textContent = (currentStage || typeInfo.label).toUpperCase();
+      // No-objection nudge shows no tag ("SUGGEST" read wrong — it's an all-clear, not advice).
+      signalTag.style.display = (type === 'Nudge') ? 'none' : '';
+      signalSupportEl.textContent = '';
+      signalSupportEl.classList.remove('visible');
+      signalBubble.className = 'signal-card visible headless';
       ambientDot.classList.remove('visible');
       signalActive = true;
-
       stageBar.classList.remove('glow-blue', 'glow-red');
-      if (typeInfo.cls === 'alert') {
-        stageBar.classList.add('glow-red');
-      } else if (isLive) {
-        stageBar.classList.add('glow-blue');
+      if (typeInfo.cls === 'alert') stageBar.classList.add('glow-red');
+      else if (isLive)             stageBar.classList.add('glow-blue');
+    }
+
+    function showSignal(signal) {
+      // Seq guard (Step 4): never let a stale/late authoritative frame stomp a newer card.
+      if (typeof signal.seq === 'number') {
+        if (signal.seq < currentRevealSeq) return;
+        currentRevealSeq = signal.seq;
+      }
+
+      if (!signal.header) {
+        // Headless card (objection line / nudge) — one-shot smooth reveal.
+        openHeadlessShell(signal.type);
+        startReveal(signalTextEl, signal.text || '');   // complete defaults true (one-shot)
+      } else {
+        // Two-tier directive card (answer/dig/close, Phase 4) — instant, no reveal.
+        hidePill(false);
+        const typeInfo = TYPE_MAP[signal.type] || TYPE_MAP['Nudge'];
+        currentSignalType = typeInfo.cls;
+        clearTimeout(hideSignalTimer);
+        signalBubble.classList.remove('hiding');
+        signalTag.textContent = (currentStage || typeInfo.label).toUpperCase();
+        // No-objection nudge shows no tag (it's an all-clear, not a suggestion).
+        signalTag.style.display = (signal.type === 'Nudge') ? 'none' : '';
+        cancelReveal();
+        signalTextEl.textContent = signal.header;
+        if (signal.text) {
+          signalSupportEl.textContent = signal.text;
+          signalSupportEl.classList.add('visible');
+        } else {
+          signalSupportEl.textContent = '';
+          signalSupportEl.classList.remove('visible');
+        }
+        signalBubble.className = 'signal-card visible';
+        ambientDot.classList.remove('visible');
+        signalActive = true;
+        stageBar.classList.remove('glow-blue', 'glow-red');
+        if (typeInfo.cls === 'alert') stageBar.classList.add('glow-red');
+        else if (isLive)             stageBar.classList.add('glow-blue');
       }
 
       // Do NOT disable pass-through here. The card is visible but the HUD window
@@ -1477,8 +1558,28 @@
       // enables capture only when the user hovers over the card to click "got it".
     }
 
+    // ── Streaming reveal (Step 4) — feed the constant-rate loop from SSE deltas ──
+    // Every phase is seq-guarded so a late packet from an aborted/older press can't
+    // paint over the current card. "done" is the final paint (textSoFar is cumulative,
+    // so a dropped delta self-heals and no separate authoritative frame is needed).
+    function handleSignalDelta(p) {
+      if (!p || typeof p.seq !== 'number') return;
+      if (p.phase === 'start') {
+        if (p.seq < currentRevealSeq) return;            // stale start — ignore
+        currentRevealSeq = p.seq;
+        openHeadlessShell(p.type || 'Objection');
+        startReveal(signalTextEl, p.textSoFar || '', /* complete */ false);
+        return;
+      }
+      if (p.seq !== currentRevealSeq) return;            // delta/done/abort for an old press
+      if (p.phase === 'delta')      pushRevealText(p.textSoFar || '');
+      else if (p.phase === 'done')  finishReveal(p.textSoFar || '');
+      else if (p.phase === 'abort') { cancelReveal(); hideSignal(); }  // wipe a half-line
+    }
+
     function hideSignal() {
       clearTimeout(hideSignalTimer);
+      cancelReveal();   // stop any in-progress text reveal so it can't paint after dismiss
       signalBubble.classList.add('hiding');
       signalActive = false;
       currentSignalType = null;
@@ -1640,6 +1741,9 @@
       // Signal fired
       window.hud.onSignal(signal => showSignal(signal));
 
+      // Streaming reveal deltas (Step 4) — start / delta / done / abort
+      window.hud.onSignalDelta(p => handleSignalDelta(p));
+
       // Stage + all stages + completed stages
       window.hud.onStage(data => {
         if (typeof data === 'string') {
@@ -1721,6 +1825,7 @@
         if (state === 'thinking')         showPillThinking(payload.slot);
         else if (state === 'error')       showPillError();
         else if (state === 'unsupported') showPillUnsupported();
+        else if (state === 'idle')        hidePill(true);  // quiet resolve (e.g. press throttled) — no error
       });
 
       // debug #39: confirm this registration block actually completed and the
