@@ -773,6 +773,11 @@ app.on("will-quit", () => {
 autoUpdater.on("update-available", () => {
   console.log("[Updater] Update available — downloading");
 });
+autoUpdater.on("error", (err) => {
+  // Never fail silently: a broken update feed (missing zip, signature mismatch,
+  // network drop, unpublished/draft release) must leave a trace we can diagnose.
+  console.error("[Updater] Update check/download failed:", err?.message ?? err);
+});
 autoUpdater.on("update-downloaded", () => {
   console.log("[Updater] Update downloaded — prompting user to restart");
   // Use async showMessageBox so the main process is not blocked while the dialog

@@ -35,14 +35,20 @@ mac:
   icon: build/icon.icns          # macOS requires .icns format (create from Wingman.png)
   hardenedRuntime: true
   gatekeeperAssess: false
-  notarize: false                # Disabled for beta — re-enable before public launch
+  notarize: true                 # Apple notarization — clean launch (no Gatekeeper warning) + required for auto-update. Uses APPLE_ID / APPLE_APP_SPECIFIC_PASSWORD / APPLE_TEAM_ID from CI env.
   entitlements: build/entitlements.mac.plist
   entitlementsInherit: build/entitlements.mac.plist
+  # Apple Silicon ONLY — the Recall AI SDK ships no Intel (x64) binary, so an x64 build
+  # cannot run. Two targets, per the macOS auto-update contract:
+  #   dmg = first manual download (drag-to-Applications installer)
+  #   zip = REQUIRED by Squirrel.Mac — electron-updater can ONLY apply a .zip, never a .dmg
   target:
     - target: dmg
       arch:
-        - x64             # Intel Macs
-        - arm64            # Apple Silicon (M1/M2/M3)
+        - arm64
+    - target: zip
+      arch:
+        - arm64
 
 # What the DMG installer looks like
 dmg:
@@ -62,6 +68,7 @@ publish:
   provider: github
   owner: bandidoseb
   repo: wingman
+  releaseType: release   # Publish LIVE, not draft. Drafts are invisible to electron-updater — this is why auto-update never worked. No more manual `gh release edit --draft=false`.
 
-# macOS notarization — disabled for beta (re-enable before public launch)
-# afterSign: scripts/notarize.js
+# Notarization is enabled above (mac.notarize: true) via electron-builder's built-in
+# notarytool path — no custom afterSign script needed.

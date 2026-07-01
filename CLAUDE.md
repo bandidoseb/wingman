@@ -457,10 +457,15 @@ If the answer to any of those is "probably not" — it's not done yet.
    - `Wingman Brain/01 - Build Log/Current Sprint.md` — what was just done, what's next, what's blocking
    - `Wingman Brain/01 - Build Log/Known Issues.md` — current bugs and their priority
    - `Wingman Brain/01 - Build Log/Decisions Log.md` — decisions already made (don't relitigate these)
-4. Based on Current Sprint.md, tell Sebastian: "Here's where we left off and here's what I think we should work on today" — then ask if that's right before touching any code.
-5. Confirm the single task before writing any code.
-6. After completing the task, give exact test steps.
-7. Update `Wingman Brain/01 - Build Log/Current Sprint.md` to reflect what was completed and what's next.
+4. **Reconcile status against git/GitHub before trusting the prose.** The brain files are hand-written and lag reality — a branch gets merged or a release cut *after* the wrap is written, so the notes describe the world as it was *before* the last thing happened. Prose holds **decisions + intent**; git/GitHub holds **status**. Run this and report status from *its* output, never from the notes alone:
+   ```bash
+   cd "/Users/sebastianperez/Desktop/Wingman CC" && git branch --show-current && gh pr list --state merged --limit 5 && git tag --sort=-v:refname | head -3 && gh release view --json tagName,isDraft 2>/dev/null
+   ```
+   If a note says "branch not pushed / PR not merged / release not cut" but git says otherwise, git wins — say so out loud.
+5. Based on Current Sprint.md **as reconciled in step 4**, tell Sebastian: "Here's where we left off and here's what I think we should work on today" — then ask if that's right before touching any code.
+6. Confirm the single task before writing any code.
+7. After completing the task, give exact test steps.
+8. Update `Wingman Brain/01 - Build Log/Current Sprint.md` to reflect what was completed and what's next.
 
 ---
 
