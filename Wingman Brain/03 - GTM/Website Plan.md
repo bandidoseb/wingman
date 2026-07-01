@@ -206,7 +206,7 @@ Source: `05 - Operations/Wiretap Compliance Research.md` — Section 3.
 | `/terms` page written and live | Not written |
 | `/privacy` page written and live | Not written |
 | Rewardful script added to site | Not set up |
-| Apple notarization (removes quarantine warning) | Not done — see Known Issue #5 |
+| Apple notarization (removes quarantine warning) | ✅ Done 2026-07-01 (v0.1.27+) — no warning, no quarantine command |
 
 ---
 

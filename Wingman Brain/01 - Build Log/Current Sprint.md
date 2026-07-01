@@ -27,8 +27,7 @@ This is the first file Claude reads at session start. It answers: where are we, 
 | **5** | Dead-code removal (#37) + reconcile stale CLAUDE.md rules (#34) | 🔲 not started |
 
 **Cross-cutting work** (not tied to one arrow — slot in between phases):
-- ✅ **Desktop release v0.1.22** — DONE 2026-06-30. Shipped all 6 un-released PRs since June 5 (Phase 3.5, in-memory KB, objection card 3.6a) into a built + **published** `.dmg`. (Routed via PR — `main` is ruleset-protected; see corrected CLAUDE.md release flow.)
-- 🚨 **Auto-updater fix (#45)** — RELEASE-BLOCKING for beta. Releases build as GitHub *drafts* → `electron-updater` never sees them; Sebastian downloads the `.dmg` by hand every time. Must auto-publish + verify update-on-second-machine before any public distribution. Own session.
+- ✅ **Auto-updater FIXED + verified live (#45) — 2026-07-01.** Was release-blocking; now working end-to-end (0.1.25→0.1.26 auto-installed; 0.1.27→0.1.28 smooth self-relaunch). Root cause: private code repo → `releases.atom` 404. Fix: publish signed/notarized installers to the **public `bandidoseb/wingman-releases` repo** (source stays private) + `releaseType: release` + `zip` target + `notarize: true` + arm64-only + `isQuitting=true` before `quitAndInstall`. Auth = PAT `WINGMAN_RELEASES_TOKEN`. **Latest release = v0.1.28** (ships streaming card + everything to the packaged app). Beta download = https://github.com/bandidoseb/wingman-releases/releases/latest (install once → auto-updates). At-scale upgrade = Option 3 self-hosted feed (`_Inbox/` note). Full narrative: `2026-07-01.md`.
 - 🎬 **Streaming card reveal — ✅ SHIPPED. [PR #24](https://github.com/bandidoseb/wingman/pull/24) merged 2026-07-01 → Railway backend has SSE streaming + Groq removal live.** (PR #23 was folded into #24.) Server SSE (envelope opened as it streams; `no-transform` defeats Next gzip) → `hud:signal-delta` IPC → renderer SSE reader (`sse-parse.ts`) + `json-line-stream.ts` decoder; seq guard, idempotent release, TTFB/idle guards, dismiss/call-end abort. 91 tests. Sebastian live-confirmed (~1.7–2.7s warm). Also shipped: cold-start-abort fix, `Controller is already closed` crash fix, rapid-press throttle + 429 quiet-resolve, "SUGGEST" tag removed, **Sonnet warm-up** (cold first press ~6s→~2s). **Reaches the packaged Mac app only on the next desktop release** (bundle into #45). Narrative: `2026-06-30.md` Session 3.
 - 🛡️ **Model-resilience (#44)** — one `models.ts` source of truth + a daily deprecation canary. Own session.
 - 🩹 **Partials (#41)** — stale-objection correctness bug; really an ↑ objection-slot fix (transcript finalization lag).
@@ -48,22 +47,24 @@ This is the first file Claude reads at session start. It answers: where are we, 
 > ```
 > This file holds **decisions + intent**; git/GitHub holds **status**. Never restate merge/release/branch status as prose fact here.
 
-**Live now (verified 2026-07-01 — re-verify with the block above):** streaming objection card merged
-([PR #24](https://github.com/bandidoseb/wingman/pull/24)) → Railway backend has SSE streaming + Groq removal.
-Last desktop release = **v0.1.22** (published). The streaming HUD reveal reaches the **packaged Mac app only on
-the next desktop release** (bundle it into the #45 auto-updater release).
+**Live now (verified 2026-07-01 — re-verify with the block above):** **auto-updater WORKS end-to-end** — latest
+release **v0.1.28** on the public `wingman-releases` feed; installed apps self-update + relaunch. Streaming
+objection card ([PR #24](https://github.com/bandidoseb/wingman/pull/24)) is live on Railway AND now in the
+packaged app (shipped via v0.1.25+). Notarized (no Gatekeeper warning / no `xattr`). #45 + #5 resolved.
 
 **Then, in priority order (each its own session):**
-1. 🚨 **Auto-updater fix (#45)** — release-blocking for beta.
-2. **Multi-turn objection threading** (PRIORITY-BUMPED by Sebastian 2026-06-30 — see `_Inbox/multi-turn objection handling.md`): 90% of handled objections get a rebuttal → 2–10 turn exchange. Re-press threading design already written; streaming + Sonnet warm-up put the fast-re-press half in place.
-3. **Phase 3.6b — confidence-aware summarizer** (still NOT done; gate `node scripts/test-belief-ladder.mjs` is RED on purpose). Add a confidence-number rule to `BELIEF_LADDER_SYSTEM_PROMPT` in `belief-ladder.ts`: digits ONLY when stated plainly AND confirmed (echoed/repeated); hedged/vague-once → capture meaning, drop digits; never invent. Gate must go GREEN (run 3× — stochastic). Prompt-only, small blast radius.
-4. Model-resilience (#44) · partials (#41) · Phase 3.6c anchor library (deferred) · **Phase 4** (← answer · ↓ dig · → close — each streams too) + **Phase 5** (cleanup, incl. orphaned `distillObjection`/`generateNudgeCard`/non-stream `generateObjectionCard`).
+1. **Multi-turn objection threading** (PRIORITY-BUMPED by Sebastian — see `_Inbox/multi-turn objection handling.md`): 90% of handled objections get a rebuttal → 2–10 turn exchange. Re-press threading design already written; streaming + Sonnet warm-up put the fast-re-press half in place.
+2. **Phase 3.6b — confidence-aware summarizer** (still NOT done; gate `node scripts/test-belief-ladder.mjs` is RED on purpose). Add a confidence-number rule to `BELIEF_LADDER_SYSTEM_PROMPT` in `belief-ladder.ts`: digits ONLY when stated plainly AND confirmed (echoed/repeated); hedged/vague-once → capture meaning, drop digits; never invent. Gate must go GREEN (run 3× — stochastic). Prompt-only, small blast radius.
+3. Model-resilience (#44) · partials (#41) · Phase 3.6c anchor library (deferred) · **Phase 4** (← answer · ↓ dig · → close — each streams too) + **Phase 5** (cleanup, incl. orphaned `distillObjection`/`generateNudgeCard`/non-stream `generateObjectionCard`).
 
-**✅ Done 2026-06-30 → 07-01:** streaming objection card built, hardened, live-tested, **merged
-([PR #24](https://github.com/bandidoseb/wingman/pull/24)) → Railway deployed.** 5 live fixes (cold-start abort,
-controller-closed crash, rapid-press error spam, "SUGGEST" tag, cold-Sonnet warm-up); 2 tested pure modules
-(`json-line-stream.ts`, `sse-parse.ts`, 91 tests). Narrative: `2026-06-30.md` Session 3. Earlier (06-30 S1):
-released **v0.1.22**; unified roadmap (Phase 3.6); logged #45.
+**Quick follow-ups when convenient:** (a) beta invite email — use the public releases link, NO `xattr`, mention auto-update; (b) dashboard "Relaunch to update" chip (`_Inbox/2026-07-01 Dashboard update-ready chip.md`).
+
+**✅ Done 2026-07-01:** **auto-updater #45 fixed + verified live** (six-release gauntlet v0.1.23→v0.1.28 — drafts, no-zip, notarization, private-repo 404, empty-repo, auto-relaunch; PRs #25–#30); **stale-notes process fix** (git = status, prose = decisions; CLAUDE.md + wrap reconcile from `gh`/`git`); **notarization/`xattr` doc sweep** (6 files, #5 resolved). Full narrative: `2026-07-01.md`.
+
+**✅ Done 2026-06-30:** streaming objection card built, hardened, live-tested, **merged
+([PR #24](https://github.com/bandidoseb/wingman/pull/24)) → Railway deployed.** 5 live fixes; 2 tested pure
+modules (`json-line-stream.ts`, `sse-parse.ts`, 91 tests). Narrative: `2026-06-30.md` Session 3. Earlier (S1):
+released v0.1.22; unified roadmap (Phase 3.6); logged #45.
 
 ---
 
@@ -557,7 +558,7 @@ This was a **decisions/logging session — no app code changed, nothing pushed.*
 
 6. **Stripe billing end-to-end test**
 
-7. **Beta onboarding email** — must include quarantine removal command for non-notarized app.
+7. **Beta onboarding email** — download link = public `wingman-releases` page; NO quarantine command (notarized 2026-07-01); mention it auto-updates after first install.
 
 8. **Wingman Intelligence graph visualizer** — add an Obsidian-style node graph to the dashboard showing that rep's AI brain (Offer Brain nodes, objections, patterns, call history connections). Grows over time. Not mission-critical — V1.5 feature, but worth planning. No immediate action needed.
 
@@ -565,7 +566,7 @@ This was a **decisions/logging session — no app code changed, nothing pushed.*
 
 ## Current Blockers
 
-- **App not Apple-notarized** — beta testers must run quarantine command manually. (Known Issue #5)
+- ~~**App not Apple-notarized**~~ — ✅ RESOLVED 2026-07-01. Notarized + auto-updater working end-to-end (v0.1.28 verified on Sebastian's Mac). No quarantine command. (Known Issue #5 resolved, #45 resolved.)
 
 ---
 
