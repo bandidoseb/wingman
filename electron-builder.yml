@@ -67,8 +67,8 @@ dmg:
 publish:
   provider: github
   owner: bandidoseb
-  repo: wingman
-  releaseType: release   # Publish LIVE, not draft. Drafts are invisible to electron-updater — this is why auto-update never worked. No more manual `gh release edit --draft=false`.
+  repo: wingman-releases   # PUBLIC repo — holds ONLY signed/notarized installers. Source code stays in the private 'wingman' repo. electron-updater reads the release feed here (a private repo's feed 404s → auto-update can't work; this is the fix). Migrate to a self-hosted Railway feed at scale — see `Wingman Brain/_Inbox/Future Build - Self-Hosted Update Feed (Option 3).md`.
+  releaseType: release   # Publish LIVE, not draft. Drafts are invisible to electron-updater. No more manual `gh release edit --draft=false`.
 
 # Notarization is enabled above (mac.notarize: true) via electron-builder's built-in
 # notarytool path — no custom afterSign script needed.
