@@ -741,7 +741,10 @@ app.whenReady().then(() => {
   });
 
   if (app.isPackaged) {
-    autoUpdater.checkForUpdatesAndNotify();
+    // .catch() so a failed check (offline, 404, bad feed) can't surface as an
+    // unhandled promise rejection. The autoUpdater.on("error") handler does the
+    // actual logging; this just keeps the rejection from going unhandled.
+    autoUpdater.checkForUpdatesAndNotify().catch(() => {});
   }
 });
 

@@ -44,8 +44,12 @@ jobs:
       - name: Build and publish
         env:
           # ── GitHub publish token ──────────────────────────────────────────
-          # Uses GitHub's built-in token — no manual secret needed
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Releases are published to the PUBLIC bandidoseb/wingman-releases repo
+          # (source stays private). The built-in GITHUB_TOKEN is scoped to THIS
+          # (private) repo only and cannot write to wingman-releases — so we use a
+          # fine-grained PAT scoped to wingman-releases (contents: read/write),
+          # stored as the WINGMAN_RELEASES_TOKEN secret.
+          GH_TOKEN: ${{ secrets.WINGMAN_RELEASES_TOKEN }}
 
           # ── Apple Developer code signing ──────────────────────────────────
           # CSC_LINK: base64-encoded .p12 certificate exported from Keychain.
