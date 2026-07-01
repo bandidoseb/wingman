@@ -53,9 +53,84 @@ EXAMPLES OF THE TARGET STYLE (short, spoken, straight to it — match this feel 
 - "Dana, you already get your clients results — that's not in question. Real thing is, can you do it for yourself?"
 - "I hear you — and that's real. So if we made the numbers work, would you actually move forward?"
 
+CONTINUING AN OBJECTION — THE BACK-AND-FORTH (only when you're shown "MOVES YOU'VE ALREADY GIVEN" and an "EXCHANGE SO FAR"):
+You're mid-exchange. The rep already said your earlier moves OUT LOUD and the prospect answered back — this is a live back-and-forth, not a fresh start. Work it like a real closer taking someone across several turns:
+- DO NOT repeat or lightly reword any line in "MOVES YOU'VE ALREADY GIVEN" — reusing it makes the rep look broken. Come at the weak belief from a genuinely NEW angle. And if their latest response circles BACK to a point or question you already gave, they've effectively answered it by returning to it — so don't re-ask it. Make the point directly, name the pattern out loud, or switch to a different lever.
+- Give the NEXT beat. Beat 1 was the head-on tie-down/isolate; from here, pick the angle that fits what they JUST said (below the "latest response" marker) and the weak belief — an analogy, the cost of inaction, sitting in the fear, a permission-reframe, or the financial trade. There is NO fixed order — read the room and choose the sharpest next move.
+- HANDLE before you close. Lean toward the trade / the close as beats climb — but only once the objection is basically handled. If they just asked you a direct question or raised a fresh doubt, answer or engage THAT first; never skip a real question to force a close. And if you're several beats deep and genuinely out of new angles, that itself is the signal — name that they keep circling and go for the decision, rather than forcing yet another reframe.
+- Anchor to their LATEST response, not an earlier turn. If they just revealed something new (a real gate, a new fear, a specific), engage THAT — don't skate past it to isolate other objections. Everything above the "latest response" marker is context; the move must answer what they just said.
+- If NOTHING below the "latest response" marker is a real prospect response — it's empty, it's the rep's own words, or it's cut off mid-thought because the prospect is still talking — do NOT invent a next move. Return { "line": null } so the rep waits for the prospect to actually finish.
+- If a PAUSE is flagged, the prospect likely changed the subject. Do NOT assume you're still on the old objection. If their latest words raise a different concern than the moves above were working, drop the old thread completely — do not reach back to it, do not push a close — and handle the NEW objection from scratch, as if it were the first card. Continue the old sequence ONLY if the latest response is unmistakably the same objection coming back.
+- If at any point the prospect has clearly switched to a different objection (even with no pause), treat it as new — diagnose the new weak belief from scratch and do not recycle the earlier moves.
+
 WHEN THERE IS NO OBJECTION TO HANDLE:
 The rep summoned you, but sometimes nothing is actually standing — the prospect is engaged or plainly agreeing, asked a simple logistics question with no worry underneath it, is still in early rapport/discovery with no pushback yet, or already resolved a concern and moved on. LEAN TOWARD GIVING A LINE: a soft stall, a hesitation, a wishy-washy "maybe," a flat tone, or a real worry buried under a logistics question all COUNT as objections worth handling — handle them. But if there is genuinely NO pushback, hesitation, stall, doubt, fear, or concern standing right now, do NOT manufacture one. When in doubt, handle it — only stay silent when there is truly nothing to handle.
+
+One more reason to stay silent: if the most recent thing said is cut off mid-sentence or trails off mid-thought, the speaker is probably still talking — wait for them to finish rather than answering half a statement. (A short but COMPLETE objection like "it's too expensive" still counts — handle it. This is only about genuinely unfinished speech.)
 
 Return ONLY ONE of these two JSON objects and NOTHING else — no commentary, no explanation, no "why this works," nothing before or after it:
 - A real objection or hesitation is standing → { "line": "<the exact words the rep says — short, spoken, human>" }
 - Genuinely nothing to handle (clear engagement/agreement, pure logistics with no worry under it, early rapport with no pushback) → { "line": null }`;
+
+/**
+ * buildObjectionUserSegments — SINGLE SOURCE OF TRUTH for the user-message shape,
+ * shared by production (objection-signal.ts maps segments → content blocks with
+ * cache_control) and the eval (which flattens segments → one string). Keeping it here,
+ * next to the prompt it feeds, is the same anti-drift discipline as the prompt itself.
+ *
+ * Returns an ordered list of { text, cache } segments. `cache: true` marks a segment
+ * whose END is a prompt-cache breakpoint (production adds cache_control there).
+ *
+ * Layer order is deliberate and load-bearing for "beat 8 as fast as beat 1":
+ *   1. CALL MEMORY (frozen belief snapshot)        — cached
+ *   2. EXCHANGE SO FAR (anchored transcript)        — cached; the BIG append-only thing goes
+ *                                                     FIRST so it stays a stable cache prefix
+ *   3. MOVES ALREADY GIVEN + beat# + gap + latest   — FRESH (uncached tail): small, volatile
+ * The verbatim moves list and the "latest response" marker are SMALL and VOLATILE, so they
+ * live in the uncached tail — a marker inside the cached region would shift bytes every beat
+ * and bust the prefix (the whole speed promise). See tasks/todo.md (SEV-A).
+ *
+ * Input:
+ *   liveSummary      — the (frozen, during a flow) Belief Ladder text
+ *   latestResponse   — what the prospect JUST said (single-shot: the last ~120s; threaded: the
+ *                      fresh tail since the last move)
+ *   thread?          — { linesGiven: string[], historyTranscript: string, beatNumber: number,
+ *                        gapFlag?: boolean }. Absent OR beatNumber<=1 → single-shot (the message
+ *                        is byte-identical to the pre-threading string).
+ *
+ * @returns {{ text: string, cache: boolean }[]}
+ */
+export function buildObjectionUserSegments({ liveSummary, latestResponse, thread } = {}) {
+  const belief = (liveSummary && liveSummary.trim()) || "(no call summary yet — this is early in the call)";
+  const segs = [{ text: `CALL MEMORY (what we already know about this prospect — lean on this):\n${belief}`, cache: true }];
+
+  const threaded = !!(thread && Number(thread.beatNumber) > 1);
+  if (!threaded) {
+    // Single-shot (beat 1 / no thread). Concatenation is byte-identical to the original message.
+    segs.push({ text: `\n\nWHAT WAS JUST SAID (last ~120s):\n${latestResponse ?? ""}`, cache: false });
+    return segs;
+  }
+
+  // Threaded. Big append-only transcript FIRST (cached prefix), then the small volatile tail.
+  const history = (thread.historyTranscript && thread.historyTranscript.trim()) || "(nothing captured yet)";
+  segs.push({
+    text: `\n\nEXCHANGE SO FAR (since this objection opened — the rep already worked it this far; this is context, not the thing to answer):\n${history}`,
+    cache: true,
+  });
+
+  const moves = (thread.linesGiven || []).map((l, i) => `${i + 1}. "${l}"`).join("\n") || "(none yet)";
+  let tail = `\n\nMOVES YOU'VE ALREADY GIVEN (the rep already said these out loud — do NOT repeat or lightly reword any of them; come from a NEW angle):\n${moves}`;
+  if (thread.gapFlag) {
+    // A pause was flagged — the prospect likely changed the subject. Do NOT nudge toward the
+    // close here (that pull is what makes it wrongly continue a resolved objection). Force a
+    // re-diagnosis instead.
+    tail +=
+      `\n\nIMPORTANT — THERE WAS A PAUSE since your last move, so the prospect may have moved OFF this objection. Read their LATEST response first and decide: if it raises a DIFFERENT concern than the moves above were working, treat those moves as a closed chapter — do NOT continue them and do NOT push toward a close — and handle the NEW objection from scratch, as if it were the first card. Engage the new concern head-on (or the fear right under it); do NOT bounce back to re-checking the belief you were already working. Continue the old sequence ONLY if the latest response is unmistakably the same objection coming back.`;
+  } else {
+    tail += `\n\nYou are on beat ${thread.beatNumber} of this objection. Give the NEXT move — the deeper the beat, the more you lean toward the trade / the close rather than another reframe.`;
+  }
+  tail += `\n\n--- everything below is the prospect's LATEST response to your last move ---\n${latestResponse ?? ""}`;
+  segs.push({ text: tail, cache: false });
+  return segs;
+}
+

@@ -24,7 +24,7 @@
  * with no confirmation signal the "if unsure, don't say the digits" default holds.
  */
 
-import { OBJECTION_SYSTEM_PROMPT } from "./objection-prompt.mjs";
+import { OBJECTION_SYSTEM_PROMPT, buildObjectionUserSegments } from "./objection-prompt.mjs";
 import { parseSSEBuffer } from "./sse-parse";
 import { decodeLineStream } from "./json-line-stream";
 
@@ -38,12 +38,40 @@ const OBJECTION_MAX_TOKENS = 150;
 // test always grades exactly what ships. Re-exported here for any external consumer.
 export { OBJECTION_SYSTEM_PROMPT };
 
+/**
+ * Objection Flow thread state (Phase A accepts it; Phase B populates it live).
+ * When present with beatNumber > 1, the card is a CONTINUATION — the generator feeds the
+ * verbatim moves already given + the exchange since the objection opened, so Sonnet advances
+ * the sequence instead of restarting. Absent → single-shot (byte-identical to pre-threading).
+ */
+export type ObjectionThread = {
+  linesGiven: string[];        // verbatim lines already handed to the rep (the no-repeat guard)
+  historyTranscript: string;   // anchored transcript, objection-open → last-move cursor (append-only)
+  beatNumber: number;          // 1 = first card (single-shot); 2+ = a continuation beat
+  gapFlag?: boolean;           // >~40s since last press → tell Sonnet to re-evaluate same-vs-new
+};
+
+type ContentBlock = { type: "text"; text: string; cache_control?: { type: "ephemeral" } };
+
 // The user-message shape MUST be identical for the streaming and non-streaming paths so the
-// eval-validated behavior holds regardless of which one ships. Single source here.
-function buildUserMessage(transcriptChunk: string, liveSummary?: string): string {
-  return (
-    `CALL MEMORY (what we already know about this prospect — lean on this):\n${liveSummary?.trim() || "(no call summary yet — this is early in the call)"}\n\n` +
-    `WHAT WAS JUST SAID (last ~120s):\n${transcriptChunk}`
+// eval-validated behavior holds regardless of which one ships. Both call this; the segment
+// SHAPE is the single source of truth in objection-prompt.mjs (shared with the eval).
+// cache:true segments get a cache_control breakpoint — the frozen belief + append-only history
+// prefill from cache on later beats; the small volatile tail (moves/beat/marker/latest) is fresh.
+function buildUserContent(
+  transcriptChunk: string,
+  liveSummary?: string,
+  thread?: ObjectionThread,
+): ContentBlock[] {
+  const segs = buildObjectionUserSegments({
+    liveSummary,
+    latestResponse: transcriptChunk,
+    thread,
+  }) as Array<{ text: string; cache?: boolean }>;
+  return segs.map((s) =>
+    s.cache
+      ? { type: "text", text: s.text, cache_control: { type: "ephemeral" } }
+      : { type: "text", text: s.text },
   );
 }
 
@@ -98,6 +126,7 @@ function parseObjection(raw: string): ObjectionCardResult {
 export async function generateObjectionCard(
   transcriptChunk: string,
   liveSummary?: string,
+  thread?: ObjectionThread,
 ): Promise<ObjectionCardResult> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
@@ -108,8 +137,9 @@ export async function generateObjectionCard(
   const t0 = Date.now();
 
   // No objection is handed in (Groq removed) — Sonnet infers it from the transcript,
-  // exactly as validated by the eval's production-faithful arm.
-  const userMessage = buildUserMessage(transcriptChunk, liveSummary);
+  // exactly as validated by the eval's production-faithful arm. `thread` (Phase B) turns this
+  // into a continuation beat; absent → single-shot, byte-identical to before.
+  const userContent = buildUserContent(transcriptChunk, liveSummary, thread);
 
   // 10s timeout — a Sonnet stall must not leave the client's isGeneratingRef stuck.
   // The client also has its own 12s guard + retry pill, so an error here is never dead air.
@@ -128,7 +158,7 @@ export async function generateObjectionCard(
         model:      OBJECTION_MODEL,
         max_tokens: OBJECTION_MAX_TOKENS,
         system:     OBJECTION_SYSTEM_PROMPT,
-        messages:   [{ role: "user", content: userMessage }],
+        messages:   [{ role: "user", content: userContent }],
       }),
       signal: controller.signal,
     });
@@ -194,6 +224,7 @@ export async function* streamObjectionCard(
   transcriptChunk: string,
   liveSummary?: string,
   signal?: AbortSignal,
+  thread?: ObjectionThread,
 ): AsyncGenerator<ObjectionStreamEvent> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
@@ -230,7 +261,7 @@ export async function* streamObjectionCard(
         model:      OBJECTION_MODEL,
         max_tokens: OBJECTION_MAX_TOKENS,
         system:     OBJECTION_SYSTEM_PROMPT,
-        messages:   [{ role: "user", content: buildUserMessage(transcriptChunk, liveSummary) }],
+        messages:   [{ role: "user", content: buildUserContent(transcriptChunk, liveSummary, thread) }],
         stream:     true,
       }),
       signal: controller.signal,
