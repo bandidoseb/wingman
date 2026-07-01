@@ -1,6 +1,13 @@
 # TODO — Streaming Objection Card
 
-Full plan hardened via plan-reviewer (2026-06-30). Build order below. We are on **Step 1**.
+> ✅ **COMPLETE (2026-06-30 Session 3).** All 5 steps built, hardened, wingman-reviewer APPROVED,
+> live-tested by Sebastian (line streams in ~1.7–2.7s warm). Web+electron tsc 0, 91 tests. Committed on
+> `feat/streaming-card-reveal`, awaiting push approval. Also fixed 5 live issues (cold-start abort,
+> `Controller is already closed` crash, rapid-press error spam → client throttle + 429 quiet-resolve,
+> "SUGGEST" tag removed on no-objection, Sonnet added to call-start warm-up). Narrative: `Wingman Brain/
+> 01 - Build Log/2026-06-30.md` Session 3. Steps below kept for reference.
+
+Full plan hardened via plan-reviewer (2026-06-30). Build order below.
 (Prior objection-card build plan is shipped — see `tasks/plan-objection-build.md` + git history.)
 
 ---

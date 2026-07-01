@@ -9,21 +9,19 @@
  *   - slot              : "objection" | "answer" | "dig" | "close"
  *   - current_stage     : active call stage label
  *
- * Flow (↑ objection slot — context-driven, NO KB, NO Groq since 2026-06-30):
- *   generateObjectionCard(chunk, summary) → Sonnet reads the Belief Ladder summary + 120s
- *                 buffer, infers the objection itself, and returns ONE of:
- *     status:"line"    → headless card (signal_header:"" + line in signal_text, type:"Objection")
- *     status:"abstain" → nothing standing → static "No objection detected" nudge (type:"Nudge").
- *                        This IS the honesty gate now — Sonnet's own call, no extra paid request.
- *     status:"error"   → empty { ok:true } → the client shows the retry pill (never dead air).
- *   Other slots (answer/dig/close): raw-chunk KB path unchanged until Phase 4.
- *   → returns { ok, signal_header, signal_text, signal_type } in the HTTP body
- *
- * The card is delivered synchronously in the response (not via Pusher).
- * DashboardClient awaits the response and calls window.wingman.sendSignal().
+ * Flow (↑ objection slot — context-driven, NO KB, NO Groq since 2026-06-30; STREAMING since
+ * 2026-06-30 Step 4): this slot returns a Server-Sent-Events stream, NOT JSON. We return the
+ * Response immediately and run streamObjectionCard() inside the stream's start(), emitting:
+ *     event:delta {textSoFar}  → the spoken line so far (decoder strips the JSON envelope)
+ *     event:done  {line}       → authoritative final line (headless Objection card)
+ *     event:nudge {header,text}→ Sonnet abstained → static "No objection detected" (honesty gate)
+ *     event:error {}           → API/timeout/unparseable → client shows the retry pill
+ *   The pre-Sonnet cases (auth, rate-limit, empty/oversized transcript) still return JSON; the
+ *   client branches on Content-Type, so those keep working. Other slots (answer/dig/close):
+ *   raw-chunk KB path, JSON, unchanged until Phase 4.
  *
  * Instrumentation (#38): every request logs
- *   [kb-signal] TIMING search= generate= total= branch= idleGap=
+ *   [kb-signal] TIMING ... branch= idleGap=   (objection logs `stream branch=objection`)
  * idleGap = seconds since this user's previous press ("first" if none) — this is the
  * connection-cooling probe: if slow presses correlate with long gaps, build the
  * periodic keep-warm (see tasks/todo.md, Phase 3.5 plan).
@@ -39,7 +37,12 @@ import { generateSignalCard,
          NUDGE_HEADLINE,
          NUDGE_STATIC_SUBTEXT,
          type SignalCardResult }       from "@/lib/wingman/knowledge-signal";
-import { generateObjectionCard }       from "@/lib/wingman/objection-signal";
+import { streamObjectionCard }         from "@/lib/wingman/objection-signal";
+
+// The objection slot streams (SSE). force-dynamic keeps it off any cached/static path;
+// nodejs runtime so the ReadableStream + per-request abort behave predictably on Railway.
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
 
 // Valid slot values — anything else defaults to "objection"
 const VALID_SLOTS = ["objection", "answer", "dig", "close"] as const;
@@ -62,7 +65,10 @@ export async function POST(req: NextRequest) {
     const now  = Date.now();
     const last = rateLimitMap.get(user.id) ?? 0;
     if (now - last < RATE_LIMIT_MS) {
-      return NextResponse.json({ ok: true }); // silently drop — client guard handles UX
+      // Pressed faster than the cost guard allows. This is NOT a failure — return a
+      // distinct 429 so the client resolves the pill QUIETLY (no "couldn't pull that"
+      // error). The client also throttles before sending, so this is the edge backstop.
+      return NextResponse.json({ ok: false, throttled: true }, { status: 429 });
     }
     rateLimitMap.set(user.id, now);
     // Opportunistic prune so the map can't grow unbounded across many users.
@@ -119,68 +125,95 @@ export async function POST(req: NextRequest) {
       ? live_summary.slice(0, 4_000)
       : undefined;
 
-    // ── Generate the card (Phase 3.5 branching for the ↑ objection slot) ────
-    const tPipeline  = Date.now();
-    let   searchMs   = 0;
-    let   generateMs = 0;
-    let   branch: "objection" | "objection-error" | "kb" | "fallback-grounded" | "nudge" | "raw-fallback" | "raw-kb" = "raw-kb";
-    let   card: SignalCardResult | null = null;
-    let   objectionLine: string | null = null;   // headless single-line objection card
-
-    if (activeSlot === "objection") {
-      // NO Groq, NO KB. Sonnet reads the buffer, infers the objection itself, and either
-      // writes the line, abstains (nothing standing), or errors. The Groq distiller that
-      // used to hand in the objection + gate the nudge was removed 2026-06-30 — the eval
-      // showed the hint added nothing and Sonnet abstains reliably (7/7, 0 false-silence).
-      const t2 = Date.now();
-      const objCard = await generateObjectionCard(transcript_chunk, summary);
-      generateMs = Date.now() - t2;
-
-      if (objCard.status === "line") {
-        branch = "objection";
-        objectionLine = objCard.line;
-      } else if (objCard.status === "abstain") {
-        // Honesty gate, now Sonnet's own judgment: nothing to handle → the static
-        // "No objection detected" nudge. Never a guess card, and no extra paid call.
-        branch = "nudge";
-        card = { headline: NUDGE_HEADLINE, subtext: NUDGE_STATIC_SUBTEXT, source: "" };
-      }
-      // else objCard.status === "error": card + objectionLine stay null → falls through
-      // to the failure return below → the client shows the retry pill (never dead air).
-    } else {
-      // answer / dig / close — raw-chunk path, unchanged until Phase 4.
-      const t1 = Date.now();
-      const knowledgeResults = await searchKnowledge(transcript_chunk);
-      searchMs = Date.now() - t1;
-
-      const t2 = Date.now();
-      if (knowledgeResults) {
-        card = await generateSignalCard(knowledgeResults, transcript_chunk, summary, current_stage);
-      }
-      if (!card) {
-        branch = "raw-fallback";
-        card = await generateFallbackCard(activeSlot, transcript_chunk, summary, current_stage);
-      }
-      generateMs = Date.now() - t2;
-    }
-
-    // ── #38 instrument: one line per press, grep-able on Railway ────────────
-    const totalMs = Date.now() - tPipeline;
     const idleGap = last === 0 ? "first" : `${Math.round((now - last) / 1000)}s`;
-    console.log(
-      `[kb-signal] TIMING search=${searchMs}ms ` +
-      `generate=${generateMs}ms total=${totalMs}ms branch=${branch} idleGap=${idleGap}`,
-    );
 
-    // Objection slot with a real objection → the headless single-line card.
-    if (objectionLine) {
-      return NextResponse.json({
-        ok:            true,
-        signal_type:   "Objection",
-        signal_text:   objectionLine,
-        signal_header: "",
+    // ── ↑ Objection slot → STREAMING (SSE) ──────────────────────────────────
+    // NO Groq, NO KB. Sonnet reads the buffer, infers the objection, and streams the
+    // ONE spoken line as it writes it. We return the Response IMMEDIATELY and run Sonnet
+    // INSIDE the stream's start() — nothing is awaited before return, so Next/Railway
+    // can't buffer it. The decoder yields only the inner line chars; abstain → a single
+    // `nudge` event (zero deltas); error → a single `error` event (client shows retry).
+    if (activeSlot === "objection") {
+      console.log(`[kb-signal] TIMING stream branch=objection idleGap=${idleGap}`);
+
+      const encoder = new TextEncoder();
+      const stream = new ReadableStream<Uint8Array>({
+        async start(controller) {
+          // When the client disconnects mid-stream the controller is already closed, so
+          // every enqueue must be guarded — otherwise it throws "Controller is already
+          // closed". Returns false once the pipe is gone so we can stop the loop + Sonnet.
+          const send = (event: string, data: unknown): boolean => {
+            try {
+              controller.enqueue(encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`));
+              return true;
+            } catch { return false; } // client gone — stop trying to write
+          };
+          try { controller.enqueue(encoder.encode(": ok\n\n")); } catch { return; } // flush; bail if already closed
+
+          let sawTerminal = false;
+          try {
+            // req.signal aborts on client disconnect / dismiss / call-end → stops Sonnet (W6).
+            for await (const ev of streamObjectionCard(transcript_chunk, summary, req.signal)) {
+              let alive = true;
+              if (ev.kind === "delta") {
+                alive = send("delta", { textSoFar: ev.textSoFar });
+              } else if (ev.kind === "done") {
+                alive = send("done", { line: ev.line });
+                sawTerminal = true;
+              } else if (ev.kind === "abstain") {
+                // Static "No objection detected" — server owns the copy (single source).
+                alive = send("nudge", { header: NUDGE_HEADLINE, text: NUDGE_STATIC_SUBTEXT });
+                sawTerminal = true;
+              } else {
+                alive = send("error", {});
+                sawTerminal = true;
+              }
+              if (!alive) break; // client disconnected — abort the generator (its finally stops Sonnet)
+            }
+            if (!sawTerminal) send("error", {}); // generator ended w/o terminal
+          } catch (err) {
+            console.error("[kb-signal] objection stream error:", err);
+            send("error", {}); // guarded — no-op if the client already left
+          } finally {
+            try { controller.close(); } catch { /* already closed */ }
+          }
+        },
+      });
+
+      return new Response(stream, {
+        headers: {
+          "Content-Type":      "text/event-stream; charset=utf-8",
+          "Cache-Control":     "no-cache, no-transform",  // no-transform defeats Next gzip on this route
+          "Connection":        "keep-alive",
+          "X-Accel-Buffering": "no",                      // tell Railway's edge proxy not to buffer
+        },
       });
     }
+
+    // ── answer / dig / close — raw-chunk KB path, unchanged until Phase 4. ──
+    const tPipeline  = Date.now();
+    let   branch: "kb" | "raw-fallback" = "raw-fallback";
+    let   card: SignalCardResult | null = null;
+
+    const t1 = Date.now();
+    const knowledgeResults = await searchKnowledge(transcript_chunk);
+    const searchMs = Date.now() - t1;
+
+    const t2 = Date.now();
+    if (knowledgeResults) {
+      branch = "kb";
+      card = await generateSignalCard(knowledgeResults, transcript_chunk, summary, current_stage);
+    }
+    if (!card) {
+      branch = "raw-fallback";
+      card = await generateFallbackCard(activeSlot, transcript_chunk, summary, current_stage);
+    }
+    const generateMs = Date.now() - t2;
+
+    console.log(
+      `[kb-signal] TIMING search=${searchMs}ms ` +
+      `generate=${generateMs}ms total=${Date.now() - tPipeline}ms branch=${branch} idleGap=${idleGap}`,
+    );
 
     if (!card) {
       // Generation failed (timeout / API error / unparseable) — return empty ok.
@@ -193,7 +226,7 @@ export async function POST(req: NextRequest) {
       ok:            true,
       signal_header: card.headline,
       signal_text:   card.subtext ?? "",
-      signal_type:   branch === "nudge" ? "Nudge" : "Handle",
+      signal_type:   "Handle",
     });
 
   } catch (err) {

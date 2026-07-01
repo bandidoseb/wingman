@@ -29,7 +29,7 @@ This is the first file Claude reads at session start. It answers: where are we, 
 **Cross-cutting work** (not tied to one arrow — slot in between phases):
 - ✅ **Desktop release v0.1.22** — DONE 2026-06-30. Shipped all 6 un-released PRs since June 5 (Phase 3.5, in-memory KB, objection card 3.6a) into a built + **published** `.dmg`. (Routed via PR — `main` is ruleset-protected; see corrected CLAUDE.md release flow.)
 - 🚨 **Auto-updater fix (#45)** — RELEASE-BLOCKING for beta. Releases build as GitHub *drafts* → `electron-updater` never sees them; Sebastian downloads the `.dmg` by hand every time. Must auto-publish + verify update-on-second-machine before any public distribution. Own session.
-- 🎬 **Streaming card reveal — IN PROGRESS** (branch `feat/streaming-card-reveal`, stacked on PR #23). Steps 1–3 DONE: eval single-source-of-truth + prod-faithful gate · **Groq removed** + abstain "No objection detected" (→ **PR #23**, pinned/unmerged, wingman-reviewer APPROVE) · **HUD constant-rate reveal loop** built against the one-shot card. **NEXT = Step 4** (server SSE → IPC delta channel → renderer reader) + Step 5 hardening. Full plan: `tasks/todo.md`. Merge order at wrap: #23 → streaming PR.
+- 🎬 **Streaming card reveal — ✅ BUILT + live-tested (Session 3), awaiting push approval** (branch `feat/streaming-card-reveal`, stacked on PR #23). Steps 1–3 done; **Steps 4–5 done:** server SSE (envelope opened as it streams; `no-transform` defeats Next gzip — proven on a real prod build) → `hud:signal-delta` IPC → renderer SSE reader (`sse-parse.ts`) + `json-line-stream.ts` decoder; seq guard, idempotent release, TTFB/idle guards, dismiss/call-end abort. **wingman-reviewer APPROVE**, web+electron tsc 0, **91 tests**. Sebastian live-confirmed the line streams in (~1.7–2.7s warm). Also fixed live: cold-start self-abort, `Controller is already closed` crash, rapid-press error spam (client throttle + 429 quiet-resolve), no-objection "SUGGEST" tag removed, **Sonnet warm-up added** (was Haiku-only → cold first press ~6s→~2s). **Merge order: #23 → this branch → Railway (backend). HUD reveal reaches packaged app only on next desktop release.** Narrative: `2026-06-30.md` Session 3.
 - 🛡️ **Model-resilience (#44)** — one `models.ts` source of truth + a daily deprecation canary. Own session.
 - 🩹 **Partials (#41)** — stale-objection correctness bug; really an ↑ objection-slot fix (transcript finalization lag).
 - 🎛️ **Card Placement Studio + Notch Mode** (NEW 2026-06-30, POST-STREAMING) — let the rep choose notch vs floating window + customize size/width/drop/text color/text size, via a drag-to-place mock-Zoom customizer in the dashboard, saved as a per-user preset. Inspired by Moody; we take its look/placement, NOT the teleprompter scrolling. Notch only on some Macs → graceful fallback to top-center. Spec: `_Inbox/2026-06-30 Card Placement Studio + Notch Mode.md`.
@@ -38,26 +38,27 @@ This is the first file Claude reads at session start. It answers: where are we, 
 
 ---
 
-## 🎯 NEXT SESSION — START HERE (updated 2026-06-30)
+## 🎯 NEXT SESSION — START HERE (updated 2026-06-30 Session 3)
 
-**▶ START HERE: Phase 3.6b — confidence-aware summarizer.** Plan is drafted + approved-pending-Sebastian's-yes.
-Add a **confidence-number rule** to `BELIEF_LADDER_SYSTEM_PROMPT` in `src/lib/wingman/belief-ladder.ts`:
-record a figure as digits ONLY when the prospect stated it plainly AND it's confirmed (echoed/affirmed/
-repeated — not hedged with "maybe / like / someday / I guess"); hedged or vague-once numbers → capture the
-*meaning*, drop the digits; never invent a number. **Why:** the summarizer feeds the objection card, so an
-unconfirmed number stored here leaks into a card as a fake-precise anchor (the fabrication risk from 06-29).
-**Gate = `node scripts/test-belief-ladder.mjs`** (3 fixtures, currently RED on purpose) must go GREEN — run
-**3× for stability** (output is stochastic). One file. Then `wingman-reviewer` + ship via PR. Blast radius
-small (prompt-only; summarizer is background ~2 min, never blocks a card).
+**▶ START HERE: push the streaming branch.** `feat/streaming-card-reveal` is BUILT, live-tested, and
+wingman-reviewer-APPROVED (Steps 4–5 + Session-3 fixes), committed locally, **not yet pushed** (Hard Rule #0 —
+Sebastian will give the yes). When approved: push → open PR → CI + Security green → **merge PR #23 first, then
+this branch** → Railway deploys the backend (Groq removal + SSE). The HUD reveal reaches the **packaged app only
+on the next desktop release** (bundle with the auto-updater #45 release, or cut one after merge).
 
-**✅ Done 2026-06-30 (this session):** cut + **published desktop release v0.1.22** (first since June 5 — shipped
-all 6 un-released PRs incl. 3.6a to a downloadable `.dmg`); merged the two phase-numbering systems into the
-**MASTER ROADMAP** above; corrected CLAUDE.md release flow (PR-based, draft-publish, auto-update warning);
-logged **Issue #45 (auto-updater broken — release-blocking for beta)**. Full narrative: `2026-06-30.md`.
+**Then, in priority order (each its own session):**
+1. 🚨 **Auto-updater fix (#45)** — release-blocking for beta.
+2. **Multi-turn objection threading** (PRIORITY-BUMPED by Sebastian 2026-06-30 — see `_Inbox/multi-turn objection handling.md`): 90% of handled objections get a rebuttal → 2–10 turn exchange. Re-press threading design already written; streaming + Sonnet warm-up put the fast-re-press half in place.
+3. **Phase 3.6b — confidence-aware summarizer** (still NOT done; gate `node scripts/test-belief-ladder.mjs` is RED on purpose). Add a confidence-number rule to `BELIEF_LADDER_SYSTEM_PROMPT` in `belief-ladder.ts`: digits ONLY when stated plainly AND confirmed (echoed/repeated); hedged/vague-once → capture meaning, drop digits; never invent. Gate must go GREEN (run 3× — stochastic). Prompt-only, small blast radius.
+4. Model-resilience (#44) · partials (#41) · Phase 3.6c anchor library (deferred) · **Phase 4** (← answer · ↓ dig · → close — each streams too) + **Phase 5** (cleanup, incl. orphaned `distillObjection`/`generateNudgeCard`/non-stream `generateObjectionCard`).
 
-**Other queued sessions (each its own):** 🚨 **auto-updater fix (#45, release-blocking)** · model-resilience
-(#44) · streaming card reveal · partials (#41) · then Phase 3.6c anchor library (deferred) · then **Phase 4**
-(← answer · ↓ dig · → close) + **Phase 5** (cleanup) to finish the big Hotkey Model.
+**✅ Done 2026-06-30 Session 3:** built + hardened **streaming objection card** (Steps 4–5); found+fixed 5 live
+issues (cold-start abort, controller-closed crash, rapid-press error spam, "SUGGEST" tag, cold Sonnet →
+warm-up); 2 new tested pure modules (`json-line-stream.ts`, `sse-parse.ts`, +32 tests → 91). Streaming
+live-confirmed by Sebastian. Narrative: `2026-06-30.md` Session 3.
+
+**✅ Done 2026-06-30 Session 1:** cut + published desktop release **v0.1.22**; MASTER ROADMAP unification;
+CLAUDE.md release-flow fix; logged Issue #45.
 
 ---
 

@@ -73,10 +73,15 @@ async function warmEmbedAndKb(): Promise<string> {
   return `${resp.ok ? "embed:ok" : `embed:${resp.status}`} kb:${getKbMemoryState()}`;
 }
 
-/** Anthropic 1-token ping — pure TLS/pool warm (no cache_control; see header note). */
-async function warmAnthropic(): Promise<string> {
+/**
+ * Anthropic 1-token ping — pure TLS/pool warm (no cache_control; see header note).
+ * Pinged per model: Haiku (answer/dig/close slots) AND Sonnet (the objection card). The
+ * objection slot is Sonnet, so without a Sonnet ping the first hotkey press of a call hits
+ * a cold model (~6s first token); warming it here brings the cold press near the warm ~2s.
+ */
+async function warmAnthropic(model: string, label: string): Promise<string> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) return "haiku:skipped(no-key)";
+  if (!apiKey) return `${label}:skipped(no-key)`;
 
   const resp = await fetchWithTimeout("https://api.anthropic.com/v1/messages", {
     method:  "POST",
@@ -86,12 +91,12 @@ async function warmAnthropic(): Promise<string> {
       "content-type":      "application/json",
     },
     body: JSON.stringify({
-      model:      "claude-haiku-4-5-20251001",
+      model,
       max_tokens: 1,
       messages:   [{ role: "user", content: "warm" }],
     }),
   });
-  return resp.ok ? "haiku:ok" : `haiku:${resp.status}`;
+  return resp.ok ? `${label}:ok` : `${label}:${resp.status}`;
 }
 
 /** Groq 1-token ping — warms the distiller's connection. */
@@ -115,7 +120,8 @@ export async function warmUpPipeline(): Promise<void> {
   const t0 = Date.now();
   const results = await Promise.allSettled([
     warmEmbedAndKb(),
-    warmAnthropic(),
+    warmAnthropic("claude-haiku-4-5-20251001", "haiku"),  // answer/dig/close slots
+    warmAnthropic("claude-sonnet-4-6", "sonnet"),          // the objection card (live press)
     warmGroq(),
   ]);
 
