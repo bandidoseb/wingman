@@ -101,7 +101,7 @@ Documentation of every external API dependency. For each: what endpoints we use,
 | Read/write Offer Brain | `profiles.offer_brain` | Session load, post-call update |
 | Store/retrieve KB entries | `kb_entries` | Ingestion, RAG search |
 | Vector search | `search_kb_entries()` RPC | RAG pipeline |
-| Store/delete transcripts | `call_transcript` | Session, post-call delete |
+| Store + RETAIN transcripts (user-deletable) | `call_transcript` | Saved during session; **retained after post-call** (Ask Wingman + Flight Log + follow-up memory rely on it). Never auto-deleted. Rep can delete per-call or account-wide (compliance #33). |
 | Store objections | `vault_objections` | Post-call job |
 
 **What we send:** Standard SQL operations + pgvector RPC calls.

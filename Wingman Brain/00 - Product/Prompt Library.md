@@ -1,10 +1,15 @@
 # Prompt Library
 
-> ⚠️ **SUPERSEDED for the objection card — 2026-06-21 (wiring pending).** The Haiku signal-card prompt (HEADLINE ≤5 words + SUBTEXT) is replaced for objections by a new **Sonnet** prompt that outputs ONE first-person line, no KB. Source of truth: `scripts/objection-prompt-test.mjs` → `OBJECTION_SYSTEM_PROMPT` (+ `knowledge-base/objection-transcripts/PLAYBOOK-SYNTHESIS.md`). See Decisions Log 2026-06-21.
+> ⚠️ **Partly SUPERSEDED — read before trusting the live-card prompts below (updated 2026-07-01).**
+> - The live **objection** card is a context-driven **Sonnet** prompt that outputs ONE first-person line with **no KB/retrieval** — source of truth is `src/lib/wingman/objection-signal.ts` (prompt distilled in `knowledge-base/objection-transcripts/PLAYBOOK-SYNTHESIS.md`), **not** the Haiku "headline + subtext" prompt below. Shipped 2026-06-29.
+> - Cards are **hotkey-summoned, not autonomous** — the "Trigger Classifier Prompt" (§1) is **dormant** (it no longer fires cards).
+> - **"Offer Brain" = legacy naming for Sales DNA** throughout this file.
+> - The **post-call / Sales-DNA-update prompts** further down are still accurate (Sonnet).
+> - **Stage count = 6 (canonical, resolved 2026-07-01):** Rapport · Discovery · Press · Confirm · Pitch · Close — what the code ships (`post-call/route.ts` + `IntelTab.tsx`). Any "8 stages / NEPQ 8-stage" wording in the prompt bodies below is **legacy** — the 8-stage NEPQ is the coaching *depth* underneath the 6, not the tracked list (see CLAUDE.md → Call Stages). The old "4 universal" idea was never built.
 
 [[Architecture]] | [[KB Ingestion Spec v2]]
 
-Last updated: 2026-04-02
+Last updated: 2026-07-01 (header only — prompt bodies below are historical unless noted)
 
 Every Claude prompt used in Wingman's AI pipeline. This file is the source of truth for what we're asking the AI to do and why.
 

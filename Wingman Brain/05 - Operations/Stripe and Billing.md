@@ -8,23 +8,25 @@ Current pricing model, how Stripe is configured, where Price IDs live, how Rewar
 
 ## Current Pricing Model
 
-**Product:** Wingman monthly subscription
-**Price:** $149/month (directional — not yet finalized for launch)
-**Billing:** Monthly recurring subscription via Stripe
-**Free tier:** Limited number of calls (exact limit TBD) — triggers iMessage conversion funnel at the close moment
+**Direction (2026-06-05): TIERED** — full model in `06 - Finance/Tier Pricing Proposal + Unit Economics.md`.
+- **Free** — 10 calls, then blocked (triggers the iMessage conversion funnel at the close moment)
+- **Core — $149/mo** — soft-capped ~75 calls
+- **Pro — $299/mo** — unlimited + premium (calendar / prospect-memory / Coach)
 
-**No annual plan yet.** Annual billing is a V2 consideration after monthly is proven.
+A call counts only if **≥10 min AND the prospect spoke.**
+**Billing:** Monthly recurring via Stripe. No annual plan yet (V2 after monthly is proven).
 
-**No tiered pricing yet.** One plan. One price. Closers don't want to read a pricing table.
+> Superseded: the earlier "one plan, one price $149, no tiers" model. The near-$0 live AI cost of the hotkey-summoned card is what makes a $149 tier viable at margin and a $299 unlimited tier possible. Numbers still directional — not finalized for launch.
 
 ---
 
 ## Stripe Configuration
 
-**Products setup:**
-- One product: "Wingman Monthly"
-- One price: $149/month recurring
-- Price ID: (set in Stripe dashboard, copied to Railway environment variables)
+**Products setup (per the tiered direction — not yet built out in Stripe):**
+- **Core** — $149/month recurring
+- **Pro** — $299/month recurring
+- Free tier = no Stripe product (gated in-app at 10 calls)
+- Price IDs: (set in Stripe dashboard, copied to Railway environment variables)
 
 **Where Price IDs live:**
 - Stripe dashboard → Products → copy the Price ID (looks like `price_xxxxxxxxxxxxx`)

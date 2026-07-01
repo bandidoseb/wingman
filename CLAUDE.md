@@ -230,24 +230,22 @@ Rules: One active Sales DNA per user. Never let the user manually configure it. 
 
 ---
 
-## Call Stages (8-Stage Framework)
+## Call Stages — 6 operational stages (NEPQ depth underneath)
 
-Built on Jeremy Miner (NEPQ) + Cole Gordon methodology. This is the default Wingman Playbook framework.
+**The system tracks SIX stages:** **Rapport · Discovery · Press · Confirm · Pitch · Close.** This is what the code actually uses (`STAGE_ORDER` in `post-call/route.ts` + `IntelTab.tsx`). The post-call Sonnet job derives them from the transcript into `call_stages`; the dashboard shows them (Intel coverage heatmap + Flight Log per-call framework coverage). They are **not shown live** during the call — the hotkey pivot removed the live stage bar. *(Reconciled 2026-07-01: docs previously said "8-stage" and a 2026-06-03 note said "4 universal" — neither matched the code, which ships 6. Six is canonical.)*
 
-1. **Rapport / Tonality** — Establish peer frame, not salesperson frame. Slow down, match energy. Almost no signals fire here.
-2. **Pre-frame / Agenda** — Tell them how the call works. Get permission to ask questions. Kills objections early.
-3. **Situation** — Fact-find. Current state, context, what they've tried. Logical setup for pain questions.
-4. **Pain / Problem** — NEPQ questions: dig into real problem, implications, emotional cost. Gordon "Gap": quantify distance between where they are and where they want to be.
-5. **Desired Outcome** — Get them to articulate their dream result in their own words. Future pace emotionally.
-6. **Transition / Bridge** — Summarize their pain + goal back to them. Ask: "Would it be okay if I showed you how we help?"
-7. **Pitch** — Tailored, short. Present only what solves their stated problem. Connect every feature back to their specific pain.
-8. **Close + Objections** — Assumptive or direct close. Objections = reopen pain, not fight. "What's making you hesitate?"
+The **Jeremy Miner (NEPQ) + Cole Gordon 8-stage methodology is the coaching *philosophy* — the depth underneath the 6**, not a separate system. It maps in:
 
-**Signal card philosophy per stage:**
-- Stages 1–2: Almost nothing fires. Rep is building trust.
-- Stages 3–5: Cards fire only if rep is rushing past critical discovery items.
-- Stage 6: Card fires if rep skips the transition and tries to pitch too early.
-- Stages 7–8: Cards fire for objection handling and close support.
+| System stage (code) | NEPQ / Gordon depth underneath |
+|---|---|
+| **Rapport** | Rapport / Tonality — peer frame, match energy. + Pre-frame / Agenda — how the call works, permission to ask, kills objections early. |
+| **Discovery** | Situation — fact-find: current state, context, what they've tried. |
+| **Press** | Pain / Problem — NEPQ dig into the real problem, implications, emotional cost; Gordon "Gap": quantify where they are vs. where they want to be. |
+| **Confirm** | Desired Outcome — dream result in their own words, future-pace. + Transition / Bridge — summarize pain+goal, "would it be okay if I showed you how we help?" |
+| **Pitch** | Tailored, short. Present only what solves their stated problem; tie every feature to their pain. |
+| **Close** | Close + Objections — assumptive/direct close; objections = reopen pain, not fight ("what's making you hesitate?"). |
+
+**Stage-aware card logic** (shapes the summoned objection card's context + post-call framework coverage — NOT autonomous firing, which is retired): early (Rapport/Discovery) → almost nothing relevant; Press/Confirm → matters if the rep rushed discovery or is pitching before confirming; Pitch/Close → objection handling + close support.
 
 ---
 
