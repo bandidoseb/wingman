@@ -32,11 +32,7 @@ Wingman is a Mac desktop app (Electron + Next.js) that acts as a real-time AI co
 
 **For the website:** Must be clearly stated in system requirements. Suggested copy: *"Requires a Mac with Apple Silicon (M1, M2, or M3 chip). macOS 13 or later. Compatible with Zoom, Microsoft Teams, and Google Meet."*
 
-**Note on notarization:** The current build is not Apple-notarized (code-signing). When users download a non-notarized app, macOS shows a warning. Workaround for beta testers:
-```bash
-xattr -dr com.apple.quarantine "/Applications/Wingman.app"
-```
-This must be run in Terminal after moving the app to /Applications. We should document this in the beta onboarding email.
+**Note on notarization:** ✅ Builds ARE Apple-signed (Developer ID) **and notarized** as of 2026-07-01 (v0.1.27+). Users no longer see the "unidentified developer" warning and **do not** need the old `xattr -dr com.apple.quarantine` Terminal workaround — do not include it in the beta onboarding email. (Notarization runs in CI via `mac.notarize: true` in `electron-builder.yml` using the Apple secrets already in the release workflow.)
 
 ---
 

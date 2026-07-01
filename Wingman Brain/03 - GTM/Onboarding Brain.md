@@ -18,7 +18,7 @@ That's the moment the product sells itself. Everything before it is removing fri
 
 ## The Ideal First Session (What We Want)
 
-1. Rep installs the app (downloads .dmg, opens Wingman, runs the quarantine removal command)
+1. Rep installs the app (downloads .dmg, drags Wingman to Applications, opens it — no quarantine command needed; the build is notarized as of 2026-07-01)
 2. Signs up with email, completes onboarding flow
 3. Connects their call platform (Zoom / Google Meet)
 4. Configures their Playbook framework (what they sell, their call structure)
@@ -49,10 +49,8 @@ Multi-step onboarding modal that collects:
 
 *[Populate from beta feedback — these are hypotheses until confirmed by real users]*
 
-**Hypothesis 1: The quarantine removal step.**
-The app isn't Apple-notarized. After installing, users get a macOS security warning. The fix is one Terminal command (`xattr -dr com.apple.quarantine "/Applications/Wingman.app"`) but non-technical users may not have Terminal open regularly. This is a friction point in the first session.
-
-**Mitigation:** Beta onboarding email includes this step explicitly with the exact command. In-app prompt? TBD.
+**Hypothesis 1: The quarantine removal step. — ✅ ELIMINATED 2026-07-01.**
+This used to be real friction: the app wasn't notarized, so users hit a macOS security warning and had to run a Terminal command (`xattr -dr com.apple.quarantine …`). **Notarization is now enabled** (v0.1.27+), so the app opens cleanly with no warning and no Terminal step. This drop-off point is gone — do NOT reintroduce the command in onboarding.
 
 **Hypothesis 2: "Deploy Wingman" button.**
 The button is in the tray popover. Users need to find the tray icon in the menu bar, click it, and then click Deploy. This requires them to know to look in the menu bar — which Mac-native users will, but newer Mac users might not.
@@ -71,7 +69,8 @@ If the trigger classifier doesn't fire (because the call is pure rapport or the 
 **Email 1 — Immediately after signup:**
 Subject: "Welcome to the beta — read before your first call"
 Content:
-- How to install (download .dmg, open, run quarantine command)
+- How to install (download .dmg, drag to Applications, open — notarized, no quarantine command needed)
+- Note: app auto-updates itself from here on (as of 2026-07-01) — no manual re-downloads
 - Finding the tray icon
 - The 3-minute setup before your first call (Playbook, Zoom display name)
 - What signal cards look like

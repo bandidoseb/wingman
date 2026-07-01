@@ -37,9 +37,10 @@ People who have expressed interest but haven't been onboarded yet.
 When onboarding a new beta user:
 
 1. **Send the beta invite email** — includes:
-   - Download link (GitHub Releases)
-   - Step-by-step install instructions
-   - The quarantine removal command: `xattr -dr com.apple.quarantine "/Applications/Wingman.app"`
+   - Download link — **public releases page:** https://github.com/bandidoseb/wingman-releases/releases/latest
+   - Step-by-step install instructions (download .dmg → drag to Applications → open)
+   - ~~Quarantine command~~ — **NOT needed anymore** (app is notarized as of 2026-07-01; opens with no warning)
+   - Note: after this one install, Wingman **auto-updates itself** — no more manual re-downloads
    - What to do on their first call
    - How to reach Sebastian for help
 
