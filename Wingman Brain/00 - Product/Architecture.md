@@ -1,8 +1,8 @@
 # Wingman Architecture
 
-> ⚠️ **SUPERSEDED in part — 2026-06-21 (wiring pending).** The live **objection** card no longer uses the RAG/KB pipeline (embed → pgvector → KB → Haiku). It's a context-driven prompt (diagnose the weak Belief Ladder belief → tie-down anchored to the prospect's own words → one line) on **Sonnet**, no retrieval. KB = Wingman Coach only. See Decisions Log 2026-06-21 + `tasks/wiring-objection-prompt.md`.
+> ⚠️ **The "Real-Time Pipeline" + "RAG Pipeline" sections below were rewritten 2026-07-01 to match what actually ships.** Two big changes have shipped since the original 2026-04-02 draft: (1) cards are **hotkey-SUMMONED, not autonomous** (2026-05-31 pivot); (2) the live objection card uses **Sonnet with NO KB/RAG** (decided 2026-06-21, shipped 06-29). Canonical current design: `Hotkey Model Build Plan.md` + `Phase 2 — Live Call Memory Design.md` + Decisions Log (2026-05-31, 2026-06-21). The **Post-Call Pipeline** section remains accurate.
 
-Last updated: 2026-04-02
+Last updated: 2026-07-01
 
 ---
 
@@ -12,71 +12,51 @@ Wingman is a Mac desktop app (Electron + Next.js) that sits invisibly over a sal
 
 ---
 
-## Real-Time Pipeline (Live Call)
+## Real-Time Pipeline (Live Call) — hotkey-summoned
+
+Cards are **summoned by the rep, not fired autonomously.** The rep presses **Up Arrow** → a 4-arrow **compass** appears (↑ objection · ← answer · ↓ dig deeper · → close readiness) → the rep picks a direction → Wingman generates that one card. Nothing appears on screen unless the rep asks for it.
 
 ```
 Recall.ai Desktop SDK
   ↓ (streams real-time transcript chunks via local socket)
 recall.ts (Electron main process)
   ↓ (IPC: transcript chunk)
-useRecallTranscript.ts (Next.js hook in renderer)
-  ↓
-keyword-triggers.ts — fast pattern classifier
-  ↓ (only on meaningful moments — objection detected, key phrase, etc.)
-knowledge-search.ts — embed trigger chunk → pgvector search → top 3 KB entries
-  ↓
-knowledge-signal.ts — assemble prompt → Claude Haiku → signal card JSON
-  ↓ (IPC: hud:signal)
-HUD window (electron/hud/index.html) — floating overlay, renders signal card
+useRecallTranscript.ts / useWingmanPoller.ts (renderer)
+  ├─ BACKGROUND: Belief Ladder summarizer (Sonnet 4.6, ~2-min timer) → calls.live_summary
+  └─ rep presses Up Arrow → compass → picks a direction
+        ↓
+      /api/wingman/kb-signal  (the summoned-card endpoint)
+        ↓  ↑ objection = context-driven Sonnet prompt, NO retrieval (objection-signal.ts)
+        ↓  (← answer · ↓ dig · → close = Phase 4, not built yet)
+      card streamed to HUD via SSE → IPC hud:signal-delta
+        ↓
+      HUD window (electron/hud/index.html) — progressive word-by-word reveal
 ```
 
-**Target latency:** Under 1 second from trigger detection to signal card on screen.
+**Target latency:** first words on screen in ~0.5–0.8s (streaming); full card ~1.7–2.7s warm.
 
-**Key design decision:** Only fire the RAG+Haiku pipeline when the trigger classifier confirms a meaningful moment. This keeps costs low and quality high — we don't embed and search the KB on every transcript chunk.
-
----
-
-## Trigger Classifier (`keyword-triggers.ts`)
-
-The first gatekeeper. A fast, pattern-based classifier that reads each transcript chunk and decides: "Is this a moment worth generating a signal card for?"
-
-**What it looks for:**
-- Price objection signals ("that's a lot," "I need to think about it," "let me talk to my spouse")
-- Pain questions going unanswered (rep moves past discovery too fast)
-- Close resistance signals ("not sure if this is the right time")
-- Confirmation before pitch (rep about to pitch without confirming)
-
-**What it ignores:**
-- Small talk, rapport building, pleasantries
-- Clear progress moments (prospect already bought in)
-- Any moment within the 90-second cooldown window
-
-**Current implementation:** Pattern matching + keyword lists. Not a full ML classifier yet — that's a V2 upgrade if needed.
+**Key design decision:** the rep controls when a card appears. Cost is ~$0 continuous (buffering + a background summarizer), and we pay for a card only when the rep presses. The old "fire the RAG+Haiku pipeline autonomously on a keyword" model is gone.
 
 ---
 
-## RAG Pipeline (`knowledge-search.ts` + `knowledge-signal.ts`)
+## Trigger Classifier (`keyword-triggers.ts`) — DORMANT
 
-When the trigger classifier fires, this pipeline retrieves the most relevant sales technique for the moment.
+Historically the first gatekeeper: a pattern-based classifier that *autonomously fired* a card when it detected a meaningful moment. **After the 2026-05-31 hotkey pivot it no longer launches cards** — the rep summons them. It survives at most as a silent "scout" (tagging context) and is slated for removal in cleanup (Phase 5). The old 90-second cooldown is obsolete for summoned cards.
 
-**Step 1 — Embed the trigger chunk**
-The transcript chunk that triggered the classifier is embedded using OpenAI `text-embedding-3-small`. Same model used during KB ingestion, so vectors are in the same space.
+*(For reference, the moments it used to watch for: price-objection signals, unanswered pain questions, close resistance, pitching-before-confirming.)*
 
-**Step 2 — Vector search**
-Supabase pgvector RPC `search_kb_entries()` finds the top 3 KB entries above a similarity threshold of 0.65. The KB has 419 entries as of v0.1.19, sourced from ~37 YouTube sales training videos (~15 hours of content).
+---
 
-**Step 3 — Prompt assembly**
-The signal card generation prompt includes:
-- System prompt (Wingman's coaching philosophy, stage context)
-- Offer Brain (what this rep sells, prospect archetypes, what's worked before)
-- Session memory (what's happened on this specific call so far)
-- Top 3 KB techniques (from vector search)
-- The trigger chunk (the exact words that triggered the card)
+## Knowledge Base / RAG — Wingman Coach only (NOT live cards)
 
-**Total prompt budget:** ~1,300 tokens per trigger. Lean enough for Haiku to process in under 300ms.
+**As of 2026-06-21 the KB is NOT in the live objection-card path.** The live objection card is a context-driven **Sonnet** prompt with no retrieval (`objection-signal.ts`) — see the Real-Time Pipeline above. The RAG pipeline below now serves the **Wingman Coach** (Mission Intel), the between-call coaching chatbot, only.
 
-**Step 4 — Claude Haiku**
-Model: `claude-haiku-4-5-20251001`. Output: a signal card JSON with the exact coaching suggestion, formatted for the HUD overlay.
+**How Coach retrieval works:**
+- Embed the query with OpenAI `text-embedding-3-small` (same space as ingestion).
+- Vector search over the KB (419 entries from ~37 YouTube training videos). Live search runs **in-memory** in the Node process (~10–20ms, PR #17), with the Supabase pgvector RPC kept as a circuit-breaker fallback.
+- Assemble prompt (Coach persona + retrieved techniques + call context) → **Claude Sonnet 4.6** → coaching reply.
+
+> Historical note: the original live signal card used this same embed → pgvector → **Haiku** path. That was retired for the live objection slot on 2026-06-21 (a blind A/B showed the KB added no distinguishable value and its forced-script rule hurt cards). Kept here for the Coach.
 
 ---
 

@@ -22,7 +22,7 @@ A log of approaches considered and rejected. Every entry represents a real decis
 
 **Rejected because:** 419 entries × ~200 tokens each = ~84,000 tokens per call. That's $0.084 per call in Haiku token costs alone, before the actual signal card generation. At scale, this is untenable. More importantly, a 84k-token context window filled with techniques the model has to sift through degrades output quality — the model can't focus on what's relevant right now. RAG retrieves only the 3 most relevant techniques for the specific trigger moment (~450 tokens), keeping the prompt lean and the signal card precise.
 
-**Rule derived:** Runtime RAG, always. Static system prompts are for structural context (Wingman's personality, stage framework, Offer Brain). Dynamic content (KB techniques) always goes through retrieval.
+**Rule derived (UPDATED 2026-06-21):** Runtime RAG for **KB/coaching content** (vs. stuffing the whole KB in the system prompt) — still true for the **Wingman Coach**. BUT the **live objection card cut RAG entirely** (2026-06-21): it's a context-driven Sonnet prompt with no retrieval, because a blind A/B on 12 objections showed the KB added no distinguishable value there and its forced-script rule hurt cards. So the current rule is: **RAG for the Coach; NO retrieval for the live objection card** (its "dynamic content" is the per-rep Belief Ladder, not the KB). The original reasoning below still explains why we don't stuff the full KB into a prompt.
 
 ---
 

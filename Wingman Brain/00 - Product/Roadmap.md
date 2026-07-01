@@ -10,16 +10,15 @@ Last updated: 2026-04-09
 
 V1 is not the "full product." V1 is the minimum set of features that delivers a complete, valuable experience. A rep can use Wingman on a real call, get coaching, review their performance, and get better over time. That's the bar.
 
-### Live Call Mode ✅ (keyword signal cards confirmed working on real calls)
-- One-click start from tray popover
+### Live Call Mode ✅ (hotkey-summoned objection card, live on real calls)
+- One-click Deploy from tray popover
 - Recall.ai captures audio invisibly
-- Stage bar tracks call progress
-- Signal cards fire at the right moments
-- 90-second cooldown enforced (bypassed for keyword/objection triggers)
-- "How'd it go?" card fires at call end
-- Rep logs outcome in one tap
+- Ambient presence dot (the always-on stage bar was removed in the 2026-05-31 hotkey pivot)
+- Rep presses **Up Arrow → 4-arrow compass** → summons one card (nothing fires autonomously)
+- Objection card (↑) = context-driven **Sonnet** prompt, no KB, streamed word-by-word
+- "How'd it go?" card fires at call end → rep logs outcome in one tap
 
-**Status:** Keyword-triggered signal cards confirmed firing on real calls (v0.1.19). Prospect said "this is too expensive" → card fired correctly. KB/RAG-sourced cards not yet firing (semantic mismatch in KB entries — needs re-ingestion with prospect_trigger field). Playbook page not yet built.
+**Status:** Hotkey-summoned objection card shipped + live-tested (Sonnet, KB cut from the live path — KB is Coach-only). Autonomous keyword cards + the 90s cooldown are retired (hotkey pivot). Belief Ladder summarizer runs in the background (Sonnet 4.6). Remaining: the other 3 compass arrows (← answer · ↓ dig · → close = Phase 4) and the Playbook page — not yet built.
 
 ### Flight Log ✅
 - Call list with outcome filter
