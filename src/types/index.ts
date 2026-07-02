@@ -255,6 +255,14 @@ export interface WingmanBridge {
   // · "unsupported" = arrow not built yet. Card arrival clears the pill.
   sendSummonState: (payload: { state: "thinking" | "error" | "unsupported" | "idle"; slot?: string }) => Promise<void>;
 
+  // Phase C — Objection Flow mode. Optional so a renderer running against an
+  // older preload (dev hot-reload skew) degrades to compass-only, never crashes.
+  flowOpened?:    () => void;
+  flowClosed?:    () => void;
+  onFlowExpired?: (callback: () => void) => void;
+  offFlowExpired?: () => void;
+  sendFlowState?: (payload: { active: boolean; move?: number }) => Promise<void>;
+
   // Outcome saved from HUD — tells dashboard to refresh so pill appears immediately
   onOutcomeUpdated?:  (callback: () => void) => void;
   offOutcomeUpdated?: () => void;

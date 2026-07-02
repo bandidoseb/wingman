@@ -45,6 +45,8 @@ let _signalDismissHandler:    ((_e: Electron.IpcRendererEvent) => void) | null =
 let _outcomeUpdatedHandler:   ((_e: Electron.IpcRendererEvent) => void) | null = null;
 // Phase 3: hotkey compass menu — main process sends the direction the rep picked
 let _menuPickHandler:         ((_e: Electron.IpcRendererEvent, direction: string) => void) | null = null;
+// Phase C: main's 2-min flow idle timer expired — renderer archives + resets its thread
+let _flowExpiredHandler:      ((_e: Electron.IpcRendererEvent) => void) | null = null;
 
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -192,6 +194,33 @@ contextBridge.exposeInMainWorld("wingman", {
     }
   },
 
+  // ── Objection Flow mode (Phase C) ────────────────────────────────────────
+  /** Thread opened/advanced (or threaded press) — main arms single-↑ mode + re-arms its 2-min idle timer. */
+  flowOpened: () => ipcRenderer.send("flow:open"),
+
+  /** Renderer reset its thread — main drops single-↑ mode (no echo back). */
+  flowClosed: () => ipcRenderer.send("flow:close"),
+
+  /** Fired by main when the flow's 2-min idle timer expires — archive + reset the thread ledger. */
+  onFlowExpired: (callback: () => void) => {
+    if (_flowExpiredHandler) {
+      ipcRenderer.removeListener("wingman:flow-expired", _flowExpiredHandler);
+    }
+    _flowExpiredHandler = () => callback();
+    ipcRenderer.on("wingman:flow-expired", _flowExpiredHandler);
+  },
+
+  offFlowExpired: () => {
+    if (_flowExpiredHandler) {
+      ipcRenderer.removeListener("wingman:flow-expired", _flowExpiredHandler);
+      _flowExpiredHandler = null;
+    }
+  },
+
+  /** Flow chrome for the HUD card — "MOVE #N" header + the press-↑ affordance. */
+  sendFlowState: (payload: { active: boolean; move?: number }) =>
+    ipcRenderer.invoke("hud:flow-state", payload),
+
   // ── Zoom name status sync ────────────────────────────────────────────────
   /** Tells the main process whether the user has a Zoom display name set.
    *  Called on dashboard mount and whenever the name is saved in Settings. */
@@ -334,5 +363,12 @@ contextBridge.exposeInMainWorld("hud", {
   // summon-state: relayed from DashboardClient via main — drives the pill.
   onSummonState: (callback: (payload: { state: string; slot?: string }) => void) => {
     ipcRenderer.on("wingman:summon-state", (_event, payload: { state: string; slot?: string }) => callback(payload));
+  },
+
+  // ── Objection Flow chrome (Phase C) ───────────────────────────────────────
+  // Relayed from DashboardClient via main when a threaded card lands / the flow
+  // ends — drives the "OBJECTION FLOW · MOVE #N" header + press-↑ affordance.
+  onFlowState: (callback: (payload: { active: boolean; move?: number }) => void) => {
+    ipcRenderer.on("wingman:flow-state", (_event, payload: { active: boolean; move?: number }) => callback(payload));
   },
 });
