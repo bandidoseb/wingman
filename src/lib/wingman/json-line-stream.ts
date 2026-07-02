@@ -109,3 +109,58 @@ export function decodeLineStream(raw: string): DecodeState {
   const partial = out.replace(/^\s+/, "");
   return partial ? { status: "streaming", text: partial } : { status: "pending" };
 }
+
+/**
+ * decodeLeverStream — B4 sibling decoder for the optional leading `"lever"` field of the
+ * THREADED envelope `{"lever":"<id>","line":"..."}`. Pure and idempotent like decodeLineStream
+ * (which is UNTOUCHED — it locates the line via its own key search and is transparent to a
+ * preceding field). Contract:
+ *   - "pending" : the lever key/value hasn't fully arrived AND the line hasn't started either.
+ *   - "lever"   : the lever string value closed → `lever` (verbatim; caller validates taxonomy).
+ *   - "none"    : there is definitively NO lever — `"line"` was reached without a preceding
+ *                 lever, or the lever value is null/non-string. This is the guard's
+ *                 "degrade to no-guard" signal — deterministic at first-line-char (rev-7 §3/4).
+ */
+export type LeverDecodeState =
+  | { status: "pending" }
+  | { status: "lever"; lever: string }
+  | { status: "none" };
+
+export function decodeLeverStream(raw: string): LeverDecodeState {
+  const keyIdx = raw.indexOf('"lever"');
+  if (keyIdx === -1) {
+    // No lever key (yet). If the line already resolved/started, the lever is definitively
+    // absent (it was instructed to come FIRST) → none. Otherwise still pending.
+    return decodeLineStream(raw).status === "pending" ? { status: "pending" } : { status: "none" };
+  }
+
+  let i = keyIdx + 7; // past `"lever"`
+  while (i < raw.length && /\s/.test(raw[i])) i++;
+  if (i >= raw.length) return { status: "pending" };
+  if (raw[i] !== ":") return { status: "none" }; // malformed → no guard, never an error
+  i++;
+  while (i < raw.length && /\s/.test(raw[i])) i++;
+  if (i >= raw.length) return { status: "pending" };
+
+  const first = raw[i];
+  if (first === "n") {
+    const tail = raw.slice(i);
+    if (tail.startsWith("null")) return { status: "none" };       // {"lever":null,...} → no guard
+    if ("null".startsWith(tail)) return { status: "pending" };
+    return { status: "none" };
+  }
+  if (first !== '"') return { status: "none" }; // non-string value → no guard
+
+  // Lever ids are plain hyphen-words (taxonomy invariant) — no escapes expected; treat any
+  // backslash as malformed → none (the guard degrades, the line decoder is unaffected).
+  let out = "";
+  let j = i + 1;
+  while (j < raw.length) {
+    const c = raw[j];
+    if (c === "\\") return { status: "none" };
+    if (c === '"') return { status: "lever", lever: out.trim() };
+    out += c;
+    j++;
+  }
+  return { status: "pending" }; // value still arriving
+}
