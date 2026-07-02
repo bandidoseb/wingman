@@ -1,34 +1,34 @@
 {
   "meta": {
-    "date": "2026-06-30T19:59:52.575Z",
+    "date": "2026-07-01T22:27:13.538Z",
     "objModel": "claude-sonnet-4-6",
     "judgeModel": "claude-sonnet-4-6",
     "dry": false,
-    "nReal": 30,
-    "nAbstain": 7
+    "nReal": 12,
+    "nAbstain": 0
   },
   "gatePass": {
     "PROD": true
   },
   "agg": {
     "PROD": {
-      "tonality": 148,
-      "brevity": 60,
-      "one_beat": 57,
-      "anchored": 56,
-      "right_belief": 58,
-      "no_windup": 60,
-      "composite": 587,
+      "tonality": 60,
+      "brevity": 23,
+      "one_beat": 22,
+      "anchored": 22,
+      "right_belief": 24,
+      "no_windup": 24,
+      "composite": 235,
       "fabrication": 0,
       "shaky": 0,
-      "n": 30
+      "n": 12
     }
   },
   "falseAbstain": {
     "PROD": 0
   },
   "abstainCorrect": {
-    "PROD": 7
+    "PROD": 0
   },
   "rows": [
     {
@@ -37,7 +37,7 @@
       "category": "stall",
       "arms": {
         "PROD": {
-          "line": "Yeah, totally — and I wanna make sure 'think about it' isn't just me not answering something. What's the part that still feels uncertain?",
+          "line": "Yeah, totally — and I get that. But Jenna, be honest with me... what's the actual thing you're sitting with?",
           "abstained": false,
           "score": {
             "tonality": 5,
@@ -48,7 +48,7 @@
             "no_windup": 2,
             "fabrication": false,
             "said_shaky_number": false,
-            "rationale": "Clean, human opener that correctly diagnoses the fear-of-change stall and opens the real conversation, but stays generic rather than pulling in Jenna's specific contractor history or $20k goal to sharpen the dig."
+            "rationale": "Clean, human, elite-closer move that correctly diagnoses fear-of-change as the real stall and invites Jenna to name it herself — loses one anchored point for not tying to her specific 20k goal or contractor history, and 'I get that' is a mi"
           }
         }
       }
@@ -59,7 +59,7 @@
       "category": "price",
       "arms": {
         "PROD": {
-          "line": "Yeah, I hear you — and I'm not gonna argue that. But honestly, Andre, what's two more years of 70-hour weeks actually costing you?",
+          "line": "Yeah, I get it — $9k is real money. But Andre, can I ask you something? If nothing changes, what's another two years of 70-hour weeks actually costing you?",
           "abstained": false,
           "score": {
             "tonality": 5,
@@ -70,7 +70,7 @@
             "no_windup": 2,
             "fabrication": false,
             "said_shaky_number": false,
-            "rationale": "Hits the exact weak belief (expense vs. cost of staying stuck), uses Andre's confirmed pain point verbatim, sounds like a real closer, and lands in one clean reframe."
+            "rationale": "Textbook elite closer move — validates, names the real number (confirmed), then flips to the cost of inaction using his exact confirmed pain anchor; no fabrications, clean single beat."
           }
         }
       }
@@ -81,18 +81,18 @@
       "category": "affordability",
       "arms": {
         "PROD": {
-          "line": "Yeah, I hear you — and I believe you. So let me ask: is money the only thing standing between you and moving forward, or is there any part of you that's still unsure this works?",
+          "line": "I hear you — and I believe you. So let me ask: is there a payment structure that'd actually make this workable, or is the timing just not right at all?",
           "abstained": false,
           "score": {
-            "tonality": 4,
+            "tonality": 5,
             "brevity": 2,
-            "one_beat": 0,
-            "anchored": 1,
-            "right_belief": 1,
+            "one_beat": 1,
+            "anchored": 2,
+            "right_belief": 2,
             "no_windup": 2,
             "fabrication": false,
             "said_shaky_number": false,
-            "rationale": "Stacks two moves (is it really money? + is it doubt?) when the ground truth says the constraint is real and not a smokescreen, so the second question subtly implies she might be hiding doubt — that's a mismatch with the confirmed anchor and"
+            "rationale": "Nails the real cash constraint head-on and respects her honesty, though it technically stacks two moves (payment structure offer + timing qualifier), which slightly dilutes the one-beat purity."
           }
         }
       }
@@ -103,7 +103,7 @@
       "category": "authority",
       "arms": {
         "PROD": {
-          "line": "Totally — and is that a courtesy thing, or does Dave actually need to weigh in before you can move?",
+          "line": "Totally — and is this more like Dave needs to be in the loop, or is there a real chance he pumps the brakes on something you've already decided you want?",
           "abstained": false,
           "score": {
             "tonality": 5,
@@ -114,7 +114,7 @@
             "no_windup": 2,
             "fabrication": false,
             "said_shaky_number": false,
-            "rationale": "Textbook closer move — names Dave (real anchor), asks the one question that separates a real gate from a social deflection, and does it in under 20 words with zero wind-up."
+            "rationale": "Perfectly anchored to Dave by name, asks the one surgical question that separates loop-in from veto — elite closer move, clean and conversational."
           }
         }
       }
@@ -125,7 +125,7 @@
       "category": "time",
       "arms": {
         "PROD": {
-          "line": "Tom, the reason you're slammed is exactly what we're fixing — so what if the calls are what buys you time back instead of costing it?",
+          "line": "Tom, the reason you're slammed is exactly the thing we're fixing — so what if the calls are what buys you time back?",
           "abstained": false,
           "score": {
             "tonality": 5,
@@ -136,7 +136,7 @@
             "no_windup": 2,
             "fabrication": false,
             "said_shaky_number": false,
-            "rationale": "Crisp reframe that flips 'too busy' into proof of need, grounded in Tom's exact pain, delivered in a single punchy move with natural closer tonality."
+            "rationale": "Nails the core reframe — busy is the symptom, not a valid reason to wait — with a clean tie-down and zero wasted words."
           }
         }
       }
@@ -147,18 +147,18 @@
       "category": "risk",
       "arms": {
         "PROD": {
-          "line": "Dana, you already get your clients results — that's not in question. Real thing is, can you do it for yourself?",
+          "line": "Yeah — sit in that for a sec. That fear makes sense. But Dana, you already get your clients results. The thing that's not working is doing it for yourself — so what makes you think you're the exception?",
           "abstained": false,
           "score": {
             "tonality": 5,
-            "brevity": 2,
-            "one_beat": 2,
+            "brevity": 1,
+            "one_beat": 1,
             "anchored": 2,
             "right_belief": 2,
             "no_windup": 2,
             "fabrication": false,
             "said_shaky_number": false,
-            "rationale": "Nails the exact weak belief — identity/self-doubt vs. capability — using her confirmed offline proof point, delivered in a crisp, human, closer-style reframe with no wind-up."
+            "rationale": "Nails the identity reframe with her real proof point, but stacks two moves (reframe + rhetorical question) and runs slightly long."
           }
         }
       }
@@ -169,7 +169,7 @@
       "category": "differentiation",
       "arms": {
         "PROD": {
-          "line": "Yeah, fair — and I'm not gonna pitch you on that. You told me the last two were all theory, no implementation. So what would've actually had to happen in those programs for them to work?",
+          "line": "Yeah, fair — and I'd be asking the same thing. Can I ask you something first though? The last two programs — what specifically did they not do that you actually needed?",
           "abstained": false,
           "score": {
             "tonality": 5,
@@ -180,7 +180,7 @@
             "no_windup": 2,
             "fabrication": false,
             "said_shaky_number": false,
-            "rationale": "Textbook move — quotes his exact words back, flips the frame with one question, zero wind-up, and forces him to define the difference himself rather than being pitched at."
+            "rationale": "Textbook elite move — validates, flips to a qualifying question anchored directly to his confirmed 'all theory, no implementation' history, zero wind-up, one clean beat."
           }
         }
       }
@@ -191,18 +191,18 @@
       "category": "deflection",
       "arms": {
         "PROD": {
-          "line": "Yeah, totally — and I'll send whatever's helpful. I just wanna make sure I'm not wasting your time with the wrong stuff. Be honest with me — when the price came up, what was actually going through your head?",
+          "line": "Rachel, totally — and I will. But just so I send you what actually matters, can I ask — when you picture going through it, what's the one thing you're really hoping to find the answer to?",
           "abstained": false,
           "score": {
             "tonality": 5,
             "brevity": 2,
             "one_beat": 2,
-            "anchored": 2,
+            "anchored": 1,
             "right_belief": 2,
             "no_windup": 2,
             "fabrication": false,
             "said_shaky_number": false,
-            "rationale": "Nails it — paces the 'send info' request to lower resistance, then directly surfaces the price-reveal cooling with a single honest question, perfectly matched to Rachel's conflict-avoidant pattern."
+            "rationale": "Elegantly disarms a polite dodge with a single diagnostic question that forces Rachel to surface her real concern — tonally perfect, appropriately brief, no fabricated specifics, though not tied to a named anchor like hiring chaos or the pr"
           }
         }
       }
@@ -224,7 +224,7 @@
             "no_windup": 2,
             "fabrication": false,
             "said_shaky_number": false,
-            "rationale": "Textbook closer move — validates pride, then weaponizes his own confirmed history (two abandoned plans) with a single surgical question that exposes the accountability gap without lecturing."
+            "rationale": "Textbook closer move — paces his belief, anchors directly to his confirmed history of two abandoned plans, then lands one surgical question that makes him confront his own pattern."
           }
         }
       }
@@ -235,7 +235,7 @@
       "category": "trust",
       "arms": {
         "PROD": {
-          "line": "Yeah — that $20k and getting ghosted, that's real. What did that program not do that you actually needed?",
+          "line": "Yeah — that $20k and someone just disappearing, that's real. What did that program not do that you actually needed it to?",
           "abstained": false,
           "score": {
             "tonality": 5,
@@ -246,7 +246,7 @@
             "no_windup": 2,
             "fabrication": false,
             "said_shaky_number": false,
-            "rationale": "Nails the exact anchor (her $20k ghosting experience, confirmed), opens with a natural human pace, asks one clean diagnostic question — textbook elite closer move with zero fabrication."
+            "rationale": "Directly mirrors her confirmed $20k anchor, names the ghosting, and opens with a single trust-building question — exactly what the weakest link demands."
           }
         }
       }
@@ -257,7 +257,7 @@
       "category": "skepticism",
       "arms": {
         "PROD": {
-          "line": "Yeah, fair — I'd think the same thing. Sam, forget the numbers for a sec — do you honestly feel like what we've been talking about could actually get you to where you wanna be?",
+          "line": "Yeah, I get it — sounds like hype, I'd be skeptical too. Sam, forget the number for a sec — do you honestly feel like what you've been doing is actually gonna get you more time with your kids?",
           "abstained": false,
           "score": {
             "tonality": 5,
@@ -268,7 +268,7 @@
             "no_windup": 2,
             "fabrication": false,
             "said_shaky_number": false,
-            "rationale": "Perfectly calibrated — paces the skeptic, sidesteps the shaky number, and flips ownership of belief back to Sam with a single question anchored to his real gap."
+            "rationale": "Validates skepticism naturally, sidesteps the shaky number, and drives straight to his confirmed emotional anchor (kids/time) with one clean reframe question — textbook elite closer move."
           }
         }
       }
@@ -279,7 +279,7 @@
       "category": "timing",
       "arms": {
         "PROD": {
-          "line": "Bianca, I hear you — but the reason the timing feels off is the exact thing we're fixing. If not now, before Q4, when?",
+          "line": "Bianca, I hear you — but isn't Q4 exactly what you're worried about missing? The timing feeling off *is* the thing we're here to fix.",
           "abstained": false,
           "score": {
             "tonality": 5,
@@ -290,485 +290,11 @@
             "no_windup": 2,
             "fabrication": false,
             "said_shaky_number": false,
-            "rationale": "Nails the weakest link — 'later' costs her the season — with a tight reframe and a closing question, all grounded in the Q4 timing anchor she confirmed."
-          }
-        }
-      }
-    },
-    {
-      "id": 13,
-      "objection": "I need to talk to my spouse",
-      "category": "authority",
-      "arms": {
-        "PROD": {
-          "line": "Yeah, totally — and I'd expect that. Quick honest question though: is this more of a courtesy check-in, or do you genuinely need their green light before you can move?",
-          "abstained": false,
-          "score": {
-            "tonality": 5,
-            "brevity": 2,
-            "one_beat": 2,
-            "anchored": 2,
-            "right_belief": 2,
-            "no_windup": 2,
-            "fabrication": false,
-            "said_shaky_number": false,
-            "rationale": "Nails the exact diagnostic question the ground truth flags — is this courtesy or a real gate — in natural closer language with zero fabrication."
-          }
-        }
-      }
-    },
-    {
-      "id": 14,
-      "objection": "I need to check with my accountant",
-      "category": "authority",
-      "arms": {
-        "PROD": {
-          "line": "Derek, totally — and is that a courtesy call because you're already in, or does he actually have a vote on this?",
-          "abstained": false,
-          "score": {
-            "tonality": 5,
-            "brevity": 2,
-            "one_beat": 2,
-            "anchored": 2,
-            "right_belief": 2,
-            "no_windup": 2,
-            "fabrication": false,
-            "said_shaky_number": false,
-            "rationale": "Textbook closer move — one sharp question that exposes the accountant as a logic gate without confronting Derek directly, perfectly matched to his real decision avoidance pattern."
-          }
-        }
-      }
-    },
-    {
-      "id": 15,
-      "objection": "I tried something like this before and it didn't work",
-      "category": "trust",
-      "arms": {
-        "PROD": {
-          "line": "Alyssa, I hear you — and can I be honest for a sec? You said you didn't really implement it. So was it the program, or just no one holding you accountable?",
-          "abstained": false,
-          "score": {
-            "tonality": 5,
-            "brevity": 2,
-            "one_beat": 2,
-            "anchored": 2,
-            "right_belief": 2,
-            "no_windup": 2,
-            "fabrication": false,
-            "said_shaky_number": false,
-            "rationale": "Nails the exact accountability gap from ground truth using Alyssa's own admission, delivered in a tight two-sentence reframe that sounds like a real closer."
-          }
-        }
-      }
-    },
-    {
-      "id": 16,
-      "objection": "Can you do a payment plan or a discount?",
-      "category": "price",
-      "arms": {
-        "PROD": {
-          "line": "Yeah, totally — let's make it work. If we can get the numbers right, you're in today?",
-          "abstained": false,
-          "score": {
-            "tonality": 5,
-            "brevity": 2,
-            "one_beat": 2,
-            "anchored": 1,
-            "right_belief": 2,
-            "no_windup": 2,
-            "fabrication": false,
-            "said_shaky_number": false,
-            "rationale": "Clean commitment-lock that fits the 'basically sold' framing perfectly — loses one anchored point for not tying to Tony's 'step back from the tools' why, but the move itself is exactly right."
-          }
-        }
-      }
-    },
-    {
-      "id": 17,
-      "objection": "I'm already working with a coach",
-      "category": "differentiation",
-      "arms": {
-        "PROD": {
-          "line": "Yeah, totally — and you mentioned that coaching's kind of stalled. So honestly, is it actually getting you where you wanna go?",
-          "abstained": false,
-          "score": {
-            "tonality": 5,
-            "brevity": 2,
-            "one_beat": 2,
-            "anchored": 2,
-            "right_belief": 2,
-            "no_windup": 2,
-            "fabrication": false,
-            "said_shaky_number": false,
-            "rationale": "Nails the exact anchor ('kind of stalled') and lands one clean question that lets Nina's own words do the work — textbook elite pace-plus-tie-down with zero bloat."
-          }
-        }
-      }
-    },
-    {
-      "id": 18,
-      "objection": "Let me finish my current launch first",
-      "category": "timing",
-      "arms": {
-        "PROD": {
-          "line": "Greg, I hear you — but the reason you're maxed right now is exactly what we're fixing. What if this is what makes the next launch bigger, not one more thing on top of it?",
-          "abstained": false,
-          "score": {
-            "tonality": 5,
-            "brevity": 2,
-            "one_beat": 2,
-            "anchored": 2,
-            "right_belief": 2,
-            "no_windup": 2,
-            "fabrication": false,
-            "said_shaky_number": false,
-            "rationale": "Perfectly mirrors the ground truth's weakest-link reframe almost verbatim, sounds like an elite closer, tight and human with a natural pace opener."
-          }
-        }
-      }
-    },
-    {
-      "id": 19,
-      "objection": "I need to see proof or a guarantee",
-      "category": "risk",
-      "arms": {
-        "PROD": {
-          "line": "Carla, totally fair — can I be honest with you for a sec? The only real guarantee is you. What would *you* need to see from yourself to know you'd actually do the work?",
-          "abstained": false,
-          "score": {
-            "tonality": 5,
-            "brevity": 2,
-            "one_beat": 2,
-            "anchored": 2,
-            "right_belief": 2,
-            "no_windup": 2,
-            "fabrication": false,
-            "said_shaky_number": false,
-            "rationale": "Textbook risk-reframe — flips the certainty question back onto Carla's control exactly as the ground truth prescribes, sounds fully human, no fabricated specifics."
-          }
-        }
-      }
-    },
-    {
-      "id": 20,
-      "objection": "The economy is too uncertain right now",
-      "category": "timing",
-      "arms": {
-        "PROD": {
-          "line": "Hassan, I get it — and can I be honest with you for a sec? The guys who pull back right now are the exact reason there's an opening for you.",
-          "abstained": false,
-          "score": {
-            "tonality": 5,
-            "brevity": 2,
-            "one_beat": 2,
-            "anchored": 2,
-            "right_belief": 2,
-            "no_windup": 2,
-            "fabrication": false,
-            "said_shaky_number": false,
-            "rationale": "Nails the exact weak belief (macro fear = logic) with the competitor pullback reframe anchored directly to the ground truth gap, in a tight, human permission-ask open."
-          }
-        }
-      }
-    },
-    {
-      "id": 21,
-      "objection": "I want to do more research and compare options",
-      "category": "stall",
-      "arms": {
-        "PROD": {
-          "line": "Yeah, totally — and real question: how long have you been researching this particular problem?",
-          "abstained": false,
-          "score": {
-            "tonality": 5,
-            "brevity": 2,
-            "one_beat": 2,
-            "anchored": 2,
-            "right_belief": 2,
-            "no_windup": 2,
-            "fabrication": false,
-            "said_shaky_number": false,
-            "rationale": "Textbook Socratic mirror — short, human, and the single question lands directly on her real anchor (a year of research with no movement), exposing the weak belief without stating it."
-          }
-        }
-      }
-    },
-    {
-      "id": 22,
-      "objection": "I've already spent a lot on this kind of thing",
-      "category": "money",
-      "arms": {
-        "PROD": {
-          "line": "I hear you — and honestly, what did those programs not give you that you actually needed?",
-          "abstained": false,
-          "score": {
-            "tonality": 4,
-            "brevity": 2,
-            "one_beat": 2,
-            "anchored": 1,
-            "right_belief": 1,
-            "no_windup": 2,
-            "fabrication": false,
-            "said_shaky_number": false,
-            "rationale": "Solid human tone and clean one-move question, but it asks Omar to re-diagnose a gap he already revealed (accountability/implementation) rather than tying back to that known anchor and pressing the real distinction."
-          }
-        }
-      }
-    },
-    {
-      "id": 23,
-      "objection": "My niche is unique — a general program won't fit",
-      "category": "skepticism",
-      "arms": {
-        "PROD": {
-          "line": "Sofia, totally — and can I be honest for a sec? The bottleneck isn't medical billing. It's you being in everything with no systems. That part's not niche-specific at all.",
-          "abstained": false,
-          "score": {
-            "tonality": 5,
-            "brevity": 2,
-            "one_beat": 2,
-            "anchored": 2,
-            "right_belief": 2,
-            "no_windup": 2,
-            "fabrication": false,
-            "said_shaky_number": false,
-            "rationale": "Hits the exact weak belief (bottleneck is universal, not niche-specific), uses her name and real pain anchor, stays tight, and the 'can I be honest' opener is textbook elite-closer — nothing fabricated."
-          }
-        }
-      }
-    },
-    {
-      "id": 24,
-      "objection": "I don't want to be locked into a contract",
-      "category": "risk",
-      "arms": {
-        "PROD": {
-          "line": "Trent, I get it — and can I be honest with you for a sec? The reason it's six months is the exact reason you're still stuck. Real change isn't a 30-day thing. You already know that.",
-          "abstained": false,
-          "score": {
-            "tonality": 5,
-            "brevity": 2,
-            "one_beat": 2,
-            "anchored": 2,
-            "right_belief": 2,
-            "no_windup": 2,
-            "fabrication": false,
-            "said_shaky_number": false,
-            "rationale": "Nails the exact weak belief — six months IS the point — ties to Trent's capped/stuck reality, sounds like a real closer, and the permission-ask opener is textbook elite; no fabrications."
-          }
-        }
-      }
-    },
-    {
-      "id": 25,
-      "objection": "I want to but I'm scared to invest right now",
-      "category": "affordability",
-      "arms": {
-        "PROD": {
-          "line": "Yeah — that fear makes sense, and I'm not gonna slick-talk you past it. So be honest with me: is it that the money genuinely isn't there, or is it that you're scared and the money's the safer thing to say?",
-          "abstained": false,
-          "score": {
-            "tonality": 5,
-            "brevity": 2,
-            "one_beat": 2,
-            "anchored": 2,
-            "right_belief": 2,
-            "no_windup": 2,
-            "fabrication": false,
-            "said_shaky_number": false,
-            "rationale": "Perfectly calibrated to Maya's exact emotional profile — honest, direct, non-slick, and forces the real distinction between genuine money constraint and fear-masking, exactly what the ground truth calls for."
-          }
-        }
-      }
-    },
-    {
-      "id": 26,
-      "objection": "I need to run it by my team",
-      "category": "authority",
-      "arms": {
-        "PROD": {
-          "line": "Victor, I hear you — and you run a 12-person agency, so the call's yours to make. Is this you genuinely wanting input, or is it a little bit of cover in case it doesn't work out?",
-          "abstained": false,
-          "score": {
-            "tonality": 5,
-            "brevity": 2,
-            "one_beat": 2,
-            "anchored": 2,
-            "right_belief": 2,
-            "no_windup": 2,
-            "fabrication": false,
-            "said_shaky_number": false,
-            "rationale": "Nails the real avoidance pattern with a direct, human either/or question anchored to the confirmed 12-person detail — elite closer move, zero fluff."
-          }
-        }
-      }
-    },
-    {
-      "id": 27,
-      "objection": "I'm just not sure I'm ready",
-      "category": "stall",
-      "arms": {
-        "PROD": {
-          "line": "Renee, I hear you — and honestly? Nobody feels ready. The coaches who grow just start before they do. So what would 'ready' even look like for you?",
-          "abstained": false,
-          "score": {
-            "tonality": 5,
-            "brevity": 2,
-            "one_beat": 1,
-            "anchored": 2,
-            "right_belief": 2,
-            "no_windup": 2,
-            "fabrication": false,
-            "said_shaky_number": false,
-            "rationale": "Nails the core belief gap perfectly and stays human throughout, but stacks two moves — the reframe ('nobody feels ready') plus a follow-up question — instead of landing on one."
-          }
-        }
-      }
-    },
-    {
-      "id": 28,
-      "objection": "How do I know you're not just another guru?",
-      "category": "trust",
-      "arms": {
-        "PROD": {
-          "line": "Fair — honestly, you shouldn't just take my word for it. So tell me, what did the last guy not do that you actually needed?",
-          "abstained": false,
-          "score": {
-            "tonality": 5,
-            "brevity": 2,
-            "one_beat": 2,
-            "anchored": 2,
-            "right_belief": 2,
-            "no_windup": 2,
-            "fabrication": false,
-            "said_shaky_number": false,
-            "rationale": "Meets the cynicism head-on without defending, flips control back to Reggie, and the question digs directly into the trust/authority weak link — textbook elite closer move."
-          }
-        }
-      }
-    },
-    {
-      "id": 29,
-      "objection": "I need to pray on it",
-      "category": "stall",
-      "arms": {
-        "PROD": {
-          "line": "Grace, I totally respect that — and I'd expect nothing less from you. Before you do, honest question: is prayer the one thing, or is there something else quietly sitting underneath this too?",
-          "abstained": false,
-          "score": {
-            "tonality": 5,
-            "brevity": 2,
-            "one_beat": 2,
-            "anchored": 2,
-            "right_belief": 2,
-            "no_windup": 2,
-            "fabrication": false,
-            "said_shaky_number": false,
-            "rationale": "Perfectly calibrated — respects her faith without rushing it, uses her name, and executes the exact prescribed move of gently surfacing whether something else is also holding her back, all in under 35 natural words."
-          }
-        }
-      }
-    },
-    {
-      "id": 30,
-      "objection": "Money's really tight right now, but I want this",
-      "category": "affordability",
-      "arms": {
-        "PROD": {
-          "line": "Yeah, I hear you — and I'm not gonna run a 'money aside' thing on you, that'd be disrespectful. So let's just talk real — what does tight actually look like right now?",
-          "abstained": false,
-          "score": {
-            "tonality": 5,
-            "brevity": 2,
-            "one_beat": 2,
-            "anchored": 2,
-            "right_belief": 2,
-            "no_windup": 2,
-            "fabrication": false,
-            "said_shaky_number": false,
-            "rationale": "Perfectly calibrated to the ground truth — honors the cash-timing constraint with radical honesty, skips value tricks as instructed, and opens the real conversation with one clean question."
+            "rationale": "Nails the exact weakest link — 'later' costs her the season — using her own Q4 anxiety as the reframe, in natural closer cadence with no fabricated specifics."
           }
         }
       }
     }
   ],
-  "abstainRows": [
-    {
-      "id": 31,
-      "objection": "(none — clear yes, ready to buy)",
-      "category": "no-objection",
-      "arms": {
-        "PROD": {
-          "abstained": true,
-          "line": null
-        }
-      }
-    },
-    {
-      "id": 32,
-      "objection": "(none — plain logistics question)",
-      "category": "no-objection",
-      "arms": {
-        "PROD": {
-          "abstained": true,
-          "line": null
-        }
-      }
-    },
-    {
-      "id": 33,
-      "objection": "(none — early rapport)",
-      "category": "no-objection",
-      "arms": {
-        "PROD": {
-          "abstained": true,
-          "line": null
-        }
-      }
-    },
-    {
-      "id": 34,
-      "objection": "(none — concern already resolved, moving forward)",
-      "category": "no-objection",
-      "arms": {
-        "PROD": {
-          "abstained": true,
-          "line": null
-        }
-      }
-    },
-    {
-      "id": 35,
-      "objection": "(none — answering a discovery question)",
-      "category": "no-objection",
-      "arms": {
-        "PROD": {
-          "abstained": true,
-          "line": null
-        }
-      }
-    },
-    {
-      "id": 36,
-      "objection": "(none — excited buying signal)",
-      "category": "no-objection",
-      "arms": {
-        "PROD": {
-          "abstained": true,
-          "line": null
-        }
-      }
-    },
-    {
-      "id": 37,
-      "objection": "(none — strong agreement on a tie-down)",
-      "category": "no-objection",
-      "arms": {
-        "PROD": {
-          "abstained": true,
-          "line": null
-        }
-      }
-    }
-  ]
+  "abstainRows": []
 }

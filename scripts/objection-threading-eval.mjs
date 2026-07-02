@@ -22,7 +22,8 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
-import { OBJECTION_SYSTEM_PROMPT, buildObjectionUserSegments } from "../src/lib/wingman/objection-prompt.mjs";
+import { OBJECTION_SYSTEM_PROMPT, buildObjectionUserSegments, LEVER_TAXONOMY } from "../src/lib/wingman/objection-prompt.mjs";
+import { FLOW_SYNTH_SYSTEM_PROMPT, FLOW_SYNTH_MODEL, FLOW_SYNTH_MAX_TOKENS, buildFlowSynthUserMessage } from "../src/lib/wingman/flow-synth-prompt.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -71,6 +72,8 @@ const FIX = [
     id: "advance-money-2", kind: "advance",
     belief: "Ben, gym owner, wants to add an online arm [confirmed]. Weak belief: Money (\"too expensive\"). Cash is fine; it's a spending-comfort thing.",
     thread: { beatNumber: 4,
+      // B4: the plays already run — lastLever financial-trade is what the model keeps rewording.
+      leversUsed: ["pace-tie-down", "why-probe", "financial-trade"],
       linesGiven: [
         "Price aside — you feel like this is actually the thing that gets you the online side, right?",
         "So what'd need to be true for the number to feel worth it?",
@@ -121,6 +124,8 @@ const FIX = [
     id: "advance-doubt", kind: "advance",
     belief: "Kev, wants to launch his course [confirmed]. Weak belief: Doubt ('I can do this myself'). History: two half-built courses, never shipped.",
     thread: { beatNumber: 2,
+      // B4: move 1 anchored his own history — the model's echo reflex on this circle-back.
+      leversUsed: ["consistency-anchor"],
       linesGiven: ["You probably could — but you've started two courses on your own and neither shipped. What's different this time?"],
       historyTranscript: "REP: What's different this time?\nKEV: I dunno, I've got the stuff, I just haven't sat down and done it." },
     latestResponse: "KEV: I mean I've got all the resources already, I just haven't pulled the trigger.",
@@ -222,6 +227,25 @@ const FIX = [
       ],
       historyTranscript: "REP: That's already locked in if you do nothing.\nMARCUS: Yeah... hang on, someone's at my door.\n[short pause]" },
     latestResponse: "MARCUS: Sorry, got distracted — but yeah, that fear of it not working is still the thing sitting with me.",
+  },
+
+  // ── MEMORY: beat-1 of a NEW flow, but call-level memory shows this objection was already
+  //    worked earlier this call → don't repeat an archived line, don't restart at square one. ──
+  {
+    id: "memory-resurface-money", kind: "memory",
+    belief: "Sarah, agency owner at ~$12k/mo, wants $50k/mo [confirmed]. Money was worked to a soft yes ~20 min ago; she took the pitch well since.",
+    // No thread — this is a FRESH beat-1 press. The learnings arrive via call-level memory.
+    callMemory: {
+      recaps: [
+        "OBJECTION FLOW RECAP\nReal objection → belief: Money (spending comfort, not availability) — financial bucket\nAngles tried → reaction:\n  • tie-down/isolate (money aside, 100% in?) → conceded (\"yeah, I want it\")\n  • why-probe (what'd make it a no-brainer) → softened\n  • financial trade (split payments) → softened, said she'd \"probably figure it out\"\nTrajectory: warming to yes — momentum on her desire for the $50k month\nConceded / anchored (verbatim): \"I want it. That's the whole reason I'm here.\"\nDead angles (do NOT repeat): re-isolating money from scratch — she already conceded she's in\nSuggested next lever: assume the earlier soft yes and move to the decision",
+      ],
+      linesGiven: [
+        "Money aside — if we actually got you to that $50k month, are you a hundred percent in?",
+        "So what'd have to be true for the investment to feel like a no-brainer?",
+        "We can split it so the first payment's small and you get moving now — that work?",
+      ],
+    },
+    latestResponse: "SARAH: Okay so this all sounds great, but circling back — the price is still the thing I keep getting stuck on.",
   },
 
   // ── ABSTAIN: nothing real below the marker (rep pressed before the prospect actually answered) ──
@@ -337,30 +361,50 @@ function extractJson(raw) {
 }
 
 // Build the card exactly as production would, then flatten segments → one string for the call.
-function assembleUser(fx) {
+function assembleUser(fx, leverToAvoid) {
   const segs = buildObjectionUserSegments({
     liveSummary: fx.belief,
     latestResponse: fx.latestResponse,
     thread: fx.thread,
+    flowRecap: fx.thread?.flowRecap,
+    callMemory: fx.callMemory,
+    leverToAvoid,
   });
   return segs.map((s) => s.text).join("");
 }
 
-async function generate(fx) {
-  if (DRY) return fx.kind === "abstain" ? { line: null, abstained: true } : { line: `(dry) ${fx.kind} card for ${fx.id}` };
-  const { text, error } = await anthropic(OBJ_MODEL, OBJECTION_SYSTEM_PROMPT, assembleUser(fx), 150);
+async function generateOnce(fx, leverToAvoid) {
+  if (DRY) return fx.kind === "abstain" ? { line: null, abstained: true } : { line: `(dry) ${fx.kind} card for ${fx.id}`, lever: "why-probe" };
+  const { text, error } = await anthropic(OBJ_MODEL, OBJECTION_SYSTEM_PROMPT, assembleUser(fx, leverToAvoid), 150);
   if (error) return { line: null, error };
   const p = extractJson(text);
-  if (p && typeof p.line === "string") return { line: p.line.trim() };
+  if (p && typeof p.line === "string") {
+    const lever = typeof p.lever === "string" && LEVER_TAXONOMY.includes(p.lever) ? p.lever : undefined;
+    return { line: p.line.trim(), lever, rawLever: p.lever };
+  }
   if (p && p.line === null) return { line: null, abstained: true };
   return { line: null, error: "unparseable", raw: text.slice(0, 160) };
+}
+
+// B4 production-faithful guard sim — mirrors generateObjectionCard's consecutive-lever guard:
+// same decision inputs (lever complete before the line either way), same humility valve.
+async function generate(fx) {
+  const levers = (fx.thread?.leversUsed || []).filter((v) => LEVER_TAXONOMY.includes(v));
+  const lastLever = levers.length ? levers[levers.length - 1] : undefined;
+  const guardActive = !!(fx.thread && fx.thread.beatNumber > 1 && lastLever && lastLever !== "direct-close");
+
+  const first = await generateOnce(fx);
+  if (!guardActive || !first.line || !first.lever || first.lever !== lastLever) return first;
+  const second = await generateOnce(fx, lastLever);
+  second.retried = true;
+  return second.error ? first : second; // humility valve parity
 }
 
 const JUDGE_SYSTEM = `You grade ONE objection-handling line inside a live, multi-turn objection exchange. The rep already said the "MOVES ALREADY GIVEN" out loud; the prospect then said the "LATEST RESPONSE." Judge ONLY against what you're given.
 
 Return ONLY this JSON, nothing else:
 {
-  "repeats_prior": true|false,           // TRUE if the line repeats or lightly rewords ANY move already given (same question/angle). A genuinely new angle = false.
+  "repeats_prior": true|false,           // TRUE if the line repeats or lightly rewords ANY move already given (same question/angle). A genuinely new angle = false. IMPORTANT: when the prospect asks a DIRECT question, ANSWERING it — including by using a fact/diagnosis established earlier in the exchange — is building on the thread, NOT a repeat. A repeat is re-ASKING the same question or re-running the same unanswered move; referencing established ground to answer or advance = false.
   "addresses_latest": true|false,        // TRUE if the line responds to the LATEST RESPONSE or the belief/fear behind it — e.g. answering a "what if it doesn't work?" fear with the cost of NOT acting, or isolating the fear, is valid engagement (handling the belief is the doctrine, not literal echo of every surface word). FALSE only if the line responds to an EARLIER turn instead, or is generic filler that engages nothing specific.
   "on_new_objection": true|false,        // Only meaningful when the LATEST RESPONSE raises a NEW/different objection. TRUE if the line ENGAGES that new concern or the belief/fear behind it — INCLUDING a discovery or permission question that opens it up ("what would make you feel safe/protected here?", "what does 'not working' even look like to you?", "can I be honest about what that question tells me?"). Going to the root, or asking a diagnostic question about the NEW concern, is correct closer work — NOT a dodge — so mark TRUE. FALSE only if the line ignores the new concern entirely or gives generic filler with no engagement. If the latest response is not a new objection, return false.
   "continued_old_objection": true|false, // TRUE if the line keeps pushing the EARLIER objection (e.g. still closing on price/money) despite the prospect raising a new concern. This is the real failure on a switch.
@@ -369,8 +413,14 @@ Return ONLY this JSON, nothing else:
 }`;
 
 function judgeUser(fx, line) {
-  return `WEAK BELIEF / CALL CONTEXT:\n${fx.belief}\n\n` +
-         `MOVES ALREADY GIVEN (must NOT be repeated):\n${fx.thread.linesGiven.map((l, i) => `${i + 1}. "${l}"`).join("\n")}\n\n` +
+  // "memory" fixtures have no live thread — the moves came from EARLIER flows this call
+  // (call-level memory). For the judge they're the same thing: lines the rep already said.
+  const moves = fx.thread?.linesGiven ?? fx.callMemory?.linesGiven ?? [];
+  const recapNote = !fx.thread && fx.callMemory?.recaps?.length
+    ? `CONTEXT FROM EARLIER THIS CALL (this objection was already worked once — the exchange below happened ~20 min ago):\n${fx.callMemory.recaps.join("\n")}\n\n`
+    : "";
+  return `WEAK BELIEF / CALL CONTEXT:\n${fx.belief}\n\n` + recapNote +
+         `MOVES ALREADY GIVEN (must NOT be repeated):\n${moves.map((l, i) => `${i + 1}. "${l}"`).join("\n")}\n\n` +
          `THE PROSPECT'S LATEST RESPONSE:\n${fx.latestResponse}\n\n` +
          (fx.newObjection ? `NOTE: the latest response raises ${fx.newObjection}.\n\n` : "") +
          `THE LINE TO GRADE: "${line}"`;
@@ -413,6 +463,12 @@ function evaluate(fx, card, j) {
     const pass = !j.repeats_prior && !j.restarted && j.addresses_latest;
     return { pass, why: `repeats_prior=${j.repeats_prior} restarted=${j.restarted} addresses_latest=${j.addresses_latest} — ${j.rationale}` };
   }
+  if (fx.kind === "memory") {
+    // Beat-1 of a NEW flow, but the objection was worked in an EARLIER flow this call
+    // (call-level memory): must not repeat an archived line, must not restart at square one.
+    const pass = !j.repeats_prior && !j.restarted && j.addresses_latest;
+    return { pass, why: `repeats_prior=${j.repeats_prior} restarted=${j.restarted} addresses_latest=${j.addresses_latest} — ${j.rationale}` };
+  }
   return { pass: false, why: "unknown kind" };
 }
 
@@ -432,6 +488,171 @@ function assertMarkersInSync() {
   for (const m of doctrineRefs) {
     if (!OBJECTION_SYSTEM_PROMPT.includes(m)) throw new Error(`[threading-eval] doctrine no longer references "${m}" — builder/doctrine DESYNC, threading will break silently`);
   }
+
+  // Step 2 markers: flow recap (threaded tail) + call-level memory (front segment). Built with
+  // both present so a future edit can't silently drop either from the builder OR the doctrine.
+  const builtStep2 = buildObjectionUserSegments({
+    liveSummary: "x", latestResponse: "y",
+    thread: { beatNumber: 2, linesGiven: ["a"], historyTranscript: "h" },
+    flowRecap: "r",
+    callMemory: { recaps: ["rec"], linesGiven: ["l"] },
+  }).map((s) => s.text).join("");
+  for (const m of ["OBJECTION FLOW RECAP", "EARLIER OBJECTION EXCHANGES THIS CALL"]) {
+    if (!builtStep2.includes(m)) throw new Error(`[threading-eval] builder no longer emits Step-2 marker "${m}"`);
+    if (!OBJECTION_SYSTEM_PROMPT.includes(m)) throw new Error(`[threading-eval] doctrine no longer references Step-2 marker "${m}" — builder/doctrine DESYNC`);
+  }
+  // The synth's own output header must match the marker the doctrine trusts — if the synthesis
+  // prompt's template drifts, the card prompt would reference a recap shape that never arrives.
+  if (!FLOW_SYNTH_SYSTEM_PROMPT.includes("OBJECTION FLOW RECAP")) {
+    throw new Error("[threading-eval] flow-synth prompt no longer outputs the OBJECTION FLOW RECAP header — synth/doctrine DESYNC");
+  }
+
+  // B4: the plays-run marker + envelope instruction must survive in the threaded builder, and the
+  // decoder-transparency invariant must hold for every taxonomy id (an id whose JSON rendering
+  // contained `"line"` would silently corrupt decodeLineStream's key search).
+  const builtLever = buildObjectionUserSegments({
+    liveSummary: "x", latestResponse: "y",
+    thread: { beatNumber: 2, linesGiven: ["a"], historyTranscript: "h", leversUsed: ["why-probe"] },
+    leverToAvoid: "why-probe",
+  }).map((s) => s.text).join("");
+  for (const m of ["PLAYS YOU'VE RUN", '"lever"', "YOUR PREVIOUS DRAFT"]) {
+    if (!builtLever.includes(m)) throw new Error(`[threading-eval] builder no longer emits B4 marker "${m}"`);
+  }
+  for (const id of LEVER_TAXONOMY) {
+    if (`"lever":"${id}"`.includes('"line"')) throw new Error(`[threading-eval] taxonomy id "${id}" breaks decoder transparency`);
+  }
+  // Single-shot byte-shape guard: with NO thread/recap/memory the message must be exactly the
+  // shipped two-segment shape (CALL MEMORY + WHAT WAS JUST SAID) — the eval-validated card.
+  const single = buildObjectionUserSegments({ liveSummary: "x", latestResponse: "y" });
+  const flat = single.map((s) => s.text).join("");
+  if (single.length !== 2 || !flat.startsWith("CALL MEMORY") || !flat.includes("WHAT WAS JUST SAID")) {
+    throw new Error("[threading-eval] single-shot message shape changed — objection #1 is no longer byte-identical to the shipped card");
+  }
+}
+
+// ── LONG-FLOW COMPARATIVE GATE (Step 2) ───────────────────────────────────────
+// Proves the background synthesis doesn't degrade the card: on the SAME long fixture, generate
+// card_full (entire exchange verbatim — the unattainable ideal) and card_synth (recap of the
+// absorbed middle + recent verbatim tail — what production actually sends once a flow overflows),
+// then a BLIND A/B judge picks which line better handles the latest response. The gate fails if
+// the synth arm LOSES the majority — synthesis must be as sharp as full verbatim, or we tune it.
+//
+// Fixture: adapted turn-by-turn from a REAL money+fear objection grind in
+// knowledge-base/objection-transcripts/live-calls/live-aGSOavg_Iog.txt (dating offer; ~17 min of
+// a 35-min close). The arc is the closer's actual sequence: pace → "money aside, can it get you
+// there" → why-probe → smack the small-town excuse → isolate finances → "what you want is also
+// a lot" → crossroads → courage challenge → fear-magnify (his AA 4th-step analogy) → 2-pay close.
+const LONGFLOW = {
+  id: "longflow-money-fear",
+  beatNumber: 8,
+  belief: "Gary, late 50s, single, small town. Wants a real relationship — 'tired of being rejected, tired of not even asking anymore.' Lifelong fear of humiliation (never played sports, never put himself out there). In AA — did his 4th step with a sponsor, so he KNOWS hard inner work pays off [confirmed]. Weak beliefs: Money (spending comfort — he HAS it: 'very specialized in my business, I charge quite a lot for my work') braided with Fear (rejection). High-4-figure dating coaching offer, 2-pay available.",
+  linesGiven: [
+    "The money — we can definitely look at that, no problem. Outside of the money, do you feel like the program can actually get you past the fear and help you find that great woman?",
+    "Which part of it do you think would work for you the most?",
+    "Those are girls you could go out with — they are. You see women you'd actually grab a coffee with; you're just not in the space to go connect with her yet.",
+    "So is it a case where you don't have the money at all and this is impossible — or where you have some of it and we need to figure out how to make it work?",
+    "I know. And what you want is also a lot — a partner who's really amazing to you, being genuinely happy. In terms of having that — is that worth it for you?",
+    "Let's say you did have the tools to get over the fears you've been dealing with — do you think you could find the courage in yourself, with us helping you, to actually make those connections happen?",
+    "Can I challenge you then to bet on yourself, and take a stand for yourself to correct the course of that here?",
+  ],
+  history:
+`REP: The money — we can definitely look at that, no problem. Outside of the money, do you feel like the program, based on what we've gone through, can actually get you out of the space you've been in, past a lot of the fear, and help you meet women and find that great woman?
+GARY: Yeah.
+REP: Which part of it do you think would work for you the most?
+GARY: Well, learning to have the right things to say to a lady is where I fall down. How I say things is a big turn on or turn off, and it doesn't always convey right. I've asked a few girls out on Facebook — "hey, how would you feel about getting together for a cup of coffee" — and I either get "no, I'm busy," or "I have a boyfriend," or they don't even respond.
+REP: Well, that's what we want to change, right? We don't want you stuck in that. Those are girls you could go out with — they are.
+GARY: Maybe not always on Facebook... and this is kind of a small town I live in. There's just not a lot of eligible women here, you know? There's a bigger city not too far away, but here... and right there, that sounds like I'm making an excuse for not getting out and looking around.
+REP: You said it, not me. And when you do go out — I'm sure you occasionally see women you're like, "I would actually probably go out for a coffee with this woman." But you're not thinking of her as someone you could connect with, because you're just not in the space to go connect with her.
+GARY: Right... right. So you kind of dismiss it. Yeah.
+REP: Cool. So the only real thing between us working together is the finances. So let me ask — is it a case where you don't have the money at all and you can't actually do this, it's impossible — or is it that you maybe have some of it and we can figure out how to work with you and make this happen?
+GARY: Well... that's a lot of money.
+REP: I know. And what you want also is a lot. To go forward where you're happy, fulfilled —
+GARY: I'm very specialized in my business and I charge quite a lot for my work, you know. But you get what you pay for.
+REP: Yeah, you do. So in terms of you having the fulfillment — a partner, a woman that's really amazing to you — is that worth it for you?
+GARY: Yeah. It would be, yeah.
+REP: And let's say you did have the tools to get over a lot of the fears you've been dealing with, and when you did see a woman you wanted to connect with — whether it's online or in person — do you think you could find the courage in yourself, with us helping you, to actually make those connections happen?
+GARY: Sure. With the help, I could. Because I'm tired. I'm tired of being rejected so much. I don't even ask anymore. I've always been that way — I've had that fear since I was little. Being laughed at, ridiculed, humiliated. I never played any sports, never done anything in my life, because I was so scared of rejection and being humiliated.
+REP: A hundred percent. It's not easy. But can I challenge you then to bet on yourself, and back yourself, and take a stand for yourself to correct the course of that here?
+GARY: Sure. It is a lot — it's not a little bit. I mean... it's just as fearful as doing your 4th step in AA. Working with a sponsor, looking at yourself, doing all that stuff — that's scary as hell.
+REP: But you did it.
+GARY: Yeah. I did.
+REP: And there's another mountain in front of you now, which is your relationships.
+GARY: Sure. Yeah.`,
+  // What production keeps verbatim behind the absorb boundary — matches SYNTH_RECENT_TAIL (1500)
+  // in useWingmanPoller.ts so the gate tests exactly the production composition.
+  recentTailChars: 1500,
+  latestResponse: `GARY: So if I do the two payments and I get hit for another 400 bucks on top... yeah, I mean, it's — I want to make sure I'm not putting myself in a hole here. Maybe I should sit with it for a few days and see where my head's at.`,
+};
+
+const AB_JUDGE_SYSTEM = `You compare TWO candidate lines a rep could say next at the same moment of a live multi-turn objection exchange. Both were generated from the same exchange; judge ONLY which line better handles the prospect's LATEST response — engages what they just said (or the belief/fear right under it), advances the exchange rather than repeating worked ground, and sounds like a calm, human closer (short, spoken, one move).
+
+Return ONLY this JSON, nothing else:
+{ "winner": "A" | "B" | "tie", "rationale": "one short sentence" }
+Use "tie" when both are genuinely comparable in quality — do not force a winner.`;
+
+async function runLongFlowGate() {
+  const lf = LONGFLOW;
+  const middle = lf.history.slice(0, lf.history.length - lf.recentTailChars);
+  const recentTail = lf.history.slice(-lf.recentTailChars);
+
+  console.log(`\n── Long-flow comparative gate (${lf.id}) — synth vs full-verbatim ──`);
+  if (DRY) {
+    const composed = buildObjectionUserSegments({
+      liveSummary: lf.belief, latestResponse: lf.latestResponse,
+      thread: { beatNumber: lf.beatNumber, linesGiven: lf.linesGiven, historyTranscript: recentTail },
+      flowRecap: "(dry recap placeholder)",
+    }).map((s) => s.text).join("");
+    console.log(`[DRY] synth-arm message assembles (${composed.length} chars; middle=${middle.length} chars would be synthesized). Skipping API.`);
+    return true;
+  }
+
+  // 1. Run the REAL synthesis prompt on the absorbed middle (exactly what /flow-synth does).
+  const synthRes = await anthropic(
+    FLOW_SYNTH_MODEL, FLOW_SYNTH_SYSTEM_PROMPT,
+    buildFlowSynthUserMessage({ priorRecap: "", belief: lf.belief, newExchange: middle }),
+    FLOW_SYNTH_MAX_TOKENS,
+  );
+  if (synthRes.error || !synthRes.text) { console.log(`❌ synthesis call failed (${synthRes.error}) — gate FAIL`); return false; }
+  const recap = synthRes.text;
+  console.log(`  recap (${recap.length} chars):\n${recap.split("\n").map((l) => "    " + l).join("\n")}\n`);
+
+  const fullArm  = { belief: lf.belief, latestResponse: lf.latestResponse, kind: "advance",
+    thread: { beatNumber: lf.beatNumber, linesGiven: lf.linesGiven, historyTranscript: lf.history } };
+  const synthArm = { belief: lf.belief, latestResponse: lf.latestResponse, kind: "advance",
+    thread: { beatNumber: lf.beatNumber, linesGiven: lf.linesGiven, historyTranscript: recentTail, flowRecap: recap } };
+
+  let wins = 0, ties = 0, losses = 0, boolPasses = 0;
+  for (let r = 0; r < REPEAT; r++) {
+    const [cardFull, cardSynth] = [await generate(fullArm), await generate(synthArm)];
+    if (!cardSynth.line) { losses++; console.log(`  ✗ run ${r + 1}: synth arm produced no line (${cardSynth.error ?? "abstain"})`); continue; }
+    if (!cardFull.line)  { wins++;   console.log(`  · run ${r + 1}: full arm produced no line — synth wins by default`); continue; }
+
+    // Absolute floor: the synth card must still pass the boolean rubric on its own.
+    const jb = await judge(synthArm, cardSynth.line);
+    const boolPass = !jb.error && !jb.repeats_prior && jb.addresses_latest;
+    if (boolPass) boolPasses++;
+
+    // Blind A/B, randomized order so the judge can't learn a side.
+    const synthIsA = Math.random() < 0.5;
+    const [A, B] = synthIsA ? [cardSynth.line, cardFull.line] : [cardFull.line, cardSynth.line];
+    const { text, error } = await judgeCall(AB_JUDGE_SYSTEM,
+      `THE EXCHANGE SO FAR (context):\n${lf.history}\n\nTHE PROSPECT'S LATEST RESPONSE:\n${lf.latestResponse}\n\nLINE A: "${A}"\nLINE B: "${B}"`, 200);
+    const p = error ? null : extractJson(text);
+    if (!p || !p.winner) { ties++; console.log(`  · run ${r + 1}: judge unparseable (${error ?? "bad json"}) — counted as tie`); continue; }
+    const synthWon = (p.winner === "A") === synthIsA;
+    if (p.winner === "tie") { ties++; console.log(`  · run ${r + 1}: TIE — ${p.rationale}`); }
+    else if (synthWon) { wins++; console.log(`  · run ${r + 1}: SYNTH wins — ${p.rationale}`); }
+    else { losses++; console.log(`  ✗ run ${r + 1}: FULL wins — ${p.rationale}\n      synth: "${cardSynth.line}"\n      full:  "${cardFull.line}"`); }
+  }
+
+  // Margin: synthesis must not LOSE the majority of runs, and must hold the boolean floor
+  // (need = the same strong-majority bar the main fixtures use).
+  const lossFail = losses > Math.floor(REPEAT / 2);
+  const boolFail = boolPasses < Math.ceil((REPEAT * 2) / 3);
+  const pass = !lossFail && !boolFail;
+  console.log(`  synth wins=${wins} ties=${ties} losses=${losses} · boolean floor ${boolPasses}/${REPEAT}`);
+  console.log(`── LONG-FLOW GATE: ${pass ? "✅ PASS" : "❌ FAIL"} ──`);
+  return pass;
 }
 
 async function run() {
@@ -468,11 +689,20 @@ async function run() {
     console.log("");
   }
   console.log(`── GATE: ${allPass ? "✅ PASS" : "❌ FAIL"} (every fixture ≥${need}/${REPEAT}) ──`);
+
+  // Step 2: long-flow comparative gate (skipped when ONLY filters it out).
+  let longFlowPass = true;
+  if (!ONLY || LONGFLOW.id.includes(ONLY)) {
+    longFlowPass = await runLongFlowGate();
+  }
+
   if (DRY) {
     console.log("\n[DRY] Sample assembled user message — fixture 'switch-money-to-trust':\n");
     console.log(assembleUser(FIX.find((f) => f.id === "switch-money-to-trust")));
+    console.log("\n[DRY] Sample assembled user message — fixture 'memory-resurface-money' (call-level memory on beat-1):\n");
+    console.log(assembleUser(FIX.find((f) => f.id === "memory-resurface-money")));
   }
-  process.exit(allPass ? 0 : 1);
+  process.exit(allPass && longFlowPass ? 0 : 1);
 }
 
 run().catch((e) => { console.error(e); process.exit(1); });

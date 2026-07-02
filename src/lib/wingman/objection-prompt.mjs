@@ -56,12 +56,17 @@ EXAMPLES OF THE TARGET STYLE (short, spoken, straight to it — match this feel 
 CONTINUING AN OBJECTION — THE BACK-AND-FORTH (only when you're shown "MOVES YOU'VE ALREADY GIVEN" and an "EXCHANGE SO FAR"):
 You're mid-exchange. The rep already said your earlier moves OUT LOUD and the prospect answered back — this is a live back-and-forth, not a fresh start. Work it like a real closer taking someone across several turns:
 - DO NOT repeat or lightly reword any line in "MOVES YOU'VE ALREADY GIVEN" — reusing it makes the rep look broken. Come at the weak belief from a genuinely NEW angle. And if their latest response circles BACK to a point or question you already gave, they've effectively answered it by returning to it — so don't re-ask it. Make the point directly, name the pattern out loud, or switch to a different lever.
+- BEFORE you write the line, check it against EACH move above: if it opens the same way, lands the same ask, or works the same lever with new words (a payment tweak after a payment offer, a "what's different this time" after a "what's different"), it IS a repeat — throw it away and pick a lever you have NOT used yet: an analogy, the cost of inaction, sitting in the fear, naming the pattern out loud, the financial trade, or going directly for the decision. Staying on the SAME belief is right; re-asking the same question is not.
 - Give the NEXT beat. Beat 1 was the head-on tie-down/isolate; from here, pick the angle that fits what they JUST said (below the "latest response" marker) and the weak belief — an analogy, the cost of inaction, sitting in the fear, a permission-reframe, or the financial trade. There is NO fixed order — read the room and choose the sharpest next move.
 - HANDLE before you close. Lean toward the trade / the close as beats climb — but only once the objection is basically handled. If they just asked you a direct question or raised a fresh doubt, answer or engage THAT first; never skip a real question to force a close. And if you're several beats deep and genuinely out of new angles, that itself is the signal — name that they keep circling and go for the decision, rather than forcing yet another reframe.
 - Anchor to their LATEST response, not an earlier turn. If they just revealed something new (a real gate, a new fear, a specific), engage THAT — don't skate past it to isolate other objections. Everything above the "latest response" marker is context; the move must answer what they just said.
 - If NOTHING below the "latest response" marker is a real prospect response — it's empty, it's the rep's own words, or it's cut off mid-thought because the prospect is still talking — do NOT invent a next move. Return { "line": null } so the rep waits for the prospect to actually finish.
 - If a PAUSE is flagged, the prospect likely changed the subject. Do NOT assume you're still on the old objection. If their latest words raise a different concern than the moves above were working, drop the old thread completely — do not reach back to it, do not push a close — and handle the NEW objection from scratch, as if it were the first card. Continue the old sequence ONLY if the latest response is unmistakably the same objection coming back.
 - If at any point the prospect has clearly switched to a different objection (even with no pause), treat it as new — diagnose the new weak belief from scratch and do not recycle the earlier moves.
+
+If an "OBJECTION FLOW RECAP" is shown: it is the strategic memory of the EARLIER part of this same exchange — the verbatim transcript below it may only cover the recent turns. Trust it: do NOT retry an angle it lists as dead or already tried; use what it says the prospect conceded as your anchors; let the trajectory it names steer how hard you lean toward the close.
+
+If "EARLIER OBJECTION EXCHANGES THIS CALL" is shown: those objections were already worked earlier on THIS call, and the rep already said those lines out loud. NEVER repeat or lightly reword a line listed there. If the prospect's current objection is one of those resurfacing, don't restart from square one — acknowledge it's come back and ADVANCE: build on what was already established, name the pattern out loud, or move toward the decision.
 
 WHEN THERE IS NO OBJECTION TO HANDLE:
 The rep summoned you, but sometimes nothing is actually standing — the prospect is engaged or plainly agreeing, asked a simple logistics question with no worry underneath it, is still in early rapport/discovery with no pushback yet, or already resolved a concern and moved on. LEAN TOWARD GIVING A LINE: a soft stall, a hesitation, a wishy-washy "maybe," a flat tone, or a real worry buried under a logistics question all COUNT as objections worth handling — handle them. But if there is genuinely NO pushback, hesitation, stall, doubt, fear, or concern standing right now, do NOT manufacture one. When in doubt, handle it — only stay silent when there is truly nothing to handle.
@@ -95,31 +100,94 @@ Return ONLY ONE of these two JSON objects and NOTHING else — no commentary, no
  *   latestResponse   — what the prospect JUST said (single-shot: the last ~120s; threaded: the
  *                      fresh tail since the last move)
  *   thread?          — { linesGiven: string[], historyTranscript: string, beatNumber: number,
- *                        gapFlag?: boolean }. Absent OR beatNumber<=1 → single-shot (the message
- *                        is byte-identical to the pre-threading string).
+ *                        gapFlag?: boolean }. Absent OR beatNumber<=1 → single-shot.
+ *   flowRecap?       — rolling strategic recap of the EARLIER part of THIS exchange (Step 2
+ *                      background synthesis). Rewritten every synth tick → lives in the VOLATILE
+ *                      TAIL, never inside a cached segment (a moving byte in the cached prefix
+ *                      would bust the history cache every tick — plan-review blocker 1).
+ *   callMemory?      — { recaps: string[], linesGiven: string[] }: archived exchanges from
+ *                      EARLIER objection flows this call. Changes only between flows → cached,
+ *                      placed FIRST (least-mutating layer). Absent/empty → segment omitted.
+ *
+ * With NO thread, NO flowRecap, NO callMemory the output is byte-identical to the original
+ * pre-threading message (objection #1's single-shot — the shipped, eval-validated shape).
  *
  * @returns {{ text: string, cache: boolean }[]}
  */
-export function buildObjectionUserSegments({ liveSummary, latestResponse, thread } = {}) {
+/**
+ * LEVER_TAXONOMY — the fixed vocabulary of objection "plays" (B4). Single source shared by the
+ * card prompt, the flow-synth recap, the consecutive-lever guard, and the eval.
+ * INVARIANT (decoder transparency): every id must stay hyphen-word form — an id whose JSON
+ * rendering `"lever":"<id>"` contained the substring `"line"` would confuse decodeLineStream's
+ * key search. Enforced by a gate assertion in scripts/objection-threading-eval.mjs + unit tests.
+ */
+export const LEVER_TAXONOMY = [
+  "pace-tie-down", "why-probe", "name-the-pattern", "cost-of-inaction", "fear-magnify",
+  "analogy", "permission-reframe", "financial-trade", "identity-future-self",
+  "consistency-anchor", "direct-close",
+];
+
+export function buildObjectionUserSegments({ liveSummary, latestResponse, thread, flowRecap, callMemory, leverToAvoid } = {}) {
   const belief = (liveSummary && liveSummary.trim()) || "(no call summary yet — this is early in the call)";
-  const segs = [{ text: `CALL MEMORY (what we already know about this prospect — lean on this):\n${belief}`, cache: true }];
+  const segs = [];
+
+  // Layer 0 (optional, cached, FIRST — ordered by mutation frequency): earlier flows this call.
+  // Caps mirror the route's (defense in depth — the builder must be safe even if a caller skips caps).
+  const memRecaps = (callMemory?.recaps || []).filter((r) => typeof r === "string" && r.trim()).slice(-3).map((r) => r.slice(0, 1100));
+  const memLines  = (callMemory?.linesGiven || []).filter((l) => typeof l === "string" && l.trim()).slice(-8).map((l) => l.slice(0, 200));
+  if (memRecaps.length || memLines.length) {
+    let mem = `EARLIER OBJECTION EXCHANGES THIS CALL (already worked earlier on this same call — context, not the thing to answer):`;
+    if (memRecaps.length) mem += `\n${memRecaps.join("\n---\n")}`;
+    if (memLines.length) {
+      mem += `\n\nLINES YOU ALREADY GAVE EARLIER THIS CALL (the rep already said these out loud — NEVER repeat or lightly reword them):\n${memLines.map((l, i) => `${i + 1}. "${l}"`).join("\n")}`;
+    }
+    segs.push({ text: mem + "\n\n", cache: true });
+  }
+
+  segs.push({ text: `CALL MEMORY (what we already know about this prospect — lean on this):\n${belief}`, cache: true });
 
   const threaded = !!(thread && Number(thread.beatNumber) > 1);
   if (!threaded) {
-    // Single-shot (beat 1 / no thread). Concatenation is byte-identical to the original message.
+    // Single-shot (beat 1 / no thread). With no callMemory above, concatenation is
+    // byte-identical to the original message.
     segs.push({ text: `\n\nWHAT WAS JUST SAID (last ~120s):\n${latestResponse ?? ""}`, cache: false });
     return segs;
   }
 
   // Threaded. Big append-only transcript FIRST (cached prefix), then the small volatile tail.
+  // NOTE (Step 2): history covers recapCursor→lastMove once synthesis has run — the earlier
+  // part of the exchange arrives via the FLOW RECAP in the tail. Append-only BETWEEN synth ticks.
   const history = (thread.historyTranscript && thread.historyTranscript.trim()) || "(nothing captured yet)";
   segs.push({
     text: `\n\nEXCHANGE SO FAR (since this objection opened — the rep already worked it this far; this is context, not the thing to answer):\n${history}`,
     cache: true,
   });
 
+  const recapText = typeof flowRecap === "string" && flowRecap.trim() ? flowRecap.trim().slice(0, 1400) : "";
+  let tail = "";
+  if (recapText) {
+    // Volatile tail on purpose — rewritten every synth tick (see param doc above).
+    tail += `\n\nOBJECTION FLOW RECAP (strategic read of the EARLIER part of this exchange — the verbatim above picks up where it leaves off):\n${recapText}`;
+  }
+
   const moves = (thread.linesGiven || []).map((l, i) => `${i + 1}. "${l}"`).join("\n") || "(none yet)";
-  let tail = `\n\nMOVES YOU'VE ALREADY GIVEN (the rep already said these out loud — do NOT repeat or lightly reword any of them; come from a NEW angle):\n${moves}`;
+  tail += `\n\nMOVES YOU'VE ALREADY GIVEN (the rep already said these out loud — do NOT repeat or lightly reword any of them; come from a NEW angle):\n${moves}`;
+
+  // B4: plays-run memory + the last-play judgment rule. NOT a blocklist — returning to an
+  // earlier play is legitimate when something changed or it's a decisive escalation; the one
+  // always-wrong pattern is re-running the play that JUST failed, unchanged.
+  const levers = (thread.leversUsed || []).filter((v) => LEVER_TAXONOMY.includes(v));
+  if (levers.length) {
+    const lastLever = levers[levers.length - 1];
+    tail += `\n\nPLAYS YOU'VE RUN (in order): ${levers.join(" → ")}.\nYour LAST play was "${lastLever}" and it has not landed yet — do NOT run it again unchanged. Either escalate it decisively (absolute language, the double tie-down, or take it to the decision) because something just changed, or switch to a play you haven't run.`;
+  }
+  if (leverToAvoid && LEVER_TAXONOMY.includes(leverToAvoid)) {
+    tail += `\n\nYOUR PREVIOUS DRAFT re-ran the play "${leverToAvoid}" unchanged. If you are returning to it DELIBERATELY because something changed, run it as a decisive escalation; otherwise pick a genuinely different play.`;
+  }
+  // Threaded output contract: lever FIRST so the guard reads it before any line text streams.
+  // The abstain option leads — declaring a play must never bias the model toward manufacturing
+  // one when the right move is silence (the "no response yet / still talking" rules still apply).
+  tail += `\n\nFor THIS continuation beat: FIRST decide, by the same rules as above, whether anything should be said at all — if not (no real prospect response below the marker, mid-sentence, nothing standing), return { "lever": null, "line": null }. Only if a move is genuinely warranted, return it with the play declared FIRST: { "lever": "<one of: ${LEVER_TAXONOMY.join(" | ")}>", "line": "<the exact words>" }.`;
   if (thread.gapFlag) {
     // A pause was flagged — the prospect likely changed the subject. Do NOT nudge toward the
     // close here (that pull is what makes it wrongly continue a resolved objection). Force a

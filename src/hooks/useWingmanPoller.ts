@@ -29,6 +29,13 @@ interface PusherScorecardEvent {
 const NON_ALERT_COOLDOWN_MS       = 90_000;  // 90 seconds
 const SUMMARIZE_INTERVAL_MS       = 120_000; // 2 minutes — rolling Belief Ladder update cadence
 const SUMMARIZE_MIN_CHARS         = 80;      // skip tick if fewer chars of new speech accumulated
+// ── Objection Flow rolling synthesis (Phase B, Step 2) ────────────────────────
+const SYNTH_INTERVAL_MS  = 40_000; // background cadence during a long flow (server floor is 30s)
+const SYNTH_THRESHOLD    = 3_000;  // flow length (chars, anchor→lastMove) before synthesis starts
+const SYNTH_RECENT_TAIL  = 1_500;  // chars left verbatim behind the absorb boundary (recent nuance)
+const SYNTH_SLICE_MAX    = 2_500;  // max chars absorbed per tick (rolls forward on later ticks)
+const SYNTH_MIN_SLICE    = 400;    // skip a tick when there's too little new material to absorb
+const MAX_SYNTH_TICKS    = 20;     // hard cost ceiling per flow (~$0.20 pathological worst case)
 // Rolling recent-transcript window exposed to DashboardClient for hotkey press context.
 // 2,400 chars ≈ 120 s of speech at average rate (~130 words/min).
 // Tunable — see Wingman Brain/Beta Tuning Parameters.md.
@@ -53,6 +60,36 @@ interface UseWingmanPollerReturn {
   liveSummary: string | null;
   /** Returns the last ~120 s of raw transcript for hotkey press-time context. */
   getRecentTranscript: () => string;
+  /**
+   * Objection-threading backing store (Phase B / B1).
+   * Current write position in the append-only whole-call transcript. Monotonic
+   * within a call (resets to 0 only when a new call starts). DashboardClient
+   * snapshots this at flow-open as the objection's anchor cursor.
+   */
+  getTranscriptCursor: () => number;
+  /**
+   * Everything appended to the whole-call transcript since `cursor`.
+   * Used to feed the anchored exchange (anchor→now) into threaded objection beats.
+   * Cursor is clamped defensively so a stale cursor from a previous call yields "".
+   */
+  getTranscriptSince: (cursor: number) => string;
+  /**
+   * Objection Flow synthesis engine (Phase B, Step 2). The thread ledger stays single-owned in
+   * DashboardClient; the poller only runs the background timer + holds the recap state.
+   * setFlowSynthContext is called on flow open/advance/reset; the timer synthesizes the flow's
+   * older middle into a rolling strategic recap during the prospect's talk time.
+   */
+  setFlowSynthContext: (ctx: { active: boolean; anchorCursor?: number; lastMoveCursor?: number; beliefSnapshot?: string | null }) => void;
+  /** Current rolling recap of the open flow ("" when none / not yet synthesized). */
+  getFlowRecap: () => string;
+  /** How far the recap has absorbed (=== anchorCursor until the first synth completes). */
+  getRecapCursor: () => number;
+  /**
+   * One-shot close-out synthesis for a DYING ≥2-beat flow that never got a rolling recap.
+   * Resolves to the recap string (or null on failure/guard). Bounded: single Sonnet call,
+   * mutex-shared with the rolling tick. Caller archives the result into call-level memory.
+   */
+  synthesizeClosedFlow: (args: { anchorCursor: number; lastMoveCursor: number; beliefSnapshot?: string | null }) => Promise<string | null>;
   addChunk: (chunk: string) => void;
   dismissSignal: () => void;
   flushBuffer: () => Promise<void>;
@@ -97,9 +134,32 @@ export function useWingmanPoller({
   const currentSummaryRef  = useRef<string | null>(null); // in-memory copy for fast press-time reads
   const isSummarizingRef   = useRef(false);           // mutex — one in-flight request at a time
   const summarizeIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // ── Objection Flow synthesis refs (Phase B, Step 2) ─────────────────────────
+  // The poller runs the background synth; DashboardClient owns the thread ledger and feeds
+  // flow context in via setFlowSynthContext. The synth writes ONLY flowRecapRef/recapCursorRef
+  // (disjoint from the ledger's fields — two async writers must never share fields).
+  const flowActiveRef     = useRef(false);
+  const flowAnchorRef     = useRef(0);              // flow identity — a different anchor = a different flow
+  const flowLastMoveRef   = useRef(0);              // advanced by DashboardClient on each `done`
+  const flowBeliefRef     = useRef<string | null>(null); // frozen belief snapshot (synth context)
+  const flowRecapRef      = useRef("");             // the rolling strategic recap
+  const recapCursorRef    = useRef(0);              // how far the recap absorbed (monotonic in-flow)
+  const isSynthesizingRef = useRef(false);          // mutex — one in-flight synth (rolling OR close-out)
+  const synthTickCountRef = useRef(0);              // per-flow hard cost ceiling (MAX_SYNTH_TICKS)
+  const synthIntervalRef  = useRef<ReturnType<typeof setInterval> | null>(null);
   // Rolling recent-transcript window for hotkey press-time context.
   // Never cleared between saves — always holds the last ~120 s of speech.
   const recentTranscriptRef = useRef<string>("");
+  // Objection-threading backing store (Phase B / B1). Append-only whole-call
+  // transcript — NEVER trimmed, NEVER cleared on save/summarize (unlike
+  // recentTranscriptRef / chunkBufferRef / summarizeBufferRef, none of which can
+  // serve an anchor). Reset ONLY when a new call starts. The cursor is this
+  // string's length (monotonic within a call); getTranscriptSince slices from it.
+  // Whole-call rather than flow-scoped on purpose: no coupling to flow-open timing,
+  // never an empty buffer, and it captures speech during card-1 generation. Memory
+  // is bounded (~90 KB for a 2-hour call, text only). Old-objection context can't
+  // leak because each flow anchors at its own cursor snapshot.
+  const fullTranscriptRef = useRef<string>("");
   // The rep's Zoom display name — seeded from Settings, falls back to auto-detection.
   // Used to exclude the rep's lines from keyword trigger matching so cards
   // only fire when the prospect says an objection phrase, not the rep.
@@ -133,6 +193,15 @@ export function useWingmanPoller({
       currentSummaryRef.current   = null;
       summarizeBufferRef.current  = "";
       recentTranscriptRef.current = "";
+      fullTranscriptRef.current   = ""; // Phase B: drop prior call's threading transcript
+      // Step 2: drop prior call's flow-synth state (cursors point into the wiped buffer)
+      flowActiveRef.current     = false;
+      flowAnchorRef.current     = 0;
+      flowLastMoveRef.current   = 0;
+      flowBeliefRef.current     = null;
+      flowRecapRef.current      = "";
+      recapCursorRef.current    = 0;
+      synthTickCountRef.current = 0;
       setLiveSummary(null);
     }
   }, [callId]);
@@ -356,6 +425,9 @@ export function useWingmanPoller({
 
       chunkBufferRef.current     += (chunkBufferRef.current     ? "\n" : "") + chunk;
       summarizeBufferRef.current += (summarizeBufferRef.current ? "\n" : "") + chunk;
+      // Phase B / B1: append-only whole-call transcript for objection threading.
+      // Never trimmed or cleared on save — the anchor cursor slices from here.
+      fullTranscriptRef.current  += (fullTranscriptRef.current  ? "\n" : "") + chunk;
 
       // Rolling 120 s window for hotkey press-time context.
       // Trims from the front when it exceeds the char cap so the most recent
@@ -479,6 +551,169 @@ export function useWingmanPoller({
     }
   }, []);
 
+  // ── Objection Flow synthesis (Phase B, Step 2) ─────────────────────────────
+
+  /**
+   * Flow context updates from DashboardClient (the ledger owner).
+   * A DIFFERENT anchor = a DIFFERENT flow → recap state resets; same anchor = advance.
+   * Deactivation clears everything so a dead flow's recap can never leak into the next one
+   * (DashboardClient reads getFlowRecap() for archiving BEFORE deactivating).
+   */
+  const setFlowSynthContext = useCallback(
+    (ctx: { active: boolean; anchorCursor?: number; lastMoveCursor?: number; beliefSnapshot?: string | null }) => {
+      if (!ctx.active) {
+        flowActiveRef.current     = false;
+        flowAnchorRef.current     = 0;
+        flowLastMoveRef.current   = 0;
+        flowBeliefRef.current     = null;
+        flowRecapRef.current      = "";
+        recapCursorRef.current    = 0;
+        synthTickCountRef.current = 0;
+        return;
+      }
+      const anchor = ctx.anchorCursor ?? flowAnchorRef.current;
+      if (!flowActiveRef.current || anchor !== flowAnchorRef.current) {
+        // New flow opening — reset recap state to the new anchor.
+        flowAnchorRef.current     = anchor;
+        recapCursorRef.current    = anchor;
+        flowRecapRef.current      = "";
+        synthTickCountRef.current = 0;
+        flowBeliefRef.current     = ctx.beliefSnapshot ?? null;
+      }
+      flowActiveRef.current   = true;
+      flowLastMoveRef.current = ctx.lastMoveCursor ?? flowLastMoveRef.current;
+    },
+    [],
+  );
+
+  /** Shared POST to /flow-synth. Returns the recap or null (failure/timeout). */
+  const runSynthRequest = useCallback(
+    async (newExchange: string, priorRecap: string, belief: string | null): Promise<string | null> => {
+      if (!callIdRef.current) return null;
+      const controller = new AbortController();
+      const timeoutId  = setTimeout(() => controller.abort(), 30_000);
+      try {
+        const res = await fetch("/api/wingman/flow-synth", {
+          method:  "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            call_id:      callIdRef.current,
+            prior_recap:  priorRecap || undefined,
+            belief:       belief ?? undefined,
+            new_exchange: newExchange,
+          }),
+          signal: controller.signal,
+        });
+        if (!res.ok) {
+          // 429 = rate floor (benign — next tick retries); anything else is logged and dropped.
+          if (res.status !== 429) console.error("[Wingman] flow-synth failed:", res.status);
+          return null;
+        }
+        const data = await res.json();
+        return typeof data.recap === "string" && data.recap.trim() ? data.recap.trim() : null;
+      } catch (err) {
+        if (err instanceof Error && err.name === "AbortError") {
+          console.warn("[Wingman] flow-synth timed out — will retry next tick.");
+        } else {
+          console.error("[Wingman] flow-synth error:", err);
+        }
+        return null;
+      } finally {
+        clearTimeout(timeoutId);
+      }
+    },
+    [],
+  );
+
+  /**
+   * One rolling synth tick. ALL boundaries are FROZEN AT REQUEST TIME (plan-review blocker 3):
+   * `synthAbsorbedTo` is computed before the request and recapCursor advances to exactly that
+   * value on success — never recomputed at response time, so a `done` advancing lastMoveCursor
+   * mid-request can never gap-cover the exchange (the un-absorbed region stays verbatim).
+   * The response writes ONLY if the same call + same flow are still live (blocker 2).
+   */
+  const executeFlowSynth = useCallback(async () => {
+    if (isSynthesizingRef.current || !flowActiveRef.current || !callIdRef.current) return;
+
+    // Freeze boundaries + identity at request time.
+    const callIdAtSynth = callIdRef.current;
+    const anchorAtSynth = flowAnchorRef.current;
+    const boundary      = flowLastMoveRef.current - SYNTH_RECENT_TAIL; // keep recent turns verbatim
+    const synthAbsorbedTo = Math.min(recapCursorRef.current + SYNTH_SLICE_MAX, boundary);
+    if (synthAbsorbedTo - recapCursorRef.current < SYNTH_MIN_SLICE) return; // too little to absorb
+
+    const slice = fullTranscriptRef.current.slice(recapCursorRef.current, synthAbsorbedTo);
+    if (!slice.trim()) return;
+
+    isSynthesizingRef.current = true;
+    synthTickCountRef.current += 1; // counts attempts — this is the hard cost ceiling
+    try {
+      const recap = await runSynthRequest(slice, flowRecapRef.current, flowBeliefRef.current);
+      // Stale-response guard: the flow/call may have died during the ~2-5s request. Writing a
+      // dead flow's recap onto the next flow (or call) is silent state corruption — discard.
+      if (
+        recap &&
+        callIdRef.current === callIdAtSynth &&
+        flowActiveRef.current &&
+        flowAnchorRef.current === anchorAtSynth
+      ) {
+        flowRecapRef.current   = recap;
+        recapCursorRef.current = synthAbsorbedTo; // the frozen boundary — never the live one
+        console.log(`[Wingman] flow recap updated (absorbed→${synthAbsorbedTo}, ${recap.length} chars)`);
+      }
+    } finally {
+      isSynthesizingRef.current = false;
+    }
+  }, [runSynthRequest]);
+
+  /**
+   * Close-out synthesis for a dying ≥2-beat flow that never got a rolling recap. Fired by
+   * DashboardClient on the stale-expiry archive path ONLY (never at call-end — races teardown).
+   * Does NOT touch the rolling recap state (the flow is already being reset); the caller
+   * archives the result into call-level memory, guarded by its own callId check.
+   */
+  const synthesizeClosedFlow = useCallback(
+    async (args: { anchorCursor: number; lastMoveCursor: number; beliefSnapshot?: string | null }): Promise<string | null> => {
+      if (isSynthesizingRef.current || !callIdRef.current) return null;
+      const slice = fullTranscriptRef.current
+        .slice(args.anchorCursor, args.lastMoveCursor)
+        .slice(-SYNTH_SLICE_MAX); // the tail carries the resolution — cap to one request
+      if (slice.trim().length < SYNTH_MIN_SLICE) return null;
+      isSynthesizingRef.current = true;
+      try {
+        return await runSynthRequest(slice, "", args.beliefSnapshot ?? null);
+      } finally {
+        isSynthesizingRef.current = false;
+      }
+    },
+    [runSynthRequest],
+  );
+
+  // Flow-synth timer — single cleanup path via this effect (covers isActive→false AND callId
+  // change automatically; no timer state scattered across DashboardClient's reset sites).
+  // The tick body is fully gated: inactive/short/capped flows cost literally nothing.
+  useEffect(() => {
+    if (synthIntervalRef.current) {
+      clearInterval(synthIntervalRef.current);
+      synthIntervalRef.current = null;
+    }
+    if (!isActive || !callId) return;
+
+    synthIntervalRef.current = setInterval(() => {
+      if (!flowActiveRef.current) return;
+      if (synthTickCountRef.current >= MAX_SYNTH_TICKS) return;
+      if (flowLastMoveRef.current - flowAnchorRef.current <= SYNTH_THRESHOLD) return;
+      executeFlowSynth();
+    }, SYNTH_INTERVAL_MS);
+
+    return () => {
+      if (synthIntervalRef.current) {
+        clearInterval(synthIntervalRef.current);
+        synthIntervalRef.current = null;
+      }
+    };
+  }, [isActive, callId, executeFlowSynth]);
+
   // ── Belief Ladder summarizer — ~2-min cadence, separate from transcript save ──
   useEffect(() => {
     if (summarizeIntervalRef.current) {
@@ -536,6 +771,22 @@ export function useWingmanPoller({
     await executeSummarize(true);
   }, [executeSummarize]);
 
+  // Stable accessor identities (useCallback) — consumers put these in useCallback/useEffect
+  // dependency arrays (e.g. DashboardClient's archiveCurrentFlow → its [callId] reset effect).
+  // Inline arrows here would get a NEW identity every render and make those effects fire on
+  // every render — which would archive + reset an ACTIVE flow mid-call. Load-bearing.
+  const getRecentTranscript = useCallback(() => recentTranscriptRef.current, []);
+  const getTranscriptCursor = useCallback(() => fullTranscriptRef.current.length, []);
+  const getTranscriptSince  = useCallback((cursor: number) => {
+    const full = fullTranscriptRef.current;
+    // Clamp: a stale cursor from a previous call (buffer reset to "") or any
+    // out-of-range value yields "" rather than an unexpected tail slice.
+    const start = Math.max(0, Math.min(cursor, full.length));
+    return full.slice(start);
+  }, []);
+  const getFlowRecap   = useCallback(() => flowRecapRef.current, []);
+  const getRecapCursor = useCallback(() => recapCursorRef.current, []);
+
   return {
     scorecard,
     currentSignal,
@@ -545,7 +796,13 @@ export function useWingmanPoller({
     completedStages,
     prospectName,
     liveSummary,
-    getRecentTranscript: () => recentTranscriptRef.current,
+    getRecentTranscript,
+    getTranscriptCursor,
+    getTranscriptSince,
+    setFlowSynthContext,
+    getFlowRecap,
+    getRecapCursor,
+    synthesizeClosedFlow,
     addChunk,
     dismissSignal,
     flushBuffer,

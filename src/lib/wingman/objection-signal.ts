@@ -24,9 +24,9 @@
  * with no confirmation signal the "if unsure, don't say the digits" default holds.
  */
 
-import { OBJECTION_SYSTEM_PROMPT, buildObjectionUserSegments } from "./objection-prompt.mjs";
+import { OBJECTION_SYSTEM_PROMPT, buildObjectionUserSegments, LEVER_TAXONOMY } from "./objection-prompt.mjs";
 import { parseSSEBuffer } from "./sse-parse";
-import { decodeLineStream } from "./json-line-stream";
+import { decodeLineStream, decodeLeverStream } from "./json-line-stream";
 
 const OBJECTION_MODEL = "claude-sonnet-4-6";
 // The line is ~25 words (~40 tokens) + JSON wrapper. 150 is comfortable headroom that
@@ -46,9 +46,21 @@ export { OBJECTION_SYSTEM_PROMPT };
  */
 export type ObjectionThread = {
   linesGiven: string[];        // verbatim lines already handed to the rep (the no-repeat guard)
-  historyTranscript: string;   // anchored transcript, objection-open → last-move cursor (append-only)
+  historyTranscript: string;   // anchored transcript, recap-cursor → last-move cursor (append-only between synth ticks)
   beatNumber: number;          // 1 = first card (single-shot); 2+ = a continuation beat
   gapFlag?: boolean;           // >~40s since last press → tell Sonnet to re-evaluate same-vs-new
+  flowRecap?: string;          // Step 2: rolling strategic recap of the exchange's absorbed middle
+  leversUsed?: string[];       // B4: plays run this flow, in order (flow-scoped — never from archive)
+};
+
+/**
+ * Call-level objection memory (Step 2): archived learnings from EARLIER flows this call.
+ * Compact + cached + pre-computed — never a press-time latency tax. Applies to beat-1 too
+ * (a resurfacing objection must not restart at square one).
+ */
+export type ObjectionCallMemory = {
+  recaps: string[];            // archived flow recaps (capped last 3 × 700 chars)
+  linesGiven: string[];        // every line given in earlier flows (capped last 8 × 200 chars)
 };
 
 type ContentBlock = { type: "text"; text: string; cache_control?: { type: "ephemeral" } };
@@ -62,11 +74,16 @@ function buildUserContent(
   transcriptChunk: string,
   liveSummary?: string,
   thread?: ObjectionThread,
+  callMemory?: ObjectionCallMemory,
+  leverToAvoid?: string,
 ): ContentBlock[] {
   const segs = buildObjectionUserSegments({
     liveSummary,
     latestResponse: transcriptChunk,
     thread,
+    flowRecap: thread?.flowRecap,
+    callMemory,
+    leverToAvoid,
   }) as Array<{ text: string; cache?: boolean }>;
   return segs.map((s) =>
     s.cache
@@ -84,9 +101,14 @@ function buildUserContent(
  *   - error   : API / timeout / unparseable → the client shows the retry pill.
  */
 export type ObjectionCardResult =
-  | { status: "line"; line: string }
+  | { status: "line"; line: string; lever?: string }  // lever: threaded beats only (B4)
   | { status: "abstain" }
   | { status: "error" };
+
+/** Validated lever or undefined — unknown/missing levers degrade to "no guard", never error. */
+function readLever(v: unknown): string | undefined {
+  return typeof v === "string" && LEVER_TAXONOMY.includes(v) ? v : undefined;
+}
 
 /**
  * Tolerant parse. The prompt returns ONE of:
@@ -103,7 +125,11 @@ function parseObjection(raw: string): ObjectionCardResult {
     if (!p || typeof p !== "object" || !("line" in p)) return null;
     const v = (p as { line: unknown }).line;
     // An empty/whitespace string is "nothing to say" — treat it as an abstain, not a card.
-    if (typeof v === "string") return v.trim() ? { status: "line", line: v.trim() } : { status: "abstain" };
+    if (typeof v === "string") {
+      return v.trim()
+        ? { status: "line", line: v.trim(), lever: readLever((p as { lever?: unknown }).lever) }
+        : { status: "abstain" };
+    }
     if (v === null) return { status: "abstain" };
     return null;
   };
@@ -123,10 +149,12 @@ function parseObjection(raw: string): ObjectionCardResult {
   return { status: "error" };
 }
 
-export async function generateObjectionCard(
+async function generateObjectionAttempt(
   transcriptChunk: string,
   liveSummary?: string,
   thread?: ObjectionThread,
+  callMemory?: ObjectionCallMemory,
+  leverToAvoid?: string,
 ): Promise<ObjectionCardResult> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
@@ -139,7 +167,7 @@ export async function generateObjectionCard(
   // No objection is handed in (Groq removed) — Sonnet infers it from the transcript,
   // exactly as validated by the eval's production-faithful arm. `thread` (Phase B) turns this
   // into a continuation beat; absent → single-shot, byte-identical to before.
-  const userContent = buildUserContent(transcriptChunk, liveSummary, thread);
+  const userContent = buildUserContent(transcriptChunk, liveSummary, thread, callMemory, leverToAvoid);
 
   // 10s timeout — a Sonnet stall must not leave the client's isGeneratingRef stuck.
   // The client also has its own 12s guard + retry pill, so an error here is never dead air.
@@ -193,6 +221,29 @@ export async function generateObjectionCard(
 }
 
 /**
+ * generateObjectionCard — non-streaming variant with the SAME B4 consecutive-lever guard as the
+ * streaming wrapper (the eval's guard sim runs this path; parity is load-bearing — rev-7 §5).
+ */
+export async function generateObjectionCard(
+  transcriptChunk: string,
+  liveSummary?: string,
+  thread?: ObjectionThread,
+  callMemory?: ObjectionCallMemory,
+): Promise<ObjectionCardResult> {
+  const levers = (thread?.leversUsed ?? []).filter((v) => LEVER_TAXONOMY.includes(v));
+  const lastLever = levers.length ? levers[levers.length - 1] : undefined;
+  const guardActive = !!(thread && Number(thread.beatNumber) > 1 && lastLever && lastLever !== "direct-close");
+
+  const first = await generateObjectionAttempt(transcriptChunk, liveSummary, thread, callMemory);
+  if (!guardActive || first.status !== "line" || !first.lever || first.lever !== lastLever) return first;
+
+  console.log(`[generateObjectionCard] lever "${lastLever}" repeated back-to-back — retrying once`);
+  const second = await generateObjectionAttempt(transcriptChunk, liveSummary, thread, callMemory, lastLever);
+  // Humility valve: ship attempt 2 whatever it is; fall back to attempt 1 only on hard error.
+  return second.status === "error" ? first : second;
+}
+
+/**
  * Streaming variant — yields the spoken line as Sonnet writes it.
  *
  * The route turns these into SSE frames; the HUD reveals the text at a constant rate.
@@ -209,9 +260,10 @@ export async function generateObjectionCard(
  * dismiss / call-end stops Sonnet generation immediately (W6 — don't bill an abandoned card).
  */
 export type ObjectionStreamEvent =
+  | { kind: "lever-info"; lever?: string } // B4 internal — consumed by the wrapper, NEVER reaches the route
   | { kind: "delta"; textSoFar: string }
   | { kind: "abstain" }
-  | { kind: "done"; line: string }
+  | { kind: "done"; line: string; lever?: string }
   | { kind: "error" };
 
 // Sonnet's cold first token (un-warmed connection) can run ~6s; give comfortable margin so
@@ -220,11 +272,13 @@ export type ObjectionStreamEvent =
 const OBJECTION_TTFB_MS  = 12_000;  // abort if no first text token by here
 const OBJECTION_TOTAL_MS = 20_000;  // absolute ceiling on the whole stream
 
-export async function* streamObjectionCard(
+async function* streamObjectionAttempt(
   transcriptChunk: string,
   liveSummary?: string,
   signal?: AbortSignal,
   thread?: ObjectionThread,
+  callMemory?: ObjectionCallMemory,
+  leverToAvoid?: string,
 ): AsyncGenerator<ObjectionStreamEvent> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
@@ -248,6 +302,7 @@ export async function* streamObjectionCard(
 
   let emittedLen = 0;     // length of the longest delta text already yielded (monotonic)
   let sawFirstText = false;
+  let leverReported = false; // B4: lever-info yielded once per attempt
 
   try {
     const resp = await fetch("https://api.anthropic.com/v1/messages", {
@@ -261,7 +316,7 @@ export async function* streamObjectionCard(
         model:      OBJECTION_MODEL,
         max_tokens: OBJECTION_MAX_TOKENS,
         system:     OBJECTION_SYSTEM_PROMPT,
-        messages:   [{ role: "user", content: buildUserContent(transcriptChunk, liveSummary, thread) }],
+        messages:   [{ role: "user", content: buildUserContent(transcriptChunk, liveSummary, thread, callMemory, leverToAvoid) }],
         stream:     true,
       }),
       signal: controller.signal,
@@ -295,6 +350,17 @@ export async function* streamObjectionCard(
         if (typeof text !== "string" || text.length === 0) continue;
 
         rawModel += text;
+
+        // B4: report the lever the instant it resolves (or is definitively absent) — before any
+        // line char is emitted, so the wrapper's guard decision happens pre-paint.
+        if (!leverReported) {
+          const ls = decodeLeverStream(rawModel);
+          if (ls.status !== "pending") {
+            leverReported = true;
+            yield { kind: "lever-info", lever: ls.status === "lever" ? readLever(ls.lever) : undefined };
+          }
+        }
+
         const state = decodeLineStream(rawModel);
 
         if (state.status === "pending") continue;
@@ -309,7 +375,8 @@ export async function* streamObjectionCard(
         } else if (state.status === "line") {
           const ms = Date.now() - t0;
           console.log(`[streamObjectionCard] ${ms}ms ✓ line`);
-          yield { kind: "done", line: state.line };
+          const finalLever = decodeLeverStream(rawModel);
+          yield { kind: "done", line: state.line, lever: finalLever.status === "lever" ? readLever(finalLever.lever) : undefined };
           return;
         } else if (state.status === "abstain") {
           console.log(`[streamObjectionCard] ${Date.now() - t0}ms ✓ abstain`);
@@ -326,7 +393,11 @@ export async function* streamObjectionCard(
 
     // Stream closed without an explicit terminal — resolve from what we have.
     const final = decodeLineStream(rawModel);
-    if (final.status === "line")    { yield { kind: "done", line: final.line }; return; }
+    if (final.status === "line") {
+      const lv = decodeLeverStream(rawModel);
+      yield { kind: "done", line: final.line, lever: lv.status === "lever" ? readLever(lv.lever) : undefined };
+      return;
+    }
     if (final.status === "abstain") { yield { kind: "abstain" }; return; }
     // truncated mid-line (max_tokens / early close) — never paint half a spoken line.
     console.error("[streamObjectionCard] Stream ended unresolved:", rawModel.slice(0, 200));
@@ -342,5 +413,68 @@ export async function* streamObjectionCard(
     clearTtfb();
     clearTimeout(totalTimer);
     signal?.removeEventListener("abort", onUpstreamAbort);
+    // Deterministically stop Sonnet if the consumer abandons this attempt early (B4 retry break,
+    // or a route-side disconnect breaking the for-await). No-op after a normal completion.
+    controller.abort();
+  }
+}
+
+/**
+ * streamObjectionCard — B4 wrapper: the consecutive-same-lever guard with an INVISIBLE retry.
+ *
+ * Attempt 1 streams normally UNLESS its declared lever (parsed pre-paint, before any line char)
+ * equals the flow's LAST lever (and isn't "direct-close" — re-closing is doctrine). In that one
+ * case the wrapper stops consuming attempt 1 (its finally aborts Sonnet at ~10 output tokens),
+ * yields NOTHING to the route, and streams attempt 2 with the escalate-or-switch nudge. If
+ * attempt 2 insists on the same lever, it ships (humility valve — may be a deliberate
+ * escalation). Guard NEVER fires on abstain, on a missing/unknown lever (degrade to no-guard),
+ * or on single-shot beats. One shared 20s budget spans both attempts.
+ */
+export async function* streamObjectionCard(
+  transcriptChunk: string,
+  liveSummary?: string,
+  signal?: AbortSignal,
+  thread?: ObjectionThread,
+  callMemory?: ObjectionCallMemory,
+): AsyncGenerator<ObjectionStreamEvent> {
+  const levers = (thread?.leversUsed ?? []).filter((v) => LEVER_TAXONOMY.includes(v));
+  const lastLever = levers.length ? levers[levers.length - 1] : undefined;
+  const guardActive = !!(thread && Number(thread.beatNumber) > 1 && lastLever && lastLever !== "direct-close");
+
+  // ONE budget across both attempts (rev-7 decision) — never a ~40s flagged beat.
+  const outer = new AbortController();
+  const onUpstream = () => outer.abort();
+  signal?.addEventListener("abort", onUpstream, { once: true });
+  const outerTimer = setTimeout(() => outer.abort(), OBJECTION_TOTAL_MS);
+
+  try {
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      const leverToAvoid = attempt === 2 ? lastLever : undefined;
+      let attemptLever: string | undefined;
+      let retry = false;
+      let decided = !guardActive || attempt === 2; // no guard → pure passthrough
+
+      const inner = streamObjectionAttempt(transcriptChunk, liveSummary, outer.signal, thread, callMemory, leverToAvoid);
+      for await (const ev of inner) {
+        if (ev.kind === "lever-info") { attemptLever = ev.lever; continue; } // internal — never forwarded
+        if (!decided && (ev.kind === "delta" || ev.kind === "done")) {
+          // Guard decision point — first line char about to paint, OR a short line that resolved
+          // in one chunk (done with zero deltas — reviewer finding: still pre-paint, still
+          // invisible to retry since nothing was forwarded). Abstain stays excluded (no guard).
+          decided = true;
+          if (attemptLever && attemptLever === lastLever) {
+            retry = true;
+            break; // stop consuming → inner's finally aborts Sonnet; yield NOTHING (invisible)
+          }
+        }
+        yield ev; // abstain/error/delta/done all pass through untouched
+        if (ev.kind === "done" || ev.kind === "abstain" || ev.kind === "error") return;
+      }
+      if (!retry) return; // inner ended without a terminal (it yields its own error in that case)
+      console.log(`[streamObjectionCard] lever "${lastLever}" repeated back-to-back — invisible retry (attempt 2)`);
+    }
+  } finally {
+    clearTimeout(outerTimer);
+    signal?.removeEventListener("abort", onUpstream);
   }
 }

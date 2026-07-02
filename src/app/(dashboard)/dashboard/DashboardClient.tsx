@@ -36,6 +36,49 @@ function isPaywallActive(profile: Profile): boolean {
   return !isSubscribed && hitLimit;
 }
 
+// ── Objection Flow threading (Phase B) ────────────────────────────────────────
+// Client-side ledger for multi-turn objection handling. When a flow is open, each ↑↑
+// press sends the verbatim lines already given + the anchored exchange since the objection
+// opened + the fresh tail, so the card ADVANCES the sequence instead of restarting.
+type ObjectionThread = {
+  active: boolean;               // a flow is open (card 1 landed)
+  linesGiven: string[];          // verbatim lines handed to the rep — the no-repeat guard
+  leversUsed: string[];          // B4: plays run THIS flow, in order. FLOW-scoped — resets with the
+                                 // thread; the archived copy never feeds the consecutive-lever guard.
+  beatNumber: number;            // 1 after card-1 done; ++ on each subsequent real line
+  anchorCursor: number;          // whole-call transcript cursor at flow open (objection start)
+  lastMoveCursor: number;        // cursor at the most recent done — end of the last move
+  beliefSnapshot: string | null; // liveSummary FROZEN at flow open (prompt-cache stability)
+};
+const EMPTY_THREAD: ObjectionThread = {
+  active: false, linesGiven: [], leversUsed: [], beatNumber: 0,
+  anchorCursor: 0, lastMoveCursor: 0, beliefSnapshot: null,
+};
+
+// A flow older than this since the last press is treated as stale → next press starts fresh.
+const FLOW_IDLE_MS = 120_000; // 2 min (Phase C moves ownership to main.ts)
+// A pause longer than this (but under FLOW_IDLE_MS) flags the prompt to re-evaluate same-vs-new.
+const GAP_FLAG_MS  = 40_000;
+// Interim overflow caps for the anchored history (Step 1). Step 2 (rolling synthesis) replaces
+// the elision with a pre-computed strategic recap; until then, never front-slice the whole thing.
+const LATEST_MAX_CHARS  = 3_500;
+const HISTORY_MAX_CHARS = 4_500;
+
+/** Keep the freshest tail — what the prospect JUST said matters most. */
+function capLatest(s: string): string {
+  return s.length <= LATEST_MAX_CHARS ? s : s.slice(-LATEST_MAX_CHARS);
+}
+/**
+ * Pin the objection opening + keep the recent tail, elide the middle. NEVER front-slice the
+ * whole thing (that would drop the opening objection). Interim until the Step-2 rolling recap.
+ */
+function capHistory(history: string): string {
+  if (history.length <= HISTORY_MAX_CHARS) return history;
+  const head = history.slice(0, Math.floor(HISTORY_MAX_CHARS * 0.4));
+  const tail = history.slice(-Math.floor(HISTORY_MAX_CHARS * 0.6));
+  return `${head}\n--- earlier exchange omitted ---\n${tail}`;
+}
+
 export default function DashboardClient({
   profile,
   initialCalls,
@@ -75,6 +118,28 @@ export default function DashboardClient({
   const isActiveRef = useRef(false);
   useEffect(() => { isActiveRef.current = isActive; }, [isActive]);
 
+  // Live callId mirror — the async objection stream can resolve AFTER the call ended and
+  // a new one started. The `done` branch compares this LIVE ref against the callId captured
+  // at press time; a closed-over `callId` could never detect the change (it'd be frozen at
+  // press time), so this ref is load-bearing for the "never arm a thread on a dead call" guard.
+  const callIdRef = useRef<string | null>(null);
+  useEffect(() => { callIdRef.current = callId; }, [callId]);
+
+  // ── Objection Flow thread ledger (Phase B) ─────────────────────────────────
+  // Drives multi-turn threading: on card-1 `done` the flow opens (freeze belief, drop the
+  // anchor cursor into the poller's whole-call transcript); each subsequent press feeds the
+  // verbatim lines already given + the anchored exchange since the objection opened + the
+  // fresh tail, so Sonnet advances the sequence instead of restarting. Mutated ONLY in the
+  // stream `done` branch (SEV-E) — never in release()/finally, which runs on abort/error too.
+  const objectionThreadRef = useRef<ObjectionThread>({ ...EMPTY_THREAD });
+
+  // ── No-silent deferred press (Phase B / C) ─────────────────────────────────
+  // A press inside the throttle window is NOT silently dropped: we show the "thinking" pill
+  // immediately and schedule ONE coalesced re-fire when the throttle releases. Cancelled on
+  // call-end + dismiss. One pending max (a boolean — respects "never queue").
+  const pendingPressRef = useRef(false);
+  const pendingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   // Re-entrancy guard: prevents handleEndCall from executing twice if the user
   // clicks End Call AND hits the keyboard shortcut before the first async call
   // resolves. Without this, two PATCH requests fire simultaneously.
@@ -91,6 +156,12 @@ export default function DashboardClient({
     prospectName,
     liveSummary,
     getRecentTranscript,
+    getTranscriptCursor,
+    getTranscriptSince,
+    setFlowSynthContext,
+    getFlowRecap,
+    getRecapCursor,
+    synthesizeClosedFlow,
     addChunk,
     dismissSignal,
     flushBuffer,
@@ -102,6 +173,50 @@ export default function DashboardClient({
     objections: initialObjections,
     repName: savedZoomName || null,
   });
+
+  // ── Call-level objection memory (Phase B, Step 2) ───────────────────────────
+  // Learnings from EARLIER objection flows this call — they never die with a flow reset
+  // (Sebastian's rule). Archived recaps + every line given, resets ONLY on callId change.
+  // Compact by design: what rides on a card is capped at send time (last 3 recaps / 8 lines).
+  const callObjectionMemoryRef = useRef<{ archivedRecaps: string[]; allLinesGiven: string[] }>({
+    archivedRecaps: [], allLinesGiven: [],
+  });
+
+  /**
+   * Archive a DYING flow's learnings into call-level memory. MUST run BEFORE any reset
+   * overwrites `objectionThreadRef` (two of the three reset sites destroy the data in the
+   * same statement — plan-review blocker 4). Lines always survive; the recap survives when
+   * the rolling synth produced one. `closeOutSynth: true` (stale-expiry path ONLY — never
+   * call-end, which races teardown) fires one bounded background synthesis for a ≥2-beat
+   * flow that never got a recap, archiving the result if the same call is still live.
+   */
+  const archiveCurrentFlow = useCallback((opts?: { closeOutSynth?: boolean }) => {
+    const t = objectionThreadRef.current;
+    if (!t.active) return;
+    const mem = callObjectionMemoryRef.current;
+    for (const l of t.linesGiven) {
+      if (!mem.allLinesGiven.includes(l)) mem.allLinesGiven.push(l);
+    }
+    if (mem.allLinesGiven.length > 40) mem.allLinesGiven = mem.allLinesGiven.slice(-40);
+    const recap = getFlowRecap();
+    if (recap) {
+      mem.archivedRecaps.push(recap);
+      if (mem.archivedRecaps.length > 5) mem.archivedRecaps = mem.archivedRecaps.slice(-5);
+    } else if (opts?.closeOutSynth && t.beatNumber >= 2) {
+      const cid = callIdRef.current;
+      const { anchorCursor, lastMoveCursor, beliefSnapshot } = t;
+      synthesizeClosedFlow({ anchorCursor, lastMoveCursor, beliefSnapshot })
+        .then((r) => {
+          // Guard: archive only if the SAME call is still live when the synth lands.
+          if (r && cid && callIdRef.current === cid) {
+            const m = callObjectionMemoryRef.current;
+            m.archivedRecaps.push(r);
+            if (m.archivedRecaps.length > 5) m.archivedRecaps = m.archivedRecaps.slice(-5);
+          }
+        })
+        .catch(() => { /* close-out is best-effort — lines already archived above */ });
+    }
+  }, [getFlowRecap, synthesizeClosedFlow]);
 
   // ── In-flight guard — prevents double-billing on rapid hotkey presses ───────
   const isGeneratingRef = useRef(false);
@@ -465,7 +580,14 @@ export default function DashboardClient({
   // still streaming, abort the SSE stream so Sonnet stops generating (don't bill it). (W6)
   useEffect(() => {
     if (!isElectron) return;
-    window.wingman?.onSignalDismiss(() => { streamAbortRef.current?.abort(); dismissSignal(); });
+    window.wingman?.onSignalDismiss(() => {
+      streamAbortRef.current?.abort();
+      // Cancel a queued deferred press so a dismissed card doesn't auto-pop the next beat.
+      // Does NOT reset the thread — dismiss only means "not now" (Sebastian's rule).
+      if (pendingTimerRef.current) { clearTimeout(pendingTimerRef.current); pendingTimerRef.current = null; }
+      pendingPressRef.current = false;
+      dismissSignal();
+    });
     return () => { window.wingman?.offSignalDismiss(); };
   }, [isElectron, dismissSignal]);
 
@@ -473,8 +595,31 @@ export default function DashboardClient({
   // objection stream — the renderer would otherwise keep reading + keep Sonnet billing
   // after the HUD has torn down (plan review W3/W6). Single point covers every end path.
   useEffect(() => {
-    if (!isActive) streamAbortRef.current?.abort();
-  }, [isActive]);
+    if (!isActive) {
+      streamAbortRef.current?.abort();
+      // Archive the dying flow's learnings BEFORE the reset destroys them (lines always
+      // survive; no close-out synth here — call-end races the teardown). Then reset the
+      // objection thread on every call-end path. NOTE: thread reset lives on the isActive
+      // effect ONLY — dismiss must NEVER reset the thread (Sebastian's rule).
+      archiveCurrentFlow();
+      objectionThreadRef.current = { ...EMPTY_THREAD };
+      setFlowSynthContext({ active: false });
+      // Cancel any queued deferred press + clear its pill state.
+      if (pendingTimerRef.current) { clearTimeout(pendingTimerRef.current); pendingTimerRef.current = null; }
+      pendingPressRef.current = false;
+    }
+  }, [isActive, archiveCurrentFlow, setFlowSynthContext]);
+
+  // A new (or ended) call must start with no armed thread — drop any prior flow. Belt-and-
+  // suspenders alongside the done-branch callId guard (which is the real safety net).
+  // Order matters: archive the old flow → reset the thread → THEN wipe call-level memory
+  // (memory is call-scoped; the new call starts with none).
+  useEffect(() => {
+    archiveCurrentFlow();
+    objectionThreadRef.current = { ...EMPTY_THREAD };
+    setFlowSynthContext({ active: false });
+    callObjectionMemoryRef.current = { archivedRecaps: [], allLinesGiven: [] };
+  }, [callId, archiveCurrentFlow, setFlowSynthContext]);
 
   // ── Hotkey compass menu — handle direction pick from Electron main ─────────
   // Called by main.ts when the rep presses a direction key after the Up Arrow
@@ -501,14 +646,96 @@ export default function DashboardClient({
       return;
     }
 
-    // Throttle rapid re-presses (mirrors the server's 3s cost guard). Silently ignore —
-    // no "thinking" pill — so a too-fast press never resolves as a misleading error.
+    // Throttle rapid re-presses (mirrors the server's 3s cost guard). But NEVER silently drop
+    // (Sebastian): a press inside the window shows the "thinking" pill immediately and DEFERS
+    // one coalesced re-fire until the throttle releases — the pill flows straight into the card,
+    // so the rep always knows their press registered. `sinceLast` is ALSO the gap since the last
+    // press, reused below for the stale-flow (2-min) and gap-flag (40s) threading decisions.
     const sinceLast = Date.now() - lastSummonAtRef.current;
     if (sinceLast < SUMMON_THROTTLE_MS) {
-      console.log(`[Wingman] Menu pick throttled — ${sinceLast}ms since last press (silent)`);
+      if (!pendingPressRef.current) {
+        pendingPressRef.current = true;
+        window.wingman?.sendSummonState({ state: "thinking", slot: direction });
+        const wait = SUMMON_THROTTLE_MS - sinceLast + 50; // small margin past the window
+        pendingTimerRef.current = setTimeout(() => {
+          pendingTimerRef.current = null;
+          pendingPressRef.current = false;
+          if (!isActiveRef.current) return;           // call ended during the wait → drop (pill cleared on end)
+          handleMenuPickRef.current(direction);       // re-enter FRESH: re-reads context/thread/throttle
+        }, wait);
+      }
+      // else: a deferred press is already queued + the pill is up — coalesce (never queue N).
       return;
     }
     lastSummonAtRef.current = Date.now();
+
+    // ── Objection Flow threading decision (Phase B) ─────────────────────────────
+    // Read the ledger + freeze press-time context into LOCALS. All mutation happens later,
+    // ONLY in the stream `done` branch, gated by callId/isActive. isGeneratingRef + the throttle
+    // serialize presses, so read-at-top / write-at-done has no intra-call race.
+    const callIdAtPress = callId;
+    const beliefAtPress = liveSummary ?? undefined;
+    const thr = objectionThreadRef.current;
+
+    // Stale flow (>2 min since last press) → treat as expired; fall through as a fresh beat-1.
+    // Archive its learnings FIRST (this is the one reset path with a live call + dead time,
+    // so it's also the ONLY place the bounded close-out synthesis may fire — Step 2).
+    if (thr.active && sinceLast > FLOW_IDLE_MS) {
+      archiveCurrentFlow({ closeOutSynth: true });
+      objectionThreadRef.current = { ...EMPTY_THREAD };
+      setFlowSynthContext({ active: false });
+    }
+    const t = objectionThreadRef.current;
+    const isThreaded = t.active && t.beatNumber >= 1;
+
+    // Build the threaded payload (or leave undefined for a fresh beat-1 single-shot).
+    let threadBody: {
+      lines_given: string[];
+      history_transcript: string;
+      beat_number: number;
+      gap_flag: boolean;
+      flow_recap?: string;
+      levers_used?: string[];
+    } | null = null;
+    let beatNumberSent = 1;
+    let transcriptToSend: string;
+    let summaryToSend = beliefAtPress;
+
+    if (isThreaded) {
+      // Step 2: verbatim history starts at the recap cursor — the absorbed middle arrives as
+      // the compact FLOW RECAP instead (pre-computed in background, ~zero press-time latency).
+      // Until the first synth completes, recapCursor === anchorCursor → identical to Step 1.
+      const recapCursor    = Math.max(t.anchorCursor, getRecapCursor());
+      const flowRecap      = getFlowRecap();
+      const latestResponse = getTranscriptSince(t.lastMoveCursor);
+      const sinceRecap     = getTranscriptSince(recapCursor);
+      // latestResponse is always a suffix of sinceRecap (lastMove ≥ recapCursor ≥ anchor, same
+      // monotonic buffer) → this slice is exactly recapCursor→lastMove.
+      const historyRaw     = sinceRecap.slice(0, sinceRecap.length - latestResponse.length);
+      beatNumberSent   = t.beatNumber + 1;
+      transcriptToSend = capLatest(latestResponse);
+      summaryToSend    = t.beliefSnapshot ?? beliefAtPress; // FROZEN belief → cache stability
+      threadBody = {
+        lines_given:        t.linesGiven,
+        history_transcript: capHistory(historyRaw),
+        beat_number:        beatNumberSent,
+        gap_flag:           sinceLast > GAP_FLAG_MS, // (already ≤ FLOW_IDLE_MS or we'd have reset)
+        ...(flowRecap ? { flow_recap: flowRecap } : {}),
+        ...(t.leversUsed.length ? { levers_used: t.leversUsed } : {}),
+      };
+    } else {
+      // Fresh beat-1 — byte-identical to today: the 120s rolling window, no thread fields.
+      transcriptToSend = getRecentTranscript();
+    }
+
+    // Call-level memory (Step 2): earlier flows' learnings ride on EVERY objection press —
+    // beat-1 included (a resurfacing objection must not restart at square one). Empty on the
+    // first objection of a call → omitted → that request stays byte-identical to the shipped
+    // single-shot card.
+    const mem = callObjectionMemoryRef.current;
+    const callMemoryBody = (mem.archivedRecaps.length || mem.allLinesGiven.length)
+      ? { call_memory: { recaps: mem.archivedRecaps.slice(-3), lines_given: mem.allLinesGiven.slice(-8) } }
+      : {};
 
     isGeneratingRef.current = true;
     const seq = ++seqCounterRef.current;
@@ -561,15 +788,17 @@ export default function DashboardClient({
     };
 
     try {
-      const recentTranscript = getRecentTranscript();
-
       const res = await fetch("/api/wingman/kb-signal", {
         method:  "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
-          transcript_chunk: recentTranscript,
-          live_summary:     liveSummary ?? undefined,
+          transcript_chunk: transcriptToSend,   // beat-1: 120s window · threaded: fresh tail
+          live_summary:     summaryToSend,       // threaded: FROZEN belief snapshot
           slot:             direction,
+          // Thread fields — omitted for a fresh beat-1 (byte-identical request to pre-threading).
+          ...(threadBody ?? {}),
+          // Earlier flows' learnings (Step 2) — omitted when empty (first objection of the call).
+          ...callMemoryBody,
           // No current_stage: post-Phase-1 the live stage tracker is gone, so this
           // would be a stale "Rapport". The Belief Ladder (live_summary) carries it. (Fix #1)
         }),
@@ -645,11 +874,48 @@ export default function DashboardClient({
               window.wingman?.sendSignalDelta({ seq, phase: "delta", textSoFar });
             }
           } else if (ev.event === "done") {
-            let line = "";
-            try { line = JSON.parse(ev.data)?.line ?? ""; } catch { /* ignore */ }
+            let line = "", doneLever = "";
+            try {
+              const d = JSON.parse(ev.data);
+              line = d?.line ?? "";
+              doneLever = typeof d?.lever === "string" ? d.lever : ""; // B4: additive field
+            } catch { /* ignore */ }
             // If a `done` somehow precedes any delta, open the shell so it paints.
             window.wingman?.sendSignalDelta({ seq, phase: startedReveal ? "done" : "start", textSoFar: line, type: "Objection" });
             if (!startedReveal) window.wingman?.sendSignalDelta({ seq, phase: "done", textSoFar: line });
+
+            // ── Thread ledger mutation — the ONLY mutation site (SEV-E) ──────────
+            // Guard FIRST: never open/advance a thread on a call that ended or changed during
+            // the ~2s stream (callIdRef is the LIVE mirror — a closed-over callId can't detect
+            // the change). Only a real, non-empty line opens/advances; nudge/error never mutate.
+            if (line && isActiveRef.current && callIdRef.current === callIdAtPress) {
+              if (!objectionThreadRef.current.active) {
+                // Card 1 landed → open the flow: freeze belief, drop the anchor cursor.
+                const cursor = getTranscriptCursor();
+                objectionThreadRef.current = {
+                  active: true,
+                  linesGiven: [line],
+                  leversUsed: doneLever ? [doneLever] : [],
+                  beatNumber: 1,
+                  anchorCursor: cursor,
+                  lastMoveCursor: cursor,
+                  beliefSnapshot: beliefAtPress ?? null,
+                };
+                // Arm the background synthesis for this flow (Step 2).
+                setFlowSynthContext({ active: true, anchorCursor: cursor, lastMoveCursor: cursor, beliefSnapshot: beliefAtPress ?? null });
+              } else {
+                // Continuation beat → advance. beatNumberSent is the value we SENT (not a
+                // re-read), so it stays correct even if the ref shifted.
+                const cur = objectionThreadRef.current;
+                const cursor = getTranscriptCursor();
+                cur.linesGiven     = [...cur.linesGiven, line];
+                if (doneLever) cur.leversUsed = [...cur.leversUsed, doneLever];
+                cur.beatNumber     = beatNumberSent;
+                cur.lastMoveCursor = cursor;
+                // Same anchor = same flow — this only advances the synth's absorb boundary.
+                setFlowSynthContext({ active: true, anchorCursor: cur.anchorCursor, lastMoveCursor: cursor });
+              }
+            }
             resolved = true;
           } else if (ev.event === "nudge") {
             let header = "", text = "";
@@ -680,7 +946,8 @@ export default function DashboardClient({
     } finally {
       release();
     }
-  }, [callId, getRecentTranscript, liveSummary]);
+  }, [callId, getRecentTranscript, getTranscriptCursor, getTranscriptSince, liveSummary,
+      archiveCurrentFlow, setFlowSynthContext, getFlowRecap, getRecapCursor]);
 
   // Stable ref so the IPC listener (registered once on mount) always calls
   // the latest handleMenuPick without going stale across renders.

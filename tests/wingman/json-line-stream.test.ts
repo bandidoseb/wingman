@@ -156,3 +156,52 @@ describe("decodeLineStream — structural errors", () => {
     expect(decodeLineStream('{"line":nope}')).toEqual({ status: "error" });
   });
 });
+
+// ── B4: decodeLeverStream + lever-prefixed envelope transparency ─────────────────
+import { decodeLeverStream } from "../../src/lib/wingman/json-line-stream";
+import { LEVER_TAXONOMY } from "../../src/lib/wingman/objection-prompt.mjs";
+
+describe("B4 — lever-prefixed envelope", () => {
+  const LEVERED = '{"lever":"financial-trade","line":"Money aside, you in?"}';
+
+  it("decodeLineStream is transparent to a leading lever field (whole + char-by-char)", () => {
+    expect(decodeLineStream(LEVERED)).toEqual({ status: "line", line: "Money aside, you in?" });
+    const states = driveCharByChar(LEVERED);
+    expect(states[states.length - 1]).toEqual({ status: "line", line: "Money aside, you in?" });
+    // No state ever surfaces lever-value text as line text.
+    for (const s of states) {
+      if (s.status === "streaming") expect(s.text.includes("financial")).toBe(false);
+    }
+  });
+
+  it("lever-prefixed abstain still resolves as abstain", () => {
+    expect(decodeLineStream('{"lever":"why-probe","line":null}')).toEqual({ status: "abstain" });
+    expect(decodeLineStream('{"lever":null,"line":null}')).toEqual({ status: "abstain" });
+  });
+
+  it("decodeLeverStream resolves the lever before the line starts (char-by-char)", () => {
+    let leverAt = -1, lineStartAt = -1;
+    for (let i = 1; i <= LEVERED.length; i++) {
+      const buf = LEVERED.slice(0, i);
+      if (leverAt === -1 && decodeLeverStream(buf).status === "lever") leverAt = i;
+      if (lineStartAt === -1 && decodeLineStream(buf).status !== "pending") lineStartAt = i;
+    }
+    expect(leverAt).toBeGreaterThan(0);
+    expect(lineStartAt).toBeGreaterThan(0);
+    expect(leverAt).toBeLessThan(lineStartAt); // guard decision available pre-paint
+    expect(decodeLeverStream(LEVERED)).toEqual({ status: "lever", lever: "financial-trade" });
+  });
+
+  it("no lever → 'none' the moment the line resolves (degrade-to-no-guard signal)", () => {
+    expect(decodeLeverStream('{"line":"hi"}')).toEqual({ status: "none" });
+    expect(decodeLeverStream('{"li')).toEqual({ status: "pending" });
+    expect(decodeLeverStream('{"lever":null,"line":"hi"}')).toEqual({ status: "none" });
+    expect(decodeLeverStream('{"lever":12,"line":"hi"}')).toEqual({ status: "none" });
+  });
+
+  it("taxonomy-collision invariant: no lever id's JSON rendering contains '\"line\"'", () => {
+    for (const id of LEVER_TAXONOMY) {
+      expect(`"lever":"${id}"`.includes('"line"')).toBe(false);
+    }
+  });
+});

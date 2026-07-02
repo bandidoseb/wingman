@@ -37,7 +37,9 @@ import { generateSignalCard,
          NUDGE_HEADLINE,
          NUDGE_STATIC_SUBTEXT,
          type SignalCardResult }       from "@/lib/wingman/knowledge-signal";
-import { streamObjectionCard }         from "@/lib/wingman/objection-signal";
+import { streamObjectionCard,
+         type ObjectionThread,
+         type ObjectionCallMemory }     from "@/lib/wingman/objection-signal";
 
 // The objection slot streams (SSE). force-dynamic keeps it off any cached/static path;
 // nodejs runtime so the ReadableStream + per-request abort behave predictably on Railway.
@@ -84,12 +86,53 @@ export async function POST(req: NextRequest) {
       live_summary,
       slot,
       current_stage,
+      lines_given,
+      history_transcript,
+      beat_number,
+      gap_flag,
+      flow_recap,
+      call_memory,
+      levers_used,
     }: {
-      transcript_chunk:  string;
-      live_summary?:     string;
-      slot?:             string;
-      current_stage?:    string;
+      transcript_chunk:    string;
+      live_summary?:       string;
+      slot?:               string;
+      current_stage?:      string;
+      lines_given?:        unknown;
+      history_transcript?: unknown;
+      beat_number?:        unknown;
+      gap_flag?:           unknown;
+      flow_recap?:         unknown;
+      call_memory?:        unknown;
+      levers_used?:        unknown;
     } = body;
+
+    // ── Objection-threading fields (Phase B) — untrusted client input, cap defensively ──
+    // Bounds Sonnet token spend (cost boundary) regardless of what the client sends.
+    const linesGiven: string[] = Array.isArray(lines_given)
+      ? lines_given.filter((l): l is string => typeof l === "string").slice(-12).map((l) => l.slice(0, 400))
+      : [];
+    let historyTranscript = typeof history_transcript === "string" ? history_transcript.slice(0, 5_000) : "";
+    const beatNumber = Number.isFinite(beat_number as number)
+      ? Math.min(20, Math.max(0, Math.trunc(beat_number as number)))
+      : 0;
+    const gapFlag = gap_flag === true;
+    // Step 2 fields — same defensive-cap treatment (untrusted client, cost boundary).
+    const flowRecap = typeof flow_recap === "string" ? flow_recap.slice(0, 1_400) : "";
+    const memRaw    = (call_memory ?? {}) as { recaps?: unknown; lines_given?: unknown };
+    const memory: ObjectionCallMemory = {
+      recaps: Array.isArray(memRaw.recaps)
+        ? memRaw.recaps.filter((r): r is string => typeof r === "string" && !!r.trim()).slice(-3).map((r) => r.slice(0, 1_100))
+        : [],
+      linesGiven: Array.isArray(memRaw.lines_given)
+        ? memRaw.lines_given.filter((l): l is string => typeof l === "string" && !!l.trim()).slice(-8).map((l) => l.slice(0, 200))
+        : [],
+    };
+    const hasMemory = memory.recaps.length > 0 || memory.linesGiven.length > 0;
+    // B4: flow-scoped plays run (untrusted → cap + drop non-taxonomy ids; unknown = no guard).
+    const leversUsed: string[] = Array.isArray(levers_used)
+      ? levers_used.filter((v): v is string => typeof v === "string" && v.length <= 30).slice(-12)
+      : [];
 
     const activeSlot: Slot = VALID_SLOTS.includes(slot as Slot)
       ? (slot as Slot)
@@ -134,7 +177,29 @@ export async function POST(req: NextRequest) {
     // can't buffer it. The decoder yields only the inner line chars; abstain → a single
     // `nudge` event (zero deltas); error → a single `error` event (client shows retry).
     if (activeSlot === "objection") {
-      console.log(`[kb-signal] TIMING stream branch=objection idleGap=${idleGap}`);
+      // Build the thread ONLY for a genuine continuation (beat > 1 with context). Beat-1 sends
+      // no thread → the user message is byte-identical to the shipped single-shot card.
+      let thread: ObjectionThread | undefined;
+      if (beatNumber > 1 && (historyTranscript || linesGiven.length)) {
+        // D2 backstop: if the combined payload is oversized, TRIM the history (pin head + keep
+        // tail) — NEVER drop linesGiven (the no-repeat guard) and never drop the thread. Client
+        // already caps these; this is the defensive server-side floor.
+        const combined = transcript_chunk.length + historyTranscript.length;
+        if (combined > 8_000 && historyTranscript.length > 0) {
+          const budget = Math.max(0, 8_000 - transcript_chunk.length);
+          if (historyTranscript.length > budget) {
+            const head = historyTranscript.slice(0, Math.floor(budget * 0.4));
+            const tail = historyTranscript.slice(-Math.floor(budget * 0.6));
+            historyTranscript = `${head}\n--- earlier exchange omitted ---\n${tail}`;
+          }
+        }
+        thread = { linesGiven, historyTranscript, beatNumber, gapFlag, flowRecap: flowRecap || undefined, leversUsed };
+      }
+      console.log(
+        `[kb-signal] TIMING stream branch=objection idleGap=${idleGap} ` +
+        `beat=${beatNumber} hist=${historyTranscript.length} recap=${flowRecap.length} ` +
+        `mem=${memory.recaps.length}r/${memory.linesGiven.length}l`,
+      );
 
       const encoder = new TextEncoder();
       const stream = new ReadableStream<Uint8Array>({
@@ -153,13 +218,15 @@ export async function POST(req: NextRequest) {
           let sawTerminal = false;
           try {
             // req.signal aborts on client disconnect / dismiss / call-end → stops Sonnet (W6).
-            for await (const ev of streamObjectionCard(transcript_chunk, summary, req.signal)) {
+            for await (const ev of streamObjectionCard(transcript_chunk, summary, req.signal, thread, hasMemory ? memory : undefined)) {
               let alive = true;
               if (ev.kind === "delta") {
                 alive = send("delta", { textSoFar: ev.textSoFar });
               } else if (ev.kind === "done") {
-                alive = send("done", { line: ev.line });
+                alive = send("done", { line: ev.line, lever: ev.lever });
                 sawTerminal = true;
+              } else if (ev.kind === "lever-info") {
+                continue; // B4 internal event — wrapper-filtered; defensive skip, never an error frame
               } else if (ev.kind === "abstain") {
                 // Static "No objection detected" — server owns the copy (single source).
                 alive = send("nudge", { header: NUDGE_HEADLINE, text: NUDGE_STATIC_SUBTEXT });

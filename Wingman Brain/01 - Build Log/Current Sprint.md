@@ -52,6 +52,19 @@ release **v0.1.28** on the public `wingman-releases` feed; installed apps self-u
 objection card ([PR #24](https://github.com/bandidoseb/wingman/pull/24)) is live on Railway AND now in the
 packaged app (shipped via v0.1.25+). Notarized (no Gatekeeper warning / no `xattr`). #45 + #5 resolved.
 
+**🔴 START HERE — Phase B is CODE-COMPLETE on branch `objection-threading-phase-a` (LOCAL, not pushed).**
+Full session log: `2026-07-02.md`. All of Phase B built + double-reviewed + gated 2026-07-02: threading
+core (B1-B3 + no-silent deferred press), background rolling flow synthesis + call-level objection memory
+(long-flow A/B gate: synth wins 3-0-0), and the B4 lever-declaration echo guard (invisible server-side
+retry; circle-back fixtures green, GPT-cross-confirmed). Typecheck ✅ · 96/96 tests ✅.
+**Next session, in order:** (1) one final FULL 20-fixture eval run (last complete run predates the final
+2 prompt/judge tweaks); (2) Sebastian approves → push + PR (Phase A + B together, one PR — decided);
+(3) merge → live-test on a real call per `tasks/plan-objection-threading-phaseB.md` test script.
+Then Phase C (single-↑ + combined card), partials #41, 3.6b.
+
+---
+
+### (superseded 2026-07-02 — kept for history)
 **🔴 START HERE — Multi-turn Objection Threading, PHASE B.** Phase A (the intelligence layer) is ✅ DONE +
 verified this session (2026-07-01 S2) but **NOT committed/pushed — local, awaiting review**. The full,
 plan-reviewed, 3-phase rollout lives in **`tasks/todo.md`** (read it first). Where we are:
