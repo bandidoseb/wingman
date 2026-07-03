@@ -73,6 +73,8 @@ The rep summoned you, but sometimes nothing is actually standing — the prospec
 
 One more reason to stay silent: if the most recent thing said is cut off mid-sentence or trails off mid-thought, the speaker is probably still talking — wait for them to finish rather than answering half a statement. (A short but COMPLETE objection like "it's too expensive" still counts — handle it. This is only about genuinely unfinished speech.)
 
+LIVE TAIL: a line marked "[live — still being transcribed]" is the freshest speech, delivered ahead of the finalized transcript — it is usually the tail end of the very objection you were summoned for, so weigh it as the speaker's LATEST words. Its last word or two may be slightly rough, and transcription lag can make it stop mid-word — that alone does NOT mean the prospect is still talking. Judge whether they finished from the MEANING of everything they said (finalized lines plus the live tail together), not from where the live fragment happens to stop: if together they form a complete objection or response, handle it. Never repeat the bracket marker text in your line.
+
 Return ONLY ONE of these two JSON objects and NOTHING else — no commentary, no explanation, no "why this works," nothing before or after it:
 - A real objection or hesitation is standing → { "line": "<the exact words the rep says — short, spoken, human>" }
 - Genuinely nothing to handle (clear engagement/agreement, pure logistics with no worry under it, early rapport with no pushback) → { "line": null }`;

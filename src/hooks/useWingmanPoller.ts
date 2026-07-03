@@ -12,6 +12,13 @@ import type {
 } from "@/types";
 import { DEFAULT_SCORECARD } from "@/types";
 import type { VaultObjection } from "@/types";
+import {
+  createLiveTailState,
+  updatePartial,
+  clearSpeakerFromFinal,
+  getLiveTail as getLiveTailFromState,
+  hotPartialAgeMs as hotPartialAgeFromState,
+} from "@/lib/wingman/live-tail";
 
 // ── Pusher event payload types ────────────────────────────────────────────────
 interface PusherSignalEvent {
@@ -91,6 +98,12 @@ interface UseWingmanPollerReturn {
    */
   synthesizeClosedFlow: (args: { anchorCursor: number; lastMoveCursor: number; beliefSnapshot?: string | null }) => Promise<string | null>;
   addChunk: (chunk: string) => void;
+  /** #41: feed a PARTIAL (unfinalized) chunk into the press-time live tail. Ephemeral only. */
+  addPartial: (chunk: string) => void;
+  /** #41: live-tail block to append AFTER the capped finals tail of a request ("" if none). */
+  getLiveTail: (finalsTail: string) => string;
+  /** #41: age of the freshest partial, +Infinity when none (old apps / genuine pause). */
+  hotPartialAgeMs: () => number;
   dismissSignal: () => void;
   flushBuffer: () => Promise<void>;
   flushSummarize: () => Promise<void>;
@@ -160,6 +173,10 @@ export function useWingmanPoller({
   // is bounded (~90 KB for a 2-hour call, text only). Old-objection context can't
   // leak because each flow anchors at its own cursor snapshot.
   const fullTranscriptRef = useRef<string>("");
+  // #41: freshest PARTIAL (unfinalized) chunk per speaker — press-time live
+  // tail only. Ephemeral by invariant: never written to any durable buffer,
+  // cursor, or DB save. Reset per call; swept on every update.
+  const liveTailRef = useRef(createLiveTailState());
   // The rep's Zoom display name — seeded from Settings, falls back to auto-detection.
   // Used to exclude the rep's lines from keyword trigger matching so cards
   // only fire when the prospect says an objection phrase, not the rep.
@@ -194,6 +211,7 @@ export function useWingmanPoller({
       summarizeBufferRef.current  = "";
       recentTranscriptRef.current = "";
       fullTranscriptRef.current   = ""; // Phase B: drop prior call's threading transcript
+      liveTailRef.current         = createLiveTailState(); // #41: drop prior call's partials
       // Step 2: drop prior call's flow-synth state (cursors point into the wiped buffer)
       flowActiveRef.current     = false;
       flowAnchorRef.current     = 0;
@@ -422,6 +440,10 @@ export function useWingmanPoller({
           }
         }
       }
+
+      // #41: this speaker's FINAL closes their in-progress interim segment —
+      // consume their live-tail partial so it can't duplicate finalized text.
+      clearSpeakerFromFinal(liveTailRef.current, chunk);
 
       chunkBufferRef.current     += (chunkBufferRef.current     ? "\n" : "") + chunk;
       summarizeBufferRef.current += (summarizeBufferRef.current ? "\n" : "") + chunk;
@@ -776,6 +798,16 @@ export function useWingmanPoller({
   // Inline arrows here would get a NEW identity every render and make those effects fire on
   // every render — which would archive + reset an ACTIVE flow mid-call. Load-bearing.
   const getRecentTranscript = useCallback(() => recentTranscriptRef.current, []);
+
+  // #41: live-tail accessors — all read/write refs only (no re-renders, no deps).
+  const addPartial = useCallback((chunk: string) => {
+    updatePartial(liveTailRef.current, chunk, Date.now());
+  }, []);
+  const getLiveTail = useCallback(
+    (finalsTail: string) => getLiveTailFromState(liveTailRef.current, finalsTail, Date.now()),
+    []
+  );
+  const hotPartialAgeMs = useCallback(() => hotPartialAgeFromState(liveTailRef.current, Date.now()), []);
   const getTranscriptCursor = useCallback(() => fullTranscriptRef.current.length, []);
   const getTranscriptSince  = useCallback((cursor: number) => {
     const full = fullTranscriptRef.current;
@@ -804,6 +836,9 @@ export function useWingmanPoller({
     getRecapCursor,
     synthesizeClosedFlow,
     addChunk,
+    addPartial,
+    getLiveTail,
+    hotPartialAgeMs,
     dismissSignal,
     flushBuffer,
     flushSummarize,

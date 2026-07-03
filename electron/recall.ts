@@ -31,8 +31,15 @@ import { startMeasurementLog, logMeasurement, endMeasurementLog } from "./measur
 export type AutoStopReason = "inactivity" | "max_duration" | "meeting_lost";
 
 interface RecallOptions {
-  /** Called every time a new transcript chunk arrives */
+  /** Called every time a new FINALIZED transcript chunk arrives */
   onChunk: (chunk: string) => void;
+  /**
+   * Called for PARTIAL (unfinalized) transcript chunks (#41). Same
+   * "Speaker: text" format as onChunk, but the text is the in-progress
+   * read of the current utterance and may be revised until its final
+   * lands. Consumers must treat it as ephemeral — never store it.
+   */
+  onPartial?: (chunk: string) => void;
   /** Called when Wingman auto-stops for any reason (cost protection) */
   onAutoStop?: (reason: AutoStopReason) => void;
   /** Called 10 minutes before the 2-hour hard cap so the HUD can warn the user */
@@ -341,10 +348,13 @@ export async function initRecallAI(options: RecallOptions): Promise<boolean> {
         last_word_end_abs:    lastWord?.end_timestamp?.absolute ?? null,
       });
 
-      // Partials are measurement-only for now — the live pipeline stays
-      // finals-only until the #41 reconciliation rule is chosen from real
-      // call data. Nothing below this line changes behavior.
-      if (isPartial) return;
+      // Partials feed ONLY the renderer's press-time live tail (#41) — they
+      // return here, before the finals-only pipeline below (dedup map,
+      // inactivity clock, onChunk). Durable buffers never see partial text.
+      if (isPartial) {
+        options.onPartial?.(`${speaker}: ${text}`);
+        return;
+      }
 
       // Always reset inactivity clock — duplicate events still represent real
       // call activity and must prevent a false inactivity auto-stop.

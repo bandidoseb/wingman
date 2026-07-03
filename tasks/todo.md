@@ -1,4 +1,104 @@
-# #41 Partials — MEASUREMENT BUILD (2026-07-03) — CURRENT TASK
+# #41 FIX — Partial-Tail Merge at Press Time (2026-07-03) — ✅ BUILT (plan rev 2, all 6 must-fixes in)
+
+**Evidence at build:** 124/124 unit tests · both tsc green · wingman-reviewer APPROVE (0 findings) ·
+3 new GATED live-tail fixtures 3/3 under Claude judge AND gpt-4o cross-judge (rescue-threaded,
+rescue-beat1, abstain-midword) · marker-leak assertion wired into evaluate() for every fixture.
+`advance-trust-2` red is PRE-EXISTING flakiness, proven by A/B: 3/6 with the LIVE TAIL paragraph,
+4/6 without (statistically identical ~50-60% coin; failure mode = circle-back diagnosis repetition,
+the known B4 residual — lever guard catches same-lever, not same-diagnosis-reworded). Long-flow
+best-of-3 red = documented parity sampling noise (2026-07-02 lesson; diff doesn't touch flow-synth).
+**Remaining:** live-verify on a dev call (abstain-on-press should become a card) · desktop release
+to ship the Electron side to packaged apps.
+
+## Rev-2 hardening (from plan review — all six MUST land)
+1. **`hotPartialAgeMs()` empty-state = `Number.POSITIVE_INFINITY`** (load-bearing: old packaged apps
+   with no partial IPC must get ZERO settle wait + byte-identical requests). Poller subscription
+   guarded: `if (window.wingman?.onTranscriptPartial)`. Unit-tested.
+2. **Settle-wait insertion point is EXACT:** between `lastSummonAtRef.current = Date.now()` (DC:689)
+   and the threading-decision block (DC:691) — so `thr`/`isThreaded`/beat are read POST-settle (a flow
+   idle-expiry during the sleep must not send a stale threaded payload). Set `isGeneratingRef = true`
+   AND send the "thinking" pill BEFORE the sleep (flow-mode single-↑ has no compass flash — the pill
+   is its only press ack; 350ms of dead air is unacceptable). After the sleep: re-check `isActiveRef`;
+   on bail → `sendSummonState(idle)` + reset `isGeneratingRef`. EVERY early-return between sleep and
+   fetch resets both.
+3. **Cap order:** live tail is appended AFTER `capLatest`/`getRecentTranscript` capping, and is itself
+   capped (~500 chars, tail-kept → ≤~125 tokens, not the earlier ~40 estimate). Dedup target = the
+   tail actually being sent: threaded `latestResponse`, beat-1 `getRecentTranscript()`.
+4. **Dedup = STRICT normalized substring** (entire partial contained in finals tail → suppress).
+   Never fuzzy/token-overlap — a false-positive silently defeats the whole feature. Fixtures both ways.
+5. **Live-tail map reset in the `[callId]` effect (poller ~187)** + swept on every update (drop
+   entries >5s, cap size) so Zoom display-name churn can't grow it across a 2-hour call.
+6. **Gated eval fixtures (the crux risk — marker vs "mid-thought → abstain" fight):**
+   (a) finals end truncated + live tail completes the objection → MUST yield a line, not abstain;
+   (b) genuinely-still-talking (live tail itself visibly mid-thought, no complete objection) → abstain;
+   (c) stale-partial-after-final → suppressed by dedup; (d) no generated line ever contains "[live".
+   Prompt marker text explicitly: "the [live] fragment may end mid-word due to transcription lag —
+   that alone does NOT mean the prospect is still talking; judge completeness from the words above it."
+
+**Evidence (2 measured calls):** finals lag speech ~500ms median (p90 1–2.8s, max 4.1s); partials lag
+just **126ms median** (p90 291ms). At presses, finals-only missed 76 words; partials already held 68%.
+Every live "no objection detected" abstain mapped to missing prospect words. Deepgram stays (its
+partials beat AssemblyAI's claimed ~300ms); reconciliation rule = merge freshest partial at press +
+short settle wait for the last word(s).
+
+## Design
+
+**A. Electron → renderer partial feed**
+1. `electron/recall.ts` — `RecallOptions.onPartial?: (chunk: string) => void`; in the partial branch
+   (after measurement logging, before the early return) call `options.onPartial?.("Speaker: text")` —
+   same line format as finals. Live finals path untouched.
+2. `electron/main.ts` — `onPartial: (chunk) => mainWindow?.webContents.send("transcript:partial", chunk)`
+   (mirror of `transcript:chunk` at main.ts:582).
+3. `electron/preload.ts` — expose `onTranscriptPartial` next to BOTH `onTranscriptChunk` surfaces
+   (lines ~111 + ~280); mirror the existing unsubscribe pattern.
+
+**B. Renderer live-tail state (pure module + poller wiring)**
+4. NEW `src/lib/wingman/live-tail.ts` — pure, unit-testable:
+   `updatePartial(state, speaker, text, now)` · `clearSpeaker(state, speaker)` (called when that
+   speaker's FINAL arrives — Deepgram's final closes the interim segment; a later partial belongs to
+   the next utterance and simply repopulates) · `getLiveTail(state, finalsTail, now)` → for each
+   speaker with a partial aged ≤5s whose normalized text is NOT already contained in the (normalized)
+   finals tail, emit `Speaker [live — still being transcribed]: text`; else nothing. Also
+   `hotPartialAgeMs(state, now)` → age of freshest partial (for the settle decision).
+5. `src/hooks/useWingmanPoller.ts` — subscribe `onTranscriptPartial`; keep state in a ref (map is
+   per-speaker, tiny, cleared on call start/end like the other refs); on each FINAL chunk in addChunk,
+   `clearSpeaker` for that chunk's speaker(s). Expose `getLiveTail()` + `hotPartialAgeMs()` from the
+   hook (read-only, no re-renders — refs only).
+
+**C. Press-time merge + settle wait**
+6. `DashboardClient.tsx` `handleMenuPick` (objection branch only): after the throttle gate,
+   **settle rule** — if `hotPartialAgeMs() < 1500` (speaker likely mid-utterance) `await sleep(350)`
+   then re-check `isActiveRef` (mirror the deferred-press guard) before proceeding. If no fresh
+   partial → zero added latency (press after a real pause stays as fast as today).
+   Then build context exactly as now and append `getLiveTail()` to `transcriptToSend` (threaded AND
+   fresh beat-1). Tail is part of `latest response` → lives in the VOLATILE uncached segment → no
+   cache-prefix bust (threading speed promise intact).
+7. Durable records stay finals-only: fullTranscriptRef, chunkBuffer (DB saves), summarize buffer,
+   anchors/cursors NEVER include partials — cursor math never sees live text (it's appended only to
+   the outgoing request string, after capLatest).
+
+**D. Prompt + eval gates**
+8. `src/lib/wingman/objection-prompt.mjs` — short addition: a `[live — still being transcribed]`
+   line is the freshest unfinalized speech; treat it as the prospect's latest words; last 1–2 words
+   may be slightly rough; the "cut off mid-thought → wait" rule still applies only when it genuinely
+   ends mid-thought.
+9. Re-run BOTH gates (prompt changed): `objection-eval` + `objection-threading-eval` (3× — stochastic).
+   Add live-tail fixtures (tail-only response, tail completing a truncated final, stale-partial
+   excluded). Promote the 3 advisory #41 fixtures to gated (they should flip green).
+
+**E. Rollout + verification**
+- Old packaged apps: no partial IPC → `getLiveTail()` empty → behavior byte-identical (verified by
+  the settle rule requiring a fresh partial). Web deploy is safe alone; full fix needs the next
+  desktop release (bundle with Phase C chrome).
+- Live verify in dev: same solo-call drill; abstain-on-press should turn into cards; measurement log
+  + analyzer re-run to confirm recovery at press.
+
+**Follow-on (separate PR):** contextual abstains — `{"line": null, "reason": <6-tag enum>}` +
+HUD directive chips ("They're ready — close now." etc.) + eval update. Sebastian approved 2026-07-03.
+
+---
+
+# #41 Partials — MEASUREMENT BUILD (2026-07-03) — ✅ DONE (PR #36)
 
 **Goal:** quantify the stale-objection-tail gap (press right after an objection → card misses the
 last 1–3s of it) before choosing the reconciliation rule. Decided 2026-06-15, priority-locked 2026-07-02.

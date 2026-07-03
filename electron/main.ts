@@ -580,6 +580,8 @@ function setupIPC(): void {
       appUrl:             getAppUrl(),
       authToken:          token,
       onChunk:            (chunk: string) => { mainWindow?.webContents.send("transcript:chunk", chunk); },
+      // #41: partial (unfinalized) chunks — renderer-only live tail, not the HUD
+      onPartial:          (chunk: string) => { mainWindow?.webContents.send("transcript:partial", chunk); },
       onAutoStop:         autoStopCall,
       onApproachingLimit: () => { hudWindow?.webContents.send("hud:cap-warning"); },
     });
