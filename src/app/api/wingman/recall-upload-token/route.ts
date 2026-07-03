@@ -81,7 +81,10 @@ export async function POST(req: NextRequest) {
           realtime_endpoints: [
             {
               type:   "desktop_sdk_callback",
-              events: ["transcript.data"],
+              // partial_data: low-latency unfinalized transcripts (#41) —
+              // consumed by electron/recall.ts for measurement; the live card
+              // pipeline still reads finals (transcript.data) only.
+              events: ["transcript.data", "transcript.partial_data"],
             },
           ],
         },

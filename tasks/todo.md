@@ -1,3 +1,25 @@
+# #41 Partials — MEASUREMENT BUILD (2026-07-03) — CURRENT TASK
+
+**Goal:** quantify the stale-objection-tail gap (press right after an objection → card misses the
+last 1–3s of it) before choosing the reconciliation rule. Decided 2026-06-15, priority-locked 2026-07-02.
+
+**Plan (approved by Sebastian 2026-07-03):**
+1. ✅ `recall-upload-token/route.ts` — subscribe `transcript.partial_data` alongside `transcript.data`.
+2. ✅ `electron/measurement-log.ts` (NEW) — per-call JSONL log in `<userData>/partials-measurement/`;
+   opened after `startRecording` confirms, closed in `stopRecallAI()`; fs failures can never touch the call.
+3. ✅ `electron/recall.ts` — log partials + finals (speaker, text, word timing); partials return early —
+   live pipeline stays finals-only, byte-for-byte.
+4. ✅ `electron/main.ts` — log presses (summon / double-tap / flow-up / compass-pick / flow-direct).
+5. ✅ `scripts/analyze-partials.mjs` + 15 unit tests — arrival lag per stream, partial lead time,
+   press-by-press missed-tail + recovery-%; CLI smoke-tested on synthetic log.
+
+**Next:** Sebastian runs ONE real call in dev (`npm run electron:dev`) — doubles as the Phase B+C live
+test — then `node scripts/analyze-partials.mjs <printed log path>`. Optional second call with the
+provider line flipped to `assembly_ai_v3_streaming` for the Deepgram-vs-AssemblyAI A/B (immutable
+~300ms transcripts would delete the reconciliation layer entirely). Data picks the fix.
+
+---
+
 # Multi-Turn Objection Threading ("Objection Flow") — Hardened Plan (rev 2)
 
 **Goal:** After the first objection card, the rep enters a live **Objection Flow** — a single ↑

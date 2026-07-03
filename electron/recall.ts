@@ -24,6 +24,8 @@
  *   the limit regardless of activity.
  */
 
+import { startMeasurementLog, logMeasurement, endMeasurementLog } from "./measurement-log";
+
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 export type AutoStopReason = "inactivity" | "max_duration" | "meeting_lost";
@@ -292,11 +294,35 @@ export async function initRecallAI(options: RecallOptions): Promise<boolean> {
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     realtimeHandler = (evt: any) => {
-      if (evt.event !== "transcript.data") return;
-      const words: Array<{ text: string }> = evt.data?.data?.words ?? [];
+      const isFinal   = evt.event === "transcript.data";
+      const isPartial = evt.event === "transcript.partial_data";
+      if (!isFinal && !isPartial) return;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const words: Array<{ text: string; start_timestamp?: any; end_timestamp?: any }> =
+        evt.data?.data?.words ?? [];
       const text = words.map((w) => w.text).join(" ").trim();
       if (!text) return;
       const speaker: string = evt.data?.data?.participant?.name ?? "Speaker";
+
+      // #41 measurement: record BOTH streams with word-level timing so the
+      // analyzer can compare "when was it spoken" vs "when did it arrive".
+      // Timestamp fields are provider-dependent — log defensively.
+      const lastWord = words[words.length - 1];
+      logMeasurement({
+        kind: isPartial ? "partial" : "final",
+        speaker,
+        text,
+        word_count: words.length,
+        first_word_start_rel: words[0]?.start_timestamp?.relative ?? null,
+        first_word_start_abs: words[0]?.start_timestamp?.absolute ?? null,
+        last_word_end_rel:    lastWord?.end_timestamp?.relative ?? null,
+        last_word_end_abs:    lastWord?.end_timestamp?.absolute ?? null,
+      });
+
+      // Partials are measurement-only for now — the live pipeline stays
+      // finals-only until the #41 reconciliation rule is chosen from real
+      // call data. Nothing below this line changes behavior.
+      if (isPartial) return;
 
       // Always reset inactivity clock — duplicate events still represent real
       // call activity and must prevent a false inactivity auto-stop.
@@ -351,6 +377,13 @@ export async function initRecallAI(options: RecallOptions): Promise<boolean> {
       }
     }, 60 * 1000);
 
+    // #41 measurement: open the per-call partials log. Failure is non-fatal —
+    // the call runs normally, we just lose measurement data for this session.
+    const measurePath = startMeasurementLog();
+    if (measurePath) {
+      console.log(`[Measure] #41 partials log → ${measurePath}`);
+    }
+
     console.log("[Recall AI] Recording started");
     return true;
 
@@ -393,5 +426,9 @@ export function stopRecallAI(): void {
   }
 
   recordingWindowId = null;
+
+  // #41 measurement: close the per-call partials log (idempotent).
+  endMeasurementLog();
+
   console.log("[Recall AI] Stopped");
 }
