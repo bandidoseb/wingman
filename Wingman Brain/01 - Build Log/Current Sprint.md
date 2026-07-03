@@ -1,6 +1,6 @@
 # Current Sprint
 
-Last updated: 2026-07-01
+Last updated: 2026-07-02 (Session 2)
 
 This is the first file Claude reads at session start. It answers: where are we, what's next, and what's blocking us.
 
@@ -37,30 +37,40 @@ This is the first file Claude reads at session start. It answers: where are we, 
 
 ---
 
-## 🎯 NEXT SESSION — START HERE (updated 2026-07-01)
+## 🎯 NEXT SESSION — START HERE (updated 2026-07-02 S2)
 
 > ⚠️ **STATUS BELOW IS NOT THE SOURCE OF TRUTH — git/GitHub IS.** Prose notes lag reality: a branch gets
 > merged or a release cut *after* the wrap is written, and nobody rewrites the note. At session start, ALWAYS
 > reconcile before trusting this file — report status from *this* output, not from the prose below:
 > ```bash
-> cd "/Users/sebastianperez/Desktop/Wingman CC" && git branch --show-current && gh pr list --state merged --limit 5 && git tag --sort=-v:refname | head -3 && gh release view --json tagName,isDraft 2>/dev/null
+> cd "/Users/sebastianperez/Desktop/Wingman CC" && git branch --show-current && gh pr list --state all --limit 5 && git tag --sort=-v:refname | head -3 && gh release view --json tagName,isDraft 2>/dev/null
 > ```
 > This file holds **decisions + intent**; git/GitHub holds **status**. Never restate merge/release/branch status as prose fact here.
 
-**Live now (verified 2026-07-01 — re-verify with the block above):** **auto-updater WORKS end-to-end** — latest
-release **v0.1.28** on the public `wingman-releases` feed; installed apps self-update + relaunch. Streaming
-objection card ([PR #24](https://github.com/bandidoseb/wingman/pull/24)) is live on Railway AND now in the
-packaged app (shipped via v0.1.25+). Notarized (no Gatekeeper warning / no `xattr`). #45 + #5 resolved.
+**Live now (as of 2026-07-02 S2 wrap — re-verify with the block above):** **Phase A+B multi-turn objection
+threading MERGED ([PR #33](https://github.com/bandidoseb/wingman/pull/33)) → Railway deployed.** Final eval
+was green first (main gate PASS Claude judge; GPT cross-judge confirmed; long-flow synth gate = statistical
+PARITY across 15 blind comparisons — the single FAIL was best-of-3 sampling noise, lesson logged in
+`2026-07-02.md` Session 2). Auto-updater still live (v0.1.28, public `wingman-releases` feed).
 
-**🔴 START HERE — Phase B is CODE-COMPLETE on branch `objection-threading-phase-a` (LOCAL, not pushed).**
-Full session log: `2026-07-02.md`. All of Phase B built + double-reviewed + gated 2026-07-02: threading
-core (B1-B3 + no-silent deferred press), background rolling flow synthesis + call-level objection memory
-(long-flow A/B gate: synth wins 3-0-0), and the B4 lever-declaration echo guard (invisible server-side
-retry; circle-back fixtures green, GPT-cross-confirmed). Typecheck ✅ · 96/96 tests ✅.
-**Next session, in order:** (1) one final FULL 20-fixture eval run (last complete run predates the final
-2 prompt/judge tweaks); (2) Sebastian approves → push + PR (Phase A + B together, one PR — decided);
-(3) merge → live-test on a real call per `tasks/plan-objection-threading-phaseB.md` test script.
-Then Phase C (single-↑ + combined card), partials #41, 3.6b.
+**🔴 START HERE — (1) check [PR #34](https://github.com/bandidoseb/wingman/pull/34) (Phase C) — it was OPEN
++ fully green (CI + Security) at wrap; Sebastian intended to merge. If still open, merge it first.**
+Phase C = single-↑ flow mode + "MOVE #N" combined card + direct ← ↓ → while a flow is armed (no slot locked
+out; zero-cost coming-soon pill until Phase 4). Flow mode owned by Electron main; reviewer-caught accelerator
+-collision race fixed via the openFlowMode invariant. Full narrative: `2026-07-02.md` Session 2.
+
+**(2) THEN THE SESSION TASK — #41 partials (Sebastian priority-locked 2026-07-02, fresh-brain task).**
+The press-the-instant-the-objection-ends case ships a card missing the objection's last words (1–3s Deepgram
+finalization lag). MEASUREMENT first: subscribe `transcript.partial_data`, log partials vs finals on one real
+call, then pick the reconciliation rule. Context: Known Issues #41 + `2026-06-15.md`. Bonus: the 3 advisory
+eval fixtures in `objection-threading-eval.mjs` should flip green after the fix → promote them to gated.
+
+**(3) Live-test B+C together** on a real Zoom/Meet call — test script in PR #34's body (↑↑ → Move #1 chrome →
+single-↑ advances → ← coming-soon mid-flow → dismiss ≠ reset → 2-min expiry → compass returns → `[kb-signal]
+TIMING beat=` cache check). Can fold into the #41 measurement call (same call serves both).
+
+**Then:** 3.6b confidence-aware summarizer (gate RED on purpose) · **desktop release** — Phase C's card chrome
+is HUD-side; packaged apps only get it via a release cut (Railway alone doesn't ship Electron/HUD files).
 
 ---
 
