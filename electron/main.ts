@@ -65,6 +65,18 @@ let menuOpen         = false;   // is the compass menu visible on the HUD?
 let hotkeyRegistered = false;   // idempotent guard — prevent double-registration
 let menuAutoFadeTimer: ReturnType<typeof setTimeout> | null = null;
 
+// ─── Objection Flow mode state (Phase C) ──────────────────────────────────────
+// Armed when the renderer reports an objection thread opened (card 1 landed) and
+// re-armed on every threaded press/card. While armed, a bare ↑ goes straight to
+// the next objection move — no compass round-trip. Owned by MAIN, not the
+// renderer: the Up handler reads the flag synchronously (no cross-process race
+// can route a press against stale mode), and the idle timer can't be stretched
+// by a backgrounded dashboard tab throttling its JS timers (SEV-D / SEV-F).
+let flowModeOpen  = false;
+let flowKeysRegistered = false; // ← ↓ → live while a flow is armed (idempotent guard)
+let flowIdleTimer: ReturnType<typeof setTimeout> | null = null;
+const FLOW_MODE_IDLE_MS = 2 * 60 * 1000; // mirrors the renderer's press-time stale check
+
 // ─── Hotkey helpers (Phase 3) ─────────────────────────────────────────────────
 
 /** Unregister ← ↓ → Esc and cancel the auto-fade. Called on pick, dismiss, timeout, or call-end. */
@@ -143,11 +155,88 @@ function openCompassMenu(): void {
 }
 
 /**
+ * Phase C — close Objection Flow mode and cancel its idle timer.
+ * Renderer-initiated closes (flow:close IPC — the renderer already reset its own
+ * thread ledger) must NOT echo back, or the renderer would double-reset. Only
+ * main-initiated closes (the 2-min idle expiry) notify the renderer, which then
+ * archives the flow's learnings and resets its ledger.
+ */
+/**
+ * Phase C — while a flow is armed, ← ↓ → are registered as DIRECT slot picks
+ * (single-press, no compass), so a rep mid-objection-battle can still reach the
+ * other three arrows without waiting out the 2-min flow window. Slot presses
+ * route through the same wingman:menu-pick path — unbuilt slots (Phase 4)
+ * resolve to the renderer's "coming soon" pill at zero cost. Collision safety
+ * with the compass's identical registrations is enforced by openFlowMode, which
+ * closes any open compass BEFORE calling this (see the INVARIANT note there).
+ */
+function registerFlowDirectKeys(): void {
+  if (flowKeysRegistered) return;
+  const registerDirect = (key: string, direction: string) => {
+    globalShortcut.register(key, () => {
+      console.log(`[Flow] direct ${key} → ${direction}`);
+      mainWindow?.webContents.send("wingman:menu-pick", direction);
+    });
+  };
+  registerDirect("Left",  "answer");
+  registerDirect("Down",  "dig");
+  registerDirect("Right", "close");
+  flowKeysRegistered = true;
+}
+
+function teardownFlowDirectKeys(): void {
+  if (!flowKeysRegistered) return;
+  globalShortcut.unregister("Left");
+  globalShortcut.unregister("Down");
+  globalShortcut.unregister("Right");
+  flowKeysRegistered = false;
+}
+
+function closeFlowMode(reason = "unspecified", opts: { notifyRenderer?: boolean } = {}): void {
+  if (flowIdleTimer) { clearTimeout(flowIdleTimer); flowIdleTimer = null; }
+  teardownFlowDirectKeys();
+  if (!flowModeOpen) return;
+  flowModeOpen = false;
+  console.log(`[Flow] mode closed (${reason})`);
+  if (opts.notifyRenderer) {
+    mainWindow?.webContents.send("wingman:flow-expired");
+  }
+}
+
+/**
+ * Phase C — arm (or re-arm) Objection Flow mode + its 2-min idle timer.
+ * Called on every flow:open from the renderer: thread opened (card 1 landed),
+ * thread advanced (beat N landed), and at threaded press time — so the timer
+ * tracks the rep's actual activity, not just card arrivals.
+ */
+function openFlowMode(): void {
+  if (!callActive) return; // a stale open landing after call end must not arm the mode
+  // INVARIANT: menuOpen and flowKeysRegistered may never both be true. Both
+  // register the same Left/Down/Right accelerators, and Electron's register()
+  // is a NO-OP on an already-held accelerator — it does NOT replace the handler,
+  // so a co-owned key would silently keep the compass handler and then DIE when
+  // the compass tears down. The compass CAN be open here: a card stream that
+  // outlives the flow's idle expiry lands `done` after the rep re-opened the
+  // compass with a fresh ↑. Tear the compass down first (its own state, keys,
+  // auto-fade + HUD notify) so flow keys always register against free accelerators.
+  closeCompassMenu("flow-arming");
+  if (!flowModeOpen) console.log("[Flow] mode open — all four arrows go direct");
+  flowModeOpen = true;
+  registerFlowDirectKeys(); // idempotent — re-arms are timer-only
+  if (flowIdleTimer) clearTimeout(flowIdleTimer);
+  flowIdleTimer = setTimeout(() => {
+    closeFlowMode("idle-2min", { notifyRenderer: true });
+  }, FLOW_MODE_IDLE_MS);
+}
+
+/**
  * Register the Up Arrow summon key for the duration of a call.
  * Idempotent — safe to call even if already registered.
  * First press: opens the compass menu.
  * Second press (menu already open): picks "objection" immediately
  *   (double-tap Up = instant objection help without looking).
+ * Flow mode open (Phase C): single press goes straight to the next
+ *   objection move — no compass.
  */
 function registerCallHotkey(): void {
   if (hotkeyRegistered) return;
@@ -160,6 +249,14 @@ function registerCallHotkey(): void {
       // Double-tap Up → instant objection pick (same flash-then-close as registerPick)
       sendPickFlash("objection");
       closeCompassMenu("double-tap-objection", { suppressHudSend: true });
+      mainWindow?.webContents.send("wingman:menu-pick", "objection");
+    } else if (flowModeOpen) {
+      // Phase C: single-↑ inside an active Objection Flow → next move directly,
+      // no compass. No pick-flash (the compass isn't on screen) — the renderer's
+      // "thinking" pill is the immediate press ack on this path. The other three
+      // arrows stay reachable: flow mode registers ← ↓ → as direct picks
+      // (registerFlowDirectKeys), so no slot is locked out mid-flow.
+      console.log("[Flow] single-↑ → objection");
       mainWindow?.webContents.send("wingman:menu-pick", "objection");
     } else {
       openCompassMenu();
@@ -181,6 +278,9 @@ function registerCallHotkey(): void {
  */
 function unregisterCallHotkey(): void {
   closeCompassMenu("call-end"); // tears down direction keys first
+  // No renderer notify: the renderer's own isActive effect resets its thread on
+  // every call-end path — echoing here would double-reset.
+  closeFlowMode("call-end");
   if (!hotkeyRegistered) return;
   globalShortcut.unregister("Up");
   hotkeyRegistered = false;
@@ -646,6 +746,17 @@ function setupIPC(): void {
   // ── HUD dismiss → main window ───────────────────────────────────────────────
   ipcMain.handle("hud:dismiss", () => {
     mainWindow?.webContents.send("signal:dismiss");
+  });
+
+  // ── Objection Flow mode (Phase C) ───────────────────────────────────────────
+  // Renderer reports thread lifecycle; main owns the mode flag + idle timer.
+  ipcMain.on("flow:open",  () => { openFlowMode(); });
+  ipcMain.on("flow:close", () => { closeFlowMode("renderer-reset"); });
+
+  // Flow chrome for the HUD card ("Move #N" header + press-↑ affordance) —
+  // relayed from the dashboard renderer, same pattern as hud:summon-state.
+  ipcMain.handle("hud:flow-state", (_event, payload: { active: boolean; move?: number }) => {
+    hudWindow?.webContents.send("wingman:flow-state", payload);
   });
 
   // ── Mouse interaction toggle ────────────────────────────────────────────────

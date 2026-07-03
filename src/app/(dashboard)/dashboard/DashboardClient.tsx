@@ -604,6 +604,9 @@ export default function DashboardClient({
       archiveCurrentFlow();
       objectionThreadRef.current = { ...EMPTY_THREAD };
       setFlowSynthContext({ active: false });
+      // Phase C: main already closed flow mode on its own call-end teardown; this
+      // covers ends the renderer sees first. Idempotent on both sides.
+      window.wingman?.flowClosed?.();
       // Cancel any queued deferred press + clear its pill state.
       if (pendingTimerRef.current) { clearTimeout(pendingTimerRef.current); pendingTimerRef.current = null; }
       pendingPressRef.current = false;
@@ -619,7 +622,23 @@ export default function DashboardClient({
     objectionThreadRef.current = { ...EMPTY_THREAD };
     setFlowSynthContext({ active: false });
     callObjectionMemoryRef.current = { archivedRecaps: [], allLinesGiven: [] };
+    window.wingman?.flowClosed?.(); // Phase C: no armed single-↑ mode across calls
   }, [callId, archiveCurrentFlow, setFlowSynthContext]);
+
+  // Phase C: main's 2-min flow idle timer expired — same semantics as the press-time
+  // stale reset (archive learnings + one bounded close-out synth), minus the re-press.
+  useEffect(() => {
+    if (!isElectron || !window.wingman?.onFlowExpired) return;
+    window.wingman.onFlowExpired(() => {
+      if (objectionThreadRef.current.active) {
+        archiveCurrentFlow({ closeOutSynth: true });
+        objectionThreadRef.current = { ...EMPTY_THREAD };
+        setFlowSynthContext({ active: false });
+      }
+      window.wingman?.sendFlowState?.({ active: false }); // clear the card's flow chrome
+    });
+    return () => { window.wingman?.offFlowExpired?.(); };
+  }, [isElectron, archiveCurrentFlow, setFlowSynthContext]);
 
   // ── Hotkey compass menu — handle direction pick from Electron main ─────────
   // Called by main.ts when the rep presses a direction key after the Up Arrow
@@ -684,9 +703,16 @@ export default function DashboardClient({
       archiveCurrentFlow({ closeOutSynth: true });
       objectionThreadRef.current = { ...EMPTY_THREAD };
       setFlowSynthContext({ active: false });
+      // Phase C: belt-and-suspenders — main's own 2-min timer normally beat us here.
+      window.wingman?.flowClosed?.();
+      window.wingman?.sendFlowState?.({ active: false });
     }
     const t = objectionThreadRef.current;
     const isThreaded = t.active && t.beatNumber >= 1;
+    // Phase C: a threaded press re-arms main's idle timer NOW (not just when the card
+    // lands) so the mode can't expire mid-generation and reset the thread under a
+    // stream that's about to advance it.
+    if (isThreaded) window.wingman?.flowOpened?.();
 
     // Build the threaded payload (or leave undefined for a fresh beat-1 single-shot).
     let threadBody: {
@@ -903,6 +929,9 @@ export default function DashboardClient({
                 };
                 // Arm the background synthesis for this flow (Step 2).
                 setFlowSynthContext({ active: true, anchorCursor: cursor, lastMoveCursor: cursor, beliefSnapshot: beliefAtPress ?? null });
+                // Phase C: arm main's single-↑ flow mode + paint the flow chrome on the card.
+                window.wingman?.flowOpened?.();
+                window.wingman?.sendFlowState?.({ active: true, move: 1 });
               } else {
                 // Continuation beat → advance. beatNumberSent is the value we SENT (not a
                 // re-read), so it stays correct even if the ref shifted.
@@ -914,6 +943,9 @@ export default function DashboardClient({
                 cur.lastMoveCursor = cursor;
                 // Same anchor = same flow — this only advances the synth's absorb boundary.
                 setFlowSynthContext({ active: true, anchorCursor: cur.anchorCursor, lastMoveCursor: cursor });
+                // Phase C: re-arm main's idle timer + advance the card's move counter.
+                window.wingman?.flowOpened?.();
+                window.wingman?.sendFlowState?.({ active: true, move: beatNumberSent });
               }
             }
             resolved = true;

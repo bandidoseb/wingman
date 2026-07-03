@@ -222,6 +222,21 @@
     }
     #signalSupport.visible { display: block; }
 
+    /* ── Objection Flow chrome (Phase C) ──────────────────────────────────
+       When a flow is live the tag turns blue and reads "OBJECTION FLOW ·
+       MOVE #N", and a small affordance line reminds the rep that a single
+       ↑ press summons the next move. */
+    #signalTag.flow { color: rgba(96, 165, 250, 0.85); }
+    #flowHint {
+      display: none;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      color: rgba(96, 165, 250, 0.55);
+      margin-top: 2px;
+    }
+    #flowHint.visible { display: block; }
+
     /* Dismiss button — dark theme */
     #gotItBtn {
       width: 100%;
@@ -925,6 +940,7 @@
     <div id="signalTag"></div>
     <div id="signalText"></div>
     <div id="signalSupport"></div>
+    <div id="flowHint">press &#8593; for next move</div>
     <button id="gotItBtn">got it</button>
   </div>
 
@@ -1120,6 +1136,7 @@
     const timerText            = document.getElementById('timerText');
     const signalBubble         = document.getElementById('signalBubble');
     const signalTag            = document.getElementById('signalTag');
+    const flowHint             = document.getElementById('flowHint');
     const signalTextEl         = document.getElementById('signalText');
     const signalSupportEl      = document.getElementById('signalSupport');
     const gotItBtn             = document.getElementById('gotItBtn');
@@ -1502,6 +1519,7 @@
       clearTimeout(hideSignalTimer);
       signalBubble.classList.remove('hiding');
       signalTag.textContent = (currentStage || typeInfo.label).toUpperCase();
+      clearFlowChrome();  // fresh card starts plain — flow-state after `done` re-applies (Phase C)
       // No-objection nudge shows no tag ("SUGGEST" read wrong — it's an all-clear, not advice).
       signalTag.style.display = (type === 'Nudge') ? 'none' : '';
       signalSupportEl.textContent = '';
@@ -1533,6 +1551,7 @@
         clearTimeout(hideSignalTimer);
         signalBubble.classList.remove('hiding');
         signalTag.textContent = (currentStage || typeInfo.label).toUpperCase();
+        clearFlowChrome();  // two-tier cards (answer/dig/close) are never flow cards (Phase C)
         // No-objection nudge shows no tag (it's an all-clear, not a suggestion).
         signalTag.style.display = (signal.type === 'Nudge') ? 'none' : '';
         cancelReveal();
@@ -1577,9 +1596,31 @@
       else if (p.phase === 'abort') { cancelReveal(); hideSignal(); }  // wipe a half-line
     }
 
+    // ── Objection Flow chrome (Phase C) ───────────────────────────────────
+    // Sent by DashboardClient right after a threaded card's `done` frame (and on
+    // flow end). Applies on top of whatever card is showing: blue tag with the
+    // move counter + the single-↑ affordance. Cleared whenever a new card shell
+    // opens (each card starts plain; the next flow-state re-applies it) and on
+    // dismiss/hide.
+    function clearFlowChrome() {
+      signalTag.classList.remove('flow');
+      flowHint.classList.remove('visible');
+    }
+
+    function handleFlowState(p) {
+      if (!p || !p.active) { clearFlowChrome(); return; }
+      if (!signalActive) return;                 // no card on screen — nothing to chrome
+      const move = Math.max(1, Math.floor(p.move || 1));
+      signalTag.textContent = 'OBJECTION FLOW · MOVE #' + move;
+      signalTag.classList.add('flow');
+      signalTag.style.display = '';
+      flowHint.classList.add('visible');
+    }
+
     function hideSignal() {
       clearTimeout(hideSignalTimer);
       cancelReveal();   // stop any in-progress text reveal so it can't paint after dismiss
+      clearFlowChrome();
       signalBubble.classList.add('hiding');
       signalActive = false;
       currentSignalType = null;
@@ -1819,6 +1860,12 @@
 
       // Phase 3.5: pick feedback (green flash) + summon-state pill
       window.hud.onPickFlash((direction) => playPickFlash(direction));
+
+      // Objection Flow chrome (Phase C) — "MOVE #N" tag + press-↑ affordance
+      if (window.hud.onFlowState) {
+        window.hud.onFlowState((payload) => handleFlowState(payload));
+      }
+
       window.hud.onSummonState((payload) => {
         hudLog('summon-state RECEIVED ' + JSON.stringify(payload));
         const state = payload && payload.state;
