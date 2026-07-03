@@ -292,16 +292,38 @@ export async function initRecallAI(options: RecallOptions): Promise<boolean> {
     //   evt.data.data.participant.name — speaker display name
     const lastChunkPerSpeaker = new Map<string, string>();
 
+    // #41 measurement diagnostics — a provider that silently sends nothing
+    // (or a payload shape we don't parse) must be VISIBLE in the log, not
+    // indistinguishable from "no partials arrived". Bounded per call:
+    // unknown event names once each, unparseable payloads five max.
+    const seenOtherEvents = new Set<string>();
+    let emptyTextLogged = 0;
+
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     realtimeHandler = (evt: any) => {
       const isFinal   = evt.event === "transcript.data";
       const isPartial = evt.event === "transcript.partial_data";
-      if (!isFinal && !isPartial) return;
+      if (!isFinal && !isPartial) {
+        const name = typeof evt?.event === "string" ? evt.event : "(unnamed)";
+        if (!seenOtherEvents.has(name)) {
+          seenOtherEvents.add(name);
+          logMeasurement({ kind: "other_event", event: name });
+        }
+        return;
+      }
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const words: Array<{ text: string; start_timestamp?: any; end_timestamp?: any }> =
         evt.data?.data?.words ?? [];
       const text = words.map((w) => w.text).join(" ").trim();
-      if (!text) return;
+      if (!text) {
+        if (emptyTextLogged < 5) {
+          emptyTextLogged++;
+          let raw = "";
+          try { raw = JSON.stringify(evt).slice(0, 600); } catch { raw = "(unserializable)"; }
+          logMeasurement({ kind: "empty_event", event: evt.event, raw });
+        }
+        return;
+      }
       const speaker: string = evt.data?.data?.participant?.name ?? "Speaker";
 
       // #41 measurement: record BOTH streams with word-level timing so the

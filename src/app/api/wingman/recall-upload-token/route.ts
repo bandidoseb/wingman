@@ -76,7 +76,14 @@ export async function POST(req: NextRequest) {
       body: JSON.stringify({
         recording_config: {
           transcript: {
-            provider: { deepgram_streaming: { model: "nova-2-general" } },
+            // interim_results: Deepgram only EMITS partial (unfinalized)
+            // transcripts when this is on — subscribing to the
+            // transcript.partial_data event alone yields zero events (#41,
+            // verified on the 2026-07-03 measurement call). Billing is per
+            // audio minute, so interims add no cost. Finals are unaffected.
+            provider: {
+              deepgram_streaming: { model: "nova-2-general", interim_results: true },
+            },
           },
           realtime_endpoints: [
             {
