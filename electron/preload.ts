@@ -41,6 +41,7 @@ ipcRenderer.on("call:auto-ended", () => {
 // Using removeAllListeners(channel) is too broad — it would silently remove any
 // other listener on the same channel, causing invisible breakage.
 let _transcriptChunkHandler:  ((_e: Electron.IpcRendererEvent, chunk: string) => void) | null = null;
+let _transcriptPartialHandler: ((_e: Electron.IpcRendererEvent, chunk: string) => void) | null = null;
 let _signalDismissHandler:    ((_e: Electron.IpcRendererEvent) => void) | null = null;
 let _outcomeUpdatedHandler:   ((_e: Electron.IpcRendererEvent) => void) | null = null;
 // Phase 3: hotkey compass menu — main process sends the direction the rep picked
@@ -123,6 +124,29 @@ contextBridge.exposeInMainWorld("wingman", {
     if (_transcriptChunkHandler) {
       ipcRenderer.removeListener("transcript:chunk", _transcriptChunkHandler);
       _transcriptChunkHandler = null;
+    }
+  },
+
+  /**
+   * Listen for PARTIAL (unfinalized) transcript chunks (#41). Same
+   * "Speaker: text" line format as finals, but the text is Deepgram's
+   * in-progress read of the CURRENT utterance — it arrives ~126ms behind
+   * speech and may be revised until the final lands. Used only for the
+   * press-time live tail; never stored.
+   */
+  onTranscriptPartial: (callback: (chunk: string) => void) => {
+    if (_transcriptPartialHandler) {
+      ipcRenderer.removeListener("transcript:partial", _transcriptPartialHandler);
+    }
+    _transcriptPartialHandler = (_event, chunk) => callback(chunk);
+    ipcRenderer.on("transcript:partial", _transcriptPartialHandler);
+  },
+
+  /** Remove the partial-transcript listener (call this when component unmounts) */
+  offTranscriptPartial: () => {
+    if (_transcriptPartialHandler) {
+      ipcRenderer.removeListener("transcript:partial", _transcriptPartialHandler);
+      _transcriptPartialHandler = null;
     }
   },
 

@@ -17,6 +17,7 @@ import PaywallModal from "@/components/ui/PaywallModal";
 import { FREE_CALL_LIMIT } from "@/lib/constants";
 import { getDefaultStage } from "@/lib/wingman/poll-intervals";
 import { parseSSEBuffer } from "@/lib/wingman/sse-parse";
+import { HOT_PARTIAL_MS, SETTLE_WAIT_MS } from "@/lib/wingman/live-tail";
 import { useWingmanPoller } from "@/hooks/useWingmanPoller";
 import { useRecallTranscript } from "@/hooks/useRecallTranscript";
 
@@ -163,6 +164,9 @@ export default function DashboardClient({
     getRecapCursor,
     synthesizeClosedFlow,
     addChunk,
+    addPartial,
+    getLiveTail,
+    hotPartialAgeMs,
     dismissSignal,
     flushBuffer,
     flushSummarize,
@@ -258,7 +262,7 @@ export default function DashboardClient({
   }, [savedZoomName]);
 
   // ── Recall AI transcript listener (Electron only, no-op in browser) ────────
-  const { isElectron } = useRecallTranscript({ isActive, addChunk });
+  const { isElectron } = useRecallTranscript({ isActive, addChunk, addPartial });
 
   // ── Start a live call ──────────────────────────────────────────────────────
   const handleStartCall = useCallback(async () => {
@@ -688,6 +692,30 @@ export default function DashboardClient({
     }
     lastSummonAtRef.current = Date.now();
 
+    // ── #41 settle wait ──────────────────────────────────────────────────────────
+    // A partial that landed <1.5s ago means the speaker is likely mid-utterance —
+    // the objection's last words are still streaming in. Hold one beat (350ms) so
+    // the live tail catches them. MUST sit BEFORE the threading decision below:
+    // everything (thread ledger, cursors, live tail) is read POST-settle, so a
+    // flow expiry during the sleep can't produce a stale threaded payload.
+    // No fresh partial (old packaged app, or press after a genuine pause) →
+    // hotPartialAgeMs() is +Infinity → zero added latency, request unchanged.
+    let pillSent = false;
+    if (hotPartialAgeMs() < HOT_PARTIAL_MS) {
+      // Guard + pill BEFORE the sleep: re-presses during it drop at the top
+      // guard, and the pill is flow-mode's only press ack (no compass flash).
+      isGeneratingRef.current = true;
+      window.wingman?.sendSummonState({ state: "thinking", slot: direction });
+      pillSent = true;
+      await new Promise((resolve) => setTimeout(resolve, SETTLE_WAIT_MS));
+      if (!isActiveRef.current) {
+        // Call ended during the wait — resolve the pill, free the guard.
+        window.wingman?.sendSummonState({ state: "idle", slot: direction });
+        isGeneratingRef.current = false;
+        return;
+      }
+    }
+
     // ── Objection Flow threading decision (Phase B) ─────────────────────────────
     // Read the ledger + freeze press-time context into LOCALS. All mutation happens later,
     // ONLY in the stream `done` branch, gated by callId/isActive. isGeneratingRef + the throttle
@@ -754,6 +782,17 @@ export default function DashboardClient({
       transcriptToSend = getRecentTranscript();
     }
 
+    // ── #41 live tail ──────────────────────────────────────────────────────────
+    // Append the freshest unfinalized words AFTER capping, deduped against the
+    // exact finals tail being sent (strict substring — a stale partial whose
+    // final already landed is suppressed). Re-cap the combined string to the
+    // server's 3,500 limit: capLatest keeps the END, so the live tail always
+    // survives whole and only the OLDEST finals get sliced.
+    const liveTail = getLiveTail(transcriptToSend);
+    if (liveTail) {
+      transcriptToSend = capLatest(transcriptToSend + "\n" + liveTail);
+    }
+
     // Call-level memory (Step 2): earlier flows' learnings ride on EVERY objection press —
     // beat-1 included (a resurfacing objection must not restart at square one). Empty on the
     // first objection of a call → omitted → that request stays byte-identical to the shipped
@@ -770,7 +809,9 @@ export default function DashboardClient({
     // sent, EVERY exit from this function resolves the pill — either a card
     // (sendSignal/start delta → the HUD clears it) or an explicit "error"
     // (→ "Couldn't pull that — tap ↑ to retry"). There is NO silent path.
-    window.wingman?.sendSummonState({ state: "thinking", slot: direction });
+    // (#41: skip if the settle wait already sent it — a second "thinking"
+    // would reset the pill's visible counter mid-wait.)
+    if (!pillSent) window.wingman?.sendSummonState({ state: "thinking", slot: direction });
 
     // Streaming timeouts (plan review W7): a flat wall would kill a slow-but-alive
     // stream mid-sentence. Instead guard time-to-first-TOKEN (TTFB) and idle gaps

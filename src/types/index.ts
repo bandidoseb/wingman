@@ -226,6 +226,10 @@ export interface WingmanBridge {
   // Real-time transcript from Recall AI audio capture
   onTranscriptChunk:  (callback: (chunk: string) => void) => void;
   offTranscriptChunk: () => void;
+  // #41: partial (unfinalized) chunks — OPTIONAL: absent on packaged apps
+  // older than the live-tail release, so callers must feature-guard.
+  onTranscriptPartial?:  (callback: (chunk: string) => void) => void;
+  offTranscriptPartial?: () => void;
 
   // Keyboard shortcut (Ctrl+Shift+W) → toggle call start/stop
   onToggleCall:  (callback: () => void) => void;

@@ -24,13 +24,22 @@
  *   the limit regardless of activity.
  */
 
+import { startMeasurementLog, logMeasurement, endMeasurementLog } from "./measurement-log";
+
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 export type AutoStopReason = "inactivity" | "max_duration" | "meeting_lost";
 
 interface RecallOptions {
-  /** Called every time a new transcript chunk arrives */
+  /** Called every time a new FINALIZED transcript chunk arrives */
   onChunk: (chunk: string) => void;
+  /**
+   * Called for PARTIAL (unfinalized) transcript chunks (#41). Same
+   * "Speaker: text" format as onChunk, but the text is the in-progress
+   * read of the current utterance and may be revised until its final
+   * lands. Consumers must treat it as ephemeral — never store it.
+   */
+  onPartial?: (chunk: string) => void;
   /** Called when Wingman auto-stops for any reason (cost protection) */
   onAutoStop?: (reason: AutoStopReason) => void;
   /** Called 10 minutes before the 2-hour hard cap so the HUD can warn the user */
@@ -290,13 +299,62 @@ export async function initRecallAI(options: RecallOptions): Promise<boolean> {
     //   evt.data.data.participant.name — speaker display name
     const lastChunkPerSpeaker = new Map<string, string>();
 
+    // #41 measurement diagnostics — a provider that silently sends nothing
+    // (or a payload shape we don't parse) must be VISIBLE in the log, not
+    // indistinguishable from "no partials arrived". Bounded per call:
+    // unknown event names once each, unparseable payloads five max.
+    const seenOtherEvents = new Set<string>();
+    let emptyTextLogged = 0;
+
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     realtimeHandler = (evt: any) => {
-      if (evt.event !== "transcript.data") return;
-      const words: Array<{ text: string }> = evt.data?.data?.words ?? [];
+      const isFinal   = evt.event === "transcript.data";
+      const isPartial = evt.event === "transcript.partial_data";
+      if (!isFinal && !isPartial) {
+        const name = typeof evt?.event === "string" ? evt.event : "(unnamed)";
+        if (!seenOtherEvents.has(name)) {
+          seenOtherEvents.add(name);
+          logMeasurement({ kind: "other_event", event: name });
+        }
+        return;
+      }
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const words: Array<{ text: string; start_timestamp?: any; end_timestamp?: any }> =
+        evt.data?.data?.words ?? [];
       const text = words.map((w) => w.text).join(" ").trim();
-      if (!text) return;
+      if (!text) {
+        if (emptyTextLogged < 5) {
+          emptyTextLogged++;
+          let raw = "";
+          try { raw = JSON.stringify(evt).slice(0, 600); } catch { raw = "(unserializable)"; }
+          logMeasurement({ kind: "empty_event", event: evt.event, raw });
+        }
+        return;
+      }
       const speaker: string = evt.data?.data?.participant?.name ?? "Speaker";
+
+      // #41 measurement: record BOTH streams with word-level timing so the
+      // analyzer can compare "when was it spoken" vs "when did it arrive".
+      // Timestamp fields are provider-dependent — log defensively.
+      const lastWord = words[words.length - 1];
+      logMeasurement({
+        kind: isPartial ? "partial" : "final",
+        speaker,
+        text,
+        word_count: words.length,
+        first_word_start_rel: words[0]?.start_timestamp?.relative ?? null,
+        first_word_start_abs: words[0]?.start_timestamp?.absolute ?? null,
+        last_word_end_rel:    lastWord?.end_timestamp?.relative ?? null,
+        last_word_end_abs:    lastWord?.end_timestamp?.absolute ?? null,
+      });
+
+      // Partials feed ONLY the renderer's press-time live tail (#41) — they
+      // return here, before the finals-only pipeline below (dedup map,
+      // inactivity clock, onChunk). Durable buffers never see partial text.
+      if (isPartial) {
+        options.onPartial?.(`${speaker}: ${text}`);
+        return;
+      }
 
       // Always reset inactivity clock — duplicate events still represent real
       // call activity and must prevent a false inactivity auto-stop.
@@ -351,6 +409,13 @@ export async function initRecallAI(options: RecallOptions): Promise<boolean> {
       }
     }, 60 * 1000);
 
+    // #41 measurement: open the per-call partials log. Failure is non-fatal —
+    // the call runs normally, we just lose measurement data for this session.
+    const measurePath = startMeasurementLog();
+    if (measurePath) {
+      console.log(`[Measure] #41 partials log → ${measurePath}`);
+    }
+
     console.log("[Recall AI] Recording started");
     return true;
 
@@ -393,5 +458,9 @@ export function stopRecallAI(): void {
   }
 
   recordingWindowId = null;
+
+  // #41 measurement: close the per-call partials log (idempotent).
+  endMeasurementLog();
+
   console.log("[Recall AI] Stopped");
 }

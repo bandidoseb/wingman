@@ -13,6 +13,7 @@ import {
 import * as path from "path";
 import { autoUpdater } from "electron-updater";
 import { initRecallAI, stopRecallAI, setupRecallAI, hasMeetingDetected, AutoStopReason } from "./recall";
+import { logMeasurement } from "./measurement-log";
 
 // ─── App URLs ────────────────────────────────────────────────────────────────
 const PROD_URL = "https://app.meetwingman.ai";
@@ -137,6 +138,7 @@ function openCompassMenu(): void {
   // suppressed — the flash animation owns the compass teardown on this path.
   const registerPick = (key: string, direction: string) => {
     globalShortcut.register(key, () => {
+      logMeasurement({ kind: "press", path: "compass-pick", slot: direction });
       sendPickFlash(direction);
       closeCompassMenu(`pick:${direction}`, { suppressHudSend: true });
       mainWindow?.webContents.send("wingman:menu-pick", direction);
@@ -175,6 +177,7 @@ function registerFlowDirectKeys(): void {
   const registerDirect = (key: string, direction: string) => {
     globalShortcut.register(key, () => {
       console.log(`[Flow] direct ${key} → ${direction}`);
+      logMeasurement({ kind: "press", path: "flow-direct", slot: direction });
       mainWindow?.webContents.send("wingman:menu-pick", direction);
     });
   };
@@ -247,6 +250,7 @@ function registerCallHotkey(): void {
 
     if (menuOpen) {
       // Double-tap Up → instant objection pick (same flash-then-close as registerPick)
+      logMeasurement({ kind: "press", path: "double-tap", slot: "objection" });
       sendPickFlash("objection");
       closeCompassMenu("double-tap-objection", { suppressHudSend: true });
       mainWindow?.webContents.send("wingman:menu-pick", "objection");
@@ -257,8 +261,12 @@ function registerCallHotkey(): void {
       // arrows stay reachable: flow mode registers ← ↓ → as direct picks
       // (registerFlowDirectKeys), so no slot is locked out mid-flow.
       console.log("[Flow] single-↑ → objection");
+      logMeasurement({ kind: "press", path: "flow-up", slot: "objection" });
       mainWindow?.webContents.send("wingman:menu-pick", "objection");
     } else {
+      // Summon logged too — it marks the rep's FIRST reaction to the objection,
+      // which is the truest press-time for the #41 tail-gap measurement.
+      logMeasurement({ kind: "press", path: "summon", slot: null });
       openCompassMenu();
     }
   });
@@ -572,6 +580,8 @@ function setupIPC(): void {
       appUrl:             getAppUrl(),
       authToken:          token,
       onChunk:            (chunk: string) => { mainWindow?.webContents.send("transcript:chunk", chunk); },
+      // #41: partial (unfinalized) chunks — renderer-only live tail, not the HUD
+      onPartial:          (chunk: string) => { mainWindow?.webContents.send("transcript:partial", chunk); },
       onAutoStop:         autoStopCall,
       onApproachingLimit: () => { hudWindow?.webContents.send("hud:cap-warning"); },
     });

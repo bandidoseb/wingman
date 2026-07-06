@@ -53,11 +53,38 @@ was green first (main gate PASS Claude judge; GPT cross-judge confirmed; long-fl
 PARITY across 15 blind comparisons — the single FAIL was best-of-3 sampling noise, lesson logged in
 `2026-07-02.md` Session 2). Auto-updater still live (v0.1.28, public `wingman-releases` feed).
 
-**🔴 START HERE — (1) check [PR #34](https://github.com/bandidoseb/wingman/pull/34) (Phase C) — it was OPEN
-+ fully green (CI + Security) at wrap; Sebastian intended to merge. If still open, merge it first.**
-Phase C = single-↑ flow mode + "MOVE #N" combined card + direct ← ↓ → while a flow is armed (no slot locked
-out; zero-cost coming-soon pill until Phase 4). Flow mode owned by Electron main; reviewer-caught accelerator
--collision race fixed via the openFlowMode invariant. Full narrative: `2026-07-02.md` Session 2.
+**🔴 START HERE (next session, Sebastian-locked 2026-07-03) — FIX THE CIRCLE-BACK REPETITION WEAKNESS.**
+The objection card, on a SPECIFIC shape — "prospect confirms a diagnosis Wingman already gave, then re-asks
+the core question" (fixture `advance-trust-2`) — re-serves its own prior point in fresh words ~50% of the
+time instead of ADVANCING (new angle / answer the direct question / go for commitment). It is NOT 50% of all
+2nd cards — every other continuation fixture (money/fear/support/doubt/busy/think/toogood) passes 3/3; this is
+a targeted blind spot, but it happens on real calls and Sebastian wants it good before beta. Root: the B4
+consecutive-lever guard (`objection-signal.ts`) catches same-LEVER repeats, NOT same-DIAGNOSIS-reworded.
+Fix options: a prompt rule in the CONTINUING AN OBJECTION section of `objection-prompt.mjs` against restating
+any diagnosis already in MOVES YOU'VE ALREADY GIVEN, and/or a text-similarity retry-guard. GATE:
+`ONLY=advance-trust-2 REPEAT=6 node scripts/objection-threading-eval.mjs` ≥5/6 without regressing the full run
+(re-run with the gpt-4o cross-judge too). Chip spawned this session (won't survive app restart — this note is
+the durable pointer). Full context: `tasks/todo.md` #41 section.
+
+**(prior) Phase C** ([PR #34](https://github.com/bandidoseb/wingman/pull/34)) — MERGED 2026-07-03. single-↑
+flow mode + "MOVE #N" combined card + direct ← ↓ → while a flow is armed. Flow mode owned by Electron main;
+reviewer-caught accelerator-collision race fixed via the openFlowMode invariant. Narrative: `2026-07-02.md` S2.
+
+**(this session, 2026-07-03) ✅ #41 PARTIALS — MEASUREMENT + FIX BUILT, [PR #36](https://github.com/bandidoseb/wingman/pull/36) pushed + CI green (awaiting Sebastian's merge).**
+Measured (2 real calls): finals lag speech ~500ms median / up to 4s; Deepgram partials lag 126ms and already
+hold 68% of press-time missing words. Root cause of the earlier "no data" was `interim_results` defaulting off
+— fixed. Fix = merge freshest partial tail at press (settle wait ≤350ms only when a partial <1.5s old; strict
+substring dedup; live tail rides the volatile uncached segment; durable buffers stay finals-only; old apps
+byte-identical). wingman-reviewer APPROVE ×3; 124 unit tests; 3 new GATED live-tail eval fixtures 3/3 (Claude
++ gpt-4o). Provider stays Deepgram (its partials beat AssemblyAI's claimed ~300ms). **Ships to packaged apps
+only via a desktop release** (Electron/HUD side) — bundle with the Phase C chrome release.
+
+**Decisions to log at wrap (Sebastian, 2026-07-03):** (a) **Contextual abstains** — replace the generic "no
+objection detected" with a small enum of directive chips ("They're ready — close now." / "Let them finish." /
+"Just logistics — answer it straight." / "Nothing standing — keep going." / "Handled — move forward."); build
+AFTER #41 lands (clean input first) as `{"line":null,"reason":<enum>}` + HUD chips + eval. (b) **The → close
+arrow = a PRE-PITCH readiness read** ("am I clear to pitch?"), NOT a mid-action closing-line button — Phase 4
+must be built to this definition.
 
 **(2) THEN THE SESSION TASK — #41 partials (Sebastian priority-locked 2026-07-02, fresh-brain task).**
 The press-the-instant-the-objection-ends case ships a card missing the objection's last words (1–3s Deepgram

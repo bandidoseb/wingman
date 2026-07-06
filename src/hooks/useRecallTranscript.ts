@@ -29,6 +29,8 @@ interface UseRecallTranscriptOptions {
   isActive: boolean;
   /** The addChunk function from useWingmanPoller — call this with each new chunk */
   addChunk: (chunk: string) => void;
+  /** #41: optional partial-chunk feed from useWingmanPoller (press-time live tail) */
+  addPartial?: (chunk: string) => void;
 }
 
 interface UseRecallTranscriptReturn {
@@ -41,6 +43,7 @@ interface UseRecallTranscriptReturn {
 export function useRecallTranscript({
   isActive,
   addChunk,
+  addPartial,
 }: UseRecallTranscriptOptions): UseRecallTranscriptReturn {
   const isElectron = typeof window !== "undefined" && !!window.wingman?.isElectron;
   const [chunkCount, setChunkCount] = useState(0);
@@ -56,17 +59,28 @@ export function useRecallTranscript({
         addChunk(chunk);
         setChunkCount((n) => n + 1);
       });
+      // #41: partial (unfinalized) chunks → press-time live tail. Guarded:
+      // an old packaged app's preload has no onTranscriptPartial — the live
+      // tail then simply stays empty and behavior is identical to today.
+      if (addPartial && window.wingman.onTranscriptPartial) {
+        window.wingman.onTranscriptPartial((chunk) => {
+          if (!chunk.trim()) return;
+          addPartial(chunk);
+        });
+      }
     } else {
-      // Call ended or not started — remove listener to stop processing
+      // Call ended or not started — remove listeners to stop processing
       window.wingman.offTranscriptChunk();
+      window.wingman.offTranscriptPartial?.();
       setChunkCount(0);
     }
 
-    // Cleanup: remove listener when component unmounts or isActive changes
+    // Cleanup: remove listeners when component unmounts or isActive changes
     return () => {
       window.wingman?.offTranscriptChunk();
+      window.wingman?.offTranscriptPartial?.();
     };
-  }, [isActive, isElectron, addChunk]);
+  }, [isActive, isElectron, addChunk, addPartial]);
 
   return { isElectron, chunkCount };
 }

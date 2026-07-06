@@ -290,6 +290,43 @@ const FIX = [
       historyTranscript: "REP: Good that you're nervous — means it matters.\nMARCUS: Yeah I guess..." },
     latestResponse: "MARCUS: Yeah I guess what scares me is like, what if I put all this in and then—",
   },
+
+  // ── #41 LIVE TAIL (gated) — the partial-merge fix under test ─────────────────
+  // Production now appends the freshest UNFINALIZED words as a marked live-tail
+  // line when the rep presses the instant an objection ends. The crux risk
+  // (plan rev 2, must-fix 6): the "[live]" marker must NOT fight the
+  // "cut off mid-thought → wait" rule. These gate both directions:
+  // a fragment RESCUED by a completing tail → line; a tail that is itself
+  // clearly unfinished → still abstain. The leak check (no "[live" in any
+  // generated line) is enforced for EVERY fixture in evaluate().
+  {
+    id: "advance-livetail-rescue", kind: "advance",
+    belief: "Sarah, agency owner, wants $50k/mo [confirmed]. Weak belief: Money. Mid-exchange — the rep pressed the instant she finished; her last words arrived on the live (unfinalized) stream.",
+    thread: { beatNumber: 3,
+      linesGiven: ["Money aside — you a hundred percent in?", "What'd have to be true for it to feel like a no-brainer?"],
+      historyTranscript: "REP: What'd have to be true for it to feel like a no-brainer?\nSARAH: I mean..." },
+    // Finalized part alone is the old abstain-fragment case; the live tail
+    // completes the objection → the model must handle it, not wait.
+    latestResponse: "SARAH: I do want it, it's just that right now with everything going on I'm not totally sure if I can\nSARAH [live — still being transcribed]: afford the whole twenty thousand upfront to be honest",
+  },
+  {
+    id: "livetail-rescue-beat1", kind: "advance",
+    belief: "Gary, consultant, single, wants a real relationship [confirmed]. Weak belief: Money (spending comfort). First press of this objection — no thread.",
+    // Single-shot beat-1 (no thread) — the MOST common press in production.
+    // Prospect-only tail: the finalized fragment stops mid-objection and the
+    // live tail completes the sticker-shock reveal.
+    latestResponse: "GARY: Yeah... I mean the program sounds right, it's just that twenty grand is\nGARY [live — still being transcribed]: honestly a lot more than I was expecting to spend on this",
+  },
+  {
+    id: "abstain-livetail-midword", kind: "abstain",
+    belief: "Marcus, leaving his W2 [confirmed]. Weak belief: Fear. Mid-exchange — the rep pressed while Marcus is clearly mid-sentence; even the live tail is unfinished.",
+    thread: { beatNumber: 2,
+      linesGiven: ["Good that you're nervous — means it matters."],
+      historyTranscript: "REP: Good that you're nervous — means it matters.\nMARCUS: Yeah I guess..." },
+    // The live tail does NOT complete the thought — combined meaning is still
+    // half a sentence. The model must wait, marker or no marker.
+    latestResponse: "MARCUS: Yeah I guess what scares me is\nMARCUS [live — still being transcribed]: like what if I",
+  },
 ];
 
 async function anthropic(model, system, user, maxTokens) {
@@ -448,6 +485,10 @@ function evaluate(fx, card, j) {
   }
   if (card.abstained) return { pass: false, why: "abstained on a real continuation beat (false silence)" };
   if (!card.line) return { pass: false, why: `no card (${card.error})` };
+  // #41: the live-tail bracket marker must never leak into a spoken line.
+  if (card.line.toLowerCase().includes("[live")) {
+    return { pass: false, why: `live-tail marker leaked into the line: "${card.line}"` };
+  }
   if (j.error) return { pass: false, why: `judge error: ${j.error}` };
   if (fx.kind === "advance") {
     const pass = !j.repeats_prior && j.addresses_latest;
