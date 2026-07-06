@@ -2,11 +2,32 @@
 
 A running log of every major architectural or product decision made on Wingman. Append only — never delete. Each entry captures the decision, the date, the reasoning, and any alternatives that were rejected.
 
-Last updated: 2026-06-30
+Last updated: 2026-07-03
 
 ---
 
 ## 2026
+
+### 2026-07-03 — #41 fix = merge Deepgram partials at press time; stay on Deepgram
+**Decision:** Fix the stale-objection-tail bug by merging Deepgram's partial (unfinalized) transcript stream into the objection-card request AT PRESS TIME, rather than switching providers or moving the whole live pipeline onto partials. Finals remain the authoritative/durable record (DB, summarizer, anchors, cursors); the partial "live tail" is ephemeral and rides only the outgoing request's volatile uncached segment. A ≤350ms settle wait fires only when a partial is <1.5s old.
+**Why:** Measured on 2 real calls — finals lag speech ~500ms median (up to 4.1s); Deepgram partials lag **126ms** and already hold **68%** of press-time missing words. The bug was never the provider — it was that we ignored Deepgram's fast partial stream (and `interim_results` defaulted OFF, so we got zero partials at first). **Rejected: switching to AssemblyAI** — its own claimed ~300ms is slower than measured Deepgram partials; a switch would delete the reconciliation layer but isn't warranted. AssemblyAI stays the accuracy fallback only.
+**Status:** Active — shipped PR #36 (web). Packaged apps get the Electron side on the next desktop release.
+
+---
+
+### 2026-07-03 — Contextual abstain chips replace the generic "no objection detected" card
+**Decision:** When the objection model abstains, return `{"line":null,"reason":<enum>}` and show a short DIRECTIVE chip instead of the generic "no objection detected" — a small fixed set: "They're ready — close now." / "Let them finish." / "Waiting on their response." / "Nothing standing — keep going." / "Just logistics — answer it straight." / "Handled — move forward." Build AFTER #41 lands.
+**Why:** A rep fumbling for a next move while the prospect says "yeah, let's do it" is the most expensive silence on the call — a dead-end "no objection" card wastes it; a "close now" directive is arguably Wingman's highest-value card. Must build on clean input (#41 fixed) or it could flash "close now!" on half-arrived transcript. Chips stay directive, never scripted lines (robot-risk). Keep the set SMALL for reliable classification.
+**Status:** Planned — next objection-slot work after the circle-back fix.
+
+---
+
+### 2026-07-03 — The → close arrow is a PRE-PITCH readiness read, not a mid-action closing button
+**Decision:** Phase 4's → close slot answers "am I clear to pitch? what are my odds of an objectionless close?" — used BEFORE the rep pitches. It is NOT a "give me a closing line" button pressed mid-objection-battle.
+**Why:** Sebastian's framing: once you've pitched, figuring out "should I close yet" is moot — you're already there. The pre-pitch readiness read is the genuinely useful moment. Mid-objection "they're ready, close now" is the abstain-chip's job (above), not this arrow's. This keeps the two features from overlapping and defines how Phase 4 must be built.
+**Status:** Active (guides unbuilt Phase 4).
+
+---
 
 ### 2026-06-30 — Unified the two phase-numbering systems into ONE master roadmap (objection "Phase 1/2/3" → Phase 3.6)
 **Decision:** Collapse the "small" objection-card refinement numbering (its own Phase 1/2/3, from the 06-21 → 06-29 sessions) into the "big" Hotkey Signal-Card Model (Phases 0–5). The small track is renamed **Phase 3.6** — a deepening of the ↑ objection arrow *inside* big-model Phase 3. 3.6a = shipped (Sonnet prompt/KB cut/headless card), 3.6b = confidence-aware summarizer (next), 3.6c = anchor library (deferred). A MASTER ROADMAP table now lives at the top of `Current Sprint.md`; all future build logs use these unified numbers.
