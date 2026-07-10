@@ -12,14 +12,16 @@
 export const BELIEF_LADDER_MODEL = "claude-sonnet-4-6";
 
 // Hard cap on output tokens per summarize tick.
-// Raised from 400 → 600 on 2026-06-06 after live call logs showed consistent
-// 397–400 output, meaning Sonnet was hitting the ceiling every tick. The end of
-// the template (Open Objections, Weakest Link) was likely being truncated.
-// 600 gives ~50% breathing room over the observed natural output size.
-// ⚠️  BETA TUNING: after a few live calls, check actual output counts. If still
-//     hitting 580–600 consistently, raise again. See Wingman Brain/Beta Tuning Parameters.md.
-// Cost impact: +$0.05/call vs the old 400-token cap (negligible).
-export const BELIEF_LADDER_MAX_TOKENS = 600;
+// 400 → 600 (2026-06-06), then 600 → 1200 (2026-07-09): live logs on a real call showed
+// out=600 pinned at the ceiling on EVERY tick → the tail of the template (Open Objections,
+// WEAKEST LINK) was being TRUNCATED — and WEAKEST LINK is exactly what the ↓ Dig card reads
+// to pick which belief to dig. Suffocating the summary starves every live card of context.
+// ⚠️  BETA TUNING (Current Sprint): re-check output counts on the next call. The goal is
+//     COMPLETE-but-not-BLOATED: if it now finishes well under 1200 (e.g. 700–900 with
+//     variance), the cap is right. If it pins at 1200 every tick, the PROMPT is over-writing
+//     (it's meant to be compact/fixed-size) — tighten the prompt rather than raising again.
+// Cost impact: negligible (~a few cents/call).
+export const BELIEF_LADDER_MAX_TOKENS = 1200;
 
 export const BELIEF_LADDER_SYSTEM_PROMPT = `You are Wingman's live-call memory — an elite high-ticket closing coach (Cole Gordon / Jeremy Miner caliber) silently maintaining a running scorecard of a sales call AS IT HAPPENS.
 

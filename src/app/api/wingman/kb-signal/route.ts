@@ -40,6 +40,15 @@ import { generateSignalCard,
 import { streamObjectionCard,
          type ObjectionThread,
          type ObjectionCallMemory }     from "@/lib/wingman/objection-signal";
+import { streamDigCard }                from "@/lib/wingman/dig-signal";
+
+// ── ↓ Dig nudge copy (server owns it — single source). ───────────────────────
+// Shown as headless nudge cards. NOTE (2026-07-07): PLACEHOLDER copy — Sebastian is
+// workshopping the final wording; these are sensible defaults from the 2026-07-07 options.
+const DIG_TAKE_CLOSE_HEADER = "Take the close";
+const DIG_TAKE_CLOSE_TEXT   = "They're ready — stop digging and ask for the sale.";
+const DIG_TOO_EARLY_HEADER  = "Too early to dig";
+const DIG_TOO_EARLY_TEXT    = "Let them talk first.";
 
 // The objection slot streams (SSE). force-dynamic keeps it off any cached/static path;
 // nodejs runtime so the ReadableStream + per-request abort behave predictably on Railway.
@@ -150,6 +159,17 @@ export async function POST(req: NextRequest) {
           signal_type:   "Nudge",
         });
       }
+      // Dig pressed before anyone spoke — a static "too early" nudge, NOT { ok: true }
+      // (which the client would treat as a failed pull and show the retry pill on the
+      // wrong arrow). This is the honest "let them talk first" case.
+      if (activeSlot === "dig") {
+        return NextResponse.json({
+          ok:            true,
+          signal_header: DIG_TOO_EARLY_HEADER,
+          signal_text:   DIG_TOO_EARLY_TEXT,
+          signal_type:   "Nudge",
+        });
+      }
       return NextResponse.json({ ok: true });
     }
 
@@ -257,7 +277,66 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // ── answer / dig / close — raw-chunk KB path, unchanged until Phase 4. ──
+    // ── ↓ Dig slot → STREAMING (SSE) ─────────────────────────────────────────
+    // NO Groq, NO KB. Sonnet reads the Belief Ladder + buffer, picks the weakest belief,
+    // and streams the ONE discovery question. Same immediate-return + run-inside-start()
+    // shape as the objection branch (nothing awaited before return → Next/Railway can't
+    // buffer). Belief resolves first (→ "DIG · <belief>" tag); { line:null } → take-close.
+    if (activeSlot === "dig") {
+      console.log(`[kb-signal] TIMING stream branch=dig idleGap=${idleGap}`);
+      const encoder = new TextEncoder();
+      const stream = new ReadableStream<Uint8Array>({
+        async start(controller) {
+          const send = (event: string, data: unknown): boolean => {
+            try {
+              controller.enqueue(encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`));
+              return true;
+            } catch { return false; } // client gone — stop writing
+          };
+          try { controller.enqueue(encoder.encode(": ok\n\n")); } catch { return; }
+
+          let sawTerminal = false;
+          try {
+            for await (const ev of streamDigCard(transcript_chunk, summary, req.signal)) {
+              let alive = true;
+              if (ev.kind === "belief") {
+                alive = send("belief", { belief: ev.belief ?? null });
+              } else if (ev.kind === "delta") {
+                alive = send("delta", { textSoFar: ev.textSoFar });
+              } else if (ev.kind === "done") {
+                alive = send("done", { line: ev.line, belief: ev.belief ?? null });
+                sawTerminal = true;
+              } else if (ev.kind === "nudge") {
+                // { line:null } → prospect is ready. Static take-the-close nudge.
+                alive = send("nudge", { header: DIG_TAKE_CLOSE_HEADER, text: DIG_TAKE_CLOSE_TEXT });
+                sawTerminal = true;
+              } else {
+                alive = send("error", {});
+                sawTerminal = true;
+              }
+              if (!alive) break; // client disconnected — abort the generator (its finally stops Sonnet)
+            }
+            if (!sawTerminal) send("error", {}); // generator ended w/o terminal
+          } catch (err) {
+            console.error("[kb-signal] dig stream error:", err);
+            send("error", {});
+          } finally {
+            try { controller.close(); } catch { /* already closed */ }
+          }
+        },
+      });
+
+      return new Response(stream, {
+        headers: {
+          "Content-Type":      "text/event-stream; charset=utf-8",
+          "Cache-Control":     "no-cache, no-transform",
+          "Connection":        "keep-alive",
+          "X-Accel-Buffering": "no",
+        },
+      });
+    }
+
+    // ── answer / close — raw-chunk KB path, unchanged until Phase 4b/4c. ──
     const tPipeline  = Date.now();
     let   branch: "kb" | "raw-fallback" = "raw-fallback";
     let   card: SignalCardResult | null = null;

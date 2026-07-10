@@ -219,7 +219,7 @@ export interface WingmanBridge {
   hideHud:       () => Promise<void>;
   sendSignal:    (signal: { header: string; text: string; type: string; seq?: number }) => Promise<void>;
   // Streaming objection card (Step 4) — feed the HUD's constant-rate reveal loop.
-  sendSignalDelta: (payload: { seq: number; phase: "start" | "delta" | "done" | "abort"; textSoFar?: string; type?: string }) => Promise<void>;
+  sendSignalDelta: (payload: { seq: number; phase: "start" | "delta" | "done" | "abort"; textSoFar?: string; type?: string; beliefTag?: string }) => Promise<void>;
   sendScorecard: (scorecard: Record<string, unknown>) => Promise<void>;
   sendStage:     (data: { current: string; all: string[]; completed: string[] }) => Promise<void>;
 

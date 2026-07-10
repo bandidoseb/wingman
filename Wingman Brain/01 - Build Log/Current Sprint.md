@@ -32,12 +32,26 @@ This is the first file Claude reads at session start. It answers: where are we, 
 - 🛡️ **Model-resilience (#44)** — one `models.ts` source of truth + a daily deprecation canary. Own session.
 - 🩹 **Partials (#41)** — stale-objection correctness bug; really an ↑ objection-slot fix (transcript finalization lag).
 - 🎛️ **Card Placement Studio + Notch Mode** (NEW 2026-06-30, POST-STREAMING) — let the rep choose notch vs floating window + customize size/width/drop/text color/text size, via a drag-to-place mock-Zoom customizer in the dashboard, saved as a per-user preset. Inspired by Moody; we take its look/placement, NOT the teleprompter scrolling. Notch only on some Macs → graceful fallback to top-center. Spec: `_Inbox/2026-06-30 Card Placement Studio + Notch Mode.md`.
+- ⭐ **Offer-Aware Wingman — THE MOAT** (NEW 2026-07-07, Sebastian's core conviction) — capture the rep's offer + discovery process in **onboarding** (questionnaire first; AI voice-call later) → inject into the Belief Ladder summarizer so ALL live cards are offer-specific/verbatim/tailored, not generic. **Tier split:** Core = generic Dig-only supplement · Pro = offer-aware (leads early discovery). Generic cards kill trust → churn; tailored = the retention moat no competitor is building. Deferred pending the 4a.1 live test but worth building regardless. **Canonical spec: `07 - North Star/Offer-Aware Wingman — The Moat.md`.**
 
 **Collision killed:** when an older build log says "Phase 1 shipped" (06-29), it meant **3.6a**, NOT big-model Phase 1. All future logs use the unified numbers above.
 
 ---
 
-## 🎯 NEXT SESSION — START HERE (updated 2026-07-02 S2)
+## 🎯 NEXT SESSION — START HERE (updated 2026-07-09)
+
+> **2026-07-09 — Phase 4a.1 (single-shot ↓ Dig) BUILT + live-verified on a real call (branch `phase-4a1-dig`, PR opened; reconcile status with `gh`).** Dig fires end-to-end, `branch=dig`, ~2.3s warm, wingman-reviewer APPROVE, eval green (tonality 4.8/5.0, 100% right-belief, 0 fabrication). Shipped transcript-only (no offer context).
+
+### 🔴 QUEUED FROM THE 2026-07-09 SESSION — each its own FRESH session (don't drag one session on):
+1. **Deploy-detection bug (Known Issue #47) — HIGHEST.** "Video call not detected" + ~8 presses to deploy on a live call. Blocks the core action. Investigate the Recall detection→deploy handshake.
+2. **Verify the summarizer cap fix (Known Issue #48).** Cap raised 600→1200 this session (was truncating WEAKEST LINK, which Dig reads). Re-check output counts on the next call — complete-but-not-bloated (~700–900 = right; pinned at 1200 = tighten the PROMPT instead).
+3. **Offer-Aware Wingman — THE MOAT** (`07 - North Star/Offer-Aware Wingman — The Moat.md`). The real fix for weak early Dig cards. Capture offer + discovery process in onboarding → offer-aware cards. Core=generic / Pro=offer-aware.
+4. **Early Dig prompt polish** — even Core (no offer context) early cards felt generic/"not what I'd say" on a real call. Revisit the dig prompt's early/no-ladder behavior independently of offer-awareness (Core won't have offer context, so the prompt itself must carry more weight early).
+5. **Cut the KB / kb-memory?** — Sebastian 2026-07-09: the ingested-sales-methods KB is scrapped for live cards, and he's now questioning whether to keep it for the Wingman Coach at all (a well-crafted "respond like Cole Gordon" prompt + a little training data may beat retrieval). Meanwhile the 6,554-trigger KB still loads into RAM at server startup (~44s) — wasteful if unused live. Decide: cut KB entirely vs keep for Coach; stop loading it if not needed.
+
+---
+
+## 🎯 (prior) NEXT SESSION — START HERE (updated 2026-07-02 S2)
 
 > ⚠️ **STATUS BELOW IS NOT THE SOURCE OF TRUTH — git/GitHub IS.** Prose notes lag reality: a branch gets
 > merged or a release cut *after* the wrap is written, and nobody rewrites the note. At session start, ALWAYS

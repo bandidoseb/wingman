@@ -127,14 +127,34 @@ export type LeverDecodeState =
   | { status: "none" };
 
 export function decodeLeverStream(raw: string): LeverDecodeState {
-  const keyIdx = raw.indexOf('"lever"');
+  return decodeLeadingStringField(raw, '"lever"');
+}
+
+/**
+ * decodeBeliefStream — Dig-slot sibling of decodeLeverStream for the leading `"belief"` field
+ * of the dig envelope `{"belief":"<Pain|…|Trust>","line":"…"}`. Same contract/semantics:
+ *   - "pending" : the belief key/value hasn't fully arrived AND the line hasn't started.
+ *   - "lever"   : the belief string value closed → `lever` holds it verbatim (caller validates
+ *                 against BELIEF_TAXONOMY). Reuses the LeverDecodeState shape — the `lever`
+ *                 field just carries the belief id; no separate type needed.
+ *   - "none"    : definitively no belief (line reached first, or value null/non-string) →
+ *                 the chrome degrades to a plain "DIG" tag. decodeLineStream is UNTOUCHED and
+ *                 transparent to a preceding field (it locates "line" via its own key search).
+ */
+export function decodeBeliefStream(raw: string): LeverDecodeState {
+  return decodeLeadingStringField(raw, '"belief"');
+}
+
+/** Shared body for the optional leading string field (lever/belief) — pure + idempotent. */
+function decodeLeadingStringField(raw: string, key: string): LeverDecodeState {
+  const keyIdx = raw.indexOf(key);
   if (keyIdx === -1) {
     // No lever key (yet). If the line already resolved/started, the lever is definitively
     // absent (it was instructed to come FIRST) → none. Otherwise still pending.
     return decodeLineStream(raw).status === "pending" ? { status: "pending" } : { status: "none" };
   }
 
-  let i = keyIdx + 7; // past `"lever"`
+  let i = keyIdx + key.length; // past `"lever"` / `"belief"`
   while (i < raw.length && /\s/.test(raw[i])) i++;
   if (i >= raw.length) return { status: "pending" };
   if (raw[i] !== ":") return { status: "none" }; // malformed → no guard, never an error
