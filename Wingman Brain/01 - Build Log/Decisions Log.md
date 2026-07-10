@@ -2,7 +2,7 @@
 
 A running log of every major architectural or product decision made on Wingman. Append only — never delete. Each entry captures the decision, the date, the reasoning, and any alternatives that were rejected.
 
-Last updated: 2026-07-07
+Last updated: 2026-07-09
 
 ---
 
