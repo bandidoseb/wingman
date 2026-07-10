@@ -644,6 +644,10 @@ export default function DashboardClient({
     return () => { window.wingman?.offFlowExpired?.(); };
   }, [isElectron, archiveCurrentFlow, setFlowSynthContext]);
 
+  // Forward ref to the ↓ dig handler (defined below) so handleMenuPick can route to it
+  // without a declaration-order cycle. Assigned in an effect once handleDigPick exists.
+  const handleDigPickRef = useRef<(() => void) | null>(null);
+
   // ── Hotkey compass menu — handle direction pick from Electron main ─────────
   // Called by main.ts when the rep presses a direction key after the Up Arrow
   // summons the compass. Assembles the full context (Belief Ladder + last 120 s
@@ -660,12 +664,15 @@ export default function DashboardClient({
     }
     if (!callId || !isActiveRef.current) return;
 
-    // Phase 3.5 ships only the ↑ objection slot. ← ↓ → are captured by
-    // globalShortcut so they don't fall through to Zoom/Meet; the HUD shows a
-    // brief "coming soon" pill instead of dead air. Phase 4 implements them.
+    // ↓ Dig (Phase 4a) → its own slim handler (shares the guard/throttle/pill refs,
+    // no threading). ← answer · → close are still Phase 4b/4c → "coming soon" pill.
+    if (direction === "dig") {
+      handleDigPickRef.current?.();
+      return;
+    }
     if (direction !== "objection") {
       window.wingman?.sendSummonState({ state: "unsupported", slot: direction });
-      console.log(`[Wingman] Slot "${direction}" not yet implemented — Phase 4`);
+      console.log(`[Wingman] Slot "${direction}" not yet implemented — Phase 4b/4c`);
       return;
     }
 
@@ -1022,10 +1029,200 @@ export default function DashboardClient({
   }, [callId, getRecentTranscript, getTranscriptCursor, getTranscriptSince, liveSummary,
       archiveCurrentFlow, setFlowSynthContext, getFlowRecap, getRecapCursor]);
 
+  // ── ↓ Dig Deeper (Phase 4a.1, single-shot) ─────────────────────────────────
+  // A slim sibling of handleMenuPick: SAME shared refs (isGeneratingRef, lastSummonAtRef,
+  // pendingPressRef/pendingTimerRef, streamAbortRef, seqCounterRef) so cross-slot presses
+  // serialize on one in-flight guard and call-end teardown covers dig — but NO threading,
+  // NO flow-mode IPC, NO belief-freeze, NO live-tail merge. Streams the dig question; a
+  // `belief` frame names the HUD tag ("DIG · PAIN"); a `nudge` = take-the-close.
+  const handleDigPick = useCallback(async () => {
+    const direction = "dig";
+    if (isGeneratingRef.current) {
+      console.log("[Wingman] Dig pick dropped — generation already in flight");
+      return;
+    }
+    if (!callId || !isActiveRef.current) return;
+
+    // Throttle + coalesce — shared refs with the objection path (one thing at a time; a
+    // press inside the window defers ONE coalesced re-fire, never queues N).
+    const sinceLast = Date.now() - lastSummonAtRef.current;
+    if (sinceLast < SUMMON_THROTTLE_MS) {
+      if (!pendingPressRef.current) {
+        pendingPressRef.current = true;
+        window.wingman?.sendSummonState({ state: "thinking", slot: direction });
+        const wait = SUMMON_THROTTLE_MS - sinceLast + 50;
+        pendingTimerRef.current = setTimeout(() => {
+          pendingTimerRef.current = null;
+          pendingPressRef.current = false;
+          if (!isActiveRef.current) return;
+          handleDigPickRef.current?.();
+        }, wait);
+      }
+      return;
+    }
+    lastSummonAtRef.current = Date.now();
+
+    // #41 settle-wait — if a partial landed <1.5s ago the prospect is likely mid-utterance;
+    // hold one beat so the question isn't anchored to half-finished words. (No live-tail
+    // MERGE in 4a.1 — just the wait.) Old app / genuine pause → hotPartialAgeMs()=+Inf → skip.
+    let pillSent = false;
+    if (hotPartialAgeMs() < HOT_PARTIAL_MS) {
+      isGeneratingRef.current = true;
+      window.wingman?.sendSummonState({ state: "thinking", slot: direction });
+      pillSent = true;
+      await new Promise((resolve) => setTimeout(resolve, SETTLE_WAIT_MS));
+      if (!isActiveRef.current) {
+        window.wingman?.sendSummonState({ state: "idle", slot: direction });
+        isGeneratingRef.current = false;
+        return;
+      }
+    }
+
+    const transcriptToSend = getRecentTranscript();
+    const summaryToSend    = liveSummary ?? undefined;
+
+    isGeneratingRef.current = true;
+    const seq = ++seqCounterRef.current;
+    if (!pillSent) window.wingman?.sendSummonState({ state: "thinking", slot: direction });
+
+    // Streaming timeouts — same TTFB/idle discipline as the objection stream (W7).
+    const controller = new AbortController();
+    streamAbortRef.current = controller;
+    const TTFB_MS = 14_000;
+    const IDLE_MS = 7_000;
+    let ttfbTimer: ReturnType<typeof setTimeout> | null = setTimeout(() => controller.abort(), TTFB_MS);
+    let idleTimer: ReturnType<typeof setTimeout> | null = null;
+    const clearTimers = () => {
+      if (ttfbTimer) { clearTimeout(ttfbTimer); ttfbTimer = null; }
+      if (idleTimer) { clearTimeout(idleTimer); idleTimer = null; }
+    };
+    const armIdle = () => {
+      if (idleTimer) clearTimeout(idleTimer);
+      idleTimer = setTimeout(() => controller.abort(), IDLE_MS);
+    };
+
+    // Single idempotent terminal owner — the ONLY place that clears timers, drops the stream
+    // ref, and frees the in-flight guard. Called once from every exit.
+    let released = false;
+    const release = () => {
+      if (released) return;
+      released = true;
+      clearTimers();
+      if (streamAbortRef.current === controller) streamAbortRef.current = null;
+      isGeneratingRef.current = false;
+    };
+    const fail = () => {
+      window.wingman?.sendSignalDelta({ seq, phase: "abort" }); // wipe a half-revealed line
+      window.wingman?.sendSummonState({ state: "error", slot: direction });
+    };
+
+    let beliefTag = "Dig"; // becomes "Dig · PAIN" once the belief frame lands (pre-paint)
+
+    try {
+      const res = await fetch("/api/wingman/kb-signal", {
+        method:  "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ transcript_chunk: transcriptToSend, live_summary: summaryToSend, slot: direction }),
+        signal: controller.signal,
+      });
+
+      if (!res.ok) {
+        if (res.status === 429) {
+          window.wingman?.sendSummonState({ state: "idle", slot: direction });
+        } else {
+          console.error("[Wingman] dig kb-signal request failed:", res.status);
+          fail();
+        }
+        return;
+      }
+
+      const isStream = (res.headers.get("content-type") || "").includes("text/event-stream");
+      if (!isStream) {
+        // pre-Sonnet JSON (too-early nudge). Render it; no card → retry pill.
+        const data = await res.json();
+        const cardText = data.signal_text || data.signal_header;
+        if (cardText && window.wingman) {
+          window.wingman.sendSignal({ header: data.signal_header ?? "", text: data.signal_text ?? "", type: data.signal_type ?? "Nudge", seq });
+        } else {
+          fail();
+        }
+        return;
+      }
+
+      if (!res.body) { fail(); return; }
+      const reader  = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer    = "";
+      let startedReveal = false;
+      let resolved      = false;
+
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const { events, rest } = parseSSEBuffer(buffer);
+        buffer = rest;
+
+        for (const ev of events) {
+          if (ttfbTimer) { clearTimeout(ttfbTimer); ttfbTimer = null; }
+
+          if (ev.event === "belief") {
+            let belief: string | null = null;
+            try { belief = JSON.parse(ev.data)?.belief ?? null; } catch { /* ignore */ }
+            beliefTag = belief ? `Dig · ${belief}` : "Dig";
+          } else if (ev.event === "delta") {
+            let textSoFar = "";
+            try { textSoFar = JSON.parse(ev.data)?.textSoFar ?? ""; } catch { /* ignore */ }
+            if (!textSoFar) continue;
+            armIdle();
+            if (!startedReveal) {
+              startedReveal = true;
+              window.wingman?.sendSignalDelta({ seq, phase: "start", textSoFar, type: "Dig", beliefTag });
+            } else {
+              window.wingman?.sendSignalDelta({ seq, phase: "delta", textSoFar });
+            }
+          } else if (ev.event === "done") {
+            let line = "";
+            try { line = JSON.parse(ev.data)?.line ?? ""; } catch { /* ignore */ }
+            window.wingman?.sendSignalDelta({ seq, phase: startedReveal ? "done" : "start", textSoFar: line, type: "Dig", beliefTag });
+            if (!startedReveal) window.wingman?.sendSignalDelta({ seq, phase: "done", textSoFar: line });
+            resolved = true;
+          } else if (ev.event === "nudge") {
+            // { line:null } → take the close (or the too-early static nudge).
+            let header = "", text = "";
+            try { const d = JSON.parse(ev.data); header = d?.header ?? ""; text = d?.text ?? ""; } catch { /* ignore */ }
+            window.wingman?.sendSignal({ header, text, type: "Nudge", seq });
+            resolved = true;
+          } else if (ev.event === "error") {
+            fail();
+            resolved = true;
+          }
+          if (resolved) break;
+        }
+        if (resolved) break;
+      }
+
+      if (!resolved) {
+        console.warn("[Wingman] dig stream ended without a terminal event — retry pill");
+        fail();
+      }
+    } catch (err) {
+      if (err instanceof Error && err.name === "AbortError") {
+        console.warn("[Wingman] dig stream aborted (timeout / call-end / dismiss).");
+      } else {
+        console.error("[Wingman] handleDigPick error:", err);
+      }
+      fail();
+    } finally {
+      release();
+    }
+  }, [callId, getRecentTranscript, liveSummary]);
+
   // Stable ref so the IPC listener (registered once on mount) always calls
   // the latest handleMenuPick without going stale across renders.
   const handleMenuPickRef = useRef(handleMenuPick);
   useEffect(() => { handleMenuPickRef.current = handleMenuPick; }, [handleMenuPick]);
+  useEffect(() => { handleDigPickRef.current = handleDigPick; }, [handleDigPick]);
 
   useEffect(() => {
     if (typeof window === "undefined" || !window.wingman) return;

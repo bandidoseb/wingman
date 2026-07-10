@@ -731,7 +731,7 @@ function setupIPC(): void {
   });
 
   // ── Streaming reveal delta → HUD (Step 4) — relay only, mirrors hud:signal ──
-  ipcMain.handle("hud:signal-delta", (_event, payload: { seq: number; phase: string; textSoFar?: string; type?: string }) => {
+  ipcMain.handle("hud:signal-delta", (_event, payload: { seq: number; phase: string; textSoFar?: string; type?: string; beliefTag?: string }) => {
     hudWindow?.webContents.send("hud:update-signal-delta", payload);
   });
 

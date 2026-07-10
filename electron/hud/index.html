@@ -954,6 +954,7 @@
       'Topic':   { cls: 'topic',   label: 'Topic'   },
       'Suggest': { cls: 'suggest', label: 'Suggest' },
       'Objection': { cls: 'suggest', label: 'Objection' },
+      'Dig':     { cls: 'suggest', label: 'Dig'     },
     };
 
     // ── State ─────────────────────────────────────────────────────────────
@@ -1512,13 +1513,15 @@
     // the one-shot headless path and the streaming "start" phase (Step 4 / plan review W10),
     // so the streamed card can never look different from the instant one. The caller starts
     // the reveal afterward (one-shot vs streaming differ only in the `complete` flag).
-    function openHeadlessShell(type) {
+    // tagOverride (optional): the dig slot passes "DIG · PAIN" so the tag names the belief.
+    // Absent for objection/others → unchanged behavior (byte-identical for the objection card).
+    function openHeadlessShell(type, tagOverride) {
       hidePill(false);                                   // a card resolves the thinking pill
       const typeInfo = TYPE_MAP[type] || TYPE_MAP['Nudge'];
       currentSignalType = typeInfo.cls;
       clearTimeout(hideSignalTimer);
       signalBubble.classList.remove('hiding');
-      signalTag.textContent = (currentStage || typeInfo.label).toUpperCase();
+      signalTag.textContent = (tagOverride || currentStage || typeInfo.label).toUpperCase();
       clearFlowChrome();  // fresh card starts plain — flow-state after `done` re-applies (Phase C)
       // No-objection nudge shows no tag ("SUGGEST" read wrong — it's an all-clear, not advice).
       signalTag.style.display = (type === 'Nudge') ? 'none' : '';
@@ -1586,7 +1589,7 @@
       if (p.phase === 'start') {
         if (p.seq < currentRevealSeq) return;            // stale start — ignore
         currentRevealSeq = p.seq;
-        openHeadlessShell(p.type || 'Objection');
+        openHeadlessShell(p.type || 'Objection', p.beliefTag);  // beliefTag: dig only (undefined → unchanged)
         startReveal(signalTextEl, p.textSoFar || '', /* complete */ false);
         return;
       }

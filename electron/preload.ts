@@ -83,7 +83,7 @@ contextBridge.exposeInMainWorld("wingman", {
    *   phase "abort" → wipe a half-revealed line (mid-stream drop / dismiss / call-end)
    * The authoritative final frame still also arrives via sendSignal (carrying the same seq).
    */
-  sendSignalDelta: (payload: { seq: number; phase: "start" | "delta" | "done" | "abort"; textSoFar?: string; type?: string }) =>
+  sendSignalDelta: (payload: { seq: number; phase: "start" | "delta" | "done" | "abort"; textSoFar?: string; type?: string; beliefTag?: string }) =>
     ipcRenderer.invoke("hud:signal-delta", payload),
 
   /**
