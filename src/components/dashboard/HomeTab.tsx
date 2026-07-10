@@ -191,10 +191,10 @@ export default function HomeTab({ profile, calls, onDebrief, isActive, isPending
           <div style={{ position: "relative", zIndex: 10, isolation: "isolate", padding: "24px 28px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16 }}>
             <div style={{ flex: 1 }}>
               <div style={{ fontSize: 16, fontWeight: 700, color: "#fff", letterSpacing: "-0.02em", marginBottom: 6 }}>
-                Personalize Wingman
+                Build your Sales DNA
               </div>
               <div style={{ fontSize: 13, color: "rgba(255,255,255,0.55)", lineHeight: 1.55 }}>
-                The more Wingman knows about your offer and close style, the sharper it gets. Tell it who you&apos;re selling to and how you fly.
+                The more Wingman knows your offer and how you sell, the sharper every card gets. Brief it once — who you sell to, and how you run discovery.
               </div>
             </div>
             <button

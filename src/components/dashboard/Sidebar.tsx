@@ -203,7 +203,7 @@ const NAV_ITEMS: Array<{ id: DashboardTab; label: string; icon: (active: boolean
     ),
   },
   {
-    id: "personalize", label: "Personalize",
+    id: "personalize", label: "Sales DNA",
     icon: (active) => (
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
         <g className="sb-sparkle">

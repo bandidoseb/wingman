@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
 import Card from "@/components/ui/Card";
 import SectionLabel from "@/components/ui/SectionLabel";
-import type { Profile } from "@/types";
+import type { Profile, SalesDna, SalesSyntax } from "@/types";
 import { formatPrice } from "@/lib/utils";
 
 interface Props {
@@ -49,7 +49,7 @@ function SaveButton({ saving, saved, onClick }: { saving: boolean; saved: boolea
   );
 }
 
-// ── Your Offer Section ────────────────────────────────────────────────────────
+// ── Your Offer Section (offers table — name/price) ─────────────────────────────
 interface OfferRow { id?: string; name: string; price: string; is_main: boolean; }
 
 function OfferSection({ userId }: { userId: string }) {
@@ -169,78 +169,114 @@ function OfferSection({ userId }: { userId: string }) {
   );
 }
 
-const WEAKNESS_OPTIONS = [
-  { value: "too_much_talking", label: "I talk too much in discovery" },
-  { value: "not_pressing",     label: "I don't press hard enough" },
-  { value: "rush_pitch",       label: "I rush to pitch" },
-  { value: "fold_price",       label: "I fold on price" },
-  { value: "objections",       label: "I struggle with objections" },
+// ── Sales DNA Capture (the moat) ───────────────────────────────────────────────
+function BrainDumpNote() {
+  return (
+    <div style={{ fontSize: 12, color: "#8e8e93", marginBottom: 16, lineHeight: 1.55 }}>
+      The more you dump here, the smarter your Wingman gets — don&apos;t hold back, Wingman will make sense of it.
+    </div>
+  );
+}
+
+function DnaField({ label, star, sub, example, value, onChange }: {
+  label: string; star?: boolean; sub?: string; example: string;
+  value: string; onChange: (v: string) => void;
+}) {
+  return (
+    <div style={{ marginBottom: 18 }}>
+      <div style={{ fontSize: 12.5, color: "#1c1c1e", fontWeight: 600, marginBottom: sub ? 3 : 6, lineHeight: 1.45 }}>
+        {label}{star && <span style={{ color: "#ff9500", marginLeft: 5 }}>★</span>}
+      </div>
+      {sub && <div style={{ fontSize: 11.5, color: "#8e8e93", marginBottom: 7, lineHeight: 1.5 }}>{sub}</div>}
+      <textarea
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={example ? `e.g. ${example}` : ""}
+        rows={3}
+        style={{ ...inputStyle, resize: "vertical", lineHeight: 1.6, minHeight: 64 }}
+      />
+    </div>
+  );
+}
+
+type DnaFieldConfig = { key: keyof SalesDna; label: string; star?: boolean; sub?: string; example: string };
+
+const OFFER_CORE_FIELDS: DnaFieldConfig[] = [
+  { key: "transformation", label: "What do you sell, and what changes for someone after working with you?",
+    example: "People go from stuck at a W2 to doing land deals full-time" },
+  { key: "root_driver", star: true, label: "Boil it all down — what's the ONE thing every client is really chasing?",
+    example: "A monthly cash-flow number that replaces their job" },
+  { key: "emotional_root", label: "Underneath the numbers, what are they really after?",
+    example: "Freedom — being their own boss" },
+  { key: "guarantee", label: "Your guarantee, if you have one",
+    example: "Full refund if you don't get results in 90 days" },
 ];
 
-const DEAL_LOSS_OPTIONS = [
-  { value: "discovery",      label: "Discovery" },
-  { value: "pressing_pain",  label: "Pressing pain" },
-  { value: "pitching",       label: "Pitching" },
-  { value: "price_reveal",   label: "Price reveal" },
-  { value: "partner_spouse", label: "Partner / spouse" },
-  { value: "follow_up",      label: "Follow-up" },
+const DISCOVERY_FIELDS: DnaFieldConfig[] = [
+  { key: "pain", label: "What's the problem almost everyone comes to you with?",
+    example: "Grinding on sales calls themselves and can't scale" },
+  { key: "desire", star: true, label: "People say their goal in different ways. What are the common ones — and what do they really come down to for you?",
+    example: "'Quit my job,' '$10k months,' 'more freedom' — it all comes down to consistent monthly cash flow" },
+  { key: "cost", label: "If nothing changes, what does staying stuck cost them?", sub: "There's never just one cost — it's all over the board. List a handful you hear a lot.",
+    example: "Never retiring comfortably · staying buried in debt · stuck at a job they hate for years" },
+  { key: "doubt", label: "Why can't they just fix this themselves? What've they usually already tried?",
+    example: "Bought courses and watched YouTube but never had a coach in their corner" },
+  { key: "trust", label: "Why is your way different from everything else they've tried?",
+    example: "Everyone teaches theory — we build the system with you and roleplay it live" },
+  { key: "money", label: "How do you know a prospect can actually afford your offer?", sub: "Money comes down to whether they've got the means. What do you ask or look for, so Wingman can tell a real money block from just nerves?",
+    example: "I ask 'do you have money set aside to get started?' then probe the range so I've anchored it before the pitch" },
+  { key: "support", label: "Who else is usually in on the decision, and how often does it come up?",
+    example: "Almost always a spouse — I ask early if they're on board" },
 ];
 
-const LEAD_SOURCE_OPTIONS = [
-  { value: "vsl_webinar", label: "VSL / Webinar" },
-  { value: "referral", label: "Referral" },
-  { value: "organic_content", label: "Organic Content" },
-  { value: "paid_ads", label: "Paid Ads" },
-  { value: "cold_outreach", label: "Cold Outreach" },
-  { value: "other", label: "Other" },
+const SYNTAX_OPTIONS: { value: SalesSyntax; label: string }[] = [
+  { value: "problems", label: "Their problems" },
+  { value: "goals",    label: "Their goals" },
+  { value: "unsure",   label: "Not sure yet" },
 ];
 
-// ── Offer Crawl Section ────────────────────────────────────────────────────────
-function OfferCrawlSection({ profile, userId }: { profile: Profile; userId: string }) {
-  // URL state
-  const [url, setUrl] = useState(profile.offer_url ?? "");
+function SalesDnaCapture({ profile }: { profile: Profile }) {
+  const initial: SalesDna = profile.sales_dna ?? {};
+  const [dna, setDna] = useState<SalesDna>({
+    ...initial,
+    // Legacy pre-fills until the rep sets these in the Sales DNA form itself.
+    guarantee: initial.guarantee ?? profile.guarantee ?? null,
+    trust: initial.trust ?? profile.unique_differentiator ?? null,
+  });
 
-  // Crawl state
+  const [url, setUrl]           = useState(profile.offer_url ?? "");
   const [crawling, setCrawling] = useState(false);
   const [crawlError, setCrawlError] = useState("");
-
-  // Editable fields — always visible
-  const [idealClient, setIdealClient]       = useState(profile.ideal_client ?? "");
-  const [differentiator, setDifferentiator] = useState(profile.unique_differentiator ?? "");
-  const [guarantee, setGuarantee]           = useState(profile.guarantee ?? "");
-
-  // Multi-select lead sources — stored as JSON array string in DB
-  const [leadSources, setLeadSources]         = useState<string[]>(() => {
-    try { return JSON.parse(profile.lead_source ?? "[]"); } catch { return []; }
-  });
-  const [leadSourceOther, setLeadSourceOther] = useState("");
+  const [overview, setOverview] = useState("");   // reference only — never stored, never sent to cards
 
   const [saving, setSaving] = useState(false);
   const [saved, setSaved]   = useState(false);
+  const [error, setError]   = useState("");
 
-  const toggleLeadSource = (value: string) => {
+  const set = (key: keyof SalesDna, val: string) => {
     setSaved(false);
-    setLeadSources((prev) =>
-      prev.includes(value) ? prev.filter((v) => v !== value) : [...prev, value]
-    );
+    setError("");
+    setDna((d) => ({ ...d, [key]: val }));
   };
 
-  const handleCrawl = async () => {
+  // Paste an offer URL → Wingman reads the page and returns a short OVERVIEW as a
+  // memory-jogger. It does NOT fill the fields and is never stored or sent to live
+  // cards — the rep's own words below are the only source of truth. A landing page
+  // never has the insight the rep does; auto-filling from it would just be wrong.
+  const handleAnalyze = async () => {
     if (!url.trim()) return;
     setCrawling(true);
     setCrawlError("");
+    setOverview("");
     try {
       const res = await fetch("/api/wingman/crawl-offer", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url: url.trim(), userId }),
+        body: JSON.stringify({ url: url.trim() }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "Crawl failed");
-      if (data.ideal_client)          setIdealClient(data.ideal_client);
-      if (data.unique_differentiator) setDifferentiator(data.unique_differentiator);
-      if (data.guarantee)             setGuarantee(data.guarantee);
-      setSaved(false);
+      if (!res.ok) throw new Error(data.error ?? "Couldn't read that page");
+      setOverview(typeof data.overview === "string" ? data.overview : "");
     } catch (e: unknown) {
       setCrawlError(e instanceof Error ? e.message : "Something went wrong");
     } finally {
@@ -248,283 +284,134 @@ function OfferCrawlSection({ profile, userId }: { profile: Profile; userId: stri
     }
   };
 
+  // Full-blob save: only non-empty fields are sent, and the server REPLACES the
+  // whole jsonb — so clearing a field here removes it from storage. Saving from
+  // either card persists both (shared state), so no card can clobber the other.
   const handleSave = async () => {
     setSaving(true);
-    // Merge "other" custom text into the array
-    const finalSources = leadSources.includes("other") && leadSourceOther.trim()
-      ? [...leadSources.filter((v) => v !== "other"), `other:${leadSourceOther.trim()}`]
-      : leadSources;
-
-    await fetch("/api/profile/update", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        updates: {
-          offer_url:             url.trim() || null,
-          ideal_client:          idealClient.trim() || null,
-          unique_differentiator: differentiator.trim() || null,
-          guarantee:             guarantee.trim() || null,
-          lead_source:           finalSources.length > 0 ? JSON.stringify(finalSources) : null,
-        },
-      }),
+    setError("");
+    const payload: Record<string, string> = {};
+    (Object.keys(dna) as (keyof SalesDna)[]).forEach((k) => {
+      const v = dna[k];
+      if (typeof v === "string" && v.trim()) payload[k] = v.trim();
     });
+    let ok = false;
+    try {
+      const res = await fetch("/api/profile/update", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ updates: { sales_dna: payload, offer_url: url.trim() || null } }),
+      });
+      ok = res.ok;
+      if (!ok) console.error("[SalesDna] save failed:", res.status, await res.text().catch(() => ""));
+    } catch (err) {
+      console.error("[SalesDna] save network error:", err);
+    }
     setSaving(false);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 3000);
+    if (ok) {
+      setSaved(true);
+      setTimeout(() => setSaved(false), 3000);
+    } else {
+      setError("Couldn't save — check your connection and try again.");
+    }
   };
 
+  const errorLine = error
+    ? <div style={{ fontSize: 12, color: "#c0392b", marginTop: 10 }}>⚠ {error}</div>
+    : null;
+
   return (
-    <Card style={{ marginBottom: 12 }}>
-      <SectionLabel>Offer Intelligence</SectionLabel>
-      <div style={{ fontSize: 12, color: "#8e8e93", marginBottom: 12, lineHeight: 1.5 }}>
-        Paste your offer page URL and Wingman will auto-fill what it learns. Edit anything before saving.
-      </div>
+    <>
+      {/* The Core — offer essence (+ URL auto-fill) */}
+      <Card style={{ marginBottom: 12 }}>
+        <SectionLabel>The Core</SectionLabel>
+        <BrainDumpNote />
 
-      {/* URL + crawl button */}
-      <div style={{ display: "flex", gap: 8, marginBottom: crawlError ? 8 : 20 }}>
-        <input
-          value={url}
-          onChange={(e) => { setUrl(e.target.value); setSaved(false); }}
-          placeholder="https://yoursite.com/offer"
-          style={{ ...inputStyle, flex: 1 }}
-        />
-        <button
-          onClick={handleCrawl}
-          disabled={crawling || !url.trim()}
-          style={{
-            background: crawling || !url.trim() ? "#e5e5ea" : "#1c1c1e",
-            color: crawling || !url.trim() ? "#8e8e93" : "#fff",
-            border: "none",
-            borderRadius: 10,
-            padding: "0 16px",
-            fontSize: 13,
-            fontWeight: 600,
-            fontFamily: "inherit",
-            cursor: crawling || !url.trim() ? "not-allowed" : "pointer",
-            flexShrink: 0,
-            whiteSpace: "nowrap",
-          }}
-        >
-          {crawling ? "Reading…" : "Auto-fill ↑"}
-        </button>
-      </div>
-
-      {crawlError && (
-        <div style={{ fontSize: 12, color: "#c0392b", marginBottom: 12 }}>
-          ⚠ {crawlError}
+        {/* Offer URL → overview (reference only) */}
+        <div style={{ fontSize: 11.5, color: "#8e8e93", marginBottom: 7, lineHeight: 1.5 }}>
+          Got an offer page? Paste it and Wingman will pull a quick overview to jog your memory. It&apos;s just a reference — only what you write below reaches your live Wingman.
         </div>
-      )}
-
-      <div style={{ height: 1, background: "rgba(0,0,0,0.06)", marginBottom: 16 }} />
-
-      {/* Who you sell to */}
-      <div style={{ fontSize: 11, color: "#8e8e93", fontWeight: 500, marginBottom: 6 }}>Who you sell to</div>
-      <textarea
-        value={idealClient}
-        onChange={(e) => { setIdealClient(e.target.value); setSaved(false); }}
-        placeholder="e.g. Online coaches doing $5–20k/month who want to scale without burning out"
-        rows={2}
-        style={{ ...inputStyle, resize: "none", lineHeight: 1.6, marginBottom: 12 }}
-      />
-
-      {/* Differentiator */}
-      <div style={{ fontSize: 11, color: "#8e8e93", fontWeight: 500, marginBottom: 6 }}>What makes your offer different</div>
-      <textarea
-        value={differentiator}
-        onChange={(e) => { setDifferentiator(e.target.value); setSaved(false); }}
-        placeholder="e.g. The only program with a guaranteed signed client in 30 days or you don't pay"
-        rows={2}
-        style={{ ...inputStyle, resize: "none", lineHeight: 1.6, marginBottom: 12 }}
-      />
-
-      {/* Guarantee */}
-      <div style={{ fontSize: 11, color: "#8e8e93", fontWeight: 500, marginBottom: 6 }}>Your guarantee (if any)</div>
-      <input
-        value={guarantee}
-        onChange={(e) => { setGuarantee(e.target.value); setSaved(false); }}
-        placeholder="e.g. Full refund if you don't get results in 90 days"
-        style={{ ...inputStyle, marginBottom: 16 }}
-      />
-
-      {/* Lead source — multi-select */}
-      <div style={{ fontSize: 11, color: "#8e8e93", fontWeight: 500, marginBottom: 10 }}>
-        Where do your leads come from? <span style={{ fontWeight: 400 }}>(select all that apply)</span>
-      </div>
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: leadSources.includes("other") ? 8 : 4 }}>
-        {LEAD_SOURCE_OPTIONS.map((opt) => {
-          const active = leadSources.includes(opt.value);
-          return (
-            <button
-              key={opt.value}
-              onClick={() => toggleLeadSource(opt.value)}
-              style={{
-                padding: "7px 14px",
-                borderRadius: 20,
-                border: active ? "1.5px solid #1c1c1e" : "1.5px solid rgba(0,0,0,0.12)",
-                background: active ? "#1c1c1e" : "transparent",
-                color: active ? "#fff" : "#3a3a3c",
-                fontSize: 12,
-                fontWeight: 500,
-                fontFamily: "inherit",
-                cursor: "pointer",
-                transition: "all 0.15s ease",
-              }}
-            >
-              {opt.label}
-            </button>
-          );
-        })}
-      </div>
-      {leadSources.includes("other") && (
-        <input
-          value={leadSourceOther}
-          onChange={(e) => { setLeadSourceOther(e.target.value); setSaved(false); }}
-          placeholder="Describe your lead source…"
-          style={{ ...inputStyle, marginTop: 4, marginBottom: 4 }}
-        />
-      )}
-
-      <SaveButton saving={saving} saved={saved} onClick={handleSave} />
-    </Card>
-  );
-}
-
-// ── Call Coaching Section ──────────────────────────────────────────────────────
-function CallCoachingSection({ profile }: { profile: Profile }) {
-  const [weaknesses,      setWeaknesses]      = useState<string[]>(() => { try { return JSON.parse(profile.call_weakness   ?? "[]"); } catch { return []; } });
-  const [dealLoss,        setDealLoss]        = useState<string[]>(() => { try { return JSON.parse(profile.deal_loss_stage ?? "[]"); } catch { return []; } });
-
-  const [weaknessInput,   setWeaknessInput]   = useState("");
-  const [weaknessAdding,  setWeaknessAdding]  = useState(false);
-  const [weaknessHovered, setWeaknessHovered] = useState<string | null>(null);
-
-  const [dealLossInput,   setDealLossInput]   = useState("");
-  const [dealLossAdding,  setDealLossAdding]  = useState(false);
-  const [dealLossHovered, setDealLossHovered] = useState<string | null>(null);
-
-  const [saving, setSaving] = useState(false);
-  const [saved,  setSaved]  = useState(false);
-
-  const toggle = (arr: string[], set: (v: string[]) => void, value: string) => {
-    setSaved(false);
-    set(arr.includes(value) ? arr.filter(v => v !== value) : [...arr, value]);
-  };
-
-  const addCustom = (
-    arr: string[], set: (v: string[]) => void,
-    input: string, setInput: (v: string) => void, setAdding: (v: boolean) => void
-  ) => {
-    const val = input.trim();
-    if (val && !arr.includes(val)) { set([...arr, val]); setSaved(false); }
-    setInput(""); setAdding(false);
-  };
-
-  const handleSave = async () => {
-    setSaving(true);
-    await fetch("/api/profile/update", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        updates: {
-          call_weakness:   weaknesses.length > 0 ? JSON.stringify(weaknesses) : null,
-          deal_loss_stage: dealLoss.length   > 0 ? JSON.stringify(dealLoss)   : null,
-        },
-      }),
-    });
-    setSaving(false); setSaved(true);
-    setTimeout(() => setSaved(false), 3000);
-  };
-
-  const activePillStyle: React.CSSProperties = {
-    padding: "7px 14px", borderRadius: 20,
-    border: "1.5px solid #1c1c1e", background: "#1c1c1e",
-    color: "#fff", fontSize: 12, fontWeight: 500, fontFamily: "inherit",
-    cursor: "pointer", transition: "all 0.15s ease",
-    display: "inline-flex", alignItems: "center", gap: 5,
-  };
-  const inactivePillStyle: React.CSSProperties = {
-    ...activePillStyle, border: "1.5px solid rgba(0,0,0,0.12)",
-    background: "transparent", color: "#3a3a3c",
-  };
-  const addPillStyle: React.CSSProperties = {
-    ...inactivePillStyle, border: "1.5px dashed rgba(0,0,0,0.18)", color: "#8e8e93",
-  };
-
-  const renderPills = (
-    options: { value: string; label: string }[],
-    selected: string[], setSelected: (v: string[]) => void,
-    adding: boolean, setAdding: (v: boolean) => void,
-    inputVal: string, setInputVal: (v: string) => void,
-    hovered: string | null, setHovered: (v: string | null) => void,
-  ) => {
-    const customItems = selected.filter(v => !options.find(o => o.value === v));
-    return (
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-        {options.map(opt => (
-          <button key={opt.value} onClick={() => toggle(selected, setSelected, opt.value)}
-            style={selected.includes(opt.value) ? activePillStyle : inactivePillStyle}>
-            {opt.label}
-          </button>
-        ))}
-        {customItems.map(v => (
-          <button key={v}
-            onMouseEnter={() => setHovered(v)} onMouseLeave={() => setHovered(null)}
-            onClick={() => { setSaved(false); setSelected(selected.filter(x => x !== v)); }}
-            style={activePillStyle}>
-            {v}
-            {hovered === v && <span style={{ fontSize: 10, opacity: 0.65 }}>✕</span>}
-          </button>
-        ))}
-        {!adding ? (
-          <button onClick={() => setAdding(true)} style={addPillStyle}>+ Add your own</button>
-        ) : (
-          <input autoFocus value={inputVal} onChange={e => setInputVal(e.target.value)}
-            onKeyDown={e => {
-              if (e.key === "Enter") addCustom(selected, setSelected, inputVal, setInputVal, setAdding);
-              if (e.key === "Escape") { setAdding(false); setInputVal(""); }
-            }}
-            onBlur={() => {
-              if (inputVal.trim()) addCustom(selected, setSelected, inputVal, setInputVal, setAdding);
-              else { setAdding(false); setInputVal(""); }
-            }}
-            placeholder="Type and press enter…"
-            style={{ ...inputStyle, width: 180, padding: "6px 12px", fontSize: 12 }}
+        <div style={{ display: "flex", gap: 8, marginBottom: crawlError ? 8 : (overview ? 12 : 20) }}>
+          <input
+            value={url}
+            onChange={(e) => { setUrl(e.target.value); setSaved(false); }}
+            placeholder="https://yoursite.com/offer"
+            style={{ ...inputStyle, flex: 1 }}
           />
+          <button
+            onClick={handleAnalyze}
+            disabled={crawling || !url.trim()}
+            style={{
+              background: crawling || !url.trim() ? "#e5e5ea" : "#1c1c1e",
+              color: crawling || !url.trim() ? "#8e8e93" : "#fff",
+              border: "none", borderRadius: 10, padding: "0 16px",
+              fontSize: 13, fontWeight: 600, fontFamily: "inherit",
+              cursor: crawling || !url.trim() ? "not-allowed" : "pointer",
+              flexShrink: 0, whiteSpace: "nowrap",
+            }}
+          >
+            {crawling ? "Reading…" : "Analyze ↑"}
+          </button>
+        </div>
+        {crawlError && <div style={{ fontSize: 12, color: "#c0392b", marginBottom: 12 }}>⚠ {crawlError}</div>}
+        {overview && (
+          <div style={{ background: "#f7f7fb", border: "1px solid rgba(0,0,0,0.06)", borderRadius: 10, padding: "12px 14px", marginBottom: 20 }}>
+            <div style={{ fontSize: 10.5, color: "#aeaeb2", fontWeight: 600, letterSpacing: "0.05em", textTransform: "uppercase", marginBottom: 6 }}>
+              What Wingman found on your page · reference only
+            </div>
+            <div style={{ fontSize: 12.5, color: "#3a3a3c", lineHeight: 1.6, whiteSpace: "pre-wrap" }}>{overview}</div>
+          </div>
         )}
-      </div>
-    );
-  };
 
-  return (
-    <Card style={{ marginBottom: 12 }}>
-      <SectionLabel>Call Coaching</SectionLabel>
+        {OFFER_CORE_FIELDS.map((f) => (
+          <DnaField key={f.key} label={f.label} star={f.star} sub={f.sub} example={f.example}
+            value={String(dna[f.key] ?? "")} onChange={(v) => set(f.key, v)} />
+        ))}
+        <SaveButton saving={saving} saved={saved} onClick={handleSave} />
+        {errorLine}
+      </Card>
 
-      <div style={{ fontSize: 11, color: "#8e8e93", fontWeight: 500, marginBottom: 10 }}>
-        What&apos;s your biggest weakness on calls?{" "}
-        <span style={{ fontWeight: 400 }}>(select all that apply)</span>
-      </div>
-      {renderPills(
-        WEAKNESS_OPTIONS, weaknesses, setWeaknesses,
-        weaknessAdding, setWeaknessAdding,
-        weaknessInput, setWeaknessInput,
-        weaknessHovered, setWeaknessHovered,
-      )}
+      {/* Your Discovery — how the beliefs show up (Q4–Q11) */}
+      <Card style={{ marginBottom: 12 }}>
+        <SectionLabel>Your Discovery</SectionLabel>
+        <BrainDumpNote />
 
-      <div style={{ height: 1, background: "rgba(0,0,0,0.06)", margin: "16px 0" }} />
+        {/* Syntax toggle */}
+        <div style={{ marginBottom: 20 }}>
+          <div style={{ fontSize: 12.5, color: "#1c1c1e", fontWeight: 600, marginBottom: 3, lineHeight: 1.45 }}>
+            On a call, do you open on their problems or their goals first?
+          </div>
+          <div style={{ fontSize: 11.5, color: "#8e8e93", marginBottom: 9, lineHeight: 1.5 }}>
+            Some reps start with what&apos;s going wrong; others start with the dream. Both work — we just match how you run it.
+          </div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+            {SYNTAX_OPTIONS.map((opt) => {
+              const active = dna.syntax === opt.value;
+              return (
+                <button key={opt.value} onClick={() => set("syntax", opt.value)}
+                  style={{
+                    padding: "7px 14px", borderRadius: 20,
+                    border: active ? "1.5px solid #1c1c1e" : "1.5px solid rgba(0,0,0,0.12)",
+                    background: active ? "#1c1c1e" : "transparent",
+                    color: active ? "#fff" : "#3a3a3c",
+                    fontSize: 12, fontWeight: 500, fontFamily: "inherit", cursor: "pointer",
+                    transition: "all 0.15s ease",
+                  }}>
+                  {opt.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
 
-      <div style={{ fontSize: 11, color: "#8e8e93", fontWeight: 500, marginBottom: 10 }}>
-        Where do you lose most deals?{" "}
-        <span style={{ fontWeight: 400 }}>(select all that apply)</span>
-      </div>
-      {renderPills(
-        DEAL_LOSS_OPTIONS, dealLoss, setDealLoss,
-        dealLossAdding, setDealLossAdding,
-        dealLossInput, setDealLossInput,
-        dealLossHovered, setDealLossHovered,
-      )}
-
-      <SaveButton saving={saving} saved={saved} onClick={handleSave} />
-    </Card>
+        {DISCOVERY_FIELDS.map((f) => (
+          <DnaField key={f.key} label={f.label} star={f.star} sub={f.sub} example={f.example}
+            value={String(dna[f.key] ?? "")} onChange={(v) => set(f.key, v)} />
+        ))}
+        <SaveButton saving={saving} saved={saved} onClick={handleSave} />
+        {errorLine}
+      </Card>
+    </>
   );
 }
 
@@ -533,13 +420,12 @@ export default function PersonalizeTab({ profile, userId }: Props) {
   return (
     <div style={{ maxWidth: 580, margin: "0 auto" }}>
       <div style={{ marginBottom: 24 }}>
-        <div style={{ fontSize: 26, fontWeight: 700, color: "#1c1c1e", letterSpacing: "-0.03em" }}>Personalize Wingman.</div>
-        <div style={{ fontSize: 14, color: "#8e8e93", marginTop: 3 }}>The more it knows, the sharper it gets.</div>
+        <div style={{ fontSize: 26, fontWeight: 700, color: "#1c1c1e", letterSpacing: "-0.03em" }}>Sales DNA.</div>
+        <div style={{ fontSize: 14, color: "#8e8e93", marginTop: 3 }}>The more Wingman knows your offer and how you sell, the sharper every card gets.</div>
       </div>
 
       <OfferSection userId={userId} />
-      <OfferCrawlSection profile={profile} userId={userId} />
-      <CallCoachingSection profile={profile} />
+      <SalesDnaCapture profile={profile} />
     </div>
   );
 }

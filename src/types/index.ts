@@ -42,6 +42,7 @@ export interface Profile {
   lead_source?: string | null;
   call_weakness?: string | null;
   deal_loss_stage?: string | null;
+  sales_dna?: SalesDna | null;
   chat_messages_today?: number;
   chat_reset_date?: string | null;
   zoom_display_name?: string | null;
@@ -49,6 +50,51 @@ export interface Profile {
   compliance_acknowledged_ip?: string | null;
   created_at: string;
   updated_at: string;
+}
+
+// ── Sales DNA ────────────────────────────────────────────────────────────────
+// Per-user offer + discovery capture (the "Offer-Aware Wingman" moat). Stored as
+// a single flexible jsonb blob on profiles.sales_dna so question edits need no
+// migration. Every field optional — a rep can brain-dump some now, more later.
+// Design: Wingman Brain/07 - North Star/Sales DNA Capture — Design.md
+export type SalesSyntax = "problems" | "goals" | "unsure";
+
+export interface SalesDna {
+  // Your Offer (the anchor)
+  transformation?: string | null;   // Q1 — what you sell + before→after
+  root_driver?: string | null;      // Q2 ⭐ the one thing every client is chasing
+  emotional_root?: string | null;   // Q3 — what they're really after underneath
+  guarantee?: string | null;        // offer guarantee / risk-reversal
+  // Your Discovery (how the beliefs show up — internal tags, never surfaced)
+  syntax?: SalesSyntax | null;      // Q4 — open on problems or goals
+  pain?: string | null;             // Q5
+  desire?: string | null;           // Q6 ⭐ manifestations + chunk-down to root
+  cost?: string | null;             // Q7 — several costs of staying stuck
+  doubt?: string | null;            // Q8
+  trust?: string | null;            // Q9 — why your way is different
+  money?: string | null;            // Q10 — how you know they can afford it
+  support?: string | null;          // Q11
+}
+
+// The essential fields that gate Deploy (Phase 1c). Offer name/price live in the
+// `offers` table and are checked separately — this covers only the sales_dna blob.
+// Single source of truth: the dashboard AND the deploy gate both import these so
+// the definition of "briefed" can never drift between them.
+export const SALES_DNA_ESSENTIALS: (keyof SalesDna)[] = [
+  "transformation",
+  "root_driver",
+  "pain",
+  "desire",
+];
+
+export function salesDnaEssentialsMissing(dna: SalesDna | null | undefined): (keyof SalesDna)[] {
+  const d = dna ?? {};
+  return SALES_DNA_ESSENTIALS.filter((k) => !String(d[k] ?? "").trim());
+}
+
+/** True when every gating essential in the sales_dna blob has content. */
+export function salesDnaComplete(dna: SalesDna | null | undefined): boolean {
+  return salesDnaEssentialsMissing(dna).length === 0;
 }
 
 export interface Offer {
