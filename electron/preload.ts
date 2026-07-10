@@ -48,6 +48,10 @@ let _outcomeUpdatedHandler:   ((_e: Electron.IpcRendererEvent) => void) | null =
 let _menuPickHandler:         ((_e: Electron.IpcRendererEvent, direction: string) => void) | null = null;
 // Phase C: main's 2-min flow idle timer expired — renderer archives + resets its thread
 let _flowExpiredHandler:      ((_e: Electron.IpcRendererEvent) => void) | null = null;
+// #47: main pushes the Deploy phase (idle/searching/starting/live/stopping) so the
+// dashboard button + HUD reflect it. Separate handler refs per surface (wingman/hud).
+let _deployStateHandler:      ((_e: Electron.IpcRendererEvent, payload: { state: string; reason?: string }) => void) | null = null;
+let _hudDeployStateHandler:   ((_e: Electron.IpcRendererEvent, payload: { state: string; reason?: string }) => void) | null = null;
 
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -59,6 +63,27 @@ contextBridge.exposeInMainWorld("wingman", {
 
   /** Called when user ends a live call. Stops audio capture + shows HUD outcome card. */
   endCall: (callId?: string, token?: string) => ipcRenderer.invoke("call:end", callId, token),
+
+  // ── Deploy state machine (#47) ───────────────────────────────────────────
+  /**
+   * Subscribe to Deploy phase updates pushed by main:
+   *   "idle" | "searching" | "starting" | "live" | "stopping"  (+ optional reason
+   *   on terminal frames: no_meeting | no_auth | recording_failed | cancelled).
+   * Drives the Deploy button's label/spinner/cancel affordance ONLY — never routing.
+   */
+  onDeployState: (callback: (payload: { state: string; reason?: string }) => void) => {
+    if (_deployStateHandler) ipcRenderer.removeListener("deploy:state", _deployStateHandler);
+    _deployStateHandler = (_e, payload) => callback(payload);
+    ipcRenderer.on("deploy:state", _deployStateHandler);
+  },
+  offDeployState: () => {
+    if (_deployStateHandler) {
+      ipcRenderer.removeListener("deploy:state", _deployStateHandler);
+      _deployStateHandler = null;
+    }
+  },
+  /** Cancel an in-flight Deploy search (while "searching"). */
+  cancelSearch: () => ipcRenderer.invoke("deploy:cancel-search"),
 
   // ── HUD control ─────────────────────────────────────────────────────────
   /** Show the floating HUD overlay */
@@ -329,6 +354,16 @@ contextBridge.exposeInMainWorld("hud", {
   dismissDetection: () => ipcRenderer.invoke("hud:dismiss-detection"),
 
   deployCall: () => ipcRenderer.invoke("hud:deploy-call"),
+
+  // ── Deploy state machine (#47) → HUD ─────────────────────────────────────
+  /** Deploy phase pushed by main so the HUD toast shows Looking…/Starting… + Cancel. */
+  onDeployState: (callback: (payload: { state: string; reason?: string }) => void) => {
+    if (_hudDeployStateHandler) ipcRenderer.removeListener("deploy:state", _hudDeployStateHandler);
+    _hudDeployStateHandler = (_e, payload) => callback(payload);
+    ipcRenderer.on("deploy:state", _hudDeployStateHandler);
+  },
+  /** Cancel an in-flight Deploy search from the HUD. */
+  cancelSearch: () => ipcRenderer.invoke("deploy:cancel-search"),
 
   onManualTrigger: (callback: () => void) => {
     ipcRenderer.on("hud:manual-trigger", () => callback());

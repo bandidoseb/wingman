@@ -2,13 +2,19 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
 // ── Rate limiting ─────────────────────────────────────────────────────────────
-// Prevents a leaked or replayed Supabase access token from minting unlimited
-// Recall AI upload tokens (Recall AI charges per recording minute).
-// One token per user per 30 seconds is far more than any legitimate use case needs.
-// NOTE: This map lives in-process. On a single Railway server this is sufficient
-// for beta. For multi-instance deployments, swap for a Redis-backed rate limiter.
-const tokenRateLimit = new Map<string, number>();
-const RATE_LIMIT_MS  = 30 * 1000; // 30 seconds between tokens per user
+// Purpose: stop a leaked/replayed Supabase access token from minting UNLIMITED
+// Recall AI upload tokens (abuse guard — Recall bills per recorded minute). It is
+// NOT a product limit on normal use.
+//
+// Rolling-window burst limiter, per Supabase user id: up to RATE_MAX_STARTS starts
+// per RATE_WINDOW_MS. Generous on purpose — a dropped call that the rep redeploys
+// immediately must NOT get blocked. The old "1 per 30s" broke exactly that case.
+// Per-user, so different users on different machines never affect each other.
+// NOTE: in-process Map — fine for single-instance beta. Swap for Redis if Railway
+// ever runs multiple instances (each would otherwise keep its own window).
+const tokenStarts    = new Map<string, number[]>(); // userId → recent start timestamps (ms)
+const RATE_WINDOW_MS = 60 * 1000; // rolling 60-second window
+const RATE_MAX_STARTS = 6;        // up to 6 call-starts per user per rolling minute
 
 /**
  * POST /api/wingman/recall-upload-token
@@ -45,17 +51,18 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // ── 2. Rate limit: one upload token per user per 30 seconds ──────────────
-    const now       = Date.now();
-    const lastMint  = tokenRateLimit.get(user.id) ?? 0;
-    if (now - lastMint < RATE_LIMIT_MS) {
-      console.warn(`[recall-upload-token] Rate limit hit for user ${user.id}`);
+    // ── 2. Rate limit: burst of RATE_MAX_STARTS per user per rolling minute ──
+    const now    = Date.now();
+    const recent = (tokenStarts.get(user.id) ?? []).filter((t) => now - t < RATE_WINDOW_MS);
+    if (recent.length >= RATE_MAX_STARTS) {
+      console.warn(`[recall-upload-token] Rate limit hit for user ${user.id} (${recent.length} starts in ${RATE_WINDOW_MS / 1000}s)`);
       return NextResponse.json(
         { error: "Too many requests — please wait a moment before starting a new call" },
         { status: 429 }
       );
     }
-    tokenRateLimit.set(user.id, now);
+    recent.push(now);
+    tokenStarts.set(user.id, recent);
 
     // ── 4. Verify server has the Recall AI key configured ────────────────────
     const recallApiKey = process.env.RECALL_AI_API_KEY;

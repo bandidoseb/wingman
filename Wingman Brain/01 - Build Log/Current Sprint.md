@@ -38,16 +38,17 @@ This is the first file Claude reads at session start. It answers: where are we, 
 
 ---
 
-## 🎯 NEXT SESSION — START HERE (updated 2026-07-09)
+## 🎯 NEXT SESSION — START HERE (updated 2026-07-10)
 
-> **2026-07-09 — Phase 4a.1 (single-shot ↓ Dig) BUILT + live-verified on a real call (branch `phase-4a1-dig`, PR opened; reconcile status with `gh`).** Dig fires end-to-end, `branch=dig`, ~2.3s warm, wingman-reviewer APPROVE, eval green (tonality 4.8/5.0, 100% right-belief, 0 fabrication). Shipped transcript-only (no offer context).
+> **2026-07-10 — #47 Deploy state machine BUILT + reviewed + live-verified ("everything looks good"), but NOT YET PUSHED.** 🔴 **FIRST THING NEXT SESSION: reconcile with git/`gh`** — if the branch/PR still isn't up, the immediate task is to **branch → commit → PR the #47 work** (9 files, all uncommitted locally at wrap; see `2026-07-10.md`). Needs Sebastian's explicit go (Hard Rule #0). After merge → Railway gets the web bits; the HUD chrome (card states, toast, swipe hint) needs a **desktop release** to reach packaged apps. The instrumented probe was already stripped; typechecks green.
 
-### 🔴 QUEUED FROM THE 2026-07-09 SESSION — each its own FRESH session (don't drag one session on):
-1. **Deploy-detection bug (Known Issue #47) — HIGHEST.** "Video call not detected" + ~8 presses to deploy on a live call. Blocks the core action. Investigate the Recall detection→deploy handshake.
-2. **Verify the summarizer cap fix (Known Issue #48).** Cap raised 600→1200 this session (was truncating WEAKEST LINK, which Dig reads). Re-check output counts on the next call — complete-but-not-bloated (~700–900 = right; pinned at 1200 = tighten the PROMPT instead).
-3. **Offer-Aware Wingman — THE MOAT** (`07 - North Star/Offer-Aware Wingman — The Moat.md`). The real fix for weak early Dig cards. Capture offer + discovery process in onboarding → offer-aware cards. Core=generic / Pro=offer-aware.
-4. **Early Dig prompt polish** — even Core (no offer context) early cards felt generic/"not what I'd say" on a real call. Revisit the dig prompt's early/no-ladder behavior independently of offer-awareness (Core won't have offer context, so the prompt itself must carry more weight early).
-5. **Cut the KB / kb-memory?** — Sebastian 2026-07-09: the ingested-sales-methods KB is scrapped for live cards, and he's now questioning whether to keep it for the Wingman Coach at all (a well-crafted "respond like Cole Gordon" prompt + a little training data may beat retrieval). Meanwhile the 6,554-trigger KB still loads into RAM at server startup (~44s) — wasteful if unused live. Decide: cut KB entirely vs keep for Coach; stop loading it if not needed.
+### 🔴 QUEUED — each its own FRESH session (don't drag one session on):
+0. **PUSH #47** (above) — branch/PR the completed, reviewed Deploy state-machine work. Then a desktop release to ship the HUD chrome.
+1. **Verify the summarizer cap fix (Known Issue #48).** Cap raised 600→1200 this session (was truncating WEAKEST LINK, which Dig reads). Re-check output counts on the next call — complete-but-not-bloated (~700–900 = right; pinned at 1200 = tighten the PROMPT instead).
+2. **Offer-Aware Wingman — THE MOAT** (`07 - North Star/Offer-Aware Wingman — The Moat.md`). The real fix for weak early Dig cards. Capture offer + discovery process in onboarding → offer-aware cards. Core=generic / Pro=offer-aware.
+3. **Early Dig prompt polish** — even Core (no offer context) early cards felt generic/"not what I'd say" on a real call. Revisit the dig prompt's early/no-ladder behavior independently of offer-awareness (Core won't have offer context, so the prompt itself must carry more weight early).
+4. **Cut the KB / kb-memory?** — Sebastian 2026-07-09: the ingested-sales-methods KB is scrapped for live cards, and he's now questioning whether to keep it for the Wingman Coach at all (a well-crafted "respond like Cole Gordon" prompt + a little training data may beat retrieval). Meanwhile the 6,554-trigger KB still loads into RAM at server startup (~44s) — wasteful if unused live. Decide: cut KB entirely vs keep for Coach; stop loading it if not needed.
+5. **Calendar-based detection (Google Calendar) — its own session (Sebastian 2026-07-10).** Recall's Desktop SDK only detects the Zoom/Meet window when it's on the current macOS Space (documented SDK limit) — reps must swipe to the call window for Deploy to fire. Hook Wingman to Google Calendar so it detects the meeting from the calendar instead, getting Granola's "just works" feel WITHOUT losing Recall's per-speaker separation (which Granola's system-audio approach lacks and which Wingman needs). Ties into the Call Continuity + Prospect Memory roadmap. Interim mitigation already shipped in #47: the "Looking for your call…" state now tells the rep to swipe to the call window. Full context: memory `project_calendar_detection.md` + `reference_recall_detection_constraints.md`.
 
 ---
 

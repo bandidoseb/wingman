@@ -73,6 +73,12 @@ let detectedWindowId: string | null       = null;
 // even if detectedWindowId is cleared by a meeting-closed event mid-call.
 let recordingWindowId: string | null      = null;
 
+// #47 arm-and-wait: a single pending Deploy attempt can await meeting detection.
+// waitForMeeting() resolves this the instant meeting-detected fires (or on timeout).
+// Only one attempt is ever in flight (guarded by deployState in main.ts), but the
+// helper is written defensively so a stale waiter can never leak.
+let meetingWaiter: { resolve: (v: boolean) => void; timer: ReturnType<typeof setTimeout> } | null = null;
+
 // Auto-stop safeguard timers
 let hardCapTimer:          ReturnType<typeof setTimeout>  | null = null;
 let approachingLimitTimer: ReturnType<typeof setTimeout>  | null = null;
@@ -188,6 +194,14 @@ export async function setupRecallAI(onMeetingDetected?: () => void): Promise<voi
     sdk.addEventListener("meeting-detected", (evt: { window: { id: string } }) => {
       detectedWindowId = evt.window.id;
       console.log("[Recall AI] Meeting detected — window ID:", detectedWindowId);
+      // #47: unblock any Deploy attempt that's arm-and-waiting for detection.
+      // Resolve BEFORE onMeetingDetected so a waiting call:start proceeds first.
+      if (meetingWaiter) {
+        clearTimeout(meetingWaiter.timer);
+        const resolve = meetingWaiter.resolve;
+        meetingWaiter = null;
+        resolve(true);
+      }
       onMeetingDetected?.();
     });
 
@@ -219,6 +233,43 @@ export function hasMeetingDetected(): boolean {
 }
 
 /**
+ * #47 arm-and-wait: resolve `true` the instant a meeting window is detected, or
+ * `false` after `timeoutMs`. Resolves immediately if one is already detected.
+ * Lets a single Deploy press wait out detection lag instead of rejecting, so the
+ * rep never has to spam the button. Only one attempt is ever in flight (enforced
+ * by deployState in main.ts); a pre-existing waiter is defensively resolved false
+ * so a stale promise can never leak.
+ */
+export function waitForMeeting(timeoutMs: number): Promise<boolean> {
+  if (detectedWindowId !== null) return Promise.resolve(true);
+  if (meetingWaiter) {
+    clearTimeout(meetingWaiter.timer);
+    const stale = meetingWaiter.resolve;
+    meetingWaiter = null;
+    stale(false);
+  }
+  return new Promise<boolean>((resolve) => {
+    const timer = setTimeout(() => { meetingWaiter = null; resolve(false); }, timeoutMs);
+    meetingWaiter = { resolve, timer };
+  });
+}
+
+/**
+ * #47: cancel a pending waitForMeeting (user cancelled the search, call ended, or
+ * the call auto-stopped mid-search). Resolves the waiter `false` so the awaiting
+ * call:start unblocks; the epoch check in main.ts makes it bail without clobbering
+ * whatever state the canceller set. No-op if nothing is waiting.
+ */
+export function cancelWaitForMeeting(): void {
+  if (meetingWaiter) {
+    clearTimeout(meetingWaiter.timer);
+    const resolve = meetingWaiter.resolve;
+    meetingWaiter = null;
+    resolve(false);
+  }
+}
+
+/**
  * Start audio capture when the user begins a call.
  * Records the detected meeting window via Recall AI.
  *
@@ -246,13 +297,26 @@ export async function initRecallAI(options: RecallOptions): Promise<boolean> {
     // 1. Fetch a short-lived upload token from our Next.js API route.
     //    The Recall AI API key lives on the server (Railway) — it is never
     //    embedded in the desktop app binary.
-    const res = await fetch(`${options.appUrl}/api/wingman/recall-upload-token`, {
-      method: "POST",
-      headers: {
-        "content-type":  "application/json",
-        "Authorization": `Bearer ${options.authToken}`,
-      },
-    });
+    //    #47: an 8s AbortController timeout so a hung request (DNS/TCP stall, or
+    //    Railway accepting the connection but never responding) can't leave the
+    //    await pending forever — which would strand deployState at "starting" and
+    //    brick Deploy for the whole app session. On abort the fetch throws → the
+    //    catch below returns false → call:start resets the lifecycle to idle.
+    const tokenController = new AbortController();
+    const tokenTimeout    = setTimeout(() => tokenController.abort(), 8000);
+    let res: Response;
+    try {
+      res = await fetch(`${options.appUrl}/api/wingman/recall-upload-token`, {
+        method: "POST",
+        headers: {
+          "content-type":  "application/json",
+          "Authorization": `Bearer ${options.authToken}`,
+        },
+        signal: tokenController.signal,
+      });
+    } finally {
+      clearTimeout(tokenTimeout);
+    }
 
     const data = await res.json() as { upload_token?: string; error?: string };
 
