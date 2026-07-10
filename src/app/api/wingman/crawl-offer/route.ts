@@ -53,46 +53,33 @@ export async function POST(req: NextRequest) {
         messages: [
           {
             role: "user",
-            content: `You are extracting sales intelligence from an offer page. Read the page text below and extract the following fields. Return ONLY a valid JSON object — no markdown, no explanation.
+            content: `You are Wingman helping a sales rep set up. They pasted their own offer page. Read it and write a SHORT overview of the key info you can find — a memory-jogger the rep will glance at while describing their offer in their own words. This is reference only; it is NOT the source of truth.
 
-Fields to extract:
-- ideal_client: Who is this offer for? (1-2 sentences describing the target person — their situation, struggle, or identity)
-- unique_differentiator: What makes this offer different or better? (1 sentence — their mechanism, edge, or unique promise)
-- guarantee: What guarantee or risk-reversal do they offer? (1 sentence, or null if none found)
-- offer_name: The name of the main product/program/service
-- offer_price: The price if visible (e.g. "$5,000" or "$997/month"), or null if not found
+Cover, in a few tight bullet points, only what's actually on the page:
+- What they sell + who it's for
+- The core promise / transformation
+- Price, if shown
+- Any guarantee or notable claim
+
+Rules: Only include what's genuinely on the page — NEVER invent or infer. If the page is thin on real info, say so plainly. Keep it under ~120 words. Plain text bullets, no headers, no preamble.
 
 Page text:
-${pageText}
-
-Return only JSON like:
-{"ideal_client":"...","unique_differentiator":"...","guarantee":"...","offer_name":"...","offer_price":"..."}`,
+${pageText}`,
           },
         ],
       }),
     });
 
     const aiJson = await aiRes.json();
-    const raw: string = aiJson.content?.[0]?.text?.trim() ?? "";
+    const overview: string = aiJson.content?.[0]?.text?.trim() ?? "";
 
-    // Parse JSON safely
-    let extracted: Record<string, string | null> = {};
-    try {
-      extracted = JSON.parse(raw);
-    } catch {
-      // Try to find JSON in the response if Claude added extra text
-      const match = raw.match(/\{[\s\S]*\}/);
-      if (match) extracted = JSON.parse(match[0]);
-      else return NextResponse.json({ error: "Could not parse AI response" }, { status: 500 });
+    if (!overview) {
+      return NextResponse.json({ error: "Couldn't read anything useful on that page" }, { status: 502 });
     }
 
-    return NextResponse.json({
-      ideal_client: extracted.ideal_client ?? null,
-      unique_differentiator: extracted.unique_differentiator ?? null,
-      guarantee: extracted.guarantee ?? null,
-      offer_name: extracted.offer_name ?? null,
-      offer_price: extracted.offer_price ?? null,
-    });
+    // Reference-only summary for the rep to react to — NEVER used as live-card
+    // context (that stays 100% the rep's own words). Not persisted server-side.
+    return NextResponse.json({ overview });
   } catch (err: unknown) {
     console.error("[crawl-offer]", err);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
