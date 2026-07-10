@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, type CSSProperties } from "react";
 import { useMotionValue } from "framer-motion";
 import Card from "@/components/ui/Card";
 import OutcomeBadge from "@/components/ui/OutcomeBadge";
@@ -17,9 +17,28 @@ interface Props {
   onDeploy: () => void;
   onEndCall: () => void;
   onPersonalize: () => void;
+  // #47: Deploy phase from Electron main (pre-live). "searching" = arm-and-waiting
+  // for the call, "starting" = recording spinning up. Drives the button only.
+  deployPhase?: "idle" | "searching" | "starting";
+  stillLooking?: boolean;   // 15s into searching → nudge copy
+  onCancelSearch?: () => void;
 }
 
-export default function HomeTab({ profile, calls, onDebrief, isActive, isPendingOutcome = false, savedMessage, onDeploy, onEndCall, onPersonalize }: Props) {
+// #47: shared base so every Deploy-card control (Deploy / Looking / Starting / End)
+// is the exact same size — the fixed-width slot + this identical box = no resizing.
+const deployControlBase: CSSProperties = {
+  width: "100%", boxSizing: "border-box", height: 46,
+  display: "flex", alignItems: "center", justifyContent: "center", gap: 9,
+  padding: "0 16px", border: "none", borderRadius: 12,
+  fontSize: 14, fontWeight: 600, fontFamily: "inherit", letterSpacing: "-0.01em", whiteSpace: "nowrap",
+};
+const spinnerStyle: CSSProperties = {
+  width: 14, height: 14, borderRadius: "50%", flexShrink: 0,
+  border: "2px solid rgba(255,255,255,0.35)", borderTopColor: "#fff",
+  animation: "wmSpin 0.7s linear infinite",
+};
+
+export default function HomeTab({ profile, calls, onDebrief, isActive, isPendingOutcome = false, savedMessage, onDeploy, onEndCall, onPersonalize, deployPhase = "idle", stillLooking = false, onCancelSearch }: Props) {
   const { greeting, sub } = getGreeting();
   const mouseX = useMotionValue(0);
   const mouseY = useMotionValue(0);
@@ -85,7 +104,9 @@ export default function HomeTab({ profile, calls, onDebrief, isActive, isPending
 
       {/* Deploy / End Call card */}
       <Card style={{ marginBottom: 12, padding: "28px 28px" }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16 }}>
+        {/* minHeight keeps the card the exact same height in every state (idle has
+            the ⌃⇧W hint row; live doesn't) so it never grows/shrinks — #47 solidity */}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, minHeight: 64 }}>
           <div>
             {isActive ? (
               <>
@@ -97,6 +118,16 @@ export default function HomeTab({ profile, calls, onDebrief, isActive, isPending
                 {savedMessage && (
                   <div style={{ fontSize: 12, fontWeight: 600, color: "#34c759", marginTop: 8 }}>{savedMessage}</div>
                 )}
+              </>
+            ) : deployPhase === "searching" ? (
+              // #47: Recall only detects the meeting when its window is on the
+              // current desktop/Space — tell the rep to swipe to it so they don't
+              // just sit there wondering why nothing happens.
+              <>
+                <div style={{ fontSize: 18, fontWeight: 700, color: "#1c1c1e", letterSpacing: "-0.02em", marginBottom: 5 }}>Looking for your call…</div>
+                <div style={{ fontSize: 13, color: "#8e8e93", lineHeight: 1.5, maxWidth: 380 }}>
+                  Swipe to your call window — Wingman starts automatically.
+                </div>
               </>
             ) : (
               <>
@@ -117,29 +148,32 @@ export default function HomeTab({ profile, calls, onDebrief, isActive, isPending
               </>
             )}
           </div>
-          {isActive ? (
-            <button
-              onClick={onEndCall}
-              style={{
-                flexShrink: 0, padding: "12px 28px", background: "#ff3b30", color: "#fff", border: "none",
-                borderRadius: 12, fontSize: 14, fontWeight: 600, fontFamily: "inherit", cursor: "pointer",
-                boxShadow: "0 4px 16px rgba(255,59,48,0.3)",
-              }}
-            >
-              End Call
-            </button>
-          ) : (
-            <button
-              onClick={onDeploy}
-              style={{
-                flexShrink: 0, padding: "12px 28px", background: "#1c1c1e", color: "#fff", border: "none",
-                borderRadius: 12, fontSize: 14, fontWeight: 600, fontFamily: "inherit", cursor: "pointer",
-                boxShadow: "0 4px 16px rgba(0,0,0,0.15)",
-              }}
-            >
-              Deploy Wingman
-            </button>
-          )}
+          {/* #47: every state fills ONE fixed-width slot so the button never changes
+              size and the left text never reflows between states (solidity). */}
+          <div style={{ width: 240, flexShrink: 0, display: "flex", justifyContent: "flex-end" }}>
+            {isActive ? (
+              <button onClick={onEndCall} style={{ ...deployControlBase, background: "#ff3b30", color: "#fff", cursor: "pointer", boxShadow: "0 4px 16px rgba(255,59,48,0.3)" }}>
+                End Call
+              </button>
+            ) : deployPhase === "searching" ? (
+              // Arm-and-waiting for the call. The whole pill is the Cancel target.
+              <button onClick={onCancelSearch} title="Cancel" style={{ ...deployControlBase, background: "#1c1c1e", color: "#fff", cursor: "pointer", boxShadow: "0 4px 16px rgba(0,0,0,0.15)", gap: 8, fontSize: 13 }}>
+                <span style={spinnerStyle} />
+                {stillLooking ? "Still looking…" : "Looking for your call…"}
+                <span style={{ marginLeft: 2, fontSize: 13, color: "rgba(255,255,255,0.55)", lineHeight: 1 }}>✕</span>
+              </button>
+            ) : deployPhase === "starting" ? (
+              // Meeting found, recording spinning up. Locked, no cancel.
+              <div style={{ ...deployControlBase, background: "#1c1c1e", color: "#fff", opacity: 0.9 }}>
+                <span style={spinnerStyle} />
+                Starting…
+              </div>
+            ) : (
+              <button onClick={onDeploy} style={{ ...deployControlBase, background: "#1c1c1e", color: "#fff", cursor: "pointer", boxShadow: "0 4px 16px rgba(0,0,0,0.15)" }}>
+                Deploy Wingman
+              </button>
+            )}
+          </div>
         </div>
       </Card>
 

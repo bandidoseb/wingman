@@ -146,6 +146,20 @@ export default function DashboardClient({
   // resolves. Without this, two PATCH requests fire simultaneously.
   const isEndingRef = useRef(false);
 
+  // #47: mirror of isEndingRef for the START path. Blocks overlapping
+  // handleStartCall runs (button + hotkey firing together) so we never fire two
+  // call:start / duplicate POST /session. Belt-and-suspenders with main's guard.
+  const isStartingRef = useRef(false);
+
+  // #47: Deploy phase pushed by Electron main — drives the button label/spinner/
+  // cancel affordance ONLY (routing still keys off isActive). "searching" while
+  // arm-and-waiting for the call, "starting" while recording spins up.
+  const [deployPhase, setDeployPhase] = useState<"idle" | "searching" | "starting">("idle");
+  // #47: after 15s of searching, the button nudges "still looking…" so a long wait
+  // doesn't feel frozen. Timer lives in a ref so it's cleared on every phase change.
+  const [stillLooking, setStillLooking] = useState(false);
+  const stillLookingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   // ── Paywall ────────────────────────────────────────────────────────────────
   const [showPaywall, setShowPaywall] = useState<boolean>(() => isPaywallActive(profile));
   const handleLimitReached = useCallback(() => setShowPaywall(true), []);
@@ -266,18 +280,31 @@ export default function DashboardClient({
 
   // ── Start a live call ──────────────────────────────────────────────────────
   const handleStartCall = useCallback(async () => {
+    // #47: re-entrancy guard. startCall() now BLOCKS for up to 30s while Electron
+    // arm-and-waits for the meeting, so an overlapping press (button + hotkey, or a
+    // second click) must be ignored here — not just deduped by main. Cleared in the
+    // finally covering EVERY exit so a throw can't permanently block future deploys.
+    if (isStartingRef.current) return;
+    isStartingRef.current = true;
     setStartError(null);
 
-    // Gate: Zoom display name must be set so Wingman knows which voice is the rep's.
-    // Without it, keyword triggers may fire on the rep's own words.
-    if (!savedZoomName.trim()) {
-      setStartError("Set your Zoom display name in Settings before deploying Wingman.");
-      return;
-    }
+    // #47: once Electron reports the recording started, it is genuinely live and
+    // billing. If the session POST then fails (throw / no call_id / network drop),
+    // we MUST stop Electron too — otherwise the recording orphans (bills to the 2h
+    // cap) and the button strands on "Starting…". Mirrors the !res.ok branch below.
+    let electronStarted = false;
 
     try {
-      // Check meeting detection BEFORE creating a session record.
-      // If no Zoom/Meet window is open, bail immediately — no DB entry created.
+      // Gate: Zoom display name must be set so Wingman knows which voice is the rep's.
+      // Without it, keyword triggers may fire on the rep's own words.
+      if (!savedZoomName.trim()) {
+        setStartError("Set your Zoom display name in Settings before deploying Wingman.");
+        return;
+      }
+
+      // Ask Electron to start. It arm-and-waits for the meeting, then starts
+      // recording — pushing deploy:state ("searching"/"starting") the whole time,
+      // which drives the button label. No DB session is created until it succeeds.
       if (typeof window !== "undefined" && window.wingman) {
         // Fetch the Supabase access token so Electron can authenticate
         // the server-side Recall AI upload token request.
@@ -287,16 +314,20 @@ export default function DashboardClient({
           const { data: { session } } = await supabase.auth.getSession();
           authToken = session?.access_token ?? undefined;
         } catch (sessionErr) {
-          // Token fetch failure is non-fatal for the meeting detection check.
-          // If the token is missing, Electron will return no_auth and we surface
-          // a clear error to the user below. Log so it's visible in production.
+          // Token fetch failure is non-fatal here. If the token is missing, Electron
+          // returns no_auth and we surface a clear error below. Log for production.
           console.error("[handleStartCall] Failed to get Supabase session:", sessionErr);
         }
 
         const result = await window.wingman.startCall(authToken) as { success: boolean; error?: string } | undefined;
         if (result && !result.success) {
+          // busy = another press already owns the deploy; superseded = this attempt
+          // was cancelled/ended/auto-stopped while it waited. Both are benign — NO
+          // error banner (showing "Failed to start" on a successful spam is the bug
+          // we're fixing). Deploy phase resets via the deploy:state push.
+          if (result.error === "busy" || result.error === "superseded") return;
           if (result.error === "no_meeting") {
-            setStartError("No call detected. Open Zoom or Google Meet first.");
+            setStartError("No call found — make sure Zoom, Google Meet, or Teams is open.");
           } else if (result.error === "no_auth") {
             setStartError("Session expired. Please refresh the page and try again.");
           } else {
@@ -304,6 +335,8 @@ export default function DashboardClient({
           }
           return;
         }
+        // startCall resolved success → Electron is now recording (live + billing).
+        electronStarted = true;
       }
 
       const res = await fetch("/api/wingman/session", {
@@ -332,7 +365,13 @@ export default function DashboardClient({
       setPendingOutcome(false);
       pendingCallIdRef.current = null;
     } catch (err) {
+      // #47: if Electron already started (session POST threw / returned no call_id /
+      // network dropped in the gap), stop it so the recording doesn't orphan and the
+      // button doesn't strand on "Starting…". endCall pushes deploy:state → idle.
+      if (electronStarted && typeof window !== "undefined" && window.wingman) window.wingman.endCall();
       setStartError(err instanceof Error ? err.message : "Failed to start call");
+    } finally {
+      isStartingRef.current = false;
     }
   }, [handleLimitReached, savedZoomName]);
 
@@ -520,6 +559,57 @@ export default function DashboardClient({
     });
     return () => { window.wingman?.offAutoEnded?.(); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // ── IPC: Deploy phase from Electron main (#47) ─────────────────────────────
+  // Drives the Deploy button's label/spinner/cancel. Registered once. Any state
+  // that isn't an in-progress deploy ("live"/"stopping"/"idle") collapses the
+  // button back to its normal look — a single dropped frame can't strand a label
+  // (the isActive effect below is a second backstop).
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.wingman?.onDeployState) return;
+    const clearNudge = () => {
+      if (stillLookingTimerRef.current) { clearTimeout(stillLookingTimerRef.current); stillLookingTimerRef.current = null; }
+    };
+    window.wingman.onDeployState(({ state }) => {
+      if (state === "searching") {
+        setDeployPhase("searching");
+        clearNudge();
+        setStillLooking(false);
+        stillLookingTimerRef.current = setTimeout(() => setStillLooking(true), 15_000);
+      } else if (state === "starting" || state === "live") {
+        // Keep the "Starting…" spinner through "live" too — recording has begun but
+        // the DB session POST (which flips isActive → the End Call button) is still
+        // ~500ms out. Collapsing to idle here would flash "Deploy Wingman" in that
+        // gap. The isActive effect below is what finally clears this to the live UI.
+        setDeployPhase("starting");
+        clearNudge();
+        setStillLooking(false);
+      } else {
+        // idle | stopping
+        setDeployPhase("idle");
+        clearNudge();
+        setStillLooking(false);
+      }
+    });
+    return () => { window.wingman?.offDeployState?.(); clearNudge(); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Defensive backstop: once a call is genuinely active, the Deploy button is gone,
+  // so force the phase to idle regardless of any missed deploy:state frame.
+  useEffect(() => {
+    if (isActive) { setDeployPhase("idle"); setStillLooking(false); }
+  }, [isActive]);
+
+  // User pressed Cancel while Deploy was searching. Tell main to abort the search;
+  // it pushes deploy:state 'idle' back, but reset optimistically for instant feedback.
+  const handleCancelSearch = useCallback(() => {
+    window.wingman?.cancelSearch?.();
+    setDeployPhase("idle");
+    setStillLooking(false);
+    if (stillLookingTimerRef.current) { clearTimeout(stillLookingTimerRef.current); stillLookingTimerRef.current = null; }
+    setStartError(null);
   }, []);
 
   // ── Outcome saved from HUD → refresh data but keep skeleton up ──────────────
@@ -1271,6 +1361,7 @@ export default function DashboardClient({
         .typing-dot:nth-child(2){animation-delay:0.2s}
         .typing-dot:nth-child(3){animation-delay:0.4s}
         @keyframes livePulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+        @keyframes wmSpin { to { transform: rotate(360deg) } }
       `}</style>
 
       {/* Error banner (e.g. call limit reached) */}
@@ -1322,6 +1413,9 @@ export default function DashboardClient({
               onDeploy={handleStartCall}
               onEndCall={handleEndCall}
               onPersonalize={() => setTab("personalize")}
+              deployPhase={deployPhase}
+              stillLooking={stillLooking}
+              onCancelSearch={handleCancelSearch}
             />
           )}
           {tab === "flight-plan" && <FlightPlanTab />}

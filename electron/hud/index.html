@@ -315,6 +315,18 @@
       gap: 9px;
     }
 
+    /* #47 deploy-status spinner */
+    .wm-spinner {
+      width: 15px;
+      height: 15px;
+      flex-shrink: 0;
+      border-radius: 50%;
+      border: 2px solid rgba(255, 255, 255, 0.28);
+      border-top-color: #ffffff;
+      animation: wmSpin 0.7s linear infinite;
+    }
+    @keyframes wmSpin { to { transform: rotate(360deg); } }
+
     .toast-title {
       font-size: 14px;
       font-weight: 600;
@@ -491,6 +503,16 @@
       padding-left: 29px;
       margin-top: -4px;
       line-height: 1.4;
+    }
+
+    /* #47 — swipe instruction under the "Looking for your call…" spinner */
+    #deployHint {
+      font-size: 11px;
+      color: rgba(255, 255, 255, 0.5);
+      padding-left: 24px; /* aligns under the title, past the 15px spinner + gap */
+      margin-top: -2px;
+      line-height: 1.4;
+      max-width: 280px;
     }
 
     #setupRequiredSub {
@@ -845,6 +867,18 @@
     </div>
   </div>
 
+  <!-- COMPONENT 3B-2: Deploy status toast (#47) — arm-and-wait / starting feedback -->
+  <div id="deployStatusToast" class="wingman-toast">
+    <div class="toast-header">
+      <div id="deploySpinner" class="wm-spinner"></div>
+      <span id="deployStatusTitle" class="toast-title">Looking for your call…</span>
+    </div>
+    <div id="deployHint">Swipe to your call window — Wingman starts automatically.</div>
+    <div class="toast-actions">
+      <button id="deployCancelBtn" class="toast-dismiss-btn">Cancel</button>
+    </div>
+  </div>
+
   <!-- COMPONENT 3C: End Call Confirmation Toast (Ctrl+Shift+W during active call) -->
   <div id="endCallToast" class="wingman-toast">
     <div class="toast-header">
@@ -1156,6 +1190,10 @@
     const manualTriggerToast   = document.getElementById('manualTriggerToast');
     const manualConfirmBtn     = document.getElementById('manualConfirmBtn');
     const manualCancelBtn      = document.getElementById('manualCancelBtn');
+    const deployStatusToast    = document.getElementById('deployStatusToast');
+    const deployStatusTitle    = document.getElementById('deployStatusTitle');
+    const deployHint           = document.getElementById('deployHint');
+    const deployCancelBtn      = document.getElementById('deployCancelBtn');
     const endCallToast         = document.getElementById('endCallToast');
     const endCallConfirmBtn    = document.getElementById('endCallConfirmBtn');
     const endCallCancelBtn     = document.getElementById('endCallCancelBtn');
@@ -1308,6 +1346,45 @@
     });
 
     manualCancelBtn.addEventListener('click', () => hideManualTriggerToast(true));
+
+    // ── Deploy status toast (#47) — arm-and-wait / starting ───────────────
+    // Driven entirely by main's deploy:state push. "searching" shows a spinner +
+    // Cancel and (after 15s) nudges "still looking…"; "starting" locks it with no
+    // cancel; anything else hides it. Replaces the old detection/manual toasts once
+    // a deploy is in flight so there's exactly one thing on screen.
+    let stillLookingTimeout = null;
+    function clearStillLookingTimer() {
+      if (stillLookingTimeout) { clearTimeout(stillLookingTimeout); stillLookingTimeout = null; }
+    }
+    function showDeployStatus(phase) {
+      hideDetectionToast(false);
+      hideManualTriggerToast(false);
+      clearStillLookingTimer();
+      if (phase === 'searching') {
+        deployStatusTitle.textContent = 'Looking for your call…';
+        deployHint.style.display = '';       // show the swipe instruction
+        deployCancelBtn.style.display = '';
+        stillLookingTimeout = setTimeout(() => { deployStatusTitle.textContent = 'Still looking…'; }, 15000);
+      } else { // 'starting'
+        deployStatusTitle.textContent = 'Starting…';
+        deployHint.style.display = 'none';   // no swipe needed once it's found
+        deployCancelBtn.style.display = 'none';
+      }
+      deployStatusToast.classList.add('visible');
+      // Don't force global mouse capture (this HUD covers the whole screen — it
+      // would block clicks to Zoom underneath). The hover forEach below captures
+      // the mouse only while the cursor is actually over the toast, same as the
+      // detection/manual toasts — enough to click Cancel.
+    }
+    function hideDeployStatus() {
+      clearStillLookingTimer();
+      deployStatusToast.classList.remove('visible');
+      if (!signalActive && window.hud) window.hud.setMouseIgnore(true);
+    }
+    deployCancelBtn.addEventListener('click', () => {
+      hideDeployStatus();
+      if (window.hud) window.hud.cancelSearch();
+    });
 
     // ── End call confirmation toast ───────────────────────────────────────
     let endCallTimeout = null;
@@ -1769,7 +1846,7 @@
     // Instead, we enable capture only on hover — same pattern as signalBubble + stageBar.
     // The outcomeCard is included here so picking a disposition no longer freezes the
     // whole screen — the rep can click elsewhere / deploy the next call (Issue #35).
-    [detectionToast, manualTriggerToast, endCallToast, setupRequiredToast, outcomeCard].forEach(toast => {
+    [detectionToast, manualTriggerToast, deployStatusToast, endCallToast, setupRequiredToast, outcomeCard].forEach(toast => {
       toast.addEventListener('mouseenter', () => {
         if (window.hud) window.hud.setMouseIgnore(false);
       });
@@ -1802,6 +1879,14 @@
 
       // Call detected (meeting window found — show detection toast)
       window.hud.onCallDetected(() => showDetectionToast());
+
+      // Deploy phase (#47) — arm-and-wait / starting feedback in the HUD
+      if (window.hud.onDeployState) {
+        window.hud.onDeployState(({ state }) => {
+          if (state === 'searching' || state === 'starting') showDeployStatus(state);
+          else hideDeployStatus(); // idle / live / stopping
+        });
+      }
 
       // Manual trigger (Ctrl+Shift+W pressed, no active call — show confirmation)
       window.hud.onManualTrigger(() => showManualTriggerToast());

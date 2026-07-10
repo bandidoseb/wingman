@@ -209,10 +209,22 @@ export const DEFAULT_SCORECARD: LiveScorecard = {
 // When Wingman runs as a desktop app (Electron), window.wingman is available.
 // These types prevent TypeScript errors when the web app calls window.wingman.xxx()
 
+// Deploy phase pushed by the Electron main process (#47). Drives the Deploy
+// button/HUD label + affordance only — never call routing.
+export type DeployPhase = "idle" | "searching" | "starting" | "live" | "stopping";
+export type DeployStatePayload = { state: DeployPhase; reason?: string };
+
 export interface WingmanBridge {
   // Call lifecycle
-  startCall: (token?: string) => Promise<{ success: boolean; error?: string }>;
+  // error union (#47): "busy"/"superseded" = benign no-op (ignore), the rest surface a message.
+  startCall: (token?: string) => Promise<{ success: boolean; error?: "busy" | "superseded" | "no_meeting" | "no_auth" | "recording_failed" | string }>;
   endCall:   (callId?: string, token?: string) => Promise<{ success: boolean; error?: string }>;
+
+  // Deploy state machine (#47) — optional so a renderer against an older preload
+  // (dev hot-reload skew) degrades gracefully instead of crashing.
+  onDeployState?:  (callback: (payload: DeployStatePayload) => void) => void;
+  offDeployState?: () => void;
+  cancelSearch?:   () => Promise<void>;
 
   // HUD control
   showHud:       () => Promise<void>;

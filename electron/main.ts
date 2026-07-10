@@ -12,7 +12,7 @@ import {
 } from "electron";
 import * as path from "path";
 import { autoUpdater } from "electron-updater";
-import { initRecallAI, stopRecallAI, setupRecallAI, hasMeetingDetected, AutoStopReason } from "./recall";
+import { initRecallAI, stopRecallAI, setupRecallAI, hasMeetingDetected, waitForMeeting, cancelWaitForMeeting, AutoStopReason } from "./recall";
 import { logMeasurement } from "./measurement-log";
 
 // ─── App URLs ────────────────────────────────────────────────────────────────
@@ -30,6 +30,48 @@ let tray:         Tray | null = null;
 // Tracks whether a call is active so the shortcut knows whether to show the
 // "Ready to deploy?" confirmation toast or end the current call.
 let callActive = false;
+
+// ─── Deploy state machine (#47) ───────────────────────────────────────────────
+// Single source of truth for the Deploy lifecycle, owned by the main process
+// (every deploy entry point — dashboard button, tray, hotkey, HUD toast — routes
+// through here). Makes Deploy idempotent (mashing = no-op) and lets one press
+// arm-and-wait for meeting detection instead of rejecting.
+//
+//   idle      → nothing happening; the only state a new Deploy is accepted from
+//   searching → Deploy claimed, waiting (bounded) for meeting-detected
+//   starting  → meeting known, initRecallAI() in flight
+//   live      → recording genuinely active (mirrors recall.ts isRunning)
+//   stopping  → call:end in flight
+type DeployState = "idle" | "searching" | "starting" | "live" | "stopping";
+let deployState: DeployState = "idle";
+
+// Generation token. call:start captures it at claim time and re-checks it after
+// each of its two long awaits (waitForMeeting, initRecallAI). Any path that seizes
+// the lifecycle from under an in-flight attempt (cancel, call:end, autoStopCall)
+// bumps this — so a suspended handler that resumes into a changed world bails
+// WITHOUT touching deployState. Without this the guard is entry-only and the
+// await resumptions are unguarded re-entrancy (the race the plan-review caught).
+let deployEpoch = 0;
+
+// #47: how long a single Deploy press waits for the meeting to be detected before
+// giving up. Nothing records or bills during the wait, and it's always cancellable.
+const SEARCH_TIMEOUT_MS = 30_000;
+
+// Pushes the deploy phase to BOTH the dashboard renderer and the HUD so their
+// Deploy affordance (label/spinner/cancel) always reflects the real state. This
+// is the ONLY writer of the deploy:state channel — call it on every transition.
+function pushDeployState(state: DeployState, reason?: string): void {
+  mainWindow?.webContents.send("deploy:state", { state, reason });
+  hudWindow?.webContents.send("deploy:state", { state, reason });
+}
+
+// The ONLY way call:start returns the lifecycle to idle from its own exits.
+// Centralised so no early return can ever strand deployState non-idle (which would
+// brick Deploy for the whole session — the second blocker the plan-review caught).
+function resetDeploy(reason?: string): void {
+  deployState = "idle";
+  pushDeployState("idle", reason);
+}
 
 // ─── Pending outcome state ────────────────────────────────────────────────────
 // Holds the callId + access token from the most recent ended call so the
@@ -302,8 +344,15 @@ function unregisterCallHotkey(): void {
 function autoStopCall(reason: AutoStopReason): void {
   console.log(`[AutoStop] Reason: ${reason}`);
   callActive = false;
+  // #47: seize the deploy lifecycle. Bumping the epoch supersedes any in-flight
+  // call:start (e.g. an auto-stop landing mid-init) so it bails without clobbering
+  // state; cancelling the waiter unblocks a call:start still arm-and-waiting.
+  deployEpoch++;
+  cancelWaitForMeeting();
   unregisterCallHotkey(); // close compass + release Up Arrow before anything else
   stopRecallAI();
+  deployState = "idle";
+  pushDeployState("idle", reason);
   hudWindow?.webContents.send("call:ended");
   hudWindow?.webContents.send("hud:auto-stopped", reason);
   trayPopover?.webContents.send("tray:call-state", false);
@@ -558,19 +607,51 @@ function setupIPC(): void {
 
   // ── Call lifecycle ──────────────────────────────────────────────────────────
   ipcMain.handle("call:start", async (_event, token?: string) => {
-    console.log("[IPC] call:start");
-
-    if (!hasMeetingDetected()) {
-      return { success: false, error: "no_meeting" };
+    // ── CLAIM (synchronous, race-safe) ───────────────────────────────────────
+    // The check + set are synchronous with no await between them, so single-threaded
+    // JS guarantees exactly one press can claim the lifecycle. Every other press —
+    // rapid mashing, tray + hotkey firing together — returns a benign no-op here and
+    // changes NOTHING. This is what kills the spam-teardown bug (#47).
+    if (deployState !== "idle") {
+      console.log(`[call:start] ignored — deployState=${deployState}`);
+      return { success: false, error: "busy" };
     }
+    deployState = "searching";
+    const myEpoch = deployEpoch;
+    console.log("[IPC] call:start — claimed (searching)");
+    hudWindow?.show();
+    pushDeployState("searching");
 
     // Auth token is required — used server-side to fetch the Recall AI upload token.
     // The token comes from the web app's Supabase session (passed via startCall(token)).
+    // Any exit AFTER the claim must reset via resetDeploy() or the lifecycle strands.
     if (!token) {
       console.error("[call:start] No auth token — cannot fetch Recall AI upload token");
+      resetDeploy("no_auth");
       return { success: false, error: "no_auth" };
     }
 
+    // ── ARM-AND-WAIT for meeting detection ───────────────────────────────────
+    // Instead of rejecting when the meeting isn't detected yet, wait (bounded) for
+    // it so a single press "just works". Nothing records or bills during the wait.
+    if (!hasMeetingDetected()) {
+      const found = await waitForMeeting(SEARCH_TIMEOUT_MS);
+      // Someone seized the lifecycle while we waited (cancel / call:end / auto-stop).
+      // They already own the reset — bail WITHOUT touching deployState.
+      if (myEpoch !== deployEpoch) {
+        console.log("[call:start] superseded during wait — bailing");
+        return { success: false, error: "superseded" };
+      }
+      if (!found) {
+        console.log("[call:start] no meeting detected within timeout");
+        resetDeploy("no_meeting");
+        return { success: false, error: "no_meeting" };
+      }
+    }
+
+    // ── START recording ──────────────────────────────────────────────────────
+    deployState = "starting";
+    pushDeployState("starting");
     callActive = true;
     hudWindow?.show();
     hudWindow?.webContents.send("call:started");
@@ -586,24 +667,47 @@ function setupIPC(): void {
       onApproachingLimit: () => { hudWindow?.webContents.send("hud:cap-warning"); },
     });
 
+    // A cancel / end / auto-stop landed while initRecallAI was awaiting. The
+    // canceller's stopRecallAI() may have NO-OP'd: isRunning only flips true at the
+    // very end of initRecallAI, so a stop that ran mid-init did nothing and the
+    // recording is now genuinely live with no one tracking it. If it started, stop
+    // it here before bailing — otherwise it's an orphaned Recall recording that
+    // bills until the 2h hard cap (Invariant #4: never leave isRunning true alone).
+    // Bail without the hotkey and without success so the renderer skips the session.
+    if (myEpoch !== deployEpoch) {
+      if (started) stopRecallAI();
+      console.log("[call:start] superseded during init — bailing");
+      return { success: false, error: "superseded" };
+    }
+
     if (!started) {
-      // Recording failed to start — roll back Electron state so the web app
-      // knows not to create a session. HUD hides cleanly after 600ms.
+      // Recording genuinely failed to start — roll back Electron state so the web
+      // app knows not to create a session. HUD hides cleanly after 600ms.
       callActive = false;
       unregisterCallHotkey(); // release Up Arrow — nothing to summon during a failed start
       hudWindow?.webContents.send("call:ended", {});  // reset HUD to idle state
       trayPopover?.webContents.send("tray:call-state", false);
       setTimeout(() => hudWindow?.hide(), 600);
+      resetDeploy("recording_failed");
       return { success: false, error: "recording_failed" };
     }
 
+    deployState = "live";
     registerCallHotkey(); // Up Arrow live — call is genuinely active
+    pushDeployState("live");
     return { success: true };
   });
 
   ipcMain.handle("call:end", async (_event, callId?: string, token?: string) => {
     console.log("[IPC] call:end", callId ? "(with callId)" : "(no callId)");
     callActive = false;
+    // #47: seize the deploy lifecycle. Bumping the epoch supersedes any in-flight
+    // call:start (e.g. End pressed while a search or init is still running); cancelling
+    // the waiter unblocks a call:start still arm-and-waiting so it bails cleanly.
+    deployState = "stopping";
+    deployEpoch++;
+    cancelWaitForMeeting();
+    pushDeployState("stopping");
     unregisterCallHotkey(); // close compass + release Up Arrow
 
     // Store for use when HUD picks an outcome
@@ -614,6 +718,8 @@ function setupIPC(): void {
     hudWindow?.webContents.send("call:ended", { callId });
     trayPopover?.webContents.send("tray:call-state", false);
     stopRecallAI();
+    deployState = "idle";
+    pushDeployState("idle");
 
     if (callId) {
       // Cancel any pending auto-hide from autoStopCall — the outcome card must
@@ -725,6 +831,21 @@ function setupIPC(): void {
   // ── Detection toast dismissed — hide HUD (call never started) ──────────────
   ipcMain.handle("hud:dismiss-detection", () => { hudWindow?.hide(); });
 
+  // ── Cancel an in-flight Deploy search (#47) ────────────────────────────────
+  // The user pressed Cancel while Deploy was arm-and-waiting for the call. Bump
+  // the epoch (so the suspended call:start bails via 'superseded' — NOT via the
+  // timeout branch, which would wrongly show "no call found"), cancel the waiter,
+  // and return to idle. Only meaningful while searching; harmless otherwise.
+  ipcMain.handle("deploy:cancel-search", () => {
+    console.log("[IPC] deploy:cancel-search");
+    if (deployState !== "searching") return;
+    deployEpoch++;
+    cancelWaitForMeeting();
+    deployState = "idle";
+    pushDeployState("idle", "cancelled");
+    hudWindow?.hide(); // the HUD was only showing the search state — nothing else to keep
+  });
+
   // ── Signal → HUD ───────────────────────────────────────────────────────────
   ipcMain.handle("hud:signal", (_event, signal: { header: string; text: string; type: string; seq?: number }) => {
     hudWindow?.webContents.send("hud:update-signal", signal);
@@ -786,10 +907,9 @@ function setupIPC(): void {
       trayPopover?.webContents.send("tray:setup-required");
       return;
     }
-    if (!hasMeetingDetected()) {
-      trayPopover?.webContents.send("tray:no-meeting");
-      return;
-    }
+    // #47: no detection pre-gate here anymore. Funnel straight into the toggle so
+    // tray Deploy gets the same arm-and-wait ("Looking for your call…") as the
+    // dashboard button instead of an instant "no meeting" reject.
     trayPopover?.hide();
     sendToMainWindow("shortcut:toggle-call");
   });
@@ -848,6 +968,9 @@ app.whenReady().then(() => {
   setupIPC();
   setupShortcuts();
   setupRecallAI(() => {
+    // #47: if a Deploy is already searching/starting/live, we're handling it —
+    // the redundant "Deploy Wingman" detection toast would just be confusing.
+    if (deployState !== "idle") return;
     // Meeting detected — show the branded Wingman detection toast
     hudWindow?.show();
     hudWindow?.webContents.send("call:detected");
