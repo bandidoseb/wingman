@@ -1,0 +1,439 @@
+[
+  {
+    "id": "2026-07-10-sales-dna",
+    "date": "2026-07-10",
+    "category": "ai",
+    "title": "Wingman starts learning your offer",
+    "summary": "Began building Sales DNA — a place to tell Wingman about your offer and how you run discovery. The goal: live cards that already understand your business instead of giving generic advice.",
+    "changes": [
+      "New 'Sales DNA' section to capture your offer and discovery questions",
+      "This is the foundation for cards that sound like you, not a robot"
+    ],
+    "details": [
+      "Right now, Wingman gives everyone fairly generic advice because it doesn't actually know what you sell. Two closers pitching completely different things get the same kind of suggestions. That's the single biggest reason a card can feel 'off' — it's coaching in the abstract.",
+      "Sales DNA fixes that at the root. It's a place where you describe your offer — what it is, who it's for, the price — and how you run your discovery (the questions you ask to understand a prospect). Wingman reads all of that before every call.",
+      "Here's the insight it's built on: almost every objection is really the prospect not believing one specific thing yet. Which thing depends entirely on your offer. Once Wingman knows your offer, its cards can aim at the exact belief that's shaky — phrased the way you'd actually say it, not the way a textbook would.",
+      "This first step builds the place to store all of it. The next step is feeding it into the live cards during the call, which is where you'll feel the difference."
+    ]
+  },
+  {
+    "id": "2026-07-10-deploy",
+    "date": "2026-07-10",
+    "category": "fix",
+    "title": "The Deploy button is now bulletproof",
+    "summary": "Deploy used to feel flimsy — and hammering it could actually kill a call that had already started. Fixed the root cause. Now you press once and Wingman waits for your meeting, then starts on its own the moment it sees it.",
+    "changes": [
+      "Press Deploy once — it shows 'Looking for your call…' and auto-starts when found",
+      "Mashing the button does nothing harmful anymore",
+      "A hung network request can no longer freeze Deploy for the rest of the session"
+    ],
+    "details": [
+      "The bug: pressing Deploy a second time while it was still starting up would trigger the 'something went wrong, shut everything down' path — on top of the call that had just successfully started. Your call would end a couple of seconds in, with no transcript, for no obvious reason.",
+      "The real cause was a timing collision, not slow detection. Two button presses were racing each other, and the system couldn't tell 'genuine failure' apart from 'already busy starting.' So a harmless second press looked like a failure and tore the call down.",
+      "The fix rebuilt Deploy as a strict step-by-step machine that always knows exactly which state it's in — idle, looking, starting, live, or stopping. Extra presses now just bounce off as 'busy' and are ignored. No more accidental teardown.",
+      "On top of that, it now waits for your meeting instead of failing when it can't find one yet. You press once, it shows 'Looking for your call…', and it starts the instant your meeting window appears. A 30-second timeout with a 'still looking…' nudge means it never hangs forever.",
+      "One quirk worth knowing: the technology that joins your call can only see your meeting when that window is on the screen you're currently looking at. So the button now tells you to swipe over to your call window — that's expected behavior, not a bug."
+    ]
+  },
+  {
+    "id": "2026-07-10-billing-hole",
+    "date": "2026-07-10",
+    "category": "security",
+    "title": "Closed an account-security hole",
+    "summary": "Found and closed a gap where a signed-in user could have quietly granted themselves a paid plan. Profile updates are now locked down to only the fields that are meant to be editable.",
+    "details": [
+      "When you edit your profile, the app sends your changes to the server to be saved. The old code accepted whatever fields it was handed and wrote them straight to your account — there was no list of what's actually allowed to change.",
+      "That meant a technically-savvy user could craft a request that flipped their own account to a paid plan, or reset their monthly call limit, without ever paying.",
+      "The fix adds a strict allowlist: only the handful of fields that are supposed to be editable get through. Anything sensitive — like your subscription status or plan — is now rejected outright.",
+      "No accounts were affected. This closed the door before it could become a real problem, which is exactly when you want to catch these."
+    ]
+  },
+  {
+    "id": "2026-07-09-dig",
+    "date": "2026-07-09",
+    "category": "feature",
+    "title": "New 'Dig Deeper' card",
+    "summary": "Press the down arrow during a live call and Wingman hands you a discovery question aimed at whatever the prospect is least convinced about — so you deepen the conversation instead of rushing to pitch.",
+    "changes": [
+      "Aims at the prospect's weakest point automatically",
+      "If they're already sold, it nudges you to go for the close instead"
+    ],
+    "details": [
+      "In the background during a call, Wingman keeps a quiet read on how convinced the prospect is across the things that matter — their pain, whether they trust you, whether they believe it's worth the money, and so on.",
+      "Press the down arrow and Wingman looks at that read, finds the weakest spot, and hands you a discovery question aimed right at it. Instead of guessing what to ask next, you get a question that opens up the exact area they're least sold on.",
+      "If the prospect already seems convinced across the board, it won't pile on another question — it nudges you to go for the close instead, so you don't talk yourself out of a 'yes.'",
+      "Important: this is a supplement to your own discovery, not a script to read. And early in a call, before Wingman has much to go on, the questions are more generic. That's not a flaw — it's exactly the gap that Sales DNA is built to close, by giving Wingman your offer up front."
+    ]
+  },
+  {
+    "id": "2026-07-03-partials",
+    "date": "2026-07-03",
+    "category": "speed",
+    "title": "Objection cards catch the prospect's latest words",
+    "summary": "Cards used to sometimes fire on the previous objection because the transcript lagged a second or two behind real speech. Wingman now reads the live, in-progress transcript at the moment you press — so cards respond to what was just said.",
+    "changes": [
+      "Waits a beat if the prospect is mid-sentence, so it doesn't answer half a thought",
+      "Older installs are unaffected — no added delay for anyone"
+    ],
+    "details": [
+      "The service that turns speech into text sends words in two waves: a fast rough draft within a fraction of a second, then a cleaned-up final version a beat later. The app used to wait only for the polished finals.",
+      "The catch is that those finals lag real speech by up to a couple of seconds. So if you pressed right after an objection, the card sometimes responded to the *previous* thing the prospect said — because their newest words hadn't officially arrived yet. It felt like Wingman was a step behind.",
+      "Now, the moment you press, Wingman also grabs the fast rough-draft words — which lag by only about a tenth of a second — and folds them in. The card responds to what was genuinely just said.",
+      "It's careful about it, too. If you press while the prospect is still mid-sentence, it waits a fraction of a second so it isn't answering half a thought. And anyone on an older installed version is completely unaffected — nobody gets any extra delay from this.",
+      "This wasn't a guess. We measured real calls first: about two-thirds of the words the old approach was missing were already sitting in that fast draft, just waiting to be used."
+    ]
+  },
+  {
+    "id": "2026-07-02-streaming",
+    "date": "2026-07-02",
+    "category": "speed",
+    "title": "Objection cards stream in as they're written",
+    "summary": "Instead of a two-to-three second frozen wait and then a card popping in all at once, the suggested line now appears word by word as it's generated. Also removed an extra behind-the-scenes step that was slowing things down.",
+    "changes": [
+      "Feels noticeably quicker in the moment",
+      "When there's genuinely nothing to say, you get a clear 'No objection detected' instead of a guess"
+    ],
+    "details": [
+      "Before, when a card was being generated, you'd stare at a frozen screen for two to three seconds and then the whole suggestion would appear at once. In the middle of a live call, that pause felt long and a little awkward.",
+      "Now the suggested line writes itself out word by word as it's being created — like watching someone type it to you. The total time is about the same, but it *feels* dramatically faster because you see it working immediately instead of waiting on a blank screen.",
+      "We also removed an extra middle step that every card used to pass through. That shaved off roughly half a second and, just as importantly, removed one more thing that could fail or slow things down.",
+      "And when there's honestly nothing worth saying, Wingman now shows a clear 'No objection detected' instead of inventing a line to fill the space. You get real words or an honest 'nothing here' — never filler you'd regret reading out loud."
+    ]
+  },
+  {
+    "id": "2026-07-01-autoupdate",
+    "date": "2026-07-01",
+    "version": "0.1.28",
+    "category": "infra",
+    "title": "The app updates itself now",
+    "summary": "Auto-update never actually worked before — every new version had to be downloaded by hand. It's fixed and verified end to end: the app quietly downloads new versions and relaunches itself.",
+    "changes": [
+      "No more scary 'unidentified developer' warning — builds are Apple-notarized",
+      "The old Terminal workaround is gone for good"
+    ],
+    "details": [
+      "For the app's entire history, auto-update never actually worked. Every new version had to be downloaded and installed by hand, which meant installed apps quietly fell behind while new work piled up.",
+      "Getting it working took shipping six real releases in a row, because each hidden problem only showed itself once the previous one was fixed. The issues ranged from plumbing (the app was building the wrong file type for updates, and updates were being published as invisible drafts) to a subtle one: the update feed was pointing at a private location that installed apps simply couldn't read.",
+      "The fix publishes each signed, Apple-approved build to a public spot the app can check, and makes the app quietly download new versions and relaunch itself when one is ready — no action needed from you.",
+      "A nice side benefit: builds are now Apple-notarized, so the scary 'unidentified developer' warning is gone, and that old copy-paste Terminal command people used to have to run is no longer needed at all."
+    ]
+  },
+  {
+    "id": "2026-06-30-release-0122",
+    "date": "2026-06-30",
+    "version": "0.1.22",
+    "category": "release",
+    "title": "First desktop release in weeks",
+    "summary": "The installed app had been frozen on an old June build while weeks of work piled up behind it. Cut and published a fresh build so the new objection card and everything behind it finally reached the Mac app.",
+    "details": [
+      "The version installed on the Mac had quietly fallen weeks behind. Six separate improvements had been finished and merged into the codebase — but none had been packaged into an actual downloadable app, so none of them had reached the desktop yet.",
+      "This cut a fresh build (v0.1.22) and published it, so all of that backed-up work — including the redesigned objection card — finally landed in the app you actually open and use.",
+      "It also made clear *why* this keeps happening: releases weren't being cut on any regular rhythm. The release steps were tightened up and written down so the installed app is less likely to drift this far behind again."
+    ]
+  },
+  {
+    "id": "2026-06-29-objection-card",
+    "date": "2026-06-29",
+    "category": "ai",
+    "title": "Smarter, more natural objection cards",
+    "summary": "Rebuilt the objection card to read the moment and give you one spoken line in your voice — no headers, no script. Moved it to the top-center of your screen, near the camera, so glancing at it reads as looking at the prospect.",
+    "changes": [
+      "Card sits under the camera instead of down in the corner",
+      "Reads as one natural sentence, not a headline",
+      "Fixed the 'Ask Wingman' coach, which had stopped responding"
+    ],
+    "details": [
+      "The objection card used to lean on a library of pre-written sales techniques and stitch together an answer. This rebuilt it to instead read the actual moment — what the prospect just said — and give you one natural spoken line, in a conversational voice, with no header or label attached.",
+      "It also moved from the bottom-left corner up to the top-center of your screen, right under your camera. On a real call, a prospect noticed the rep's eyes flicking down to the corner every time a card appeared. Sitting the card near the camera means a quick glance reads as looking right at them.",
+      "The card was widened and the text softened so it looks like something you'd actually say out loud, not a headline you're reading off a teleprompter.",
+      "Separately, the 'Ask Wingman' coach had quietly broken — it was calling an AI model that had since been retired, so it returned an error on every single question. That's fixed and working again."
+    ]
+  },
+  {
+    "id": "2026-06-21-smarter-objection-cards",
+    "date": "2026-06-21",
+    "category": "ai",
+    "title": "Objection help that leans on YOUR call, not generic sales advice",
+    "summary": "Wingman stopped pulling objection lines from a library of generic YouTube sales tips and instead writes them from what actually happened on your call — the prospect's own words and the specific thing they're worried about. The result is sharper, more human, and sounds like something you'd really say.",
+    "changes": [
+      "Objection cards now draw on your live conversation, not a canned technique library",
+      "Cards sound more like a real person talking and less like AI",
+      "Switched the objection card to a smarter (slightly slower) writer for better tone"
+    ],
+    "details": [
+      "For a long time, when you asked Wingman for help with an objection, it searched a big library of sales techniques it had learned from YouTube videos and based its suggestion on the closest match. The problem: that library is just the public sales playbook everyone already knows, and forcing the suggestion to fit a pre-written script often made the advice worse, not better — plus searching that library took time.",
+      "We ran a blind test: 12 real objections, each handled four different ways (library-based vs. the AI writing freely vs. two famous closers' styles), graded without knowing which was which. The library version was no better — sometimes worse — than just letting the AI handle it directly with good context.",
+      "The real insight: a great objection response depends entirely on what the AI knows about THIS prospect. Wingman already quietly tracks the seven things a prospect needs to believe before they buy (their pain, whether they can fix it themselves, the cost of waiting, their desired outcome, budget, who else decides, and whether they trust you). Every objection traces back to one of those seven being weak. So now the card figures out which belief is shaky and rebuilds it with one line anchored to something the prospect actually said.",
+      "We also caught that the faster writing engine had a stubborn habit of starting cards with throat-clearing filler ('real quick,' 'here's what I'm asking'). Swapping to a more capable engine cleaned that up completely — the lines now sound calm, natural, and spoken. It costs about half a second more per card, which we bought back by dropping the slow library search.",
+      "One more change: signal cards lose their headline entirely. Instead of a title plus a suggestion, a card is now just a tiny label and the exact first-person line for you to say."
+    ]
+  },
+  {
+    "id": "2026-06-15-instant-card-search",
+    "date": "2026-06-15",
+    "category": "speed",
+    "title": "The slowest part of getting a card is basically gone",
+    "summary": "The step where Wingman looked up the right help for a moment used to take about 2.8 seconds. It now takes about 20 milliseconds — over a hundred times faster. Waiting for a card after you press the hotkey feels dramatically snappier.",
+    "changes": [
+      "Card lookup dropped from ~2.8 seconds to ~20 milliseconds",
+      "Also uncovered a separate bug where a card could answer the wrong objection"
+    ],
+    "details": [
+      "When you press the hotkey during a call, Wingman has to find the most relevant guidance for what's happening right then. That search was mysteriously slow — measured live at nearly three seconds. We traced it to how the information was being looked up: the way the request was written forced the database to laboriously scan through all 6,500-plus stored items every single time instead of jumping straight to the right ones.",
+      "The fix is what top engineering teams do at this size: load the whole library into the server's fast working memory when it starts up, so every lookup happens instantly in memory instead of hitting the slow database. The database stays the official record — this is just a fast copy of it. We proved the fast version returns identical results to the old one across every test before shipping it.",
+      "Live-tested, the search went from about 2,800 milliseconds to roughly 20. That makes the biggest single chunk of the press-to-card delay effectively disappear.",
+      "The live test also surfaced something more important than speed: because the transcription service waits for a natural pause before finalizing a sentence, if you press the hotkey the instant a prospect finishes an objection, that last sentence isn't in the system yet — so the card can end up answering the PREVIOUS objection. That's a correctness problem (a wrong card feels like the whole tool is broken), and it's now the top thing to fix next. It was always there; the speed work just made it visible.",
+      "We also mapped out the remaining speed wins in order: catch the prospect's words a beat sooner, reveal the card word-by-word as it's written, and eventually generate the underlying match on our own servers to cut an outside dependency."
+    ]
+  },
+  {
+    "id": "2026-06-11-no-more-dead-air",
+    "date": "2026-06-11",
+    "category": "feature",
+    "title": "Press the hotkey and you always get a response — never silence",
+    "summary": "When you summon help mid-call, Wingman now shows a little 'thinking…' indicator with a live timer, then always resolves — either a card, an honest 'no objection caught, here's a tip,' or a clear retry message. No more pressing a key and getting nothing. It also got much better at pinpointing the real objection.",
+    "changes": [
+      "A 'Handling objection… 3s' indicator now shows while Wingman works",
+      "If there's no real objection, you get an honest nudge instead of a made-up card",
+      "The picked arrow flashes green so you know your press registered",
+      "Much better at finding the objection that's actually still on the table"
+    ],
+    "details": [
+      "Before this, pressing the hotkey could leave you staring at nothing while Wingman worked, and you had no idea if it even heard you. Now the moment you pick a direction, the chosen arrow flashes green, the others vanish, and a small 'thinking' pill appears with a running seconds counter. Every path is guaranteed to end in something visible: a card, a clear error you can retry, or a graceful timeout — never dead air.",
+      "The bigger win is accuracy. Wingman now takes the last couple minutes of conversation and boils it down to the single objection still standing at that moment, then uses that to find help. In testing this correctly saw through tricky cases — for example, pulling out 'I'm scared I'll drop $9k and still not follow through' from behind a prospect who was hiding it under questions about the refund policy.",
+      "We also found and fixed a quiet root cause of bad suggestions: Wingman was being too strict about what counted as a match, which was throwing away genuinely relevant help for common objections (like needing a partner's sign-off, or fear of not following through). Loosening that threshold — but only when it has confirmed there's a real objection — brought those good matches back.",
+      "For the actions that aren't built yet, instead of silence you now see a friendly 'Not ready yet — coming soon.' And crucially, on a call where there's no real objection, Wingman tells you that honestly and offers a quick pointer rather than inventing a fake card just to have something to show.",
+      "Sebastian ran a live test with 12 presses: zero dead air, every response correct, and the fast ones came back in about 1.5 seconds — right in the target range."
+    ]
+  },
+  {
+    "id": "2026-06-10-compass-appears",
+    "date": "2026-06-10",
+    "category": "fix",
+    "title": "The on-screen compass finally shows up when you press the hotkey",
+    "summary": "A bug that had survived three separate work sessions is fixed: the little four-arrow menu that's supposed to appear when you press the hotkey wasn't rendering at all. One stray leftover line of code had been silently breaking it — and three other on-screen features — on every call ever.",
+    "changes": [
+      "The four-arrow 'compass' menu now appears reliably",
+      "Also un-broke: the auto-stop notice, the 2-hour cap warning, and dismiss animations",
+      "Verified live on a real Zoom call"
+    ],
+    "details": [
+      "When you press the hotkey during a call, a small compass of four arrows is supposed to pop up so you can pick the kind of help you want. It simply wasn't appearing. Two earlier sessions had stared at the compass code, found nothing wrong, and moved on — because the compass code WAS correct.",
+      "The real culprit was somewhere else entirely: a single leftover instruction, sitting in the on-screen overlay since the very first version of the app, was trying to call a function that no longer existed. That error quietly crashed the setup of everything below it — the compass, the 'why the call stopped' notice, the two-hour limit warning, and more — on every single call. Deleting that one dead line fixed all four at once.",
+      "The reason it hid so long: the floating overlay is a see-through, click-through window with no visible console, so there was no easy way to see errors happening inside it. This session, we opened a hidden inspection window on the overlay — and the error revealed itself the instant the app launched, before a single test call.",
+      "A bonus bug turned up during re-testing: two different fade-out animations had the same name, so they were colliding and yanking the compass and cards up-and-to-the-left as they disappeared. Renaming one fixed the janky exit — cards now fade cleanly in place.",
+      "Sebastian confirmed the whole chain working on a real Zoom call: compass appears, fades smoothly, double-tap for instant objection help fires, and everything tears down cleanly when the call ends."
+    ]
+  },
+  {
+    "id": "2026-06-09-hotkey-hardening",
+    "date": "2026-06-09",
+    "category": "infra",
+    "title": "Toughening up the new press-for-help feature before it goes live",
+    "summary": "The brand-new hotkey system (press an arrow to summon help) had just been built. This session reviewed it hard, fixed several real problems, and pinned down the two things standing between it and being usable: the on-screen menu wasn't showing, and it was too slow.",
+    "changes": [
+      "Added a safety net so a mid-call internet drop can't permanently freeze the help feature",
+      "Made summoned objection cards always show the full suggestion, not just a headline",
+      "Identified the two blockers: menu not rendering + ~7 second delay"
+    ],
+    "details": [
+      "The core 'press an arrow key to get help' feature had just been assembled, so this session was about pressure-testing it rather than adding anything new. The most important catch: the request Wingman makes when you press the key had no time limit, meaning if your internet hiccuped mid-call, the feature could get stuck 'thinking' forever and stay broken for the rest of the call. We added a cutoff so it recovers instead of bricking.",
+      "We also fixed a subtle content bug: because live stage-tracking had been retired, summoned objection cards were being quietly stripped down to a bare headline with no actual suggestion. Now they always show the full guidance.",
+      "Live testing then exposed the two real gaps. First, the four-arrow menu wasn't appearing on screen at all (fixed the next day). Second, getting a card was taking around seven seconds — far too slow for a live call — mostly from the system 'waking up' cold on the first request.",
+      "One reassuring finding: we confirmed nothing is firing cards on its own anymore. The old always-listening, auto-interrupting behavior is genuinely gone — Wingman only speaks when you ask it to. A few bits of dead leftover plumbing remain, queued for a later cleanup.",
+      "This work was held in review rather than pushed live, since there were no real users yet and the two blockers had to be solved first."
+    ]
+  },
+  {
+    "id": "2026-06-06-first-full-live-call",
+    "date": "2026-06-06",
+    "category": "infra",
+    "title": "First full 31-minute live call ran end-to-end with zero errors",
+    "summary": "Sebastian ran a real 31-minute sales call with Wingman deployed — the first true end-to-end live test. Everything worked: listening, live note-taking, auto-stopping, the post-call debrief, and the outcome save. Cost came in at 21 cents for the call, right on target.",
+    "changes": [
+      "Confirmed the whole pipeline works on a real call, start to finish",
+      "A 31-minute call cost about $0.21 — within the target range",
+      "Made the app's live call-memory capture a bit more complete so nothing important gets cut off"
+    ],
+    "details": [
+      "This was the moment of truth: a real 31-minute sales call with Wingman running the entire time. Every step of the chain worked without a single error — detecting the meeting, streaming the conversation in, keeping a running understanding of the call, stopping automatically at the end, generating the post-call debrief, and saving the outcome.",
+      "The cost math also checked out. The full call cost about 21 cents, right in the 20–25 cent target. Almost all of that is the background note-taking; the on-screen help cards cost basically nothing. A full hour would run roughly 40 cents, which keeps the business economics healthy at every planned price point.",
+      "We also spotted that Wingman's live understanding of the call was occasionally getting cut off at the end — right where it summarizes open objections and the single weakest point to shore up, which is the most useful part. We gave it more room so those key details don't get truncated. The cost impact is a rounding error.",
+      "The one behind-the-scenes efficiency trick we'd built — reusing the same instructions across the call instead of re-sending them every few seconds — was confirmed working, quietly shaving cost off every long call.",
+      "Bottom line: the plumbing that had long been flagged as 'never tested end-to-end live' is now proven on a real call."
+    ]
+  },
+  {
+    "id": "2026-06-05-outcome-card-fix",
+    "date": "2026-06-05",
+    "category": "fix",
+    "title": "The 'How'd it go?' card now works on every call, not just the first",
+    "summary": "The card that pops up after a call asking you to log the outcome was becoming unresponsive on the second call of a session — clicks would pass right through it and it would vanish without saving. It now reliably reappears, centered, and captures your input every time.",
+    "changes": [
+      "The post-call outcome card is reliable on back-to-back calls",
+      "It's now centered on screen and won't freeze the rest of your screen",
+      "Clicking it no longer passes through to Zoom underneath"
+    ],
+    "details": [
+      "After a call ends, Wingman shows a 'How'd it go?' card so you can instantly log whether you closed, lost, or disqualified the deal. The bug: if you ended one call without logging it, then ended a second call soon after, the new card would appear dead — your clicks went straight through it to the Zoom window behind it, and then it quietly disappeared without saving anything.",
+      "The root cause was leftover state from the first call's card blocking the second one from setting itself up properly. The fix makes the card fully re-initialize itself every time it appears, so a stale card can never poison the next one.",
+      "While in there, we also improved how it behaves on screen: it no longer freezes your entire screen while it's up (it only captures clicks when you hover over it), and it's now centered with its own clean entrance animation instead of tucked in a corner.",
+      "Because this is desktop-app code, it reaches you through a downloaded app update rather than an automatic web deploy.",
+      "A related rare timing conflict — where a manual 'end call' and Wingman's automatic stop could both fire at once and double-charge a call against your quota — was also confirmed already guarded against."
+    ]
+  },
+  {
+    "id": "2026-06-05-whole-call-memory",
+    "date": "2026-06-05",
+    "category": "ai",
+    "title": "Wingman now remembers the whole call, not just the last 90 seconds",
+    "summary": "Wingman quietly keeps a running scorecard of the entire conversation in the background — where the prospect is on pain, budget, trust, who decides, and more — plus their exact words. So when you ask for help, it reasons over the whole call, not just the last minute and a half.",
+    "changes": [
+      "A running, whole-call understanding updates quietly every couple minutes",
+      "It tracks the 7 things a prospect must believe before buying, plus their exact quotes",
+      "This memory feeds every help card you summon"
+    ],
+    "details": [
+      "Previously Wingman only had the most recent chunk of the conversation to work with, so it could lose track of something important a prospect said earlier in the call. Now it maintains a living summary that updates in the background roughly every two minutes across the whole call.",
+      "That summary is built around the seven beliefs a prospect needs before they'll buy — their real pain, whether they think they can fix it alone, the cost of doing nothing, their desired outcome, their budget, who else is involved in the decision, and whether they trust you — each marked as covered, shaky, or still open. It also captures the gap between where they are and where they want to be, and, critically, their exact words so your suggested lines can mirror their language.",
+      "Choosing the engine for this mattered. We ran a five-scenario trap test with planted traps (a fake yes, a guarded skeptic, a hidden objection) and graded against a pre-written answer key. The more capable engine scored a clean 5 out of 5 while the faster one slipped twice — once mistaking enthusiasm for real desire, once muddying a hidden objection. Since this runs quietly in the background (not while you're waiting for a card), we could afford the smarter, slightly slower engine here.",
+      "Impressively, when tested on a short call that was just tech-setup chatter with no real selling, it refused to make things up — it honestly reported that no sales conversation had happened yet. That honesty is exactly what we wanted.",
+      "This memory is what every summoned help card now reasons over, so its suggestions reflect the entire conversation rather than a narrow recent window."
+    ]
+  },
+  {
+    "id": "2026-06-03-no-more-popups",
+    "date": "2026-06-03",
+    "category": "feature",
+    "title": "No more cards popping up on their own — plus a full stage breakdown after every call",
+    "summary": "Wingman stopped interrupting you with cards it decided to show on its own. During the call you now see only a quiet presence dot. After the call, your Flight Log shows a full breakdown of the six stages of the conversation — where you spent time and where you rushed.",
+    "changes": [
+      "No unprompted pop-ups during a call — just a subtle presence dot",
+      "The six call stages are now worked out and shown after the call, in your Flight Log",
+      "Your transcript, debrief, and objection list keep flowing as before"
+    ],
+    "details": [
+      "This is a foundational shift in how Wingman behaves. The old model had Wingman constantly analyzing the call and deciding on its own when to flash a card on screen. That was distracting and assumed the software knew better than you when you needed help. Now nothing appears unless you ask for it — during the call you just see a small ambient dot confirming Wingman is present and listening.",
+      "The stage tracking that used to run live (and cost money to run continuously) moved to after the call. When the call ends, Wingman works out the six stages of the conversation — Rapport, Discovery, Press, Confirm, Pitch, and Close — and shows them in your Flight Log with notes on each, plus a coverage heatmap so you can see at a glance where you were strong and where you skipped ahead.",
+      "A crucial piece of plumbing had to be rebuilt first: the old always-on analysis loop was secretly also the only thing saving your transcript. Retiring it naively would have silently blanked every Flight Log, debrief, Ask-Wingman chat, and Objection Vault. So we first split transcript-saving onto its own steady, cheap heartbeat, then retired the expensive loop — leaving all your call history fully intact.",
+      "A review caught a real bug before it shipped: the stage breakdown was about to be saved with an invalid status label that the database would silently reject, which would have left the stage heatmap permanently blank while the logs claimed success. Fixed before merge.",
+      "The upshot: calmer, less intrusive calls, and richer, more useful review afterward."
+    ]
+  },
+  {
+    "id": "2026-06-01-safety-net-and-leak-fix",
+    "date": "2026-06-01",
+    "category": "security",
+    "title": "A safety net for building fast — and a leaked access key locked down",
+    "summary": "Set up automated reviews that check every code change for bugs and security holes before it can go live, so mistakes get caught even though the founder can't read code. Also found and shut down an access key that had been sitting exposed in plain text, and rotated it.",
+    "changes": [
+      "Every change now gets an automatic bug review and security scan before going live",
+      "Found and killed an exposed access token; replaced it with a safer setup",
+      "New rule: changes go through review before touching the live product"
+    ],
+    "details": [
+      "Because the founder can't personally catch bugs or security holes in code, this session built the safety net that does it automatically. Now every proposed change is checked two ways before it can reach the live product: an automated bug review reads the change with fresh eyes and flags anything risky, and a separate security scan looks for vulnerabilities. On top of that, a hard gate blocks any change that doesn't pass the project's automated tests.",
+      "The workflow itself changed too. Previously every code change pushed straight to the live product with no check at all. Now changes go onto a side branch, get reviewed and scanned, and only then merge in — so the live app (and paying customers, once there are any) is protected.",
+      "The security find: an access token — essentially a password for the code repository — was discovered sitting in plain text embedded in a settings file. Sebastian rotated it (which instantly kills the old one), and we switched to storing credentials safely in the Mac's built-in secure keychain instead of in the project files.",
+      "We also seeded a batch of automated tests covering the app's core logic, because 'the code compiles' doesn't prove 'the code works.' Tests turn 'it works' into something a machine can actually check on every future change.",
+      "None of this changes what you see in the app — it's the scaffolding that makes building quickly also safe."
+    ]
+  },
+  {
+    "id": "2026-05-31-ask-dont-interrupt",
+    "date": "2026-05-31",
+    "category": "infra",
+    "title": "Big direction call: Wingman speaks only when you ask it to",
+    "summary": "Decided the core behavior change that shaped everything after: instead of Wingman deciding on its own when to pop up a card, you summon help by pressing a key. This makes calls far less distracting and slashes running costs. No code yet — this was the decision.",
+    "changes": [
+      "Locked in: press a hotkey to summon help, instead of auto pop-ups",
+      "Renamed the app's learning layer from 'Offer Brain' to 'Sales DNA'",
+      "Set early pricing direction: 10 free calls, then a monthly plan"
+    ],
+    "details": [
+      "This session set the product direction that everything since has been built around. The old idea was that Wingman would watch the call and decide for itself when to flash a suggestion. The problem: pop-ups you didn't ask for are distracting, and they assume the software knows better than you when you're stuck. You always know the moment you need help — Wingman's job is to supply the right words, fast. So the model flipped to: you press a key, Wingman answers.",
+      "A nice side effect is cost. Constantly analyzing every call to decide when to interrupt is expensive; only generating a card when you actually press a key makes the live running cost almost nothing, which is what makes an affordable unlimited plan possible.",
+      "The fast background 'listener' that used to trigger pop-ups doesn't go away — it gets demoted to a silent scout that just quietly tags moments. Because it no longer interrupts anyone, it can be made broadly sensitive with zero downside if it's occasionally wrong.",
+      "We also renamed the part of Wingman that learns your offer and style from 'Offer Brain' to 'Sales DNA' — a warmer name that says 'this is you, learned' rather than a feature label. And we set an early pricing direction of 10 free calls followed by a monthly plan.",
+      "No app code changed this session — it was the strategy and the decisions that the following weeks of building executed on."
+    ]
+  },
+  {
+    "id": "2026-05-30-faster-cheaper-cards-plan",
+    "date": "2026-05-30",
+    "category": "infra",
+    "title": "Groundwork to make cards faster and cheaper",
+    "summary": "Research-and-planning day. Decided to stick with the current AI engine (it beat the faster alternative on quality where it counts), and lined up a caching trick to make the very first card of a call as fast as the tenth. No app changes shipped.",
+    "changes": [
+      "Evaluated a faster/cheaper AI engine and chose to keep the higher-quality one for now",
+      "Planned a caching trick to remove the first-card 'cold start' delay",
+      "Built architecture diagrams for understanding and investor use"
+    ],
+    "details": [
+      "Sebastian asked whether switching to a much faster, cheaper AI provider would speed up cards. We ran the numbers with current data and concluded: not yet. The faster provider's head start before it even begins writing eats nearly the whole one-second budget, its quality is a notch below, and it produces a malformed card about 1 in 50 times — which on a live call is a visible failure. At today's tiny scale the cost savings are under a dollar a day, not worth the quality risk. We'll revisit once there's real user volume.",
+      "We did find a real speed opportunity: the card generator wasn't using 'caching,' a trick where Wingman pays once to memorize its standing instructions and then reuses them cheaply and quickly for the rest of the call. Adding it — plus firing a quick warm-up at the start of each call — would make the first card land as fast as later ones, instead of the first one being sluggish. This went onto the build list.",
+      "We also took an honest inventory of the whole system, marking what's solid (security, model choices) versus what needs work before a wider launch (the missing caching, smarter moment-detection, and a couple of infrastructure upgrades that only matter at scale).",
+      "Finally, we produced a set of clean architecture diagrams — a technical data-flow reference, a swimlane view, and a polished investor-facing 'under one second' story — for explaining how Wingman works.",
+      "Nothing shipped to the live app; this was the thinking that set up the caching and speed work that followed."
+    ]
+  },
+  {
+    "id": "2026-04-26-instant-card-delivery",
+    "date": "2026-04-26",
+    "category": "speed",
+    "title": "Cards delivered instantly instead of after a wait — and 81% cheaper",
+    "summary": "Replaced the old system where the app checked for new cards on a timer (up to a 90-second wait) with one that pushes cards to your screen the instant they're ready. Same change cut the AI running cost per call by 81%. Also removed a wasteful background scan that was quietly burning money.",
+    "changes": [
+      "Cards now arrive the moment they're generated, not on the next check-in",
+      "AI cost per call dropped from about $1.98 to $0.37",
+      "Killed a background scan that ran every 10 seconds and wasted ~$0.41 per call"
+    ],
+    "details": [
+      "Wingman used to fetch updates on a timer — checking anywhere from every 8 to every 90 seconds depending on the call stage. That meant a card could be ready but sit unseen until the next check-in, up to a minute and a half later. This work switched to a live 'push' connection, so the moment a card is generated it appears on your screen instantly.",
+      "The same change slashed cost. Because the app is no longer repeatedly asking the expensive AI to re-analyze on every timer tick, the per-call AI cost dropped from about $1.98 to about $0.37 — an 81% reduction.",
+      "Separately, we found a background scan that had been running every 10 seconds for the entire call whether or not anything meaningful was happening, quietly wasting about 41 cents per call. It now only runs when something actually worth checking occurs.",
+      "A tricky ordering bug was caught during review — a piece of the new live-connection code referenced something before it was defined, which would have crashed the screen on every render. Fixed before it shipped.",
+      "Note for the record: this live-push system was later made unnecessary by the shift to press-a-key-for-help (summoned cards come back instantly on their own), but at the time it was a major speed and cost win."
+    ]
+  },
+  {
+    "id": "2026-04-25-signup-fixes",
+    "date": "2026-04-25",
+    "category": "fix",
+    "title": "Signup and login made smoother — plus a cleaner chatbot",
+    "summary": "Fixed several rough edges in creating an account: show/hide buttons on password fields, a 'resend confirmation email' button, and a broken 'Sign in with Google' flow. Also hardened the Ask-Wingman chatbot so it never swears, and trimmed a pointless onboarding step.",
+    "changes": [
+      "Added show/hide toggles on password fields",
+      "Added a 'Didn't get it? Resend email' button on signup",
+      "Fixed 'Sign in with Google' failing with a connection error",
+      "Ask-Wingman chatbot no longer uses profanity, ever",
+      "Removed a useless onboarding question"
+    ],
+    "details": [
+      "This session cleaned up the account-creation experience. Password fields got show/hide eye toggles so you can check what you typed. The signup confirmation flow got a 'Didn't get it? Resend email' button for when the first email doesn't arrive. And 'Sign in with Google,' which was failing with a connection error, was fixed — the sign-in address simply hadn't been added to the approved list, corrected without any code change.",
+      "The Ask-Wingman chatbot had occasionally slipped into profanity because its 'talk like a sharp human' personality was overriding a soft no-swearing note. We turned that soft note into a hard, unambiguous rule — no profanity, not once, not even for emphasis.",
+      "We also removed a 'How do you fly?' onboarding question that collected a sales-style answer the app never actually used — pure friction on the way in, now gone.",
+      "A couple of previously reported issues were reviewed and confirmed already fixed: the floating overlay correctly lets clicks pass through to your meeting, and its interactive bits only capture the mouse when you hover them.",
+      "Small, unglamorous fixes — but they're the difference between a signup that feels polished and one that quietly loses people."
+    ]
+  },
+  {
+    "id": "2026-04-25-recording-law-terms",
+    "date": "2026-04-25",
+    "category": "security",
+    "title": "Clear recording-law terms added, and the founder's name off the legal pages",
+    "summary": "Added a plain, explicit section to the Terms of Service covering call-recording laws and making clear the rep — not Wingman — is the one recording. Also replaced Sebastian's personal name with 'Wingman LLC' on the legal pages.",
+    "changes": [
+      "New Terms section naming all 14 all-party-consent states and the relevant federal law",
+      "Makes explicit that the rep is responsible for recording-law compliance",
+      "Legal pages now say 'Wingman LLC' instead of the founder's personal name"
+    ],
+    "details": [
+      "Wingman listens to live sales calls, so its legal footing around call recording matters. This session added a dedicated Terms of Service section that spells it out plainly: the rep using Wingman is the party doing the recording, and they're responsible for following recording laws where they and their prospect are located.",
+      "The section names all 14 U.S. states that require everyone on a call to consent to recording, cites the specific federal wiretap law, and states clearly that Wingman does not automatically announce recording to call participants — with an indemnification clause protecting the company. It mirrors the approach a well-known competitor takes, but with more explicit law and state citations.",
+      "On both the Terms and Privacy pages, Sebastian's personal name was replaced with 'Wingman LLC,' so the founder's individual name no longer appears in the legal documents. The company will be formally filed before the first paying users.",
+      "We also confirmed the Terms and Privacy pages themselves already existed and are reachable from the signup screen — clearing a launch blocker where the signup agreement linked to pages that had to exist.",
+      "These changes were pushed live. For beta, the stance is terms-based disclosure (acknowledged at signup) rather than aggressive mid-call consent prompts, matching industry precedent."
+    ]
+  }
+]
