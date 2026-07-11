@@ -4,10 +4,10 @@ Last updated: 2026-07-11
 
 This is the first file Claude reads at session start. It answers: where are we, what's next, and what's blocking us.
 
-> **Live now (verified 2026-07-11 via `gh pr list --state merged`)** — reconcile before trusting any prose below.
-> Merged to main since the last wrap: **#41** Sales DNA Phase 1a (capture+storage), **#42** private Changelog page (`/changelog`, owner-gated), **#43** auth-callback public-origin fix (Google/magic-link/reset login was landing on `localhost:8080` on prod web — broken since launch, now fixed + live-confirmed). Latest release still **v0.1.28**. **NEXT is unchanged: Phase 1b (Offer-Aware moat).**
+> **Live now (verified 2026-07-11 S2 via `gh pr list --state merged`)** — reconcile before trusting any prose below.
+> Latest merge: **#45** Phase 1b Offer-Aware moat + syntax auto-detect → on main, Railway deploying. (Earlier today: #41 Sales DNA 1a, #42 Changelog, #43 auth-origin fix.) Latest release still **v0.1.28** (no desktop release this session). **NEXT: live-test 1b on a real call, then Phase 1c (onboarding + Deploy gate).**
 >
-> **Two side quests done this session, not on the roadmap:** (1) the Changelog page is a private founder tool — `/wrap` now auto-appends an entry each session (SKILL Step 3b); memory `project_changelog_page`. (2) the auth fix is Known Issue #49 (resolved) + a lesson in `tasks/lessons.md` (Railway proxy → use `getPublicOrigin`, never `request.url` origin, for redirects).
+> **#45 shipped (2026-07-11 S2):** Sales DNA now feeds the LIVE cards — belief-ladder summarizer (interpretive lens + NUMBER CONFIDENCE rule, which took **3.6b GREEN**) + dig card, client-passed + prompt-cached + warm-at-deploy. Zero-fabrication gate GREEN (Claude+GPT dual-judge). Plus the "I'm not sure" syntax auto-detect (post-call self-update via the atomic `set_sales_dna_syntax_if_unsure` RPC — Known Issue #50 = the DB-function deploy-dep). Demoed live on Sebastian's real land offer (generic "what does that look like?" → offer-aware "what would you need to be MAKING to leave?", 0 fabrication). Not yet live-pipeline-verified (needs a real call).
 
 ---
 
@@ -26,7 +26,7 @@ This is the first file Claude reads at session start. It answers: where are we, 
 | 3.5 | Groq query distillation + latency fixes | ✅ PR #15 |
 | **3.6** | **↑ Objection slot deepening** *(was the "small" Phase 1/2/3)* | ◐ in progress |
 | &nbsp;&nbsp;3.6a | Sonnet prompt, KB cut, headless top-center card *(was small "Phase 1")* | ✅ shipped 06-29, PR #20 |
-| &nbsp;&nbsp;3.6b | Confidence-aware summarizer — `belief-ladder.ts`; `test-belief-ladder.mjs` gate must go GREEN *(was small "Phase 2")* | 🔲 next in objection track |
+| &nbsp;&nbsp;3.6b | Confidence-aware summarizer — `belief-ladder.ts`; `test-belief-ladder.mjs` gate GREEN *(was small "Phase 2")* | ✅ shipped 2026-07-11 in PR #45 (NUMBER CONFIDENCE rule pulled forward with the moat; gate green, Claude+GPT dual-judge) |
 | &nbsp;&nbsp;3.6c | Anchor library — needs `calls.anchors` schema *(was small "Phase 3")* | 🔲 DEFERRED (eval showed no aggregate lift) |
 | **4** | The other 3 arrows: ← answer · ↓ dig deeper · → close readiness | 🔲 not started |
 | **5** | Dead-code removal (#37) + reconcile stale CLAUDE.md rules (#34) | 🔲 not started |
@@ -43,12 +43,14 @@ This is the first file Claude reads at session start. It answers: where are we, 
 
 ---
 
-## 🎯 NEXT SESSION — START HERE (updated 2026-07-10 S2)
+## 🎯 NEXT SESSION — START HERE (updated 2026-07-11 S2)
 
-> **2026-07-10 S2 — Offer-Aware Wingman (THE MOAT) is now IN FLIGHT. Phase 1a shipped as [PR #41](https://github.com/bandidoseb/wingman/pull/41)** (branch `feat/sales-dna-1a`, capture+storage only — reconcile: check if #41 merged before trusting this). #47 already merged (PR #40 → main). **🔴 FIRST THING NEXT SESSION: Phase 1b** — the moat's engine. Full design: `07 - North Star/Sales DNA Capture — Design.md`; build plan: `tasks/todo.md` (decomposed 1a→1d + fast-follow).
+> **Phase 1b (Offer-Aware moat) + syntax auto-detect SHIPPED — [PR #45](https://github.com/bandidoseb/wingman/pull/45) merged → Railway.** The moat's ENGINE is live: Sales DNA feeds the summarizer + dig card, zero-fabrication gate green. 3.6b (NUMBER CONFIDENCE) went green with it. What's left is (1) proving it on a real call, then (2) making it MANDATORY via onboarding + a Deploy gate (Phase 1c). Full design: `07 - North Star/Sales DNA Capture — Design.md`; plan: `tasks/todo.md`.
 
-### 🔴 PHASE 1b — START HERE (fresh session, plan-reviewed)
-Wire the captured Sales DNA into live cards. Key correction from plan review: inject the **belief-ladder SUMMARIZER** (the chokepoint every card reads — feeds objection card for free), not just dig. `buildSalesDnaBlock()` → cached system block in `summarize/route.ts` (interpretive lens, anti-fabrication clause + trap in `test-belief-ladder.mjs`) AND `dig-prompt.mjs` (cached, ordered BEFORE the volatile summary). Pass `sales_dna` from client into `kb-signal` (NO hot-path DB read). Adversarial fabrication traps in dig-eval + belief-ladder eval. Then **1c** (onboarding flow + Deploy gate at top of `call:start` before `deployState="searching"` + native mic/audio permissions) → **1d** (🎤 mic brain-dump). Fast-follow: **syntax auto-detect after ~5 calls** (must wire — "Not sure yet" is a real option; signal lives in the `calls.live_summary` text blob, regex-parse).
+### 🔴 START HERE — live-test Phase 1b, then Phase 1c
+1. **Live-test 1b on a real call FIRST.** Fill Sales DNA fully → Deploy → confirm `[summarize] dna=present` + `cache_read>0` in logs, the ↓ Dig card aims at the offer's root driver in the rep's voice, and ZERO fabrication on real speech. Solo option = the rename-trick (set Settings Zoom name to something you won't join as → Wingman treats you as the prospect). Also verify summarizer cap #48 (~700–900, not pinned at 1200) while you're watching the logs.
+2. **Phase 1c — make it mandatory (its own session, plan-reviewer + wingman-reviewer both required).** Onboarding step-machine + a Deploy gate that blocks until EVERY Sales DNA question is answered (`salesDnaComplete`, all-questions — Sebastian-locked), the 4-option syntax question (`Problems/Goals/I read the room/I'm not sure` — needs a `SalesSyntax` 4th value), native mic/system-audio permissions, and the Granola-style "try a demo meeting" activation (short video + a fake computer-audio call to learn the hotkeys). Then **1d** (🎤 mic brain-dump) → the **voice-AI onboarding discovery call** (queue item, `project_voice_ai_onboarding`).
+3. Queued behind the moat (each its own session): the **positioning wedge** demo/blog (`03 - GTM/`, HIGH), **↓ Dig threading + natural transition** (`_Inbox/2026-07-11 Dig card…`), desktop release (ship accumulated HUD/Electron changes), KB cut decision, calendar detection.
 
 ### 🔴 QUEUED — after the moat (each its own FRESH session):
 1. **Verify the summarizer cap fix (Known Issue #48).** Cap raised 600→1200 (was truncating WEAKEST LINK, which Dig reads). Re-check output counts on the next call — complete-but-not-bloated (~700–900 = right; pinned at 1200 = tighten the PROMPT instead). NOTE: 1b edits this same summarizer prompt — verify the cap while there.

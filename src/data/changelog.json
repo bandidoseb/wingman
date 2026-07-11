@@ -1,5 +1,24 @@
 [
   {
+    "id": "2026-07-11-offer-aware-cards",
+    "date": "2026-07-11",
+    "category": "ai",
+    "title": "Your live cards now know your offer",
+    "summary": "Fill out your Sales DNA and Wingman's in-call suggestions stop being generic — they aim at what your prospects are really after and use your own language, without ever putting words in the prospect's mouth.",
+    "changes": [
+      "Live cards now understand your specific offer, not generic sales advice",
+      "Wingman never claims the prospect said something they didn't",
+      "If you answered 'not sure' about how you open calls, Wingman figures it out from your real calls"
+    ],
+    "details": [
+      "Until now, every closer got roughly the same coaching because Wingman didn't actually know what you sell — that's the single biggest reason a suggestion could feel 'off'. Now, once your Sales DNA is filled in, Wingman reads it before every call and uses it to understand what your prospect's words are really pointing at.",
+      "A real example: a prospect says 'honestly I just want to quit my job.' A generic tool asks 'what would that look like for you?' Wingman, knowing your offer is about building monthly cash flow, instead asks 'what would you need to be making to actually pull the trigger on leaving?' — it steers straight at the thing that closes the deal, in your voice.",
+      "The part we were most careful about: Wingman treats your Sales DNA as background about your typical prospect — averages, never gospel. It will never tell you to say a number or a fact as if this specific prospect gave it to you. That 'never make something up' rule is enforced by tests that deliberately try to trick it, and it has to pass before anything ships.",
+      "There's also a quality-of-life touch: if you answered 'not sure' about whether you open on problems or goals, Wingman watches how your real calls actually go and, after a handful, quietly sets it for you and tells you what it noticed. One less thing to figure out.",
+      "Under the hood it's also faster and cheaper — your offer info is loaded once when you deploy and reused all call long, so the first suggestion of the call is already warmed up."
+    ]
+  },
+  {
     "id": "2026-07-11-login-redirect",
     "date": "2026-07-11",
     "category": "fix",
