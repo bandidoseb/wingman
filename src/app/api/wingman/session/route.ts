@@ -3,6 +3,18 @@ import { createClient } from "@/lib/supabase/server";
 import { PLANS } from "@/lib/stripe";
 import { FREE_CALL_LIMIT } from "@/lib/constants";
 import { warmUpPipeline } from "@/lib/wingman/pipeline-warmup";
+import { sanitizeSalesDna } from "@/lib/wingman/sales-dna.mjs";
+
+// ── Warm-up debounce (Phase 1b reviewer 🟡) ─────────────────────────────────
+// warmUpPipeline fires paid requests (embed ping, Haiku/Sonnet pings, and — with
+// complete Sales DNA — a ~2k-token Sonnet cache-write prime). Session POST itself
+// is deliberately NOT rate-limited (a failed deploy must be retryable instantly),
+// so cap the SPEND instead: skip the warm-up when this user warmed <60s ago. A
+// retry inside that window doesn't need re-warming anyway — connections and the
+// prompt cache (5-min TTL) are still hot. In-memory Map is fine on single-instance
+// Railway (same trade-off as kb-signal's rateLimitMap).
+const warmupDebounce = new Map<string, number>();
+const WARMUP_DEBOUNCE_MS = 60_000;
 
 // ─── POST /api/wingman/session — start a new call session ──────────────────
 export async function POST(req: NextRequest) {
@@ -12,7 +24,12 @@ export async function POST(req: NextRequest) {
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     const body = await req.json().catch(() => ({}));
-    const { prospect_name } = body;
+    const { prospect_name, sales_dna } = body;
+
+    // Phase 1b (warm-at-deploy): the client sends its Sales DNA copy at call start
+    // so the warm-up can prime the dig card's prompt cache. Untrusted → the ONE
+    // shared sanitizer (same caps as every other rail). Never blocks call start.
+    const salesDna = sanitizeSalesDna(sales_dna);
 
     // Load profile and flight plan in parallel.
     // Flight plan has a 3s timeout — a slow fetch must never block call start.
@@ -112,12 +129,24 @@ export async function POST(req: NextRequest) {
 
     if (error) throw error;
 
-    // Phase 3.5 (#38): fire-and-forget pipeline warm-up — opens TLS/connection
-    // pools to OpenAI/Anthropic/Groq and wakes the pgvector index so the rep's
-    // FIRST hotkey press isn't the cold sample. Never awaited (call start is
-    // unaffected), never throws, <$0.001/call. Fired only after the call row
-    // insert succeeds. Railway = persistent Node, so it completes post-response.
-    void warmUpPipeline().catch(() => {});
+    // Phase 3.5 (#38) + 1b: fire-and-forget pipeline warm-up — opens TLS/connection
+    // pools to OpenAI/Anthropic/Groq, kicks the in-memory KB load, and (when the
+    // rep's Sales DNA is complete) primes the dig card's prompt cache with the real
+    // DNA prefix so the FIRST hotkey press hits a warm cache. Never awaited (call
+    // start is unaffected), never throws, <$0.01/call worst case. Fired only after
+    // the call row insert succeeds, at most once per user per 60s (spend cap — a
+    // rapid retry is still warm). Railway = persistent Node → completes post-response.
+    const lastWarm = warmupDebounce.get(user.id) ?? 0;
+    if (Date.now() - lastWarm >= WARMUP_DEBOUNCE_MS) {
+      warmupDebounce.set(user.id, Date.now());
+      // Opportunistic prune so the map can't grow unbounded across many users.
+      if (warmupDebounce.size > 500) {
+        for (const [uid, t] of warmupDebounce) {
+          if (Date.now() - t > WARMUP_DEBOUNCE_MS) warmupDebounce.delete(uid);
+        }
+      }
+      void warmUpPipeline(salesDna).catch(() => {});
+    }
 
     return NextResponse.json({ call_id: call.id, call });
   } catch (err) {

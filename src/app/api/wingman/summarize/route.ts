@@ -5,6 +5,7 @@ import {
   BELIEF_LADDER_MODEL,
   BELIEF_LADDER_MAX_TOKENS,
 } from "@/lib/wingman/belief-ladder";
+import { buildSummarizerDnaSystemBlock } from "@/lib/wingman/sales-dna.mjs";
 
 // ── Per-user rate limit ───────────────────────────────────────────────────────
 // Each summarize tick calls Claude Sonnet (paid). Reject calls faster than once
@@ -32,10 +33,11 @@ export async function POST(req: NextRequest) {
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     const body = await req.json().catch(() => ({}));
-    const { call_id, current_summary, new_transcript } = body as {
+    const { call_id, current_summary, new_transcript, sales_dna } = body as {
       call_id: string;
       current_summary?: string | null;
       new_transcript: string;
+      sales_dna?: unknown;
     };
 
     if (!call_id) {
@@ -102,6 +104,28 @@ export async function POST(req: NextRequest) {
       `CURRENT SCORECARD:\n${current_summary?.trim() || "(empty — this is the start of the call)"}\n\n` +
       `NEW TRANSCRIPT (only what was said since the last update):\n${new_transcript}`;
 
+    // ── Phase 1b (offer-aware): the rep's Sales DNA as an interpretive LENS ──
+    // Client-passed (same untrusted rail as new_transcript); the builder sanitizes
+    // (shared caps with the save path) and gates on completeness — a partial blob
+    // returns null and the system below is byte-identical to pre-1b. The lens text
+    // (AVERAGES-NOT-GOSPEL fence + never-evidence rules) lives in sales-dna.mjs so
+    // scripts/test-belief-ladder.mjs grades the exact bytes shipped here.
+    const dnaSystemBlock = buildSummarizerDnaSystemBlock(sales_dna);
+
+    // System block assembly — the cache breakpoint sits on the LAST system block.
+    // Both blocks are call-stable, so the ~2-min summarize tick re-hits the same
+    // prefix and keeps the cache warm the whole call (5-min TTL refreshes on use).
+    // Bonus: the DNA block finally pushes the prefix over Sonnet's ~1,024-token
+    // cache minimum, which the bare prompt sat under (see the cache log below).
+    const systemBlocks = dnaSystemBlock
+      ? [
+          { type: "text" as const, text: BELIEF_LADDER_SYSTEM_PROMPT },
+          { type: "text" as const, text: dnaSystemBlock, cache_control: { type: "ephemeral" as const } },
+        ]
+      : [
+          { type: "text" as const, text: BELIEF_LADDER_SYSTEM_PROMPT, cache_control: { type: "ephemeral" as const } },
+        ];
+
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 25_000);
 
@@ -119,13 +143,7 @@ export async function POST(req: NextRequest) {
         body: JSON.stringify({
           model: BELIEF_LADDER_MODEL,
           max_tokens: BELIEF_LADDER_MAX_TOKENS,
-          system: [
-            {
-              type: "text",
-              text: BELIEF_LADDER_SYSTEM_PROMPT,
-              cache_control: { type: "ephemeral" },
-            },
-          ],
+          system: systemBlocks,
           messages: [{ role: "user", content: userMessage }],
         }),
         signal: controller.signal,
@@ -140,21 +158,22 @@ export async function POST(req: NextRequest) {
       const data = await resp.json();
       summary = (data.content?.[0]?.text ?? "").trim();
 
-      // Log cache stats so we can verify caching is actually engaging.
-      // ⚠️ IMPORTANT: Anthropic only caches blocks above ~1,024 tokens (Sonnet).
-      // The system prompt alone (~300 tokens) is likely under this threshold —
-      // if cache_creation=0 AND cache_read=0 on EVERY call, add the rep's Sales DNA
-      // profile to the cached system block to push it over the minimum.
+      // Log cache stats so we can verify caching is actually engaging (never assume).
+      // Anthropic only caches prefixes above ~1,024 tokens (Sonnet). With Sales DNA
+      // present the prefix comfortably clears it; the bare prompt (~300 tok) may not.
+      // Expected pattern with DNA: creation>0 on the first tick, read>0 on every tick
+      // after (the ~2-min cadence keeps the 5-min TTL warm all call).
       const usage = data.usage ?? {};
+      const dnaTag = dnaSystemBlock ? "dna=present" : "dna=absent";
       if ((usage.cache_creation_input_tokens ?? 0) > 0 || (usage.cache_read_input_tokens ?? 0) > 0) {
         console.log(
           `[summarize] ✅ Cache hit: created=${usage.cache_creation_input_tokens ?? 0} ` +
-          `read=${usage.cache_read_input_tokens ?? 0} ` +
+          `read=${usage.cache_read_input_tokens ?? 0} ${dnaTag} ` +
           `in=${usage.input_tokens} out=${usage.output_tokens} call=${call_id}`,
         );
       } else {
         console.warn(
-          `[summarize] ⚠️ Cache NOT engaged (created=0 read=0) — system prompt may be under ` +
+          `[summarize] ⚠️ Cache NOT engaged (created=0 read=0) ${dnaTag} — prefix likely under ` +
           `the ~1,024-token minimum for Sonnet. ` +
           `in=${usage.input_tokens} out=${usage.output_tokens} call=${call_id}`,
         );

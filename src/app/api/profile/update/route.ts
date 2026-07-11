@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient, createServiceClient } from "@/lib/supabase/server";
+import { sanitizeSalesDna } from "@/lib/wingman/sales-dna.mjs";
 
 /**
  * POST /api/profile/update
@@ -36,37 +37,12 @@ const WRITABLE_PROFILE_COLUMNS = new Set<string>([
   "sales_dna",
 ]);
 
-// Keys allowed inside the sales_dna jsonb blob (mirrors the SalesDna type).
-const SALES_DNA_KEYS = new Set<string>([
-  "transformation", "root_driver", "emotional_root", "guarantee", "syntax",
-  "pain", "desire", "cost", "doubt", "trust", "money", "support",
-]);
-const SALES_DNA_FIELD_MAX = 2000;   // per-field char cap
-// Total cap must sit ABOVE the natural ceiling of a full brain-dump
-// (11 fields × 2000 = 22,000) so legitimate heavy input is NEVER dropped —
-// the cap only guards against true abuse. Overflow returns a 400 (see handler),
-// never a silent drop with a false "Saved".
-const SALES_DNA_TOTAL_MAX = 26000;  // serialized blob char cap
-
-/**
- * Coerce untrusted sales_dna input into a safe object:
- * plain object only, known string keys only, per-field + total size capped.
- * Returns null when the input is unusable (caller drops it) — never throws.
- */
-function sanitizeSalesDna(v: unknown): Record<string, string> | null {
-  if (v === null) return {};                                 // explicit reset
-  if (typeof v !== "object" || Array.isArray(v)) return null; // not a blob → drop
-  const out: Record<string, string> = {};
-  for (const [k, val] of Object.entries(v as Record<string, unknown>)) {
-    if (!SALES_DNA_KEYS.has(k)) continue;      // unknown key → drop
-    if (val == null) continue;                 // skip empties (leave key unset)
-    if (typeof val !== "string") continue;     // strings only (syntax is a string)
-    const trimmed = val.slice(0, SALES_DNA_FIELD_MAX);
-    if (trimmed.trim()) out[k] = trimmed;
-  }
-  if (JSON.stringify(out).length > SALES_DNA_TOTAL_MAX) return null; // oversized → drop
-  return out;
-}
+// sales_dna sanitizer — single source in sales-dna.mjs (Phase 1b, imported above),
+// shared with every call-time injection rail (summarize body, press payload,
+// session create) so the caps at save time and at inject time can never disagree.
+// Semantics unchanged: plain object only, known string keys only, per-field 2,000
+// chars, total 26,000 chars (above a full 12×2,000 brain-dump — guards abuse only,
+// never drops legitimate heavy input; overflow → 400, never a silent "Saved").
 export async function POST(request: Request) {
   try {
     // 1. Verify the caller is an authenticated Supabase user

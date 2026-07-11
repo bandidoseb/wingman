@@ -5,7 +5,14 @@
  * memory. It was locked on 2026-06-05 after a 5-trap calibration test
  * (Sonnet 5/5 vs Haiku 2 slips) using scripts/test-belief-ladder.mjs.
  *
- * If you change the prompt, re-run the offline harness first:
+ * 2026-07-11 (Phase 1b): added the NUMBER CONFIDENCE hard rule — the confidence-
+ * number rule the test-belief-ladder gate was deliberately RED without (the core
+ * of queued 3.6b, pulled forward). Offer-awareness (the rep's Sales DNA) is NOT
+ * in this prompt — it's a second system block appended by summarize/route.ts via
+ * buildSummarizerDnaSystemBlock (sales-dna.mjs), so un-briefed reps run this
+ * prompt byte-identically.
+ *
+ * If you change the prompt, re-run the offline gate first (must be GREEN to ship):
  *   node scripts/test-belief-ladder.mjs
  */
 
@@ -60,6 +67,7 @@ HOW TO GRADE EACH BELIEF (evidence bar — be strict):
 
 HARD RULES:
 - Record ONLY what was actually said. No flattering inferences. An honest ⬜ beats a hallucinated ✅.
+- NUMBER CONFIDENCE — digits only when CONFIRMED. Record a specific number (revenue, $GOAL, budget, timeline) as digits ONLY when the prospect states it plainly as their real situation or real target (e.g. "we're doing about 30k a month"), especially when it's then echoed or reaffirmed without pushback. A number that is HEDGED or hypothetical — "I dunno", "maybe", "like … someday", "I guess", "would be nice" — is NOT confirmed: capture the intent WITHOUT the digits (e.g. "wants a meaningful monthly number — not yet confirmed") and leave $GOAL as —. Never promote a hedged number into the scorecard; if they later state it plainly, record it then.
 - A rep ASSERTING pain ≠ the prospect CONFIRMING it. Grade what the PROSPECT did, not what the rep framed.
 - "Their exact words" must be VERBATIM from the transcript — never paraphrased (tie-downs depend on the exact words). Keep the 2–4 most useful quotes.
 - UPDATE IN PLACE: this is a running scorecard, not a log. Merge new info into the existing structure; carry forward what's still true.

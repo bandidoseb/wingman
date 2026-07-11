@@ -14,6 +14,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient }        from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/server";
+import { detectSyntax }        from "@/lib/wingman/syntax-detect";
 import type { PillarCoverage, PillarResult } from "@/types";
 
 // ── Post-call analysis system prompt ────────────────────────────────────────
@@ -430,11 +431,59 @@ export async function POST(req: NextRequest) {
       console.warn(`[post-call] stages malformed or missing for call ${call_id} — skipping write`);
     }
 
+    // ── 6d. Syntax auto-detect — "I'm not sure" is not a dead end ─────────────
+    //        A rep who answered "not sure" on their opening syntax at onboarding
+    //        never comes back to the Sales DNA page to fix it — so we infer it from
+    //        how their recent calls ACTUALLY opened and self-update their Sales DNA.
+    //        Only touches an "unsure" rep (never overwrites a deliberate pick), only
+    //        acts on a clear, well-sampled tendency. Independent + non-blocking, like
+    //        6a–6c: any failure here never affects the debrief that already succeeded.
+    //
+    //        The WRITE is an atomic single-key update via the `set_sales_dna_syntax_if_unsure`
+    //        RPC (jsonb_set of only the '{syntax}' key, guarded on `sales_dna->>'syntax'
+    //        = 'unsure'` IN THE DB). That closes the read-modify-write race with the client
+    //        save path (reviewer 2026-07-11): jsonb_set operates on the row's freshest value
+    //        under its lock, so a concurrent save of a sibling field (e.g. `pain`) is preserved,
+    //        and a concurrent deliberate syntax pick makes the guard fail (0 rows) — neither is
+    //        clobbered. The `.select("sales_dna")` below is only a cheap gate so we don't run
+    //        the calls query + detection for reps who already have a real syntax; the RPC's
+    //        WHERE is the correctness guarantee. REQUIRES the SQL function (Supabase) to exist.
+    let syntaxSet: string | null = null;
+    try {
+      const { data: prof } = await service
+        .from("profiles")
+        .select("sales_dna")
+        .eq("id", user.id)
+        .maybeSingle();
+      const dna = (prof?.sales_dna ?? {}) as Record<string, unknown>;
+      if (dna.syntax === "unsure") {
+        const { data: recent } = await service
+          .from("calls")
+          .select("live_summary")
+          .eq("user_id", user.id)
+          .not("live_summary", "is", null)
+          .order("call_date", { ascending: false })
+          .limit(10);
+        const { detected, sample } = detectSyntax((recent ?? []).map((c) => c.live_summary as string | null));
+        if (detected) {
+          const { error: synErr } = await service.rpc("set_sales_dna_syntax_if_unsure", {
+            p_user_id: user.id,
+            p_syntax:  detected,
+          });
+          if (synErr) console.error(`[post-call] syntax auto-detect write failed for user ${user.id}:`, synErr.message);
+          else { syntaxSet = detected; console.log(`[post-call] syntax auto-detected for user ${user.id}: ${detected} (from ${sample} calls)`); }
+        }
+      }
+    } catch (synErr) {
+      console.error(`[post-call] syntax auto-detect threw for user ${user.id}:`, synErr);
+    }
+
     console.log(
       `[post-call] ✓ call ${call_id} — debrief written, ` +
       `${detected.length} objection(s) processed, ` +
       `pillar_coverage ${pillarCoverage ? "saved" : "skipped"}, ` +
-      `stages ${stagesSaved ? "saved" : "skipped"}`
+      `stages ${stagesSaved ? "saved" : "skipped"}` +
+      `${syntaxSet ? `, syntax→${syntaxSet}` : ""}`
     );
 
     return NextResponse.json({ ok: true });

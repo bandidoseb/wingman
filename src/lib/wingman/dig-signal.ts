@@ -32,8 +32,16 @@ export { DIG_SYSTEM_PROMPT };
 
 type ContentBlock = { type: "text"; text: string; cache_control?: { type: "ephemeral" } };
 
-function buildUserContent(transcriptChunk: string, liveSummary?: string): ContentBlock[] {
-  return (buildDigUserSegments({ liveSummary, latestResponse: transcriptChunk }) as Array<{ text: string; cache?: boolean }>).map(
+// salesDna: the rep's sanitized Sales DNA blob (Phase 1b offer-aware). The segment builder
+// gates it internally — incomplete DNA injects nothing and the shape is byte-identical to
+// the pre-1b prompt. When present, its segment carries the cache breakpoint that the
+// warm-at-deploy prime (pipeline-warmup.ts) pre-loads.
+function buildUserContent(
+  transcriptChunk: string,
+  liveSummary?: string,
+  salesDna?: Record<string, string> | null,
+): ContentBlock[] {
+  return (buildDigUserSegments({ salesDna, liveSummary, latestResponse: transcriptChunk }) as Array<{ text: string; cache?: boolean }>).map(
     (s) => (s.cache ? { type: "text", text: s.text, cache_control: { type: "ephemeral" } } : { type: "text", text: s.text }),
   );
 }
@@ -67,6 +75,7 @@ export async function* streamDigCard(
   transcriptChunk: string,
   liveSummary?: string,
   signal?: AbortSignal,
+  salesDna?: Record<string, string> | null,
 ): AsyncGenerator<DigStreamEvent> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
@@ -100,7 +109,7 @@ export async function* streamDigCard(
         model:      DIG_MODEL,
         max_tokens: DIG_MAX_TOKENS,
         system:     DIG_SYSTEM_PROMPT,
-        messages:   [{ role: "user", content: buildUserContent(transcriptChunk, liveSummary) }],
+        messages:   [{ role: "user", content: buildUserContent(transcriptChunk, liveSummary, salesDna) }],
         stream:     true,
       }),
       signal: controller.signal,
@@ -126,6 +135,21 @@ export async function* streamDigCard(
       sseBuf = rest;
 
       for (const ev of events) {
+        // Cache telemetry (Phase 1b): prove the DNA-prefix cache actually engages —
+        // message_start carries usage. read>0 = warm hit (the prime / a prior press
+        // paid for this prefix); creation>0 = this press wrote the cache; both 0 with
+        // DNA present = the breakpoint is a silent no-op → investigate, don't assume.
+        if (ev.event === "message_start") {
+          try {
+            const usage = JSON.parse(ev.data)?.message?.usage ?? {};
+            console.log(
+              `[streamDigCard] TIMING usage cache_read=${usage.cache_read_input_tokens ?? 0} ` +
+              `cache_creation=${usage.cache_creation_input_tokens ?? 0} in=${usage.input_tokens ?? 0} ` +
+              `dna=${salesDna ? "present" : "absent"}`,
+            );
+          } catch { /* telemetry only — never affects the stream */ }
+          continue;
+        }
         if (ev.event !== "content_block_delta") continue;
         let text: string | undefined;
         try { text = JSON.parse(ev.data)?.delta?.text; } catch { /* partial/ignorable */ }

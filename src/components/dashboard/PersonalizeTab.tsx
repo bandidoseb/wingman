@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import Card from "@/components/ui/Card";
 import SectionLabel from "@/components/ui/SectionLabel";
@@ -178,9 +179,11 @@ function BrainDumpNote() {
   );
 }
 
-function DnaField({ label, star, sub, example, value, onChange }: {
+function DnaField({ label, star, sub, example, value, onChange, quickAnswer }: {
   label: string; star?: boolean; sub?: string; example: string;
   value: string; onChange: (v: string) => void;
+  /** One-click honest answer for questions where "none" is legitimate (e.g. no guarantee) — "answered" means addressed, not "has one". */
+  quickAnswer?: { label: string; value: string };
 }) {
   return (
     <div style={{ marginBottom: 18 }}>
@@ -195,11 +198,29 @@ function DnaField({ label, star, sub, example, value, onChange }: {
         rows={3}
         style={{ ...inputStyle, resize: "vertical", lineHeight: 1.6, minHeight: 64 }}
       />
+      {quickAnswer && (
+        <button
+          onClick={() => onChange(quickAnswer.value)}
+          style={{
+            marginTop: 6, padding: "5px 12px", borderRadius: 20,
+            border: value === quickAnswer.value ? "1.5px solid #1c1c1e" : "1.5px solid rgba(0,0,0,0.12)",
+            background: value === quickAnswer.value ? "#1c1c1e" : "transparent",
+            color: value === quickAnswer.value ? "#fff" : "#8e8e93",
+            fontSize: 11.5, fontWeight: 500, fontFamily: "inherit", cursor: "pointer",
+            transition: "all 0.15s ease",
+          }}
+        >
+          {quickAnswer.label}
+        </button>
+      )}
     </div>
   );
 }
 
-type DnaFieldConfig = { key: keyof SalesDna; label: string; star?: boolean; sub?: string; example: string };
+type DnaFieldConfig = {
+  key: keyof SalesDna; label: string; star?: boolean; sub?: string; example: string;
+  quickAnswer?: { label: string; value: string };
+};
 
 const OFFER_CORE_FIELDS: DnaFieldConfig[] = [
   { key: "transformation", label: "What do you sell, and what changes for someone after working with you?",
@@ -209,7 +230,10 @@ const OFFER_CORE_FIELDS: DnaFieldConfig[] = [
   { key: "emotional_root", label: "Underneath the numbers, what are they really after?",
     example: "Freedom — being their own boss" },
   { key: "guarantee", label: "Your guarantee, if you have one",
-    example: "Full refund if you don't get results in 90 days" },
+    example: "Full refund if you don't get results in 90 days",
+    // "Answered" means addressed — no guarantee is a legitimate answer, and the
+    // all-questions completeness gate (salesDnaComplete) counts it as answered.
+    quickAnswer: { label: "We don't offer one", value: "We don't offer a formal guarantee." } },
 ];
 
 const DISCOVERY_FIELDS: DnaFieldConfig[] = [
@@ -236,6 +260,7 @@ const SYNTAX_OPTIONS: { value: SalesSyntax; label: string }[] = [
 ];
 
 function SalesDnaCapture({ profile }: { profile: Profile }) {
+  const router = useRouter();
   const initial: SalesDna = profile.sales_dna ?? {};
   const [dna, setDna] = useState<SalesDna>({
     ...initial,
@@ -252,6 +277,21 @@ function SalesDnaCapture({ profile }: { profile: Profile }) {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved]   = useState(false);
   const [error, setError]   = useState("");
+
+  // Syntax auto-detect (the "Not sure yet" fast-follow). The SELF-UPDATE happens in the
+  // post-call job (it sets an "unsure" rep's syntax from how their recent calls actually
+  // opened). This page just re-derives the same detection to EXPLAIN what was found:
+  //   • syntax still "unsure" (post-call hasn't caught up) → an actionable "set it?" chip
+  //   • syntax matches the detection → a passive "here's what we noticed" note
+  const [syntaxHint, setSyntaxHint] = useState<{ detected: "problems" | "goals"; problems: number; goals: number; sample: number } | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/wingman/detect-syntax")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => { if (!cancelled) setSyntaxHint(d?.detected ? d : null); })
+      .catch(() => { /* non-fatal — the toggle just stays as-is */ });
+    return () => { cancelled = true; };
+  }, []);
 
   const set = (key: keyof SalesDna, val: string) => {
     setSaved(false);
@@ -311,6 +351,14 @@ function SalesDnaCapture({ profile }: { profile: Profile }) {
     if (ok) {
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
+      // Phase 1b — the stale-copy fix (plan-review gap #1): the dashboard's
+      // `profile` prop is a server snapshot from page mount, and the live-call
+      // rails (summarize / dig press / warm-at-deploy) all read profile.sales_dna
+      // from it. Without this refresh, "fill Sales DNA → Deploy in the same
+      // session" would silently send the OLD (empty) DNA → generic cards with no
+      // error. router.refresh() re-runs the server component and flows the fresh
+      // profile down; local form state (this component) is untouched.
+      router.refresh();
     } else {
       setError("Couldn't save — check your connection and try again.");
     }
@@ -365,6 +413,7 @@ function SalesDnaCapture({ profile }: { profile: Profile }) {
 
         {OFFER_CORE_FIELDS.map((f) => (
           <DnaField key={f.key} label={f.label} star={f.star} sub={f.sub} example={f.example}
+            quickAnswer={f.quickAnswer}
             value={String(dna[f.key] ?? "")} onChange={(v) => set(f.key, v)} />
         ))}
         <SaveButton saving={saving} saved={saved} onClick={handleSave} />
@@ -402,6 +451,39 @@ function SalesDnaCapture({ profile }: { profile: Profile }) {
               );
             })}
           </div>
+
+          {/* Fallback chip — post-call self-updates an "unsure" rep, but if they're on this
+              page in the brief window before it catches up, let them confirm the tendency. */}
+          {syntaxHint && dna.syntax === "unsure" && (
+            <div style={{ marginTop: 10, background: "#f2f7ff", border: "1px solid rgba(0,90,255,0.15)", borderRadius: 10, padding: "10px 12px" }}>
+              <div style={{ fontSize: 12, color: "#1c1c1e", lineHeight: 1.5, marginBottom: 8 }}>
+                Based on your last {syntaxHint.sample} calls, you tended to open on{" "}
+                <strong>{syntaxHint.detected === "problems" ? "their problems" : "their goals"}</strong> first
+                {" "}({syntaxHint.detected === "problems" ? syntaxHint.problems : syntaxHint.goals}/{syntaxHint.sample}). Set that as your default?
+              </div>
+              <button
+                onClick={() => { set("syntax", syntaxHint.detected); }}
+                style={{
+                  padding: "6px 14px", borderRadius: 20, border: "none",
+                  background: "#1c1c1e", color: "#fff", fontSize: 12, fontWeight: 600,
+                  fontFamily: "inherit", cursor: "pointer",
+                }}
+              >
+                Set {syntaxHint.detected === "problems" ? "problems" : "goals"}-first
+              </button>
+            </div>
+          )}
+
+          {/* Passive "here's what we noticed" note — gated on the PERSISTED syntax (from the
+              server-loaded profile), NOT the in-progress toggle, so it never claims "set for
+              you" before a change is actually saved (reviewer 🟣). Shows once the post-call
+              self-update has landed and matches the rep's real call pattern. */}
+          {syntaxHint && profile.sales_dna?.syntax === syntaxHint.detected && (
+            <div style={{ marginTop: 10, fontSize: 11.5, color: "#8e8e93", lineHeight: 1.5 }}>
+              📊 Based on your last {syntaxHint.sample} calls, Wingman noticed you open on{" "}
+              {syntaxHint.detected === "problems" ? "their problems" : "their goals"} first — so this is set for you. Change it anytime.
+            </div>
+          )}
         </div>
 
         {DISCOVERY_FIELDS.map((f) => (

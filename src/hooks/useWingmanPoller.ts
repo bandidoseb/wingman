@@ -11,7 +11,7 @@ import type {
   WingmanPollResponse,  // used in PusherScorecardEvent type below
 } from "@/types";
 import { DEFAULT_SCORECARD } from "@/types";
-import type { VaultObjection } from "@/types";
+import type { VaultObjection, SalesDna } from "@/types";
 import {
   createLiveTailState,
   updatePartial,
@@ -54,6 +54,14 @@ interface UseWingmanPollerOptions {
   isActive: boolean;
   objections: VaultObjection[];
   repName?: string | null;
+  /**
+   * Phase 1b (offer-aware): the rep's Sales DNA blob from the profile. Sent with
+   * every summarize tick so the Belief Ladder reads the offer as an interpretive
+   * lens. Server-side gating means a partial/empty blob changes nothing. The copy
+   * is per-call — a mid-call edit takes effect on the NEXT call (intentional:
+   * DNA is averages about the offer, never per-prospect live state).
+   */
+  salesDna?: SalesDna | null;
 }
 
 interface UseWingmanPollerReturn {
@@ -115,6 +123,7 @@ export function useWingmanPoller({
   isActive,
   objections,
   repName,
+  salesDna,
 }: UseWingmanPollerOptions): UseWingmanPollerReturn {
   const [scorecard, setScorecard] = useState<LiveScorecard>({
     ...DEFAULT_SCORECARD,
@@ -147,6 +156,10 @@ export function useWingmanPoller({
   const currentSummaryRef  = useRef<string | null>(null); // in-memory copy for fast press-time reads
   const isSummarizingRef   = useRef(false);           // mutex — one in-flight request at a time
   const summarizeIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // Phase 1b: stable ref so executeSummarize (dep-free useCallback) reads the
+  // latest Sales DNA without re-creating the summarize timer chain on prop change.
+  const salesDnaRef = useRef<SalesDna | null>(salesDna ?? null);
+  useEffect(() => { salesDnaRef.current = salesDna ?? null; }, [salesDna]);
   // ── Objection Flow synthesis refs (Phase B, Step 2) ─────────────────────────
   // The poller runs the background synth; DashboardClient owns the thread ledger and feeds
   // flow context in via setFlowSynthContext. The synth writes ONLY flowRecapRef/recapCursorRef
@@ -544,6 +557,9 @@ export function useWingmanPoller({
           call_id:         callIdRef.current,
           current_summary: currentSummaryRef.current,
           new_transcript:  newTranscript,
+          // Phase 1b: the offer lens. Server sanitizes + gates on completeness —
+          // sending a partial/empty blob is byte-identical to not sending it.
+          sales_dna:       salesDnaRef.current ?? undefined,
         }),
         signal: controller.signal,
       });

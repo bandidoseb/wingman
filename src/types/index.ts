@@ -76,25 +76,21 @@ export interface SalesDna {
   support?: string | null;          // Q11
 }
 
-// The essential fields that gate Deploy (Phase 1c). Offer name/price live in the
-// `offers` table and are checked separately — this covers only the sales_dna blob.
-// Single source of truth: the dashboard AND the deploy gate both import these so
-// the definition of "briefed" can never drift between them.
-export const SALES_DNA_ESSENTIALS: (keyof SalesDna)[] = [
-  "transformation",
-  "root_driver",
-  "pain",
-  "desire",
-];
+// Completeness — "briefed" means EVERY question addressed (Sebastian, 2026-07-11;
+// overrides the earlier 4-essentials rule). "Addressed" ≠ "has one": guarantee's
+// explicit "we don't offer one" answer and syntax "unsure" both count.
+// The LOGIC lives in sales-dna.mjs (single source shared with the eval gates and
+// every injection site); these are typed re-exports so the dashboard and the
+// Phase 1c Deploy gate can never drift from what the cards actually require.
+import { salesDnaMissing, isSalesDnaComplete } from "@/lib/wingman/sales-dna.mjs";
 
 export function salesDnaEssentialsMissing(dna: SalesDna | null | undefined): (keyof SalesDna)[] {
-  const d = dna ?? {};
-  return SALES_DNA_ESSENTIALS.filter((k) => !String(d[k] ?? "").trim());
+  return salesDnaMissing(dna) as (keyof SalesDna)[];
 }
 
-/** True when every gating essential in the sales_dna blob has content. */
+/** True when every Sales DNA question has been addressed — the 1b inject threshold AND the 1c Deploy gate. */
 export function salesDnaComplete(dna: SalesDna | null | undefined): boolean {
-  return salesDnaEssentialsMissing(dna).length === 0;
+  return isSalesDnaComplete(dna);
 }
 
 export interface Offer {

@@ -136,15 +136,23 @@ Score these dimensions:
 - right_belief (0-2): 2 = aims squarely at the weakest belief per the WEAKEST LINK line; 1 = a reasonable but not-the-weakest belief; 0 = misreads what's weak.
 - no_windup (0-2): 2 = goes straight to the question, OR opens with a natural warm lead-in / permission-ask a real closer uses ("gotcha,", "okay so,", "can I ask you something personal?"); 0 = AI-style wind-up that NAMES what it's about to do ("I'm curious to understand…", "I'd love to explore…"). Warm lead-ins and permission-asks are GOOD — never penalize them.
 
+Some fixtures include a REP'S SALES DNA section: offer context the rep saved BEFORE the call — averages about the TYPICAL prospect for this offer, NOT things this prospect said. Good offer-aware digging uses it to aim (e.g. knowing "quit my job" typically chunks down to a monthly cash-flow number for this offer) — but its facts are NOT ground truth about this prospect.
+
 Hard flags (trust-killers — judge carefully against the ground truth):
-- fabrication (true/false): TRUE if the question states ANY specific — a number, quote, name, or fact — NOT supported by the ground truth, or alters/sharpens one (e.g. "so you want to go from $8k to $30k" when those numbers aren't in the memory). A belief marked ⬜ open is UN-discussed — asking about it as if you know details is fabrication. When in doubt a stated specific is grounded, mark TRUE.
+- fabrication (true/false): TRUE if the question states ANY specific — a number, quote, name, or fact — NOT supported by the ground truth, or alters/sharpens one (e.g. "so you want to go from $8k to $30k" when those numbers aren't in the memory). A belief marked ⬜ open is UN-discussed — asking about it as if you know details is fabrication. A specific imported from the REP'S SALES DNA and asserted as this prospect's situation ("so you're at around $30k a month, right?") is fabrication — the DNA describes the average prospect, not this one. When in doubt a stated specific is grounded, mark TRUE.
 - order_violation (true/false): TRUE if the question digs into MONEY (budget/afford/investment) or SUPPORT (spouse/partner/who decides) while PAIN is still ⬜ open or 🟡 partial AND the call is early (Stage Rapport/Discovery). Cole's doctrine leaves Money and Support for later, after the problem and goal are built. FALSE if Pain is already ✅ locked, or the conversation clearly moved there on its own.
 
 Return ONLY this JSON object, nothing else:
 { "tonality": n, "brevity": n, "one_question": n, "is_question": n, "right_belief": n, "no_windup": n, "fabrication": true|false, "order_violation": true|false, "rationale": "one short sentence" }`;
 
 function judgeUser(scenario, line) {
-  return `GROUND TRUTH — the live belief-ladder scorecard:\n${scenario.context ?? "(no scorecard yet — this is the first ~2 minutes of the call; only the recent transcript is available, so a solid generic OPENING discovery question is correct and fabrication of specifics is especially bad)"}\n\n` +
+  // Phase 1b: surface the fixture's Sales DNA to the judge, labeled as rep context —
+  // so a question importing a DNA specific as the prospect's own reads as fabrication.
+  const dnaSection = scenario.salesDna
+    ? `REP'S SALES DNA (offer context the rep saved BEFORE the call — averages about the typical prospect, NOT things this prospect said):\n${JSON.stringify(scenario.salesDna, null, 2)}\n\n`
+    : "";
+  return dnaSection +
+         `GROUND TRUTH — the live belief-ladder scorecard:\n${scenario.context ?? "(no scorecard yet — this is the first ~2 minutes of the call; only the recent transcript is available, so a solid generic OPENING discovery question is correct and fabrication of specifics is especially bad)"}\n\n` +
          `RECENT TRANSCRIPT:\n${scenario.transcript}\n\n` +
          `THE DIG QUESTION TO GRADE: "${line}"`;
 }
