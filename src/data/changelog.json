@@ -1,5 +1,22 @@
 [
   {
+    "id": "2026-07-11-login-redirect",
+    "date": "2026-07-11",
+    "category": "fix",
+    "title": "Fixed website sign-in dumping people on a dead page",
+    "summary": "Signing into the website with Google (or a magic link, or a password-reset link) could strand you on a broken 'localhost' address that only exists inside our server. Website sign-in now lands you where it should — on your dashboard.",
+    "changes": [
+      "Google sign-in, magic links, and password-reset links now land on the real site",
+      "Only the website was affected — the desktop app was never impacted"
+    ],
+    "details": [
+      "When you signed into the website with Google, the login itself worked — but the very last hand-off sent you to an address like 'localhost:8080', which is our server talking to itself. That address doesn't exist on your phone or computer, so you'd land on a dead page.",
+      "The cause: the app runs on Railway, where the server sits behind a traffic router. When our login code asked 'what's my web address?', it got the server's private internal name instead of the public 'app.meetwingman.ai' — and sent you to the private one.",
+      "The fix teaches the login code to read the real public address the router passes along, and use that for the final hand-off. Local development is unaffected.",
+      "A review pass caught that the same flaw was hiding in a second place — the links inside password-reset and email-confirmation messages — so those were fixed in the same change. All of it had quietly been broken on the website since launch; nobody noticed because day-to-day sign-in goes through the desktop app, which uses a different path."
+    ]
+  },
+  {
     "id": "2026-07-10-sales-dna",
     "date": "2026-07-10",
     "category": "ai",
