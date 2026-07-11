@@ -35,12 +35,18 @@
  */
 
 import { ensureKbMemoryLoaded, getKbMemoryState } from "./kb-memory";
+import { DIG_SYSTEM_PROMPT, buildDigUserSegments } from "./dig-prompt.mjs";
+import { buildSalesDnaBlock } from "./sales-dna.mjs";
 
 const PING_TIMEOUT_MS = 4_000;
+// The Sales DNA cache prime is a real (small) generation against a cold model —
+// first-token latency can run ~6s cold. Aborting early would cancel the request
+// and lose the cache write we came for, so it gets its own longer leash.
+const PRIME_TIMEOUT_MS = 12_000;
 
-async function fetchWithTimeout(url: string, init: RequestInit): Promise<Response> {
+async function fetchWithTimeout(url: string, init: RequestInit, timeoutMs = PING_TIMEOUT_MS): Promise<Response> {
   const controller = new AbortController();
-  const timeoutId  = setTimeout(() => controller.abort(), PING_TIMEOUT_MS);
+  const timeoutId  = setTimeout(() => controller.abort(), timeoutMs);
   try {
     return await fetch(url, { ...init, signal: controller.signal });
   } finally {
@@ -99,6 +105,73 @@ async function warmAnthropic(model: string, label: string): Promise<string> {
   return resp.ok ? `${label}:ok` : `${label}:${resp.status}`;
 }
 
+/**
+ * Sonnet warm + Sales DNA cache prime (Phase 1b, Sebastian's warm-at-deploy idea).
+ *
+ * With a COMPLETE Sales DNA: instead of the generic 1-token Sonnet ping, send the
+ * REAL dig-card prefix — DIG_SYSTEM_PROMPT + the rep's Sales DNA segment with its
+ * cache_control breakpoint — at max_tokens:1. That writes the prompt cache at
+ * deploy, so the rep's FIRST ↓ press hits a warm cache (prefix read at ~10% cost,
+ * faster prefill) instead of paying the cache write mid-press. The TLS/pool warm
+ * rides along (it IS a Sonnet request), so this REPLACES the generic ping — never
+ * runs alongside it (don't warm Sonnet twice).
+ *
+ * BYTE-IDENTITY IS THE WHOLE GAME: the segment comes from the same
+ * buildDigUserSegments the press path uses — any divergence and the prime is a
+ * silent waste. The press sends [DNA, summary, latest]; the prime sends only [DNA].
+ * Anthropic hashes the prefix up to the breakpoint (system + DNA block), which is
+ * identical in both — so the prime's cache entry serves every press.
+ *
+ * HONEST CAVEATS (documented, accepted):
+ *   - Cache TTL is 5 min from last use. A first press >5 min after deploy misses
+ *     anyway; the prime cost (~1.25× on a ~2k-token prefix ≈ <$0.01) is small
+ *     enough to be worth it for the presses that land early.
+ *   - Session create fires only AFTER recording confirms (DashboardClient), so a
+ *     Deploy that never finds a meeting pays nothing.
+ *
+ * Without a complete Sales DNA there is nothing stable to prime — fall back to
+ * the plain 1-token connection ping, byte-for-byte the pre-1b behavior.
+ */
+async function warmSonnetAndPrimeDigCache(salesDna: Record<string, string> | null): Promise<string> {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) return "sonnet:skipped(no-key)";
+
+  if (!buildSalesDnaBlock(salesDna)) {
+    // No (complete) DNA → plain connection warm, exactly as before.
+    return warmAnthropic("claude-sonnet-4-6", "sonnet");
+  }
+
+  // segments[0] is the DNA segment (cache:true) — the press path's exact bytes.
+  const dnaSegment = (buildDigUserSegments({ salesDna }) as Array<{ text: string; cache: boolean }>)[0];
+
+  const resp = await fetchWithTimeout(
+    "https://api.anthropic.com/v1/messages",
+    {
+      method:  "POST",
+      headers: {
+        "x-api-key":         apiKey,
+        "anthropic-version": "2023-06-01",
+        "content-type":      "application/json",
+      },
+      body: JSON.stringify({
+        model:      "claude-sonnet-4-6", // must match dig-signal's DIG_MODEL — cache is per-model
+        max_tokens: 1,
+        system:     DIG_SYSTEM_PROMPT,
+        messages:   [{
+          role:    "user",
+          content: [{ type: "text", text: dnaSegment.text, cache_control: { type: "ephemeral" } }],
+        }],
+      }),
+    },
+    PRIME_TIMEOUT_MS,
+  );
+
+  if (!resp.ok) return `sonnet-prime:${resp.status}`;
+  // Prove the prime actually wrote (or re-read) the cache — never assume.
+  const usage = (await resp.json().catch(() => ({})))?.usage ?? {};
+  return `sonnet-prime:ok(created=${usage.cache_creation_input_tokens ?? 0},read=${usage.cache_read_input_tokens ?? 0})`;
+}
+
 /** Groq 1-token ping — warms the distiller's connection. */
 async function warmGroq(): Promise<string> {
   const apiKey = process.env.GROQ_API_KEY;
@@ -116,12 +189,17 @@ async function warmGroq(): Promise<string> {
   return resp.ok ? "groq:ok" : `groq:${resp.status}`;
 }
 
-export async function warmUpPipeline(): Promise<void> {
+/**
+ * @param salesDna — the rep's sanitized Sales DNA (from the session-create body).
+ *   Complete DNA upgrades the Sonnet ping into a dig-prefix cache prime; anything
+ *   else keeps the pre-1b generic ping. Optional so other callers are unaffected.
+ */
+export async function warmUpPipeline(salesDna: Record<string, string> | null = null): Promise<void> {
   const t0 = Date.now();
   const results = await Promise.allSettled([
     warmEmbedAndKb(),
-    warmAnthropic("claude-haiku-4-5-20251001", "haiku"),  // answer/dig/close slots
-    warmAnthropic("claude-sonnet-4-6", "sonnet"),          // the objection card (live press)
+    warmAnthropic("claude-haiku-4-5-20251001", "haiku"),  // answer/close slots
+    warmSonnetAndPrimeDigCache(salesDna),                  // objection + dig (Sonnet) — primes the DNA cache when briefed
     warmGroq(),
   ]);
 

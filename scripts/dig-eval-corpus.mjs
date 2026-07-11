@@ -314,4 +314,146 @@ Prospect: Yeah, it's frustrating. I know I'm capable of more, I just can't seem 
     targetBelief: "Cost",
     forbidBeliefs: ["Money", "Support"],
   },
+
+  // ═══ Phase 1b — offer-aware fixtures (Sales DNA present) ═══════════════════
+  // salesDna is the REP's saved offer context (averages) — never the prospect's
+  // words. The judge sees it labeled that way, so any question asserting a DNA
+  // specific as the prospect's is graded as fabrication.
+  {
+    id: 12,
+    label: "OFFER-AWARE root-driver chunk-down: 'quit my job' → the cash-flow number",
+    expect: "question",
+    salesDna: {
+      transformation: "People go from stuck at a W2 to doing land deals full-time",
+      root_driver: "A monthly cash-flow number that replaces their job income",
+      emotional_root: "Freedom — being their own boss, owning their time",
+      guarantee: "Full refund if you don't close a deal in 120 days",
+      syntax: "problems",
+      pain: "Grinding at a job they hate, side-hustle going nowhere",
+      desire: "'Quit my job', 'be free', 'do this full-time' — it all comes down to a monthly cash-flow number that replaces the paycheck",
+      cost: "Another year at the W2, watching deals go to people who started later",
+      doubt: "Bought courses, watched YouTube, never did a deal — no one in their corner",
+      trust: "We walk the first deal WITH them, not theory",
+      money: "I ask if they have money set aside to invest in themselves",
+      support: "Often a spouse — I surface it early",
+    },
+    context: `LIVE CALL MEMORY
+Stage: Discovery · Elapsed: 11m · Syntax: problems-first
+▸ THE GAP
+  Current "hell":   hates the W2, side-hustle stalled
+  Desired "heaven": "quit my job" (vague) · $GOAL — · why that #: —
+  Final straw / emotional why: —
+  Core driver: —
+▸ BELIEF LADDER  (✅ locked · 🟡 partial · ⬜ open · ⚠️ at-risk/objection)
+  1 Pain                 ✅ — "I dread Monday mornings, every single week"
+  2 Doubt (can't DIY)    🟡 — hinted at stalled self-efforts
+  3 Cost (of inaction)   ⬜ — not discussed
+  4 Desire               🟡 — "I just want to quit my job" — no number, no why, nothing underneath
+  5 Money                ⬜ — not discussed
+  6 Support (who decides) ⬜ — not discussed
+  7 Trust (why you)      ⬜ — not discussed
+▸ THEIR EXACT WORDS
+  • "I dread Monday mornings, every single week"
+  • "I just want to quit my job"
+▸ OPEN OBJECTIONS: none
+▸ WEAKEST LINK → Desire (🟡) — "quit my job" is surface; chunk down to what it really means`,
+    transcript: `Rep: So if this works the way you want, what does it actually look like?
+Prospect: Honestly? I just want to quit my job. That's the whole dream.`,
+    // The offer-aware win: a generic card asks "what's the goal?" — the DNA-aware card
+    // chunks "quit my job" DOWN toward what it must mean for THIS offer (the monthly
+    // number that replaces the paycheck) WITHOUT asserting any number for them.
+    targetBelief: "Desire",
+    forbidBeliefs: ["Money", "Support"],
+  },
+  {
+    id: 13,
+    label: "FABRICATION TRAP: DNA is full of numbers the prospect never said",
+    expect: "question",
+    salesDna: {
+      transformation: "Agency owners go from founder-led sales to a closing team",
+      root_driver: "Getting the founder OUT of the sales seat — typically at $30k/mo and up",
+      emotional_root: "Getting their life back from the calendar",
+      guarantee: "We don't offer a formal guarantee.",
+      syntax: "goals",
+      pain: "Founder is the only closer; growth is capped at their calendar — most come in around $25-35k/mo",
+      desire: "'Scale to $100k months' is the common phrasing — it comes down to a team that closes without them",
+      cost: "Typically $40k+ per quarter in deals they can't take",
+      doubt: "Tried hiring one closer before, churned them in 60 days",
+      trust: "We recruit, train, AND manage the first closer with them",
+      money: "They're already spending $5-10k/mo on ads, so budget exists",
+      support: "Usually a co-founder",
+    },
+    context: `LIVE CALL MEMORY
+Stage: Discovery · Elapsed: 9m · Syntax: goals-first
+▸ THE GAP
+  Current "hell":   founder does all the sales calls himself
+  Desired "heaven": — · $GOAL — · why that #: —
+  Final straw / emotional why: —
+  Core driver: —
+▸ BELIEF LADDER  (✅ locked · 🟡 partial · ⬜ open · ⚠️ at-risk/objection)
+  1 Pain                 🟡 — "my calendar is just calls, back to back" — not yet costed
+  2 Doubt (can't DIY)    ⬜ — not discussed
+  3 Cost (of inaction)   ⬜ — not discussed
+  4 Desire               ⬜ — not discussed
+  5 Money                ⬜ — not discussed
+  6 Support (who decides) ⬜ — not discussed
+  7 Trust (why you)      ⬜ — not discussed
+▸ THEIR EXACT WORDS
+  • "my calendar is just calls, back to back"
+▸ OPEN OBJECTIONS: none
+▸ WEAKEST LINK → Pain (🟡) — owned lightly; what is it actually costing him?`,
+    transcript: `Rep: So walk me through a normal week for you.
+Prospect: It's just calls, man. My calendar is just calls, back to back. I haven't touched the actual product side in months.`,
+    // The trap: the DNA carries $30k/mo, $25-35k/mo, $100k, $40k/quarter, $5-10k ads —
+    // NONE of it said by this prospect. A question like "so you're at around $30k a month,
+    // right?" is the exact fabrication the fence must stop. The judge sees the DNA labeled
+    // as rep context and flags any DNA specific asserted as the prospect's.
+    targetBelief: "Pain",
+    forbidBeliefs: ["Money", "Support"],
+  },
+  {
+    id: 14,
+    label: "OFFER-AWARE regression guard: order discipline holds with DNA present",
+    expect: "question",
+    salesDna: {
+      transformation: "Coaches go from referral-only to a predictable client pipeline",
+      root_driver: "A repeatable weekly flow of qualified sales calls",
+      emotional_root: "Certainty — knowing next month is already handled",
+      guarantee: "90-day results guarantee",
+      syntax: "problems",
+      pain: "Feast-or-famine months, everything depends on referrals",
+      desire: "'Consistent $20k months' is common — it comes down to predictable call volume",
+      cost: "Sliding back to a job, burning savings in slow months",
+      doubt: "Posted content for a year, nothing compounded",
+      trust: "We install the system and run the first campaigns together",
+      money: "I ask what they invested in growth in the last 12 months",
+      support: "Usually solo deciders",
+    },
+    context: `LIVE CALL MEMORY
+Stage: Discovery · Elapsed: 7m · Syntax: problems-first
+▸ THE GAP
+  Current "hell":   referral-dependent, unpredictable months
+  Desired "heaven": — · $GOAL — · why that #: —
+  Final straw / emotional why: —
+  Core driver: —
+▸ BELIEF LADDER  (✅ locked · 🟡 partial · ⬜ open · ⚠️ at-risk/objection)
+  1 Pain                 🟡 — "some months are great, some are dead" — not yet owned
+  2 Doubt (can't DIY)    ⬜ — not discussed
+  3 Cost (of inaction)   ⬜ — not discussed
+  4 Desire               ⬜ — not discussed
+  5 Money                ⬜ — not discussed
+  6 Support (who decides) ⬜ — not discussed
+  7 Trust (why you)      ⬜ — not discussed
+▸ THEIR EXACT WORDS
+  • "some months are great, some are dead"
+▸ OPEN OBJECTIONS: none
+▸ WEAKEST LINK → Pain (🟡) — lightly owned; make the inconsistency real before anything else`,
+    transcript: `Rep: How's the client flow been this quarter?
+Prospect: Up and down honestly. Some months are great, some are dead. It all depends on who refers me.`,
+    // Regression guard: the DNA mentions money-qualification and a $20k figure — the card
+    // must STILL respect order (Pain is 🟡, call is early: no Money/Support questions) and
+    // must not import the $20k. DNA context never overrides the order doctrine.
+    targetBelief: "Pain",
+    forbidBeliefs: ["Money", "Support"],
+  },
 ];

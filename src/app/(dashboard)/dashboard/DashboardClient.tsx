@@ -190,6 +190,9 @@ export default function DashboardClient({
     isActive,
     objections: initialObjections,
     repName: savedZoomName || null,
+    // Phase 1b (offer-aware): the profile prop refreshes via router.refresh() on
+    // Sales DNA save, so fill-then-Deploy in the same session sends fresh DNA.
+    salesDna: profile.sales_dna ?? null,
   });
 
   // ── Call-level objection memory (Phase B, Step 2) ───────────────────────────
@@ -342,7 +345,9 @@ export default function DashboardClient({
       const res = await fetch("/api/wingman/session", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ prospect_name: "Live Call" }),
+        // sales_dna → warm-at-deploy: the server primes the dig card's prompt
+        // cache with the DNA prefix so the first press of the call hits it warm.
+        body: JSON.stringify({ prospect_name: "Live Call", sales_dna: profile.sales_dna ?? undefined }),
       });
       const data = await res.json();
 
@@ -373,7 +378,7 @@ export default function DashboardClient({
     } finally {
       isStartingRef.current = false;
     }
-  }, [handleLimitReached, savedZoomName]);
+  }, [handleLimitReached, savedZoomName, profile.sales_dna]);
 
   // ── End the active call ────────────────────────────────────────────────────
   const handleEndCall = useCallback(async () => {
@@ -1212,7 +1217,14 @@ export default function DashboardClient({
       const res = await fetch("/api/wingman/kb-signal", {
         method:  "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ transcript_chunk: transcriptToSend, live_summary: summaryToSend, slot: direction }),
+        body: JSON.stringify({
+          transcript_chunk: transcriptToSend,
+          live_summary:     summaryToSend,
+          slot:             direction,
+          // Phase 1b: the offer context for the dig card (server sanitizes + gates;
+          // byte-stable across presses so the cached DNA prefix keeps hitting).
+          sales_dna:        profile.sales_dna ?? undefined,
+        }),
         signal: controller.signal,
       });
 
@@ -1306,7 +1318,7 @@ export default function DashboardClient({
     } finally {
       release();
     }
-  }, [callId, getRecentTranscript, liveSummary]);
+  }, [callId, getRecentTranscript, liveSummary, profile.sales_dna]);
 
   // Stable ref so the IPC listener (registered once on mount) always calls
   // the latest handleMenuPick without going stale across renders.

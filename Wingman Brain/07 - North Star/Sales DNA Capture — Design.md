@@ -79,7 +79,7 @@ Every field: rotating **ghost-text examples** (3 offer types each, so reps see i
 ---
 
 ## Fast-follows (noted so they don't get lost — Sebastian 2026-07-10)
-1. **Syntax auto-detect after ~5 calls.** If a rep picks "Not sure yet" on Q4, aggregate the `Syntax:` field the live Belief-Ladder scorecard ALREADY tags on every call → after ~5 calls, set (or suggest) their default problems-first / goals-first. Signal already exists in `belief-ladder.ts` output; only the aggregation is new. MUST be wired — do not ship "Not sure yet" as a dead end.
+1. **Syntax auto-detect — ✅ BUILT 2026-07-11 (post-call SELF-UPDATE, Sebastian's model).** Correction from the first cut: reps fill this at onboarding with 0 calls and won't revisit the page, so a page-load suggestion never fires. Right model (Sebastian): "not sure" flags the account → after real calls the **post-call job self-updates it** → the page explains what was found. Implementation: post-call `route.ts` step 6d — for an "unsure" rep only, regex-parse the `Syntax:` line out of their last 10 `live_summary` blobs via `detectSyntax()` (`src/lib/wingman/syntax-detect.ts`, 9 unit tests; needs ≥3 readable signals + ≥60% agreement) and MERGE-write `sales_dna.syntax = detected` (never clobbers the blob; never touches a deliberate pick; independent + non-blocking like 6a–6c). The Sales DNA page re-derives the same detection to EXPLAIN it: a passive "📊 Based on your last N calls, Wingman noticed you open X-first — set for you, change anytime" note, plus a fallback confirm-chip for the brief window before post-call catches up. `/api/wingman/detect-syntax` (GET) powers the page note. Detector unit-tested; the post-call self-update + live note need a rep with ≥3 real calls to verify end-to-end (no seeded data yet). **RACE FIXED (reviewer-flagged, 2026-07-11):** the write is an atomic single-key `jsonb_set` via the `set_sales_dna_syntax_if_unsure` Supabase RPC (guarded on `sales_dna->>'syntax' = 'unsure'` + `p_syntax in ('problems','goals')`, `security invoker` so RLS protects cross-user calls), so a concurrent whole-blob save from the client can't clobber it and vice-versa. **DEPLOY DEP: the SQL function must exist in Supabase — Sebastian ran it 2026-07-11.** Known imperfection (acceptable): the passive note also shows for a rep who MANUALLY picked a syntax their calls confirm — harmless/true; a persistent auto-vs-manual marker would refine it later.
 2. **Mic brain-dump** on every field (record → transcribe → discard audio). Highest-lift single piece; can trail the text-first capture.
 
 ## Injection (how it reaches the card)
@@ -87,3 +87,51 @@ Compile the Sales DNA (offer core + discovery map) into a compact **SALES DNA** 
 
 ## Storage (proposed)
 `profiles.sales_dna jsonb default '{}'` holding the new discovery fields (flexible — question edits need no migration). Reuse existing `ideal_client` / `unique_differentiator` / `guarantee`. Completeness for the gate derived from the essential keys (source of truth = the data). Apply via Supabase SQL (schema drift is expected here). Details in `tasks/todo.md`.
+
+---
+
+## Capture-method evolution — "Wingman interviews the rep like a prospect" (Sebastian, 2026-07-11)
+
+Surfaced when Sebastian filled the questionnaire live to test Phase 1b. His own answers exposed the
+weakness of a static form AND pointed at the fix.
+
+**What his answers revealed:**
+1. **Q4 (problems vs. goals) doesn't fit reality → LOCKED FIX (Sebastian 2026-07-11): FOUR options, not three.**
+   `Problems first` · `Goals first` · `I read the room` · `I'm not sure`. Rationale: this is high-level sales
+   training — some reps are *trained* problems-first, some goals-first, some adapt, and **some genuinely don't
+   know the framing exists.** "I read the room" is a CONFIDENT adaptive answer (not indecision); "I'm not sure"
+   is the real don't-know. They differ downstream: "I'm not sure" should trigger the Syntax auto-detect
+   fast-follow; "I read the room" should NOT (it's intentional). CODE IMPACT: `SalesSyntax` type gains a 4th
+   value (e.g. `"read_room"`) + `SYNTAX_LABEL` / `VALID_SYNTAX` / PersonalizeTab options. Not yet built.
+2. **Beliefs bleed across boxes.** His "cost" answer folded into his "desire" answer — a real closer thinks in
+   connected arcs, not isolated fields. A form fights that; a conversation wouldn't.
+3. **The richest context came UNPROMPTED.** He chunked down on himself because he knows how. A typical rep
+   writes "cash flow" and moves on — the depth that makes cards sharp never gets captured by a passive form.
+
+**The idea (sharpens the already-planned "AI voice-call later" / 1d mic brain-dump):** don't make the voice
+AI a passive transcriber — **make it RUN A DISCOVERY PROCESS on the rep, chunking down on their answers the
+way a closer digs a prospect.** Rep says "cash flow" → Wingman asks "cash flow to do what? for who? what does
+hitting that unlock for them?" Wingman already knows how to dig (it's the whole product) — point that skill at
+the REP to pull their own offer out of them. Onboarding call could be with Sebastian OR a voice AI.
+
+**Full flow (Sebastian 2026-07-11):** an onboarding **discovery CALL** on every user via voice AI.
+1. The voice AI walks the questions and **keeps chunking down on each answer while it senses there's more
+   context to get.** ("cash flow to do what?" → "what would that free you up for?" → …)
+2. When it judges it has *enough* on that question, it **moves on to the next** — collecting far more than a
+   form ever would.
+3. When it has everything, it **tells the rep what to do next**, and **auto-fills the entire Sales DNA page
+   itself** from the conversation.
+4. The rep opens the Sales DNA page, **sees everything already filled in, and can edit** anything.
+Bonus: it's a **data goldmine** — running a real discovery on every user teaches Wingman about offers,
+objections, and how top closers actually talk. Two wins: the rep gets a far richer DNA with zero effort,
+and Wingman gets a corpus no competitor has.
+
+**Why it matters:** the moat's quality is capped by how much real context the rep gives. A form gets "cash
+flow"; a chunk-down interview gets the full belief map. This is the difference between a shallow DNA and a
+DNA that makes every live card feel like it was written by someone who knows the offer cold.
+
+**Status:** future — extends 1d (mic brain-dump) into a conversational, chunk-down capture. Build the
+text questionnaire (1a, shipped) + mic brain-dump (1d) first; layer the interviewing voice AI on top when
+the capture surface is proven. Live-demo evidence that the moat works on a real offer: this session
+(2026-07-11), Sebastian's land-investing offer — offer-aware dig chunked "I want out" → "what would you need
+to be making to leave?" with zero fabrication.

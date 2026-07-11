@@ -75,6 +75,47 @@ describe("buildDigUserSegments", () => {
     const segs = buildDigUserSegments({ liveSummary: "s" });
     expect(segs[1].text).toContain("WHAT WAS JUST SAID");
   });
+
+  // ── Phase 1b — Sales DNA layering + cache placement ─────────────────────────
+  const COMPLETE_DNA = {
+    transformation: "W2 to land deals", root_driver: "monthly cash flow",
+    emotional_root: "freedom", guarantee: "90-day refund", syntax: "problems",
+    pain: "can't scale", desire: "'quit my job' → cash flow", cost: "debt",
+    doubt: "courses failed", trust: "we build it live", money: "asks about savings",
+    support: "spouse",
+  };
+
+  it("no DNA → byte-identical legacy 2-segment shape (zero regression)", () => {
+    const legacy = buildDigUserSegments({ liveSummary: "s", latestResponse: "x" });
+    const explicit = buildDigUserSegments({ salesDna: undefined, liveSummary: "s", latestResponse: "x" });
+    expect(explicit).toEqual(legacy);
+    expect(legacy).toHaveLength(2);
+    expect(legacy[0].cache).toBe(true); // breakpoint stays on the summary segment
+  });
+
+  it("partial DNA injects NOTHING (all-questions threshold)", () => {
+    const segs = buildDigUserSegments({ salesDna: { pain: "only this" }, liveSummary: "s", latestResponse: "x" });
+    expect(segs).toHaveLength(2);
+    expect(segs[0].text).not.toContain("SALES DNA");
+  });
+
+  it("complete DNA → DNA segment FIRST + cached; summary segment no longer cached", () => {
+    const segs = buildDigUserSegments({ salesDna: COMPLETE_DNA, liveSummary: "WEAKEST LINK → Desire", latestResponse: "x" });
+    expect(segs).toHaveLength(3);
+    expect(segs[0].text).toContain("SALES DNA");
+    expect(segs[0].text).toContain("AVERAGES, NOT GOSPEL");          // fence rides inside
+    expect(segs[0].text).toContain("NEVER state a number");          // dig-side fence
+    expect(segs[0].cache).toBe(true);                                // the primed breakpoint
+    expect(segs[1].text).toContain("WEAKEST LINK → Desire");
+    expect(segs[1].cache).toBe(false);  // changes every ~2 min — no wasted cache writes
+    expect(segs[2].cache).toBe(false);
+  });
+
+  it("DNA segment bytes are stable across calls (cache-key integrity)", () => {
+    const a = buildDigUserSegments({ salesDna: COMPLETE_DNA, liveSummary: "s1", latestResponse: "x1" })[0].text;
+    const b = buildDigUserSegments({ salesDna: COMPLETE_DNA, liveSummary: "s2", latestResponse: "x2" })[0].text;
+    expect(a).toBe(b);
+  });
 });
 
 // ── streamDigCard — terminal contract via a mocked Anthropic stream ──────────

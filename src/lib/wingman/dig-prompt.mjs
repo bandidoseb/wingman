@@ -16,6 +16,8 @@
  * (read 2026-07-07). The rep's ↓ press asks "what's the best question to ask right now?"
  */
 
+import { buildSalesDnaBlock } from "./sales-dna.mjs";
+
 /**
  * BELIEF_TAXONOMY — the 7 beliefs, the fixed vocabulary the card declares so the HUD chrome
  * can name what's being dug (DIG · PAIN). Single source shared by the card prompt, the
@@ -84,19 +86,44 @@ Return ONLY ONE of these two JSON objects and NOTHING else — no commentary, no
  * production (dig-signal.ts maps segments → content blocks) and the eval (flattens → one
  * string). Same anti-drift discipline as the objection builder.
  *
- * 4a.1 single-shot: two layers — the Belief Ladder (cached; the primary input) and the last
- * ~120s of transcript (fresh). No thread, no chunk-down history (that's 4a.2).
+ * Layers (Phase 1b offer-aware): the rep's Sales DNA (call-stable → CACHED; also what the
+ * warm-at-deploy prime pre-loads), then the Belief Ladder (changes every ~2 min), then the
+ * last ~120s of transcript (fresh). No thread, no chunk-down history (that's 4a.2).
+ *
+ * CACHE PLACEMENT RULE — the breakpoint sits on the LAST CALL-STABLE segment:
+ *   - DNA present  → breakpoint on the DNA segment (stable all call; every press hits it,
+ *     and pipeline-warmup primes it at deploy). The live-summary segment is NOT cached —
+ *     it changes every summarize tick, so its breakpoint paid a 1.25× write per press for
+ *     ~zero hits (plan-review 2026-07-11 gap #8).
+ *   - DNA absent   → breakpoint on the live-summary segment, byte-identical to the shipped
+ *     pre-1b shape — zero regression for un-briefed reps.
+ *
+ * BYTE-STABILITY: the DNA segment is built via buildSalesDnaBlock (fixed order/labels) so
+ * the warm-at-deploy prime, every press, and the eval produce identical bytes.
  *
  * Input:
+ *   salesDna       — the rep's raw sales_dna blob (untrusted OK — sanitized + gated inside;
+ *                    injects ONLY when every question is answered, else fully generic)
  *   liveSummary    — the Belief Ladder scorecard text (undefined for the first ~2 min of a call)
  *   latestResponse — what was said in the last ~120s
  *
  * @returns {{ text: string, cache: boolean }[]}
  */
-export function buildDigUserSegments({ liveSummary, latestResponse } = {}) {
+export function buildDigUserSegments({ salesDna, liveSummary, latestResponse } = {}) {
   const belief = (liveSummary && liveSummary.trim()) || "(no call memory yet — this is early in the call; you have only the recent transcript to work from, so ask a solid OPENING discovery question grounded in what they just said)";
-  return [
-    { text: `LIVE CALL MEMORY (the belief scorecard — the WEAKEST LINK line is where to dig):\n${belief}`, cache: true },
+  const dnaBlock = buildSalesDnaBlock(salesDna);
+  const segments = [];
+  if (dnaBlock) {
+    segments.push({
+      text:
+        `${dnaBlock}\n\n` +
+        `HOW TO USE THE SALES DNA WHEN DIGGING: it tells you what the average prospect's words chunk down to for THIS offer (e.g. "quit my job" → a monthly cash-flow number), so aim the question at the ROOT, in the rep's own vocabulary. But offer facts ≠ what the prospect said — NEVER state a number, pain, goal, or fact from the Sales DNA as if THIS prospect said it. Their words live ONLY in the LIVE CALL MEMORY and the transcript below.\n\n`,
+      cache: true,
+    });
+  }
+  segments.push(
+    { text: `LIVE CALL MEMORY (the belief scorecard — the WEAKEST LINK line is where to dig):\n${belief}`, cache: !dnaBlock },
     { text: `\n\nWHAT WAS JUST SAID (last ~120s):\n${latestResponse ?? ""}`, cache: false },
-  ];
+  );
+  return segments;
 }

@@ -41,6 +41,7 @@ import { streamObjectionCard,
          type ObjectionThread,
          type ObjectionCallMemory }     from "@/lib/wingman/objection-signal";
 import { streamDigCard }                from "@/lib/wingman/dig-signal";
+import { sanitizeSalesDna }             from "@/lib/wingman/sales-dna.mjs";
 
 // ── ↓ Dig nudge copy (server owns it — single source). ───────────────────────
 // Shown as headless nudge cards. NOTE (2026-07-07): PLACEHOLDER copy — Sebastian is
@@ -102,6 +103,7 @@ export async function POST(req: NextRequest) {
       flow_recap,
       call_memory,
       levers_used,
+      sales_dna,
     }: {
       transcript_chunk:    string;
       live_summary?:       string;
@@ -114,7 +116,15 @@ export async function POST(req: NextRequest) {
       flow_recap?:         unknown;
       call_memory?:        unknown;
       levers_used?:        unknown;
+      sales_dna?:          unknown;
     } = body;
+
+    // Phase 1b (offer-aware): the rep's Sales DNA rides the same client rail as
+    // live_summary — untrusted, so run it through the ONE shared sanitizer (same
+    // caps as the save path; unknown keys dropped, per-field + total size bounded).
+    // The segment builder downstream gates on completeness — a partial blob injects
+    // nothing. No DB read on the press path (the client holds the profile).
+    const salesDna = sanitizeSalesDna(sales_dna);
 
     // ── Objection-threading fields (Phase B) — untrusted client input, cap defensively ──
     // Bounds Sonnet token spend (cost boundary) regardless of what the client sends.
@@ -297,7 +307,7 @@ export async function POST(req: NextRequest) {
 
           let sawTerminal = false;
           try {
-            for await (const ev of streamDigCard(transcript_chunk, summary, req.signal)) {
+            for await (const ev of streamDigCard(transcript_chunk, summary, req.signal, salesDna)) {
               let alive = true;
               if (ev.kind === "belief") {
                 alive = send("belief", { belief: ev.belief ?? null });
