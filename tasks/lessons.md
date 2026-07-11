@@ -110,3 +110,7 @@
 ### Always add .claude/launch.json to git when modified
 **What happened:** Added a new preview server to `.claude/launch.json` but didn't include it in the `git add` command, causing the working directory to be dirty.
 **Rule:** When modifying `.claude/launch.json`, include it in the commit explicitly.
+
+### On Railway (proxy), `request.url` origin is the container's internal address, not the public host
+**What happened:** After Google login on production web, users landed on `https://localhost:8080/dashboard`. `src/app/auth/callback/route.ts` built its post-login redirect from `new URL(request.url).origin`, which behind Railway's proxy is the container's internal `http://localhost:8080` — not `https://app.meetwingman.ai`. Broken for OAuth, magic links, password reset, and email confirmation since launch; unnoticed because the desktop app uses password login (client-side redirect). Supabase config was correct — this was our code.
+**Rule:** In any server route handler that redirects to an absolute URL, derive the public origin from the proxy headers (`x-forwarded-host` / `x-forwarded-proto`), not from `request.url`. Use the shared `getPublicOrigin(request)` in `src/lib/auth/public-origin.ts`. The tell for this class of bug: a redirect that lands on `localhost:8080` **with a real app path** (`/dashboard`) appended — that path comes from our code, so the origin is the culprit, not Supabase.

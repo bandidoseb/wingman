@@ -1,8 +1,13 @@
 # Current Sprint
 
-Last updated: 2026-07-09
+Last updated: 2026-07-11
 
 This is the first file Claude reads at session start. It answers: where are we, what's next, and what's blocking us.
+
+> **Live now (verified 2026-07-11 via `gh pr list --state merged`)** — reconcile before trusting any prose below.
+> Merged to main since the last wrap: **#41** Sales DNA Phase 1a (capture+storage), **#42** private Changelog page (`/changelog`, owner-gated), **#43** auth-callback public-origin fix (Google/magic-link/reset login was landing on `localhost:8080` on prod web — broken since launch, now fixed + live-confirmed). Latest release still **v0.1.28**. **NEXT is unchanged: Phase 1b (Offer-Aware moat).**
+>
+> **Two side quests done this session, not on the roadmap:** (1) the Changelog page is a private founder tool — `/wrap` now auto-appends an entry each session (SKILL Step 3b); memory `project_changelog_page`. (2) the auth fix is Known Issue #49 (resolved) + a lesson in `tasks/lessons.md` (Railway proxy → use `getPublicOrigin`, never `request.url` origin, for redirects).
 
 ---
 
