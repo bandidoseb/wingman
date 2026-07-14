@@ -215,3 +215,27 @@ Source: `05 - Operations/Wiretap Compliance Research.md` — Section 3.
 - Don't build the website before the product works end-to-end. A broken product with a polished website is worse than no website.
 - The first real beta users will come from Sebastian's personal network — direct DMs, not the website. The website is for the public launch phase.
 - Onboarding flow redesign is planned (Cluely's flow as inspiration). Coordinate website CTA with whatever the new onboarding entry point becomes.
+
+---
+
+## What to Show vs What to Protect (added 2026-07-14)
+
+The `00 - Product/Wingman Design Language.md` artifact came out beautiful and Sebastian wants some of it on the website — especially the **close-readiness** visual and the signal-card mockups. Real concern raised: don't spew so much that someone scrapes the site and rebuilds Wingman with Claude Code.
+
+**The rule: show OUTPUTS, hide MECHANISMS.**
+
+- **The UI is NOT the moat.** A pretty card is four colored words — anyone can copy the *look* from a screenshot (always could). Linear/Stripe/Granola show their UI freely; the look isn't the business. Copying it gets a competitor an empty shell.
+- **The moat is NOT visible on a marketing site anyway** — it's the Sales DNA / Belief Ladder learning layer, offer-aware personalization, the real-time pipeline, the per-rep data flywheel. None of that is scrapeable from a picture.
+- **The actual leak risk is the EXPLANATIONS, not the pixels.** What would let someone rebuild it is the *why* — "driven by the Belief Ladder score," "diagnose the weakest belief," the prompts, the architecture, the methodology mapping. The design-language artifact is dangerous to publish **as-is** only because it's annotated with that rationale. Strip the annotations and the visuals are safe.
+
+**✅ Safe to show (hooks that convert):**
+- Close-readiness visual (the 4-step chip: Not Ready → Continue Discovery → Almost Ready → Ready to Pitch)
+- Signal-card mockups (the look)
+- The **generic-vs-offer-aware side-by-side** (the positioning wedge — `Positioning wedge — Offer-Aware vs Generic.md`; Sebastian flagged HIGH). Shows the RESULT, not the method = the moat made visible without giving the recipe.
+
+**❌ Keep private:**
+- The Belief Ladder pillars / Cole Gordon methodology mapping
+- Prompt logic, "how we decide when to fire," architecture / RAG pipeline / model choices
+- The annotated Wingman Design Language doc itself (internal only)
+
+**Rule of thumb for any website visual:** it shows *what the rep sees*, never *what Wingman thinks*. The site version = polished component + marketing copy, with every "how it works" caption stripped.
