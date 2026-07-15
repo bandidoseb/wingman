@@ -1,10 +1,14 @@
 # Current Sprint
 
-Last updated: 2026-07-14
+Last updated: 2026-07-14 (S2)
 
 This is the first file Claude reads at session start. It answers: where are we, what's next, and what's blocking us.
 
-> **🎨 NEW TRACK (2026-07-14) — WINGMAN DESIGN LANGUAGE.** Sebastian kicked off a full design-language effort ("dashboard feels Frankensteined, no cohesive design language"). Canonical spec: **`00 - Product/Wingman Design Language.md`** (single source of truth — read it before any UI work). North star = Granola-clean; language-first; whole product (dashboard + HUD), one language / many rebuilds. Locked this session: tokens, "one language two surfaces," one signal-card format (no quote marks), plain-English-no-jargon copy rule, **close-readiness = 4-step word-only chip** (Not Ready → Continue Discovery → Almost Ready → Ready to Pitch, Belief-Ladder-driven), **card-color customizer** spec, and **shadcn+tokens as the one component foundation**. Forward plan (each own session): (1) HUD quick wins — one card format for answer/dig/close, strip quote marks + fence prompt, plain-English pass, verify compass; (2) close-readiness wired to live belief score; (3) card-color customizer; (4) live-indicator redesign; (5) dashboard rebuild (map tokens→shadcn `globals.css` → rebuild ONE screen first). Full session log: `2026-07-14.md`. **This is parallel to the Offer-Aware moat track below — not a replacement.**
+> **🎨 DESIGN LANGUAGE TRACK — #1 SHIPPED (2026-07-14 S2).** Canonical spec: **`00 - Product/Wingman Design Language.md`** (read before any UI work). North star = Granola-clean; language-first; one language / many rebuilds.
+> **✅ #1 HUD quick wins — MERGED [PR #48](https://github.com/bandidoseb/wingman/pull/48) (`f151154`) → Railway.** No quotation marks around any spoken line (prompt fence at root: unquoted the few-shot examples in `objection-prompt.mjs`/`dig-prompt.mjs` + a decoder-level `stripWrappingQuotes` belt in `json-line-stream.ts`); the 3 directive chips collapsed to the one single-line headless format (route-only, empty `header`); dig tags re-labeled to our pillar names (`Pain → Core Problem`, display-only). **Web/server only — reaches installed apps without a desktop release.** Gates: 187 tests, dig-eval 5.00 / objection-eval 4.90 (0 fabrication, 0/30 quoted), wingman-reviewer APPROVE. Deferred to the next desktop release: the *visual* compass verify + any `hud/index.html` chrome (labels already plain — no change needed). Log: `2026-07-14.md` Session 2.
+> **🔴 NEXT SESSION — #2 close-readiness + #4 live-indicator TOGETHER (both HUD chrome → one desktop release).** #2 is net-new + meaty (→ close arrow wired to the live Belief Ladder score + the 4-step word-only chip: Not Ready → Continue Discovery → Almost Ready → Ready to Pitch; own plan-review loop; confirm the belief score is available at press-time FIRST). Then #3 card-color customizer (dashboard + storage + HUD). Then #5 dashboard rebuild (multi-session). **Do NOT batch — one feature at a time (Sebastian agreed 2026-07-14 S2 after weighing it).**
+>
+> Still-locked design decisions (unchanged): tokens · "one language two surfaces" · one signal-card format (no quote marks) · plain-English-no-jargon copy rule · card-color customizer spec · shadcn+tokens component foundation. **Parallel to the Offer-Aware moat track below — not a replacement.**
 
 > **Live now (verified 2026-07-11 S2 via `gh pr list --state merged`)** — reconcile before trusting any prose below.
 > Latest merge: **#45** Phase 1b Offer-Aware moat + syntax auto-detect → on main, Railway deploying. (Earlier today: #41 Sales DNA 1a, #42 Changelog, #43 auth-origin fix.) Latest release still **v0.1.28** (no desktop release this session). **NEXT: live-test 1b on a real call, then Phase 1c (onboarding + Deploy gate).**
@@ -19,19 +23,19 @@ This is the first file Claude reads at session start. It answers: where are we, 
 
 **The arc:** autonomous pop-up cards → rep presses a hotkey → 4-arrow compass (↑ objection · ← answer · ↓ dig · → close) → Wingman generates that one card.
 
-| Phase | What | Status |
-|---|---|---|
-| 0 | Decouple transcript saving | ✅ PR #4 |
-| 1 | Retire live Sonnet poll, stages → post-call | ✅ PR #5 |
-| 2 | Belief Ladder live-call memory | ✅ PR #8 |
-| 3 | Hotkey + 4-arrow compass + **↑ objection slot** | ✅ PR #10 |
-| 3.5 | Groq query distillation + latency fixes | ✅ PR #15 |
-| **3.6** | **↑ Objection slot deepening** *(was the "small" Phase 1/2/3)* | ◐ in progress |
-| &nbsp;&nbsp;3.6a | Sonnet prompt, KB cut, headless top-center card *(was small "Phase 1")* | ✅ shipped 06-29, PR #20 |
+| Phase            | What                                                                                                          | Status                                                                                                                  |
+| ---------------- | ------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| 0                | Decouple transcript saving                                                                                    | ✅ PR #4                                                                                                                 |
+| 1                | Retire live Sonnet poll, stages → post-call                                                                   | ✅ PR #5                                                                                                                 |
+| 2                | Belief Ladder live-call memory                                                                                | ✅ PR #8                                                                                                                 |
+| 3                | Hotkey + 4-arrow compass + **↑ objection slot**                                                               | ✅ PR #10                                                                                                                |
+| 3.5              | Groq query distillation + latency fixes                                                                       | ✅ PR #15                                                                                                                |
+| **3.6**          | **↑ Objection slot deepening** *(was the "small" Phase 1/2/3)*                                                | ◐ in progress                                                                                                           |
+| &nbsp;&nbsp;3.6a | Sonnet prompt, KB cut, headless top-center card *(was small "Phase 1")*                                       | ✅ shipped 06-29, PR #20                                                                                                 |
 | &nbsp;&nbsp;3.6b | Confidence-aware summarizer — `belief-ladder.ts`; `test-belief-ladder.mjs` gate GREEN *(was small "Phase 2")* | ✅ shipped 2026-07-11 in PR #45 (NUMBER CONFIDENCE rule pulled forward with the moat; gate green, Claude+GPT dual-judge) |
-| &nbsp;&nbsp;3.6c | Anchor library — needs `calls.anchors` schema *(was small "Phase 3")* | 🔲 DEFERRED (eval showed no aggregate lift) |
-| **4** | The other 3 arrows: ← answer · ↓ dig deeper · → close readiness | 🔲 not started |
-| **5** | Dead-code removal (#37) + reconcile stale CLAUDE.md rules (#34) | 🔲 not started |
+| &nbsp;&nbsp;3.6c | Anchor library — needs `calls.anchors` schema *(was small "Phase 3")*                                         | 🔲 DEFERRED (eval showed no aggregate lift)                                                                             |
+| **4**            | The other 3 arrows: ← answer · ↓ dig deeper · → close readiness                                               | 🔲 not started                                                                                                          |
+| **5**            | Dead-code removal (#37) + reconcile stale CLAUDE.md rules (#34)                                               | 🔲 not started                                                                                                          |
 
 **Cross-cutting work** (not tied to one arrow — slot in between phases):
 - ✅ **Auto-updater FIXED + verified live (#45) — 2026-07-01.** Was release-blocking; now working end-to-end (0.1.25→0.1.26 auto-installed; 0.1.27→0.1.28 smooth self-relaunch). Root cause: private code repo → `releases.atom` 404. Fix: publish signed/notarized installers to the **public `bandidoseb/wingman-releases` repo** (source stays private) + `releaseType: release` + `zip` target + `notarize: true` + arm64-only + `isQuitting=true` before `quitAndInstall`. Auth = PAT `WINGMAN_RELEASES_TOKEN`. **Latest release = v0.1.28** (ships streaming card + everything to the packaged app). Beta download = https://github.com/bandidoseb/wingman-releases/releases/latest (install once → auto-updates). At-scale upgrade = Option 3 self-hosted feed (`_Inbox/` note). Full narrative: `2026-07-01.md`.
