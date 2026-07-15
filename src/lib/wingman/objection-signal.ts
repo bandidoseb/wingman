@@ -26,7 +26,7 @@
 
 import { OBJECTION_SYSTEM_PROMPT, buildObjectionUserSegments, LEVER_TAXONOMY } from "./objection-prompt.mjs";
 import { parseSSEBuffer } from "./sse-parse";
-import { decodeLineStream, decodeLeverStream } from "./json-line-stream";
+import { decodeLineStream, decodeLeverStream, stripWrappingQuotes } from "./json-line-stream";
 
 const OBJECTION_MODEL = "claude-sonnet-4-6";
 // The line is ~25 words (~40 tokens) + JSON wrapper. 150 is comfortable headroom that
@@ -126,8 +126,9 @@ function parseObjection(raw: string): ObjectionCardResult {
     const v = (p as { line: unknown }).line;
     // An empty/whitespace string is "nothing to say" — treat it as an abstain, not a card.
     if (typeof v === "string") {
-      return v.trim()
-        ? { status: "line", line: v.trim(), lever: readLever((p as { lever?: unknown }).lever) }
+      const line = stripWrappingQuotes(v.trim());
+      return line
+        ? { status: "line", line, lever: readLever((p as { lever?: unknown }).lever) }
         : { status: "abstain" };
     }
     if (v === null) return { status: "abstain" };
@@ -141,7 +142,7 @@ function parseObjection(raw: string): ObjectionCardResult {
 
   const m = cleaned.match(/"line"\s*:\s*"((?:[^"\\]|\\.)*)"/);
   if (m) {
-    const line = m[1].replace(/\\"/g, '"').replace(/\\n/g, " ").trim();
+    const line = stripWrappingQuotes(m[1].replace(/\\"/g, '"').replace(/\\n/g, " ").trim());
     return line ? { status: "line", line } : { status: "abstain" };
   }
   if (/"line"\s*:\s*null/.test(cleaned)) return { status: "abstain" };

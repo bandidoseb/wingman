@@ -205,3 +205,67 @@ describe("B4 — lever-prefixed envelope", () => {
     }
   });
 });
+
+// ── Wrapping-quote strip (design language: the spoken line never renders in quotes) ──
+// Root cause is the prompt fence; this decoder strip is the belt. The model wraps the line
+// by emitting escaped quotes INSIDE the JSON string: {"line":"\"...\""} → decodes to "...".
+import { stripWrappingQuotes } from "../../src/lib/wingman/json-line-stream";
+
+describe("stripWrappingQuotes (pure helper)", () => {
+  it("strips one balanced straight-quote pair", () => {
+    expect(stripWrappingQuotes('"can I share a perspective?"')).toBe("can I share a perspective?");
+  });
+  it("strips a balanced curly-quote pair", () => {
+    expect(stripWrappingQuotes("“what's really going on?”")).toBe("what's really going on?");
+  });
+  it("leaves an unwrapped line untouched (byte-identical)", () => {
+    expect(stripWrappingQuotes("what's really going on?")).toBe("what's really going on?");
+  });
+  it("preserves a line that only ENDS in a quoted phrase (not a wrap)", () => {
+    expect(stripWrappingQuotes('you literally said "too expensive"'))
+      .toBe('you literally said "too expensive"');
+  });
+  it("preserves an internal quote", () => {
+    expect(stripWrappingQuotes('so the "real" reason is what?')).toBe('so the "real" reason is what?');
+  });
+  it("only strips ONE pair", () => {
+    expect(stripWrappingQuotes('""double""')).toBe('"double"');
+  });
+});
+
+describe("decodeLineStream — wrapping quotes", () => {
+  it("final: unwraps a fully-quoted line", () => {
+    expect(decodeLineStream('{"line":"\\"can I share a perspective?\\""}'))
+      .toEqual({ status: "line", line: "can I share a perspective?" });
+  });
+  it("final: a line that is only quotes → abstain, never a blank card", () => {
+    expect(decodeLineStream('{"line":"\\"\\""}')).toEqual({ status: "abstain" });
+  });
+  it("final: no quotes → byte-identical to before", () => {
+    expect(decodeLineStream('{"line":"What makes you hesitant?"}'))
+      .toEqual({ status: "line", line: "What makes you hesitant?" });
+  });
+  it("final: preserves a line ending in a legit quoted phrase", () => {
+    expect(decodeLineStream('{"line":"you said \\"too expensive\\""}'))
+      .toEqual({ status: "line", line: 'you said "too expensive"' });
+  });
+  it("streaming: a lone opening quote so far stays pending (no bare-quote card)", () => {
+    expect(decodeLineStream('{"line":"\\"')).toEqual({ status: "pending" });
+  });
+  it("streaming: quote-then-space does not open the card on whitespace", () => {
+    // '{"line":"\" ' — opening wrap quote then a space, nothing real yet → pending
+    expect(decodeLineStream('{"line":"\\" ')).toEqual({ status: "pending" });
+  });
+  it("streaming: strips the leading wrap quote as real chars arrive", () => {
+    expect(decodeLineStream('{"line":"\\"can I'))
+      .toEqual({ status: "streaming", text: "can I" });
+  });
+  it("streaming char-by-char never emits a leading quote", () => {
+    const full = '{"line":"\\"can I share?\\""}';
+    for (const s of driveCharByChar(full)) {
+      if (s.status === "streaming") expect(s.text.startsWith('"')).toBe(false);
+      if (s.status === "line") expect(s.line.startsWith('"')).toBe(false);
+    }
+    expect(decodeLineStream(full)).toEqual({ status: "line", line: "can I share?" });
+  });
+});

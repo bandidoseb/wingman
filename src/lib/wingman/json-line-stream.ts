@@ -36,6 +36,23 @@ const ESCAPES: Record<string, string> = {
   '"': '"', "\\": "\\", "/": "/", b: "\b", f: "\f", n: "\n", r: "\r", t: "\t",
 };
 
+// Quote chars a model might wrap the whole line in — straight and curly, both directions.
+const WRAP_QUOTES = new Set(['"', "'", "“", "”"]);
+
+/**
+ * stripWrappingQuotes — remove AT MOST ONE balanced leading+trailing quote pair.
+ * Design language forbids the spoken line rendering inside quotation marks; the prompt
+ * fence is the root-cause fix, this is the belt. Only strips when BOTH ends are quote
+ * chars, so a line that legitimately just ENDS in a quoted phrase (`…you said "too much"`)
+ * is left intact. Returns the inner text trimmed. Idempotent enough for one pass.
+ */
+export function stripWrappingQuotes(s: string): string {
+  if (s.length >= 2 && WRAP_QUOTES.has(s[0]) && WRAP_QUOTES.has(s[s.length - 1])) {
+    return s.slice(1, -1).trim();
+  }
+  return s;
+}
+
 /**
  * Decode the JSON-string value of "line" out of the accumulated raw model output.
  * Pure: depends only on `raw`. Re-run on every growth of `raw`.
@@ -94,8 +111,9 @@ export function decodeLineStream(raw: string): DecodeState {
     }
 
     if (c === '"') {
-      // Unescaped closing quote → string complete.
-      const line = out.trim();
+      // Unescaped closing quote → string complete. Strip one balanced wrapping quote pair
+      // (belt to the prompt fence); an all-quotes line ("") falls to abstain, never a blank card.
+      const line = stripWrappingQuotes(out.trim());
       return line ? { status: "line", line } : { status: "abstain" };
     }
 
@@ -104,9 +122,13 @@ export function decodeLineStream(raw: string): DecodeState {
   }
 
   // Reached the end of `raw` without a closing quote → still streaming.
-  // Strip leading whitespace so a string that's only whitespace-so-far stays "pending"
-  // (don't open the card on invisible content). Don't strip the tail — we don't know it yet.
-  const partial = out.replace(/^\s+/, "");
+  // Consume optional leading whitespace, then AT MOST ONE leading wrap-quote, then any
+  // whitespace after it — so a card that's only whitespace/a lone opening quote so far stays
+  // "pending" (never opens on invisible content or a bare quote), and the quote-then-space
+  // case ("\" hello) doesn't leave a leading space that would open the card early. Monotonic:
+  // the quote sits at index 0 and is stripped identically on every growth. The TRAILING quote
+  // is deliberately NOT stripped here (we don't know the tail yet) — only on final "line".
+  const partial = out.replace(/^\s*["'“”]?\s*/, "");
   return partial ? { status: "streaming", text: partial } : { status: "pending" };
 }
 
