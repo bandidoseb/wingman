@@ -18,6 +18,7 @@ import { FREE_CALL_LIMIT } from "@/lib/constants";
 import { getDefaultStage } from "@/lib/wingman/poll-intervals";
 import { parseSSEBuffer } from "@/lib/wingman/sse-parse";
 import { HOT_PARTIAL_MS, SETTLE_WAIT_MS } from "@/lib/wingman/live-tail";
+import { scoreReadiness, BELIEF_DISPLAY } from "@/lib/wingman/close-readiness.mjs";
 import { useWingmanPoller } from "@/hooks/useWingmanPoller";
 import { useRecallTranscript } from "@/hooks/useRecallTranscript";
 
@@ -184,6 +185,7 @@ export default function DashboardClient({
     dismissSignal,
     flushBuffer,
     flushSummarize,
+    summarizeNow,
   } = useWingmanPoller({
     callId,
     stage,
@@ -742,6 +744,7 @@ export default function DashboardClient({
   // Forward ref to the ↓ dig handler (defined below) so handleMenuPick can route to it
   // without a declaration-order cycle. Assigned in an effect once handleDigPick exists.
   const handleDigPickRef = useRef<(() => void) | null>(null);
+  const handleClosePickRef = useRef<(() => void) | null>(null);
 
   // ── Hotkey compass menu — handle direction pick from Electron main ─────────
   // Called by main.ts when the rep presses a direction key after the Up Arrow
@@ -763,6 +766,13 @@ export default function DashboardClient({
     // no threading). ← answer · → close are still Phase 4b/4c → "coming soon" pill.
     if (direction === "dig") {
       handleDigPickRef.current?.();
+      return;
+    }
+    // → Close → readiness chip (Design #2). Its own handler: force-fresh belief-summary → score
+    // client-side → send the chip (no /kb-signal fetch, no AI on the scoring). Sits AFTER the
+    // isGeneratingRef guard above, so a → press while a card is streaming is dropped.
+    if (direction === "close") {
+      handleClosePickRef.current?.();
       return;
     }
     if (direction !== "objection") {
@@ -1211,13 +1221,9 @@ export default function DashboardClient({
       window.wingman?.sendSummonState({ state: "error", slot: direction });
     };
 
-    // Rep-facing DISPLAY labels for the dig tag — OUR pillar names, never Cole Gordon's
-    // (design language: plain English, no methodology jargon). The wire value stays the raw
-    // taxonomy id (Pain/Doubt/…); this map only re-labels what the rep sees. Matches FlightLogTab.
-    const BELIEF_DISPLAY: Record<string, string> = {
-      Pain: "Core Problem", Doubt: "Can't DIY", Cost: "Cost of Waiting", Desire: "Dream Outcome",
-      Money: "Investment", Support: "Who's Deciding", Trust: "Why You",
-    };
+    // Rep-facing DISPLAY labels for the dig tag — OUR pillar names (plain English, no methodology
+    // jargon). Shared with the close-readiness gap via BELIEF_DISPLAY (close-readiness.mjs) so the
+    // two live-call surfaces can never drift. The wire value stays the raw taxonomy id.
     let beliefTag = "Dig"; // becomes "Dig · Core Problem" once the belief frame lands (pre-paint)
 
     try {
@@ -1327,11 +1333,74 @@ export default function DashboardClient({
     }
   }, [callId, getRecentTranscript, liveSummary, profile.sales_dna]);
 
+  // ── → Close → readiness chip (Design #2) ──────────────────────────────────
+  // Deterministic + client-side: force a fresh Belief Ladder (only calls Sonnet if there's new
+  // speech since the last tick), score it with the pure scoreReadiness(), and send the chip to the
+  // HUD. NO /kb-signal fetch, NO AI on the scoring itself. Shares the in-flight guard + throttle +
+  // seq counter with the other slots (one thing at a time; call-end teardown already clears the
+  // shared pending refs). Feature-detects sendReadiness so a not-yet-updated packaged app falls
+  // back to the "coming soon" pill instead of doing nothing (renderer ships via Railway, the HUD
+  // IPC via a desktop release — they can land out of order).
+  const handleClosePick = useCallback(async () => {
+    const direction = "close";
+    if (!window.wingman?.sendReadiness) {
+      window.wingman?.sendSummonState({ state: "unsupported", slot: direction });
+      return;
+    }
+    if (isGeneratingRef.current) {
+      console.log("[Wingman] Close pick dropped — generation already in flight");
+      return;
+    }
+    if (!callId || !isActiveRef.current) return;
+
+    // Throttle + coalesce — shared refs with objection/dig (also caps how often the force-fresh
+    // summarize can fire). A press inside the window defers ONE coalesced re-fire, never queues N.
+    const sinceLast = Date.now() - lastSummonAtRef.current;
+    if (sinceLast < SUMMON_THROTTLE_MS) {
+      if (!pendingPressRef.current) {
+        pendingPressRef.current = true;
+        window.wingman?.sendSummonState({ state: "thinking", slot: direction });
+        const wait = SUMMON_THROTTLE_MS - sinceLast + 50;
+        pendingTimerRef.current = setTimeout(() => {
+          pendingTimerRef.current = null;
+          pendingPressRef.current = false;
+          if (!isActiveRef.current) return;
+          handleClosePickRef.current?.();
+        }, wait);
+      }
+      return;
+    }
+    lastSummonAtRef.current = Date.now();
+
+    isGeneratingRef.current = true;
+    const seq = ++seqCounterRef.current;
+    // "Reading the close" pill while the fresh summary lands (instant when nothing new to score).
+    window.wingman?.sendSummonState({ state: "thinking", slot: direction });
+
+    try {
+      const fresh = await summarizeNow();          // fresh Belief Ladder (or null); never throws
+      if (!isActiveRef.current) {                   // call ended during the summarize
+        window.wingman?.sendSummonState({ state: "idle", slot: direction });
+        return;
+      }
+      const summary = fresh ?? liveSummary ?? undefined; // fall back to cached if the fetch failed
+      const readiness = scoreReadiness(summary);
+      // showReadiness in the HUD clears the pill + reuses the single card slot (one-card invariant).
+      window.wingman?.sendReadiness({ state: readiness.state, label: readiness.label, gap: readiness.gap, note: readiness.note, seq });
+    } catch (err) {
+      console.error("[Wingman] handleClosePick error:", err);
+      window.wingman?.sendSummonState({ state: "error", slot: direction });
+    } finally {
+      isGeneratingRef.current = false;
+    }
+  }, [callId, liveSummary, summarizeNow]);
+
   // Stable ref so the IPC listener (registered once on mount) always calls
   // the latest handleMenuPick without going stale across renders.
   const handleMenuPickRef = useRef(handleMenuPick);
   useEffect(() => { handleMenuPickRef.current = handleMenuPick; }, [handleMenuPick]);
   useEffect(() => { handleDigPickRef.current = handleDigPick; }, [handleDigPick]);
+  useEffect(() => { handleClosePickRef.current = handleClosePick; }, [handleClosePick]);
 
   useEffect(() => {
     if (typeof window === "undefined" || !window.wingman) return;

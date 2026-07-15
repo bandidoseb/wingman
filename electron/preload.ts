@@ -270,6 +270,16 @@ contextBridge.exposeInMainWorld("wingman", {
   sendFlowState: (payload: { active: boolean; move?: number }) =>
     ipcRenderer.invoke("hud:flow-state", payload),
 
+  /**
+   * → Close readiness chip (Design #2). Deterministic, client-scored — no card generation.
+   *   state → one of not-ready | continue | almost | ready (drives the chip color + label)
+   *   label → the two-word chip text
+   *   gap   → up to 2 rep-facing belief names not yet covered ([] for "ready")
+   *   seq   → shared monotonic press id (HUD ignores a stale frame, same as sendSignal)
+   */
+  sendReadiness: (payload: { state: string; label: string; gap: string[]; note?: string; seq: number }) =>
+    ipcRenderer.invoke("hud:readiness", payload),
+
   // ── Zoom name status sync ────────────────────────────────────────────────
   /** Tells the main process whether the user has a Zoom display name set.
    *  Called on dashboard mount and whenever the name is saved in Settings. */
@@ -430,4 +440,15 @@ contextBridge.exposeInMainWorld("hud", {
   onFlowState: (callback: (payload: { active: boolean; move?: number }) => void) => {
     ipcRenderer.on("wingman:flow-state", (_event, payload: { active: boolean; move?: number }) => callback(payload));
   },
+
+  // ── → Close readiness chip (Design #2) ────────────────────────────────────
+  // Relayed from DashboardClient via main when the rep presses → Close. Drives the
+  // color + two-word label + (for not-ready states) the gap names + "↓ Dig deeper" CTA.
+  onReadiness: (callback: (payload: { state: string; label: string; gap: string[]; note?: string; seq: number }) => void) => {
+    ipcRenderer.on("hud:update-readiness", (_event, payload: { state: string; label: string; gap: string[]; note?: string; seq: number }) => callback(payload));
+  },
+
+  // Click a card's colored CTA (↓ Dig deeper / ↑ Next move) — routes through the SAME
+  // wingman:menu-pick path the hotkey uses, so a mouse click == pressing the arrow.
+  triggerPick: (direction: string) => ipcRenderer.invoke("hud:trigger-pick", direction),
 });
