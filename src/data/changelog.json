@@ -1,5 +1,25 @@
 [
   {
+    "id": "2026-07-15-close-readiness-chip",
+    "date": "2026-07-15",
+    "category": "feature",
+    "title": "\"Am I ready to pitch?\" — the close-readiness chip",
+    "summary": "Press → during a call and Wingman tells you, at a glance, whether you've done enough discovery to earn the pitch — Not Ready, Continue Discovery, Almost Ready, or Ready to Pitch — based on how many of the 7 beliefs you've actually built.",
+    "changes": [
+      "→ Close now shows a color-coded readiness chip driven by your live Belief Ladder",
+      "It names exactly what you haven't covered yet, with a one-press \"Dig deeper\" button",
+      "Objection-flow cards got a prominent \"Next move\" button; every card now dismisses with a small circled ✕",
+      "Built, reviewed, and live-tested — reaches your installed Mac app on the next desktop release"
+    ],
+    "details": [
+      "The chip reads your live Belief Ladder (the running scorecard of the 7 beliefs a prospect needs) and turns it into one honest read: red \"Not Ready\", amber \"Continue Discovery\", or green \"Almost Ready\" / \"Ready to Pitch\". It's deliberately conservative — it will never flash \"Ready\" while there's a live objection sitting on the table, because telling you to pitch right then would be exactly the wrong move.",
+      "It's driven by real data, not vibes: the four core beliefs (the problem, that they can't fix it themselves, the cost of waiting, and the dream outcome) have to be genuinely locked, plus budget and decision-maker confirmed, before it turns fully green. When you're not there yet, it names the 1–2 weakest spots (\"Haven't covered: Investment, Who's Deciding\") so you know where to go next.",
+      "When you press →, Wingman first refreshes your scorecard so a great last two minutes of the call actually counts — the read is current, not stale.",
+      "Two smaller polish wins ride along: the action buttons (Dig deeper / Next move) now work by mouse click OR the arrow key, and the old \"got it\" button became a clean circled ✕ in the corner of every card.",
+      "This is on-screen HUD work, so it reaches your installed Mac app on the next desktop release — it's built and merged, just waiting to be bundled with the next batch of on-screen changes (the Wingman live pill is next)."
+    ]
+  },
+  {
     "id": "2026-07-11-offer-aware-cards",
     "date": "2026-07-11",
     "category": "ai",
