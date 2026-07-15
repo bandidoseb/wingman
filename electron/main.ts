@@ -120,6 +120,17 @@ let flowKeysRegistered = false; // ← ↓ → live while a flow is armed (idemp
 let flowIdleTimer: ReturnType<typeof setTimeout> | null = null;
 const FLOW_MODE_IDLE_MS = 2 * 60 * 1000; // mirrors the renderer's press-time stale check
 
+// ─── Readiness dig-arm (Design #2) ─────────────────────────────────────────────
+// While a → Close readiness chip WITH A GAP is the visible card, arm the Down arrow as a direct
+// dig pick, so the rep can press ↓ (or click "Dig deeper") to dig the weakest belief. Down is
+// otherwise owned by the compass and flow-direct keys; Electron's register() NO-OPS on a held
+// accelerator, so this MUST only register when Down is free (!menuOpen && !flowKeysRegistered) and
+// MUST disarm before the compass or flow claims Down — mirrors the openFlowMode invariant.
+let readinessArmed = false;
+let readinessSafetyTimer: ReturnType<typeof setTimeout> | null = null;
+const READINESS_ARM_MS = 9_500; // ~matches the HUD chip's 9s auto-hide — a backstop; the primary
+                                // disarm is a replacing card / call-end / compass-or-flow claiming Down
+
 // ─── Hotkey helpers (Phase 3) ─────────────────────────────────────────────────
 
 /** Unregister ← ↓ → Esc and cancel the auto-fade. Called on pick, dismiss, timeout, or call-end. */
@@ -165,6 +176,8 @@ function sendPickFlash(direction: string): void {
  * - Auto-fades after 5 s (silent — no visible countdown, per spec).
  */
 function openCompassMenu(): void {
+  // Free Down before the compass registers it (register() NO-OPS on a held accelerator).
+  disarmReadinessDig();
   menuOpen = true;
   // debug #39: make the send explicit so a missing/dead HUD window is loud,
   // not silently skipped by optional chaining.
@@ -265,6 +278,7 @@ function openFlowMode(): void {
   // compass with a fresh ↑. Tear the compass down first (its own state, keys,
   // auto-fade + HUD notify) so flow keys always register against free accelerators.
   closeCompassMenu("flow-arming");
+  disarmReadinessDig(); // free Down before flow-direct claims it (same NO-OP-on-held invariant)
   if (!flowModeOpen) console.log("[Flow] mode open — all four arrows go direct");
   flowModeOpen = true;
   registerFlowDirectKeys(); // idempotent — re-arms are timer-only
@@ -272,6 +286,35 @@ function openFlowMode(): void {
   flowIdleTimer = setTimeout(() => {
     closeFlowMode("idle-2min", { notifyRenderer: true });
   }, FLOW_MODE_IDLE_MS);
+}
+
+/** Design #2 — disarm the readiness Down key. Idempotent; only unregisters Down if WE armed it
+ *  (so it never yanks the compass's or flow's Down handler). Always clears the safety timer. */
+function disarmReadinessDig(): void {
+  if (readinessSafetyTimer) { clearTimeout(readinessSafetyTimer); readinessSafetyTimer = null; }
+  if (!readinessArmed) return;
+  globalShortcut.unregister("Down");
+  readinessArmed = false;
+  console.log("[Readiness] Down disarmed");
+}
+
+/** Design #2 — arm Down as a direct dig pick while a readiness chip with a gap is showing.
+ *  Registers ONLY when Down is free (invariant: readinessArmed can't coexist with menuOpen or
+ *  flowKeysRegistered — openCompassMenu/openFlowMode disarm us first). Re-arms reset the timer. */
+function armReadinessDig(): void {
+  if (!callActive || menuOpen || flowKeysRegistered) return;
+  if (!readinessArmed) {
+    globalShortcut.register("Down", () => {
+      console.log("[Readiness] Down → dig");
+      logMeasurement({ kind: "press", path: "readiness-dig", slot: "dig" });
+      mainWindow?.webContents.send("wingman:menu-pick", "dig");
+      disarmReadinessDig(); // the dig card is about to replace the chip
+    });
+    readinessArmed = true;
+    console.log("[Readiness] Down armed");
+  }
+  if (readinessSafetyTimer) clearTimeout(readinessSafetyTimer);
+  readinessSafetyTimer = setTimeout(() => disarmReadinessDig(), READINESS_ARM_MS);
 }
 
 /**
@@ -331,6 +374,7 @@ function unregisterCallHotkey(): void {
   // No renderer notify: the renderer's own isActive effect resets its thread on
   // every call-end path — echoing here would double-reset.
   closeFlowMode("call-end");
+  disarmReadinessDig();
   if (!hotkeyRegistered) return;
   globalShortcut.unregister("Up");
   hotkeyRegistered = false;
@@ -848,11 +892,13 @@ function setupIPC(): void {
 
   // ── Signal → HUD ───────────────────────────────────────────────────────────
   ipcMain.handle("hud:signal", (_event, signal: { header: string; text: string; type: string; seq?: number }) => {
+    disarmReadinessDig(); // a real card is replacing any readiness chip → free Down
     hudWindow?.webContents.send("hud:update-signal", signal);
   });
 
   // ── Streaming reveal delta → HUD (Step 4) — relay only, mirrors hud:signal ──
   ipcMain.handle("hud:signal-delta", (_event, payload: { seq: number; phase: string; textSoFar?: string; type?: string; beliefTag?: string }) => {
+    if (payload && payload.phase === "start") disarmReadinessDig(); // a streaming card opened → free Down
     hudWindow?.webContents.send("hud:update-signal-delta", payload);
   });
 
@@ -876,6 +922,7 @@ function setupIPC(): void {
 
   // ── HUD dismiss → main window ───────────────────────────────────────────────
   ipcMain.handle("hud:dismiss", () => {
+    disarmReadinessDig(); // dismissing a gap chip must free Down (idempotent — no-op if not ours)
     mainWindow?.webContents.send("signal:dismiss");
   });
 
@@ -888,6 +935,23 @@ function setupIPC(): void {
   // relayed from the dashboard renderer, same pattern as hud:summon-state.
   ipcMain.handle("hud:flow-state", (_event, payload: { active: boolean; move?: number }) => {
     hudWindow?.webContents.send("wingman:flow-state", payload);
+  });
+
+  // → Close readiness chip (Design #2) — relay to the HUD, and arm the Down→dig key while a chip
+  // WITH A GAP is showing (a gap means there's a belief to dig). No gap (ready / cold start) → disarm.
+  ipcMain.handle("hud:readiness", (_event, payload: { state: string; label: string; gap: string[]; note?: string; seq: number }) => {
+    hudWindow?.webContents.send("hud:update-readiness", payload);
+    if (Array.isArray(payload?.gap) && payload.gap.length > 0) armReadinessDig();
+    else disarmReadinessDig();
+  });
+
+  // Card CTA click (↓ Dig deeper / ↑ Next move) → same wingman:menu-pick the hotkey sends, so a
+  // click is identical to the keypress. Validate the direction defensively (untrusted-ish input).
+  ipcMain.handle("hud:trigger-pick", (_event, direction: string) => {
+    if (typeof direction !== "string") return;
+    if (direction !== "dig" && direction !== "objection" && direction !== "answer" && direction !== "close") return;
+    if (direction === "dig") disarmReadinessDig(); // click-dig replaces the chip too
+    mainWindow?.webContents.send("wingman:menu-pick", direction);
   });
 
   // ── Mouse interaction toggle ────────────────────────────────────────────────

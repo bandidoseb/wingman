@@ -321,6 +321,10 @@ export interface WingmanBridge {
   offFlowExpired?: () => void;
   sendFlowState?: (payload: { active: boolean; move?: number }) => Promise<void>;
 
+  // Design #2 — → Close readiness chip. Optional so a renderer running against an older
+  // preload (Railway-first / desktop-release skew) degrades to the "coming soon" pill.
+  sendReadiness?: (payload: { state: string; label: string; gap: string[]; note?: string; seq: number }) => Promise<void>;
+
   // Outcome saved from HUD — tells dashboard to refresh so pill appears immediately
   onOutcomeUpdated?:  (callback: () => void) => void;
   offOutcomeUpdated?: () => void;
