@@ -157,7 +157,10 @@
       top: 64px;
       left: 50%;
       transform: translateX(-50%);
-      width: 420px;
+      /* Dynamic width — shrink to fit short lines, wrap long objection lines at 420px.
+         One design language across every signal card (readiness, objection, dig, nudge). */
+      width: auto;
+      max-width: 420px;
       z-index: 100;
       display: none;
       flex-direction: column;
@@ -188,6 +191,7 @@
       letter-spacing: 0.09em;
       text-transform: uppercase;
       color: rgba(255, 255, 255, 0.28);
+      padding-right: 26px;   /* clear the top-right dismiss ✕ */
     }
 
     /* Headline — bold, actionable alone in a single glance */
@@ -197,6 +201,7 @@
       line-height: 1.2;
       letter-spacing: -0.01em;
       color: rgba(255, 255, 255, 0.93);
+      padding-right: 26px;   /* clear the top-right dismiss ✕ */
     }
 
     /* Headless card (objection slot) — a full spoken LINE, not a 5-word headline.
@@ -207,6 +212,10 @@
       font-weight: 600;
       line-height: 1.4;
     }
+
+    /* Transparent tail during the typewriter reveal — reserves the final text width so the
+       centered, dynamic-width card doesn't drift as characters type in. */
+    .rv-pending { color: transparent; }
 
     /* Support text — shown for objection/close cards only, read during pause */
     #signalSupport {
@@ -227,35 +236,92 @@
        MOVE #N", and a small affordance line reminds the rep that a single
        ↑ press summons the next move. */
     #signalTag.flow { color: rgba(96, 165, 250, 0.85); }
-    #flowHint {
-      display: none;
-      font-size: 11px;
-      font-weight: 600;
-      letter-spacing: 0.04em;
-      color: rgba(96, 165, 250, 0.55);
-      margin-top: 2px;
+
+    /* Primary action CTA — the promoted "next move" / "dig deeper" button. Full width, colored,
+       with a keycap that doubles as the hotkey reminder (the rep can click OR press the arrow). */
+    .cta-btn {
+      width: 100%; padding: 9px 10px; border-radius: 8px; margin-top: 4px;
+      display: none; align-items: center; justify-content: center; gap: 8px;
+      font-family: inherit; font-size: 13px; font-weight: 600; cursor: pointer;
+      transition: filter 0.15s;
     }
-    #flowHint.visible { display: block; }
+    .cta-btn:hover { filter: brightness(1.18); }
+    .keycap {
+      display: inline-flex; align-items: center; justify-content: center;
+      min-width: 17px; height: 17px; padding: 0 3px; border-radius: 4px;
+      border: 1px solid currentColor; font-size: 11px; line-height: 1; font-weight: 700;
+    }
+    /* Objection-flow next-move — static blue (matches the flow tag). Shown via .visible. */
+    #flowHint {
+      background: rgba(96, 165, 250, 0.16);
+      border: 1px solid rgba(96, 165, 250, 0.55);
+      color: #7E9BFF;
+    }
+    #flowHint.visible { display: flex; }
+    /* Readiness dig CTA — colors set inline per state; shown/hidden by showReadiness. */
+    #readinessCta.show { display: flex; }
+
+    /* ── → Close readiness chip (Design #2) ───────────────────────────────
+       Shrink-to-fit chip: colored dot + two-word label; for not-ready states a
+       gap line + "↓ Dig deeper" CTA. Reuses signalBubble (one-card invariant) —
+       the .readiness modifier hides the normal card children and shows this.
+       Dot/label/CTA colors are set inline per state (the 4 sunset-gradient hues). */
+    #readinessCard { display: none; flex-direction: column; gap: 8px; }
+    /* ID+class specificity so this beats `#signalBubble { width: 420px }` → the chip
+       actually shrinks to fit its content (no dead space on the right). */
+    #signalBubble.readiness {
+      width: auto;
+      max-width: 420px;
+      padding: 13px 15px;
+    }
+    .signal-card.readiness #signalTag,
+    .signal-card.readiness #signalText,
+    .signal-card.readiness #signalSupport,
+    .signal-card.readiness #flowHint { display: none !important; }
+    .signal-card.readiness #readinessCard { display: flex; }
+
+    #readinessHead { display: flex; align-items: center; gap: 9px; padding-right: 24px; /* clear the ✕ */ }
+    #readinessDot {
+      width: 9px; height: 9px; border-radius: 50%; flex: 0 0 auto;
+    }
+    #readinessLabel {
+      font-size: 16px;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+      white-space: nowrap;
+    }
+    #readinessGap {
+      font-size: 12px;
+      color: rgba(255, 255, 255, 0.42);
+      white-space: nowrap;
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+      padding-top: 8px;
+    }
+    #readinessGapNames { color: rgba(243, 240, 233, 0.92); }
 
     /* Dismiss button — dark theme */
+    /* Dismiss ✕ — a circled ✕ in the top-right corner of every card. Opaque stroke + element
+       `opacity` for the subtle look (NOT an alpha stroke) — so the two lines crossing at the
+       centre don't double up into a brighter dot. */
     #gotItBtn {
-      width: 100%;
-      padding: 8px;
-      border-radius: 8px;
-      background: rgba(255, 255, 255, 0.07);
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      color: rgba(255, 255, 255, 0.35);
-      font-size: 12px;
-      font-weight: 600;
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      width: 22px;
+      height: 22px;
+      padding: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: none;
+      border: none;
+      color: #F3F0E9;
+      opacity: 0.4;
       cursor: pointer;
-      font-family: inherit;
-      margin-top: 4px;
-      transition: background 0.15s, color 0.15s;
+      transition: opacity 0.15s;
     }
-    #gotItBtn:hover {
-      background: rgba(255, 255, 255, 0.13);
-      color: rgba(255, 255, 255, 0.7);
-    }
+    #gotItBtn:hover { opacity: 0.82; }
+    #gotItBtn svg { width: 20px; height: 20px; }
 
     /* ── Ambient dot — always visible while Wingman is live, no signal ──── */
     #ambientDot {
@@ -974,8 +1040,19 @@
     <div id="signalTag"></div>
     <div id="signalText"></div>
     <div id="signalSupport"></div>
-    <div id="flowHint">press &#8593; for next move</div>
-    <button id="gotItBtn">got it</button>
+    <!-- Objection-flow next-move CTA (colored button + keycap) — shown during a flow. -->
+    <button id="flowHint" class="cta-btn"><span class="keycap">&#8593;</span><span>Next move</span></button>
+    <!-- → Close readiness chip (Design #2) — shown only when signalBubble has .readiness -->
+    <div id="readinessCard">
+      <div id="readinessHead">
+        <span id="readinessDot"></span>
+        <span id="readinessLabel"></span>
+      </div>
+      <div id="readinessGap"><span id="readinessGapLabel">Haven't covered: </span><span id="readinessGapNames"></span></div>
+      <button id="readinessCta" class="cta-btn"><span class="keycap">&#8595;</span><span>Dig deeper</span></button>
+    </div>
+    <!-- Dismiss — a circled ✕ in the top-right corner of every card. -->
+    <button id="gotItBtn" aria-label="Dismiss"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"></circle><line x1="9" y1="9" x2="15" y2="15"></line><line x1="15" y1="9" x2="9" y2="15"></line></svg></button>
   </div>
 
   <script>
@@ -1175,10 +1252,30 @@
     const signalTextEl         = document.getElementById('signalText');
     const signalSupportEl      = document.getElementById('signalSupport');
     const gotItBtn             = document.getElementById('gotItBtn');
+    const readinessCard        = document.getElementById('readinessCard');
+    const readinessDot         = document.getElementById('readinessDot');
+    const readinessLabel       = document.getElementById('readinessLabel');
+    const readinessGap         = document.getElementById('readinessGap');
+    const readinessGapLabel    = document.getElementById('readinessGapLabel');
+    const readinessGapNames    = document.getElementById('readinessGapNames');
+    const readinessCta         = document.getElementById('readinessCta');
     const summonPill           = document.getElementById('summonPill');
     const summonPillText       = document.getElementById('summonPillText');
     const ambientDot           = document.getElementById('ambientDot');
     let   hideSignalTimer      = null;
+    let   readinessHideTimer   = null;   // readiness chip auto-hide (Design #2)
+    // The 4 readiness colors (the sunset gradient) — literals live here, per the design language.
+    const READINESS_COLORS = {
+      'not-ready': '#C24338',
+      'continue':  '#D98A3D',
+      'almost':    '#7FA84E',
+      'ready':     '#3E8E5A',
+    };
+    // #RRGGBB → rgba(...) at the given alpha (for the tinted CTA fill/border).
+    function withAlpha(hex, a) {
+      const n = parseInt(hex.slice(1), 16);
+      return 'rgba(' + ((n >> 16) & 255) + ',' + ((n >> 8) & 255) + ',' + (n & 255) + ',' + a + ')';
+    }
     const compassMenu          = document.getElementById('compassMenu');
     const outcomeCard          = document.getElementById('outcomeCard');
     const outcomePills         = document.getElementById('outcomePills');
@@ -1540,6 +1637,10 @@
     let   revealComplete = true;    // true once no more text will arrive (one-shot: immediately)
     let   revealRAF      = null;
     let   revealLastT    = 0;
+    // Two-span reveal (no layout drift): the visible prefix + a transparent suffix that reserves
+    // the FINAL text width, so a center-anchored dynamic-width card doesn't shift as text types in.
+    let   revealShownSpan   = null;
+    let   revealPendingSpan = null;
 
     // Monotonic press id (Step 4). The renderer stamps each press; we ignore any signal or
     // reveal delta whose seq is older than the one we're showing, so a stale/late stream
@@ -1557,7 +1658,16 @@
       revealShown    = 0;
       revealComplete = complete !== false;   // default true (one-shot)
       revealLastT    = 0;
+      // Build the visible-prefix + transparent-suffix spans. The suffix holds the full text from
+      // frame 1, so the card is its final width immediately — the reveal types in without pushing
+      // it wider (no left-drift on the centered card).
       el.textContent = '';
+      revealShownSpan   = document.createElement('span');
+      revealPendingSpan = document.createElement('span');
+      revealPendingSpan.className = 'rv-pending';
+      revealPendingSpan.textContent = revealTarget;
+      el.appendChild(revealShownSpan);
+      el.appendChild(revealPendingSpan);
       revealRAF = requestAnimationFrame(revealTick);
     }
 
@@ -1575,11 +1685,16 @@
         const byTime = (REVEAL_MIN_CPS / 1000) * dt;   // linear floor
         const byEase = remaining * REVEAL_EASE;        // proportional catch-up (smooth on big buffers)
         revealShown  = Math.min(revealTarget.length, revealShown + Math.max(byTime, byEase));
-        if (revealEl) revealEl.textContent = revealTarget.slice(0, Math.floor(revealShown));
       }
+      // Paint every frame: visible prefix + transparent suffix (= the still-hidden text, holding
+      // the final width). Setting both each tick means a growing streaming target reflows correctly.
+      const n = Math.floor(revealShown);
+      if (revealShownSpan)   revealShownSpan.textContent   = revealTarget.slice(0, n);
+      if (revealPendingSpan) revealPendingSpan.textContent = revealTarget.slice(n);
 
       if (revealComplete && revealShown >= revealTarget.length) {
-        if (revealEl) revealEl.textContent = revealTarget;   // ensure the exact final text
+        if (revealShownSpan)   revealShownSpan.textContent   = revealTarget;   // exact final text
+        if (revealPendingSpan) revealPendingSpan.textContent = '';
         revealRAF = null;
         return;                                              // done — stop the loop
       }
@@ -1597,6 +1712,7 @@
       const typeInfo = TYPE_MAP[type] || TYPE_MAP['Nudge'];
       currentSignalType = typeInfo.cls;
       clearTimeout(hideSignalTimer);
+      clearTimeout(readinessHideTimer);   // a new card cancels any pending readiness auto-hide
       signalBubble.classList.remove('hiding');
       signalTag.textContent = (tagOverride || currentStage || typeInfo.label).toUpperCase();
       clearFlowChrome();  // fresh card starts plain — flow-state after `done` re-applies (Phase C)
@@ -1629,6 +1745,7 @@
         const typeInfo = TYPE_MAP[signal.type] || TYPE_MAP['Nudge'];
         currentSignalType = typeInfo.cls;
         clearTimeout(hideSignalTimer);
+        clearTimeout(readinessHideTimer);   // a new card cancels any pending readiness auto-hide
         signalBubble.classList.remove('hiding');
         signalTag.textContent = (currentStage || typeInfo.label).toUpperCase();
         clearFlowChrome();  // two-tier cards (answer/dig/close) are never flow cards (Phase C)
@@ -1697,8 +1814,67 @@
       flowHint.classList.add('visible');
     }
 
+    // ── → Close readiness chip (Design #2) ────────────────────────────────
+    // Deterministic, client-scored chip: colored dot + two-word label, and for not-ready states a
+    // "Haven't covered: …" line + "↓ Dig deeper" CTA. Reuses the single signalBubble slot (one-card
+    // invariant — W6) with the same seq guard as showSignal, so it can't stack with an objection/dig
+    // card and a stale frame can't stomp it. Owns its own auto-hide (signal cards don't auto-hide).
+    function showReadiness(p) {
+      if (!p) return;
+      if (typeof p.seq === 'number') {
+        if (p.seq < currentRevealSeq) return;   // stale press — ignore
+        currentRevealSeq = p.seq;
+      }
+      hidePill(false);                           // resolve the "Reading the close" pill
+      cancelReveal();                            // stop any in-progress card reveal
+      clearFlowChrome();
+      clearTimeout(hideSignalTimer);
+      clearTimeout(readinessHideTimer);
+      signalBubble.classList.remove('hiding');
+
+      const color = READINESS_COLORS[p.state] || READINESS_COLORS['not-ready'];
+      readinessDot.style.background = color;
+      readinessLabel.style.color    = color;
+      readinessLabel.textContent    = p.label || '';
+
+      const gap  = Array.isArray(p.gap) ? p.gap.filter(g => typeof g === 'string' && g) : [];
+      const note = typeof p.note === 'string' ? p.note : '';
+      if (gap.length) {
+        // Named gap → "Haven't covered: X, Y" + the colored dig CTA button.
+        readinessGapLabel.textContent = "Haven't covered: ";
+        readinessGapNames.textContent = gap.join(', ');
+        readinessGap.style.display    = 'block';
+        readinessCta.style.background = withAlpha(color, 0.16);
+        readinessCta.style.border     = '1px solid ' + withAlpha(color, 0.55);
+        readinessCta.style.color      = color;
+        readinessCta.classList.add('show');
+      } else if (note) {
+        // Cold start (nothing covered) → an honest line, no CTA (nothing to dig from yet).
+        readinessGapLabel.textContent = note;
+        readinessGapNames.textContent = '';
+        readinessGap.style.display    = 'block';
+        readinessCta.classList.remove('show');
+      } else {
+        // Ready to Pitch → bare chip.
+        readinessGap.style.display    = 'none';
+        readinessCta.classList.remove('show');
+      }
+
+      signalBubble.className = 'signal-card visible readiness';
+      ambientDot.classList.remove('visible');
+      signalActive = true;
+      currentSignalType = 'readiness';
+      // Readiness is not an alert — keep the calm live-blue glow.
+      stageBar.classList.remove('glow-red');
+      if (isLive) stageBar.classList.add('glow-blue');
+
+      // Auto-hide: shorter for a bare chip, longer when there's a line to read.
+      readinessHideTimer = setTimeout(hideSignal, (gap.length || note) ? 9000 : 6000);
+    }
+
     function hideSignal() {
       clearTimeout(hideSignalTimer);
+      clearTimeout(readinessHideTimer);
       cancelReveal();   // stop any in-progress text reveal so it can't paint after dismiss
       clearFlowChrome();
       signalBubble.classList.add('hiding');
@@ -1721,10 +1897,20 @@
       }, 150);
     }
 
-    // ── Dismiss button ────────────────────────────────────────────────────
+    // ── Dismiss link ──────────────────────────────────────────────────────
+    // "Got it" (underlined link) on every card — same dismissal everywhere.
     gotItBtn.addEventListener('click', () => {
       hideSignal();
       if (window.hud) window.hud.dismissSignal();
+    });
+
+    // ── Action CTAs — click = press the arrow. triggerPick routes through the SAME
+    // wingman:menu-pick path as the hotkey, so a click and a keypress are identical. ──
+    readinessCta.addEventListener('click', () => {
+      if (window.hud && window.hud.triggerPick) window.hud.triggerPick('dig');
+    });
+    flowHint.addEventListener('click', () => {
+      if (window.hud && window.hud.triggerPick) window.hud.triggerPick('objection');
     });
 
     // ── Stage bar drag-to-reposition ──────────────────────────────────────
@@ -1952,6 +2138,11 @@
       // Objection Flow chrome (Phase C) — "MOVE #N" tag + press-↑ affordance
       if (window.hud.onFlowState) {
         window.hud.onFlowState((payload) => handleFlowState(payload));
+      }
+
+      // → Close readiness chip (Design #2)
+      if (window.hud.onReadiness) {
+        window.hud.onReadiness((payload) => showReadiness(payload));
       }
 
       window.hud.onSummonState((payload) => {

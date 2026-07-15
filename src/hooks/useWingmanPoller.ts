@@ -36,6 +36,10 @@ interface PusherScorecardEvent {
 const NON_ALERT_COOLDOWN_MS       = 90_000;  // 90 seconds
 const SUMMARIZE_INTERVAL_MS       = 120_000; // 2 minutes — rolling Belief Ladder update cadence
 const SUMMARIZE_MIN_CHARS         = 80;      // skip tick if fewer chars of new speech accumulated
+// Max the readiness chip waits for a fresh belief-summary on a → Close press before falling back
+// to the latest summary we already have. Keeps the chip from hanging on a slow/stuck summarize
+// (which has its own 30s abort). Usually the summarize lands in ~2–4s, well under this.
+const CLOSE_SUMMARIZE_WAIT_MS     = 8_000;
 // ── Objection Flow rolling synthesis (Phase B, Step 2) ────────────────────────
 const SYNTH_INTERVAL_MS  = 40_000; // background cadence during a long flow (server floor is 30s)
 const SYNTH_THRESHOLD    = 3_000;  // flow length (chars, anchor→lastMove) before synthesis starts
@@ -115,6 +119,8 @@ interface UseWingmanPollerReturn {
   dismissSignal: () => void;
   flushBuffer: () => Promise<void>;
   flushSummarize: () => Promise<void>;
+  /** Force the freshest Belief Ladder (→ Close readiness) and return it; null if none yet. */
+  summarizeNow: () => Promise<string | null>;
 }
 
 export function useWingmanPoller({
@@ -809,6 +815,29 @@ export function useWingmanPoller({
     await executeSummarize(true);
   }, [executeSummarize]);
 
+  /**
+   * Force the freshest Belief Ladder for a → Close readiness read, then return it.
+   * - If a summarize (the 2-min timer OR a prior press) is already in flight, we DON'T start a
+   *   second Sonnet call — we wait for the in-flight one (executeSummarize's own isSummarizingRef
+   *   mutex makes the fire below a no-op in that case).
+   * - Otherwise fire one (executeSummarize(true) also no-ops on an empty buffer — nothing new since
+   *   the last tick means the summary is ALREADY fresh, so this returns instantly with no AI call).
+   * - The wait is capped (CLOSE_SUMMARIZE_WAIT_MS) so the chip never hangs on a slow/stuck request;
+   *   past the cap we return the latest summary we have. Never throws.
+   * @returns the freshest Belief Ladder text, or null if none exists yet (early call).
+   */
+  const summarizeNow = useCallback(async (): Promise<string | null> => {
+    if (!callIdRef.current) return currentSummaryRef.current ?? null;
+    // Fire one only if idle. isSummarizingRef flips true synchronously (before the first await)
+    // inside executeSummarize, so the poll below sees it immediately for a real run.
+    if (!isSummarizingRef.current) void executeSummarize(true);
+    const started = Date.now();
+    while (isSummarizingRef.current && Date.now() - started < CLOSE_SUMMARIZE_WAIT_MS) {
+      await new Promise((resolve) => setTimeout(resolve, 120));
+    }
+    return currentSummaryRef.current ?? null;
+  }, [executeSummarize]);
+
   // Stable accessor identities (useCallback) — consumers put these in useCallback/useEffect
   // dependency arrays (e.g. DashboardClient's archiveCurrentFlow → its [callId] reset effect).
   // Inline arrows here would get a NEW identity every render and make those effects fire on
@@ -858,5 +887,6 @@ export function useWingmanPoller({
     dismissSignal,
     flushBuffer,
     flushSummarize,
+    summarizeNow,
   };
 }
