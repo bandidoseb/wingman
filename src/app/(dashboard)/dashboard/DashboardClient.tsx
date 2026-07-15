@@ -1211,7 +1211,14 @@ export default function DashboardClient({
       window.wingman?.sendSummonState({ state: "error", slot: direction });
     };
 
-    let beliefTag = "Dig"; // becomes "Dig · PAIN" once the belief frame lands (pre-paint)
+    // Rep-facing DISPLAY labels for the dig tag — OUR pillar names, never Cole Gordon's
+    // (design language: plain English, no methodology jargon). The wire value stays the raw
+    // taxonomy id (Pain/Doubt/…); this map only re-labels what the rep sees. Matches FlightLogTab.
+    const BELIEF_DISPLAY: Record<string, string> = {
+      Pain: "Core Problem", Doubt: "Can't DIY", Cost: "Cost of Waiting", Desire: "Dream Outcome",
+      Money: "Investment", Support: "Who's Deciding", Trust: "Why You",
+    };
+    let beliefTag = "Dig"; // becomes "Dig · Core Problem" once the belief frame lands (pre-paint)
 
     try {
       const res = await fetch("/api/wingman/kb-signal", {
@@ -1271,7 +1278,7 @@ export default function DashboardClient({
           if (ev.event === "belief") {
             let belief: string | null = null;
             try { belief = JSON.parse(ev.data)?.belief ?? null; } catch { /* ignore */ }
-            beliefTag = belief ? `Dig · ${belief}` : "Dig";
+            beliefTag = belief ? `Dig · ${BELIEF_DISPLAY[belief] ?? belief}` : "Dig";
           } else if (ev.event === "delta") {
             let textSoFar = "";
             try { textSoFar = JSON.parse(ev.data)?.textSoFar ?? ""; } catch { /* ignore */ }

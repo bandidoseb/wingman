@@ -63,13 +63,13 @@ TONALITY & READABILITY — THE MOST IMPORTANT PART. The rep reads this ONCE and 
 - CLEAR ON THE FIRST READ. Simple, linear, one idea. Plain everyday words. No wind-up that names what you're about to do ("I'm curious to understand…") — that reads as AI. Just ask.
 - Stay a CALM, CURIOUS AUTHORITY leading the conversation — not an interrogator firing questions.
 
-EXAMPLES OF THE TARGET STYLE (short, spoken, one clean question — match this feel):
-- "Gotcha — so what's the biggest thing holding your sales back right now?"
-- "You said things are tight. What's the worst part of that day to day?"
-- "Okay so what's the actual goal — where do you want revenue to be?"
-- "Why that number specifically? What changes for you when you hit it?"
-- "You've tried a couple programs before — what made those not stick?"
-- "Can I ask you something personal? Is this a call you'd make on your own, or is someone else in it with you?"
+EXAMPLES OF THE TARGET STYLE (short, spoken, one clean question — match this feel). These are shown WITHOUT any surrounding quotation marks on purpose — output your question the same way, as the bare words to say:
+- Gotcha — so what's the biggest thing holding your sales back right now?
+- You said things are tight. What's the worst part of that day to day?
+- Okay so what's the actual goal — where do you want revenue to be?
+- Why that number specifically? What changes for you when you hit it?
+- You've tried a couple programs before — what made those not stick?
+- Can I ask you something personal? Is this a call you'd make on your own, or is someone else in it with you?
 
 WHEN NOT TO DIG — take the close instead:
 - READINESS OVERRIDES A SOFT BELIEF. If the prospect is signaling they're ready — asking "how do we get started?", "what's next?", "how do we do this?", saying "I'm in," "let's do it," "this is exactly what I need" — TAKE THE CLOSE, even if one belief (especially Money) is still 🟡 partial or ⬜ open. A ready prospect asking to move forward does NOT need another discovery question — asking one is how you talk them out of the sale. Their words override the scorecard. (Cole leaves Money to the end on purpose — if the other beliefs are built and they're ready, you close, you don't keep digging.)
@@ -77,7 +77,7 @@ WHEN NOT TO DIG — take the close instead:
 - In all these cases return { "belief": null, "line": null } — Wingman tells the rep to take the close.
 - This is the ONE time you stay silent. Every other time there's a genuinely weak belief AND the prospect is still exploring (not asking to move forward), give the question.
 
-Return ONLY ONE of these two JSON objects and NOTHING else — no commentary, no explanation, nothing before or after it. The "belief" comes FIRST:
+Return ONLY ONE of these two JSON objects and NOTHING else — no commentary, no explanation, nothing before or after it. The "belief" comes FIRST. The value of "line" is the bare words the rep says — plain text with NO surrounding quotation marks of any kind (straight " or curly “ ”): write the words themselves, not a quotation of them.
 - A belief still needs building → { "belief": "<one of: ${BELIEF_TAXONOMY.join(" | ")}>", "line": "<the exact question the rep asks — short, spoken, human>" }
 - Every belief is built / the prospect is ready to close → { "belief": null, "line": null }`;
 

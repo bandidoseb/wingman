@@ -34,8 +34,6 @@ import { createClient }                from "@/lib/supabase/server";
 import { searchKnowledge }             from "@/lib/wingman/knowledge-search";
 import { generateSignalCard,
          generateFallbackCard,
-         NUDGE_HEADLINE,
-         NUDGE_STATIC_SUBTEXT,
          type SignalCardResult }       from "@/lib/wingman/knowledge-signal";
 import { streamObjectionCard,
          type ObjectionThread,
@@ -43,13 +41,15 @@ import { streamObjectionCard,
 import { streamDigCard }                from "@/lib/wingman/dig-signal";
 import { sanitizeSalesDna }             from "@/lib/wingman/sales-dna.mjs";
 
-// ── ↓ Dig nudge copy (server owns it — single source). ───────────────────────
-// Shown as headless nudge cards. NOTE (2026-07-07): PLACEHOLDER copy — Sebastian is
-// workshopping the final wording; these are sensible defaults from the 2026-07-07 options.
-const DIG_TAKE_CLOSE_HEADER = "Take the close";
-const DIG_TAKE_CLOSE_TEXT   = "They're ready — stop digging and ask for the sale.";
-const DIG_TOO_EARLY_HEADER  = "Too early to dig";
-const DIG_TOO_EARLY_TEXT    = "Let them talk first.";
+// ── Directive / all-clear nudge copy (server owns it — single source). ────────
+// One plain-English line each, rendered as a single-line HEADLESS card (design language:
+// one card format, no headline/subtext, no quotation marks). Emitted with an empty header
+// so the HUD falls to its headless path. Wording Sebastian-locked 2026-07-14.
+const NUDGE_LINE          = "No objection right now — keep going.";  // ↑ pressed, nothing standing
+const DIG_TAKE_CLOSE_LINE = "They're ready — go for the close.";     // ↓ pressed, every belief built
+// ↓ pressed before anyone has spoken (zero transcript) — the one deliberate exception to the
+// always-a-question dig doctrine: there's no speech to build a question from. Generic, not scripted.
+const DIG_TOO_EARLY_LINE  = "Start the conversation.";
 
 // The objection slot streams (SSE). force-dynamic keeps it off any cached/static path;
 // nodejs runtime so the ReadableStream + per-request abort behave predictably on Railway.
@@ -164,19 +164,19 @@ export async function POST(req: NextRequest) {
       if (activeSlot === "objection") {
         return NextResponse.json({
           ok:            true,
-          signal_header: NUDGE_HEADLINE,
-          signal_text:   NUDGE_STATIC_SUBTEXT,
+          signal_header: "",           // empty → HUD renders the single-line headless card
+          signal_text:   NUDGE_LINE,
           signal_type:   "Nudge",
         });
       }
-      // Dig pressed before anyone spoke — a static "too early" nudge, NOT { ok: true }
-      // (which the client would treat as a failed pull and show the retry pill on the
-      // wrong arrow). This is the honest "let them talk first" case.
+      // Dig pressed before anyone spoke — a static nudge, NOT { ok: true } (which the client
+      // would treat as a failed pull and show the retry pill on the wrong arrow). Generic
+      // "get started" line — no speech yet to build a real question from.
       if (activeSlot === "dig") {
         return NextResponse.json({
           ok:            true,
-          signal_header: DIG_TOO_EARLY_HEADER,
-          signal_text:   DIG_TOO_EARLY_TEXT,
+          signal_header: "",           // empty → HUD renders the single-line headless card
+          signal_text:   DIG_TOO_EARLY_LINE,
           signal_type:   "Nudge",
         });
       }
@@ -258,8 +258,8 @@ export async function POST(req: NextRequest) {
               } else if (ev.kind === "lever-info") {
                 continue; // B4 internal event — wrapper-filtered; defensive skip, never an error frame
               } else if (ev.kind === "abstain") {
-                // Static "No objection detected" — server owns the copy (single source).
-                alive = send("nudge", { header: NUDGE_HEADLINE, text: NUDGE_STATIC_SUBTEXT });
+                // Nothing standing — server owns the copy. Empty header → headless single-line card.
+                alive = send("nudge", { header: "", text: NUDGE_LINE });
                 sawTerminal = true;
               } else {
                 alive = send("error", {});
@@ -317,8 +317,8 @@ export async function POST(req: NextRequest) {
                 alive = send("done", { line: ev.line, belief: ev.belief ?? null });
                 sawTerminal = true;
               } else if (ev.kind === "nudge") {
-                // { line:null } → prospect is ready. Static take-the-close nudge.
-                alive = send("nudge", { header: DIG_TAKE_CLOSE_HEADER, text: DIG_TAKE_CLOSE_TEXT });
+                // { line:null } → prospect is ready. Empty header → headless single-line card.
+                alive = send("nudge", { header: "", text: DIG_TAKE_CLOSE_LINE });
                 sawTerminal = true;
               } else {
                 alive = send("error", {});
