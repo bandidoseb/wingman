@@ -402,6 +402,11 @@ contextBridge.exposeInMainWorld("hud", {
     ipcRenderer.on("hud:cap-warning", () => callback());
   },
 
+  // ── Live Hub waveform — 0..1 loudness at ~25 Hz (registered once at HUD init) ──
+  onAudioLevel: (callback: (level: number) => void) => {
+    ipcRenderer.on("hud:audio-level", (_event, level: number) => callback(level));
+  },
+
   // ── Setup required (Zoom display name not set — fired when deploy is attempted) ──
   onSetupRequired: (callback: () => void) => {
     ipcRenderer.on("hud:setup-required", () => callback());
