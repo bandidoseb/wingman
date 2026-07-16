@@ -709,6 +709,11 @@ function setupIPC(): void {
       onPartial:          (chunk: string) => { mainWindow?.webContents.send("transcript:partial", chunk); },
       onAutoStop:         autoStopCall,
       onApproachingLimit: () => { hudWindow?.webContents.send("hud:cap-warning"); },
+      // Live Hub waveform: 0..1 loudness at ~25 Hz. isDestroyed() guard because
+      // this fires rapidly and a teardown could destroy the HUD mid-stream.
+      onAudioLevel:       (level: number) => {
+        if (hudWindow && !hudWindow.isDestroyed()) hudWindow.webContents.send("hud:audio-level", level);
+      },
     });
 
     // A cancel / end / auto-stop landed while initRecallAI was awaiting. The

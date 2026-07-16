@@ -9,6 +9,12 @@
     /* ── Reset ─────────────────────────────────────────────────────────────── */
     * { margin: 0; padding: 0; box-sizing: border-box; }
 
+    /* ── Signal-card theme tokens (Live Hub) ────────────────────────────────
+       First CSS custom property in the HUD. The Live Hub's word-color picker
+       overrides --signal-text on document.documentElement; it re-styles the
+       live card instantly, even mid-call. Default = the original headline color. */
+    :root { --signal-text: rgba(255, 255, 255, 0.93); }
+
     html, body {
       width: 100vw;
       height: 100vh;
@@ -200,7 +206,7 @@
       font-weight: 700;
       line-height: 1.2;
       letter-spacing: -0.01em;
-      color: rgba(255, 255, 255, 0.93);
+      color: var(--signal-text);   /* Live Hub word-color picker overrides this token */
       padding-right: 26px;   /* clear the top-right dismiss ✕ */
     }
 
@@ -339,6 +345,158 @@
     #ambientDot.visible {
       display: block;
       animation: ambientPulse 3s ease-in-out infinite;
+    }
+
+    /* ══════════════════════════════════════════════════════════════════════
+       LIVE HUB — Granola-style branded pill. The visible "Wingman is live"
+       presence (replaces the near-invisible ambient dot). Draggable, position
+       persists (localStorage 'hud-hub-pos'). Hover → cog → settings panel with
+       the signal-card word-color picker. Lives inside the content-protected HUD
+       window, so it inherits setContentProtection — invisible to the prospect.
+    ══════════════════════════════════════════════════════════════════════ */
+    #liveHub {
+      position: absolute;
+      bottom: 80px;
+      left: 32px;
+      z-index: 150;                 /* different corner from the top-center card lane — never overlaps */
+      height: 34px;                 /* FIXED height → the pill never grows vertically */
+      display: none;                /* shown only while live/starting */
+      align-items: center;
+      gap: 0;                       /* spacing handled per-child so the collapsed cog reserves NO space */
+      padding: 0 8px 0 11px;
+      border-radius: 999px;
+      background: rgba(16, 16, 18, 0.9);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      box-shadow: 0 6px 28px rgba(0, 0, 0, 0.5), 0 0 0 0.5px rgba(255,255,255,0.05);
+      pointer-events: auto;
+      cursor: grab;
+      user-select: none;
+    }
+    #liveHub.visible { display: flex; animation: fadeIn 0.2s ease-in forwards; }
+    #liveHub.dragging { cursor: grabbing; }
+
+    /* Wingman logo mark — the bare mark (not the app icon), centered in its box */
+    #hubLogo { width: 17px; height: 17px; flex: 0 0 auto; display: flex; align-items: center; justify-content: center; opacity: 0.95; }
+    #hubLogo img { max-width: 100%; max-height: 100%; object-fit: contain; display: block; }
+
+    /* Waveform — the "listening" indicator (4 bars). CSS-animated now; real
+       per-speaker amplitude from Recall audio_mixed_raw.data lands next build. */
+    #hubWave { display: flex; align-items: center; gap: 2.5px; height: 16px; margin-left: 8px; }
+    #hubWave .bar {
+      width: 2.5px; border-radius: 2px; background: #4ED188;
+      height: 11px; transform: scaleY(0.55); transform-origin: center; will-change: transform;
+    }
+    /* Animate TRANSFORM (GPU-composited), never height — height animation reflows
+       and pixel-steps, which reads as glitchy. scaleY stays buttery smooth. Small
+       range = calm; the transform is what makes it silky. */
+    #liveHub.live #hubWave .bar { animation: hubWave 1.2s ease-in-out infinite; }
+    #liveHub.live #hubWave .bar:nth-child(1) { animation-delay: 0s;    }
+    #liveHub.live #hubWave .bar:nth-child(2) { animation-delay: 0.15s; }
+    #liveHub.live #hubWave .bar:nth-child(3) { animation-delay: 0.3s;  }
+    #liveHub.live #hubWave .bar:nth-child(4) { animation-delay: 0.45s; }
+    @keyframes hubWave {
+      0%, 100% { transform: scaleY(0.5); opacity: 0.7;  }
+      50%      { transform: scaleY(0.9); opacity: 0.95; }
+    }
+    /* Starting state — amber gentle pulse (no dancing bars yet) */
+    #liveHub.starting #hubWave .bar { background: #E0A23C; transform: scaleY(0.6); animation: ambientPulse 1.4s ease-in-out infinite; }
+    /* Real-audio mode — JS drives each bar's scaleY from the live loudness. Must
+       come AFTER the .live rule and use !important: a running CSS animation would
+       otherwise override the inline transform and the real levels would be invisible. */
+    #liveHub.audio #hubWave .bar { animation: none !important; }
+
+    /* Settings cog — collapsed (zero width) by default. On hover it expands the
+       pill HORIZONTALLY only (width + left margin animate); fixed pill height
+       means zero vertical movement, and the growth is smooth left→right. */
+    #hubCog {
+      width: 0; height: 22px; flex: 0 0 auto; margin-left: 0; opacity: 0;
+      display: flex; align-items: center; justify-content: center; overflow: hidden;
+      border-radius: 50%; background: rgba(255,255,255,0.08);
+      color: rgba(255,255,255,0.7); cursor: pointer; pointer-events: none;
+      transition: width 0.22s ease, margin-left 0.22s ease, opacity 0.18s ease, background 0.15s, color 0.15s;
+    }
+    #liveHub:hover #hubCog, #hubCog.pinned {
+      width: 22px; margin-left: 7px; opacity: 1; pointer-events: auto;
+    }
+    #hubCog:hover { background: rgba(255,255,255,0.16); color: rgba(255,255,255,0.95); }
+    #hubCog svg { width: 14px; height: 14px; display: block; flex: 0 0 auto; }
+
+    /* Settings panel — anchored above the pill. In-HUD only (never a native
+       OS dialog — that would show to the prospect). */
+    #hubPanel {
+      position: absolute;
+      bottom: calc(100% + 10px);
+      left: 0;
+      min-width: 176px;
+      display: flex;                 /* always in DOM — open/close animates, not display-toggle */
+      flex-direction: column;
+      gap: 12px;
+      padding: 14px;
+      border-radius: 14px;
+      background: rgba(18, 18, 22, 0.96);
+      backdrop-filter: blur(24px);
+      -webkit-backdrop-filter: blur(24px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.55);
+      cursor: default;
+      /* Smooth open — fade + slight rise, never a hard pop */
+      opacity: 0; visibility: hidden; transform: translateY(6px);
+      transform-origin: bottom left; pointer-events: none;
+      transition: opacity 0.18s ease, transform 0.18s ease, visibility 0.18s;
+    }
+    #hubPanel.open { opacity: 1; visibility: visible; transform: none; pointer-events: auto; }
+    /* Invisible bridge across the 10px gap so moving the cursor from the pill up
+       to the panel stays within #liveHub — otherwise mouseleave fires and closes
+       the panel before the rep can reach a swatch. */
+    #hubPanel::before {
+      content: ''; position: absolute; top: 100%; left: 0; right: 0; height: 12px;
+    }
+    .hub-panel-head {
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .hub-panel-title {
+      font-size: 11px; font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase;
+      color: rgba(255, 255, 255, 0.5);
+    }
+    #hubPanelClose {
+      width: 18px; height: 18px; display: flex; align-items: center; justify-content: center;
+      border-radius: 50%; color: rgba(255,255,255,0.45); cursor: pointer; font-size: 13px;
+      line-height: 1;
+    }
+    #hubPanelClose:hover { color: rgba(255,255,255,0.85); background: rgba(255,255,255,0.08); }
+
+    /* Preset swatches */
+    #hubSwatches { display: flex; align-items: center; gap: 8px; }
+    .hub-swatch {
+      width: 24px; height: 24px; border-radius: 50%; cursor: pointer;
+      border: 2px solid transparent; box-shadow: 0 0 0 1px rgba(255,255,255,0.12) inset;
+      transition: transform 0.1s;
+    }
+    .hub-swatch:hover { transform: scale(1.12); }
+    .hub-swatch.active { border-color: rgba(255,255,255,0.9); }
+
+    /* Rainbow toggle — a smooth (canvas-rendered) hue/sat disc in the swatch row.
+       Clicking it EXPANDS the full picker wheel below so the rep picks precisely. */
+    #hubWheelToggle {
+      width: 24px; height: 24px; border-radius: 50%; cursor: pointer; flex: 0 0 auto; overflow: hidden;
+      border: 2px solid transparent; box-shadow: 0 0 0 1px rgba(255,255,255,0.12) inset; transition: transform 0.1s;
+    }
+    #hubWheelToggle canvas { width: 100%; height: 100%; display: block; }
+    #hubWheelToggle:hover { transform: scale(1.12); }
+    #hubWheelToggle.active { border-color: rgba(255,255,255,0.9); }
+
+    /* Expanding picker wheel — smooth canvas HSV wheel (white center → readable
+       saturated rim). Collapsed to 0 height until the rainbow toggle is clicked. */
+    #hubWheelWrap { max-height: 0; opacity: 0; overflow: hidden; transition: max-height 0.24s ease, opacity 0.2s ease; }
+    #hubWheelWrap.open { max-height: 170px; opacity: 1; }
+    #hubWheelInner { width: 140px; height: 140px; margin: 6px auto 2px; position: relative; }
+    #hubWheelCanvas { width: 140px; height: 140px; border-radius: 50%; cursor: crosshair; display: block; }
+    #hubWheelMarker {
+      position: absolute; width: 12px; height: 12px; border-radius: 50%;
+      border: 2px solid #fff; box-shadow: 0 0 3px rgba(0,0,0,0.7), 0 0 0 1px rgba(0,0,0,0.3);
+      transform: translate(-50%, -50%); pointer-events: none; display: none;
     }
 
     /* ══════════════════════════════════════════════════════════════════════
@@ -905,8 +1063,43 @@
     <button id="stopBtn" title="End call">■</button>
   </div>
 
-  <!-- Ambient dot — always visible while Wingman is live, no signal showing -->
+  <!-- Ambient dot — retired by the Live Hub pill (kept to avoid null refs). -->
   <div id="ambientDot"></div>
+
+  <!-- LIVE HUB — branded, draggable "Wingman is live" pill + word-color settings -->
+  <div id="liveHub">
+    <span id="hubLogo"><img src="WingmanMark.png" alt="Wingman" /></span>
+    <div id="hubWave">
+      <span class="bar"></span><span class="bar"></span><span class="bar"></span><span class="bar"></span>
+    </div>
+    <div id="hubCog" title="Wingman settings">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="3"></circle>
+        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+      </svg>
+    </div>
+
+    <!-- Settings panel (in-HUD, content-protected) -->
+    <div id="hubPanel">
+      <div class="hub-panel-head">
+        <span class="hub-panel-title">Card text color</span>
+        <span id="hubPanelClose" title="Close">✕</span>
+      </div>
+      <div id="hubSwatches">
+        <div class="hub-swatch" data-color="rgba(255,255,255,0.93)" style="background:#F2F2F2;" title="White"></div>
+        <div class="hub-swatch" data-color="#7E9BFF" style="background:#7E9BFF;" title="Blue"></div>
+        <div class="hub-swatch" data-color="#4ED188" style="background:#4ED188;" title="Green"></div>
+        <div class="hub-swatch" data-color="#F1D24C" style="background:#F1D24C;" title="Yellow"></div>
+        <div id="hubWheelToggle" title="Any color"><canvas id="hubToggleCanvas"></canvas></div>
+      </div>
+      <div id="hubWheelWrap">
+        <div id="hubWheelInner">
+          <canvas id="hubWheelCanvas"></canvas>
+          <div id="hubWheelMarker"></div>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <!-- COMPONENT 3A: Call Detection Toast -->
   <div id="detectionToast" class="wingman-toast">
@@ -1262,6 +1455,22 @@
     const summonPill           = document.getElementById('summonPill');
     const summonPillText       = document.getElementById('summonPillText');
     const ambientDot           = document.getElementById('ambientDot');
+    // ── Live Hub refs + state (distinct names — never reuse pill/isDragging) ──
+    const liveHub              = document.getElementById('liveHub');
+    const hubCog               = document.getElementById('hubCog');
+    const hubPanel             = document.getElementById('hubPanel');
+    const hubPanelClose        = document.getElementById('hubPanelClose');
+    const hubWheelToggle       = document.getElementById('hubWheelToggle');
+    const hubWheelWrap         = document.getElementById('hubWheelWrap');
+    const hubWheelInner        = document.getElementById('hubWheelInner');
+    const hubWheelCanvas       = document.getElementById('hubWheelCanvas');
+    const hubToggleCanvas      = document.getElementById('hubToggleCanvas');
+    const hubWheelMarker       = document.getElementById('hubWheelMarker');
+    let   hubDragging          = false;   // dedicated — does NOT share isDragging
+    let   hubPanelOpen         = false;
+    let   hubDragOffsetX       = 0;
+    let   hubDragOffsetY       = 0;
+    let   wheelDragging        = false;   // color-wheel drag — own flag, like hubDragging
     let   hideSignalTimer      = null;
     let   readinessHideTimer   = null;   // readiness chip auto-hide (Design #2)
     // The 4 readiness colors (the sunset gradient) — literals live here, per the design language.
@@ -1561,6 +1770,47 @@
       timerText.textContent = '0:00';
     }
 
+    // ── Live Hub show/hide + interactivity helpers ────────────────────────
+    // The pill is the visible "Wingman is live" presence. showHub is idempotent
+    // (classList), so rapid Deploy/end cycles can't leave duplicate state.
+    function showHub(mode) {
+      liveHub.classList.remove('starting', 'live');
+      liveHub.classList.add(mode === 'starting' ? 'starting' : 'live');
+      liveHub.classList.add('visible');
+    }
+    // hideHub fully tears down interactivity so a call that ends while the cursor
+    // is over the pill / panel can never leave the whole screen capturing clicks
+    // (the Issue #35 class of bug). Always restore pass-through here.
+    function hideHub() {
+      closeHubPanel(true);          // force-close panel, skip the mouse-restore (we do it below)
+      hubDragging = false;
+      wheelDragging = false;        // never leave a wheel-drag armed across call end
+      stopAudioWave();              // cancel the rAF + fallback timer, clear inline bar transforms
+      liveHub.classList.remove('visible', 'starting', 'live', 'dragging');
+      liveHub.style.cursor = '';
+      hubCog.classList.remove('pinned');
+      if (window.hud) window.hud.setMouseIgnore(true);
+    }
+    // Restore HUD click-through only when nothing else needs mouse capture.
+    function restoreHubPassThrough() {
+      if (!hubPanelOpen && !hubDragging && !wheelDragging && !signalActive && window.hud) {
+        window.hud.setMouseIgnore(true);
+      }
+    }
+    function openHubPanel() {
+      hubPanelOpen = true;
+      hubPanel.classList.add('open');
+      hubCog.classList.add('pinned');       // keep the cog visible while the panel is open
+      if (window.hud) window.hud.setMouseIgnore(false);
+    }
+    // skipRestore=true when hideHub already owns the mouse-restore.
+    function closeHubPanel(skipRestore) {
+      hubPanelOpen = false;
+      hubPanel.classList.remove('open');
+      hubCog.classList.remove('pinned');
+      if (!skipRestore) restoreHubPassThrough();  // don't rely on a mouseleave that may not fire
+    }
+
     // ── Go Live / Go Idle ─────────────────────────────────────────────────
     function setLive(live) {
       isLive = live;
@@ -1580,13 +1830,14 @@
         startTimer();
         stageBar.classList.remove('glow-red');
         stageBar.classList.add('glow-blue');
-        if (!signalActive) ambientDot.classList.add('visible');
+        showHub('live');   // the Live Hub pill replaces the old ambient dot
         stopBtn.classList.add('visible');
       } else {
         liveDot.classList.remove('live');
         stopTimer();
         stageBar.classList.remove('glow-blue', 'glow-red', 'active');
         ambientDot.classList.remove('visible');
+        hideHub();         // fully tears down pill interactivity (restores click-through)
         stopBtn.classList.remove('visible');
       }
     }
@@ -1884,7 +2135,7 @@
       stageBar.classList.remove('glow-red');
       if (isLive) {
         stageBar.classList.add('glow-blue');
-        ambientDot.classList.add('visible');
+        // Live Hub pill stays visible throughout the call — no ambient dot to restore.
       }
 
       // Don't re-enable pass-through if user is mid-drag — the mouseup/mouseleave
@@ -2012,7 +2263,7 @@
       if (window.hud) window.hud.setMouseIgnore(false);
     });
     stageBar.addEventListener('mouseleave', () => {
-      if (!isDragging && !signalActive) {
+      if (!isDragging && !signalActive && !hubPanelOpen && !hubDragging) {
         if (window.hud) window.hud.setMouseIgnore(true);
       }
     });
@@ -2021,9 +2272,11 @@
       if (window.hud) window.hud.setMouseIgnore(false);
     });
     signalBubble.addEventListener('mouseleave', () => {
-      // Always restore pass-through when leaving the card — even if a signal is active.
-      // The card stays visible; the user can hover back to interact with "got it".
-      if (window.hud) window.hud.setMouseIgnore(true);
+      // Restore pass-through when leaving the card — but NOT while the Live Hub
+      // panel is open or the pill is being dragged (they still need mouse capture).
+      if (!hubPanelOpen && !hubDragging) {
+        if (window.hud) window.hud.setMouseIgnore(true);
+      }
     });
 
     // ── Toast / outcome-card hover — enable mouse capture only when cursor is over it ──
@@ -2037,11 +2290,232 @@
         if (window.hud) window.hud.setMouseIgnore(false);
       });
       toast.addEventListener('mouseleave', () => {
-        if (!signalActive && !isDragging) {
+        if (!signalActive && !isDragging && !hubPanelOpen && !hubDragging) {
           if (window.hud) window.hud.setMouseIgnore(true);
         }
       });
     });
+
+    // ══ LIVE HUB — drag, hover, settings panel, word-color picker ═════════
+    // Restore saved pill position (own key, clamped like the stage bar).
+    (function restoreHubPosition() {
+      try {
+        const saved = localStorage.getItem('hud-hub-pos');
+        if (saved) {
+          const { left, top } = JSON.parse(saved);
+          const cl = Math.max(0, Math.min(window.innerWidth  - 160, left));
+          const ct = Math.max(8, Math.min(window.innerHeight - 44,  top));
+          liveHub.style.left   = cl + 'px';
+          liveHub.style.top    = ct + 'px';
+          liveHub.style.bottom = 'auto';
+        }
+      } catch (_) { /* corrupt storage → keep default bottom-left */ }
+    })();
+
+    // Drag (dedicated hubDragging — never the shared isDragging). Don't start a
+    // drag from the cog or inside the settings panel (those are click targets).
+    liveHub.addEventListener('mousedown', (e) => {
+      if (hubCog.contains(e.target) || hubPanel.contains(e.target)) return;
+      hubDragging = true;
+      const rect = liveHub.getBoundingClientRect();
+      hubDragOffsetX = e.clientX - rect.left;
+      hubDragOffsetY = e.clientY - rect.top;
+      liveHub.classList.add('dragging');
+      e.preventDefault();
+    });
+    document.addEventListener('mousemove', (e) => {
+      if (!hubDragging) return;
+      const w = liveHub.offsetWidth, h = liveHub.offsetHeight;
+      const newLeft = Math.max(0, Math.min(window.innerWidth  - w,     e.clientX - hubDragOffsetX));
+      const newTop  = Math.max(8, Math.min(window.innerHeight - h - 8, e.clientY - hubDragOffsetY));
+      liveHub.style.left   = newLeft + 'px';
+      liveHub.style.top    = newTop  + 'px';
+      liveHub.style.bottom = 'auto';   // switch from bottom-anchored to top/left
+    });
+    document.addEventListener('mouseup', (e) => {
+      if (!hubDragging) return;
+      hubDragging = false;
+      liveHub.classList.remove('dragging');
+      try {
+        const rect = liveHub.getBoundingClientRect();
+        localStorage.setItem('hud-hub-pos', JSON.stringify({
+          left: Math.round(rect.left), top: Math.round(rect.top),
+        }));
+        const isOver = e.clientX >= rect.left && e.clientX <= rect.right &&
+                       e.clientY >= rect.top  && e.clientY <= rect.bottom;
+        if (!isOver) restoreHubPassThrough();   // released off-pill → give clicks back to Zoom
+      } catch (_) { restoreHubPassThrough(); }
+    });
+
+    // Hover gating — capture on enter, restore on leave (guards keep it from
+    // stealing clicks while the panel is open or a drag is in flight).
+    liveHub.addEventListener('mouseenter', () => {
+      if (window.hud) window.hud.setMouseIgnore(false);
+    });
+    liveHub.addEventListener('mouseleave', () => {
+      if (hubDragging || wheelDragging) return; // a drag in flight — its mouseup handles restore
+      if (hubPanelOpen) closeHubPanel(true);    // leaving the hub closes the popover…
+      restoreHubPassThrough();                  // …and hands clicks back
+    });
+
+    // Cog toggles the panel. stopPropagation so it isn't read as a drag/outside-click.
+    hubCog.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (hubPanelOpen) closeHubPanel(true);   // cursor is still on the pill — keep capture
+      else openHubPanel();
+    });
+    hubPanelClose.addEventListener('click', (e) => {
+      e.stopPropagation();
+      closeHubPanel(true);                     // cursor still on pill; mouseleave restores later
+    });
+
+    // ── Word-color picker ────────────────────────────────────────────────
+    // Writes --signal-text on the root → the live card re-colors instantly.
+    function applySignalText(color, persist) {
+      document.documentElement.style.setProperty('--signal-text', color);
+      if (persist) { try { localStorage.setItem('hud-signal-theme', color); } catch (_) {} }
+      let matchedPreset = false;
+      document.querySelectorAll('.hub-swatch').forEach((s) => {
+        const on = s.dataset.color === color;
+        s.classList.toggle('active', on);
+        if (on) matchedPreset = true;
+      });
+      hubWheelToggle.classList.toggle('active', !matchedPreset);
+    }
+    document.querySelectorAll('.hub-swatch').forEach((sw) => {
+      sw.addEventListener('click', (e) => {
+        e.stopPropagation();
+        applySignalText(sw.dataset.color, true);
+      });
+    });
+
+    // ── Full color wheel — smooth canvas HSV (white center → readable saturated
+    // rim). Rendered pixel-wise so there are NO conic-gradient seams. ──
+    function hslToRgb(h, s, l) {
+      s /= 100; l /= 100;
+      const c = (1 - Math.abs(2 * l - 1)) * s;
+      const x = c * (1 - Math.abs((h / 60) % 2 - 1));
+      const m = l - c / 2;
+      let r = 0, g = 0, b = 0;
+      if (h < 60)       { r = c; g = x; }
+      else if (h < 120) { r = x; g = c; }
+      else if (h < 180) { g = c; b = x; }
+      else if (h < 240) { g = x; b = c; }
+      else if (h < 300) { r = x; b = c; }
+      else              { r = c; b = x; }
+      return [Math.round((r + m) * 255), Math.round((g + m) * 255), Math.round((b + m) * 255)];
+    }
+    function paintWheel(canvas, cssPx) {
+      const dpr = window.devicePixelRatio || 1;
+      const px = Math.round(cssPx * dpr);
+      canvas.width = px; canvas.height = px;
+      const ctx = canvas.getContext('2d');
+      const img = ctx.createImageData(px, px);
+      const R = px / 2;
+      for (let y = 0; y < px; y++) {
+        for (let x = 0; x < px; x++) {
+          const dx = x - R, dy = y - R, dist = Math.sqrt(dx * dx + dy * dy);
+          const i = (y * px + x) * 4;
+          if (dist <= R) {
+            const hue = (Math.atan2(dy, dx) * 180 / Math.PI + 360) % 360;
+            const sat = Math.min(1, dist / R);
+            const rgb = hslToRgb(hue, sat * 100, 100 - sat * 40);  // rim L=60 → always readable
+            img.data[i] = rgb[0]; img.data[i + 1] = rgb[1]; img.data[i + 2] = rgb[2];
+            img.data[i + 3] = dist > R - 1.2 ? Math.max(0, Math.min(255, (R - dist + 1.2) * 255)) : 255;
+          } else {
+            img.data[i + 3] = 0;   // transparent outside the circle
+          }
+        }
+      }
+      ctx.putImageData(img, 0, 0);
+    }
+    let wheelPainted = false;
+    function ensureWheelPainted() {
+      if (wheelPainted) return;
+      paintWheel(hubToggleCanvas, 24);
+      paintWheel(hubWheelCanvas, 140);
+      wheelPainted = true;
+    }
+    ensureWheelPainted();
+
+    // Rainbow toggle expands / collapses the picker.
+    hubWheelToggle.addEventListener('click', (e) => {
+      e.stopPropagation();
+      ensureWheelPainted();
+      hubWheelWrap.classList.toggle('open');
+    });
+    // Pick from the wheel (click or drag), clamped to the rim; L floor keeps it readable.
+    function pickFromWheel(e) {
+      const rect = hubWheelInner.getBoundingClientRect();
+      const R = rect.width / 2;
+      let x = e.clientX - rect.left, y = e.clientY - rect.top;
+      let dx = x - R, dy = y - R, dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist > R) { x = R + dx / dist * R; y = R + dy / dist * R; dist = R; }
+      const hue = (Math.atan2(dy, dx) * 180 / Math.PI + 360) % 360;
+      const sat = Math.min(1, dist / R);
+      applySignalText('hsl(' + Math.round(hue) + ', ' + Math.round(sat * 100) + '%, ' + Math.round(100 - sat * 40) + '%)', true);
+      hubWheelMarker.style.display = 'block';
+      hubWheelMarker.style.left = x + 'px';
+      hubWheelMarker.style.top  = y + 'px';
+    }
+    hubWheelCanvas.addEventListener('mousedown', (e) => { e.stopPropagation(); wheelDragging = true; pickFromWheel(e); });
+    document.addEventListener('mousemove', (e) => { if (wheelDragging) pickFromWheel(e); });
+    document.addEventListener('mouseup', (e) => {
+      if (!wheelDragging) return;
+      wheelDragging = false;
+      // If the drag ended OUTSIDE the hub (overshooting the wheel rim), close the
+      // popover and hand clicks back to Zoom — else the window stays capturing.
+      const r = liveHub.getBoundingClientRect();
+      const over = e.clientX >= r.left && e.clientX <= r.right &&
+                   e.clientY >= r.top  && e.clientY <= r.bottom;
+      if (!over) {
+        closeHubPanel(true);
+        if (!signalActive && window.hud) window.hud.setMouseIgnore(true);
+      }
+    });
+    // Restore the saved word color (or sync the default swatch as active).
+    (function restoreSignalTheme() {
+      try {
+        const saved = localStorage.getItem('hud-signal-theme');
+        applySignalText(saved || 'rgba(255,255,255,0.93)', false);
+      } catch (_) { applySignalText('rgba(255,255,255,0.93)', false); }
+    })();
+
+    // ══ LIVE HUB — real audio waveform ════════════════════════════════════
+    // Drive the bars from the live loudness level (0..1) piped from recall.ts.
+    // GPU-smooth via a single rAF that lerps toward the latest level; a running
+    // CSS animation is disabled by the '.audio' class while this owns the bars.
+    // Falls back to the ambient animation if the audio stream stops (~1s).
+    const hubBars = Array.from(document.querySelectorAll('#hubWave .bar'));
+    const HUB_BAR_FACTORS = [0.82, 1.0, 0.9, 0.72];   // per-bar shape so it reads as a waveform
+    let audioTarget = 0, audioCurrent = 0, audioRAF = null, audioFallbackTimer = null;
+
+    function stopAudioWave() {
+      if (audioRAF)          { cancelAnimationFrame(audioRAF); audioRAF = null; }
+      if (audioFallbackTimer) { clearTimeout(audioFallbackTimer); audioFallbackTimer = null; }
+      liveHub.classList.remove('audio');
+      audioTarget = 0; audioCurrent = 0;
+      hubBars.forEach((b) => { b.style.transform = ''; });   // hand the bars back to the CSS ambient anim
+    }
+    function audioFrame() {
+      audioCurrent += (audioTarget - audioCurrent) * 0.3;    // smooth lerp — no stepping
+      for (let i = 0; i < hubBars.length; i++) {
+        const f = HUB_BAR_FACTORS[i] ?? 0.85;
+        let s = 0.35 + audioCurrent * 1.15 * f;
+        if (s < 0.3) s = 0.3; else if (s > 1.5) s = 1.5;
+        hubBars[i].style.transform = 'scaleY(' + s.toFixed(3) + ')';
+      }
+      audioRAF = requestAnimationFrame(audioFrame);
+    }
+    function handleAudioLevel(level) {
+      if (!isLive) return;                        // ignore unless live (not starting / hidden / ended)
+      if (!Number.isFinite(level)) return;
+      audioTarget = level < 0 ? 0 : level > 1 ? 1 : level;
+      if (!liveHub.classList.contains('audio')) liveHub.classList.add('audio');
+      if (!audioRAF) audioFrame();                // SINGLE loop — events only move the target
+      if (audioFallbackTimer) clearTimeout(audioFallbackTimer);
+      audioFallbackTimer = setTimeout(stopAudioWave, 1000);   // no audio for ~1s → ambient resumes
+    }
 
     // ── IPC listeners (Electron → HUD) ───────────────────────────────────
     if (window.hud) {
@@ -2071,6 +2545,15 @@
         window.hud.onDeployState(({ state }) => {
           if (state === 'searching' || state === 'starting') showDeployStatus(state);
           else hideDeployStatus(); // idle / live / stopping
+
+          // Live Hub pill: a visible "Wingman is running" confirmation the moment
+          // the SDK starts. setLive(true) upgrades it to the live state on call:started.
+          if (state === 'starting') {
+            showHub('starting');
+          } else if ((state === 'idle' || state === 'stopping') && !isLive) {
+            // Cancelled/failed deploy that never went live — don't leave the pill stuck.
+            hideHub();
+          }
         });
       }
 
@@ -2127,6 +2610,9 @@
 
       // 10-minute warning before 2h hard cap
       window.hud.onCapWarning(() => showApproachingLimitToast());
+
+      // Live Hub waveform — real audio loudness drives the pill bars
+      if (window.hud.onAudioLevel) window.hud.onAudioLevel(handleAudioLevel);
 
       // Phase 3: compass menu open / close (sent by main.ts hotkey handler)
       window.hud.onMenuOpen(() => { hudLog('menu-open RECEIVED'); showCompassMenu(); });

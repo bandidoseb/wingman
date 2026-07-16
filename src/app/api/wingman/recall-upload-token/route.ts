@@ -71,6 +71,17 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Server configuration error" }, { status: 500 });
     }
 
+    // ── Opt-in audio-level events (Live Hub waveform) ─────────────────────────
+    // The NEW desktop app sends { wantAudioLevel: true } so we also subscribe the
+    // audio_mixed_raw.data event, letting the HUD pill's waveform react to real
+    // speech. Parse DEFENSIVELY: existing installs send NO body, and an unguarded
+    // req.json() would throw and break token minting for everyone. No body → off,
+    // so the request stays byte-identical to today for old apps.
+    let wantAudioLevel = false;
+    try {
+      wantAudioLevel = ((await req.json()) as { wantAudioLevel?: boolean } | null)?.wantAudioLevel === true;
+    } catch { /* no/invalid body → audio-level off */ }
+
     // ── 5. Request an upload token from Recall AI ─────────────────────────────
     // Creates a Desktop SDK Upload with live transcript streaming via Deepgram.
     const recallRes = await fetch("https://us-west-2.recall.ai/api/v1/sdk_upload/", {
@@ -98,7 +109,13 @@ export async function POST(req: NextRequest) {
               // partial_data: low-latency unfinalized transcripts (#41) —
               // consumed by electron/recall.ts for measurement; the live card
               // pipeline still reads finals (transcript.data) only.
-              events: ["transcript.data", "transcript.partial_data"],
+              // audio_mixed_raw.data: only when the new app opts in — drives the
+              // Live Hub waveform (RMS computed + discarded; audio never stored).
+              events: [
+                "transcript.data",
+                "transcript.partial_data",
+                ...(wantAudioLevel ? ["audio_mixed_raw.data"] : []),
+              ],
             },
           ],
         },

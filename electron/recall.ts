@@ -45,6 +45,13 @@ interface RecallOptions {
   /** Called 10 minutes before the 2-hour hard cap so the HUD can warn the user */
   onApproachingLimit?: () => void;
   /**
+   * Called ~25×/sec with a 0..1 loudness level (mixed rep+prospect) for the HUD
+   * pill's listening waveform. The raw audio is RMS'd and IMMEDIATELY DISCARDED —
+   * never stored or logged (Invariant #6). Presence of this callback also opts the
+   * upload-token request into the audio_mixed_raw.data subscription.
+   */
+  onAudioLevel?: (level: number) => void;
+  /**
    * Base URL of the Next.js app (e.g. https://app.meetwingman.ai).
    * Used to fetch the Recall AI upload token from the server — the API key
    * lives on Railway and is never embedded in the desktop app.
@@ -312,6 +319,9 @@ export async function initRecallAI(options: RecallOptions): Promise<boolean> {
           "content-type":  "application/json",
           "Authorization": `Bearer ${options.authToken}`,
         },
+        // Opt into audio_mixed_raw.data (Live Hub waveform) only when a level
+        // consumer is wired. The route parses this defensively.
+        body: JSON.stringify({ wantAudioLevel: !!options.onAudioLevel }),
         signal: tokenController.signal,
       });
     } finally {
@@ -370,8 +380,65 @@ export async function initRecallAI(options: RecallOptions): Promise<boolean> {
     const seenOtherEvents = new Set<string>();
     let emptyTextLogged = 0;
 
+    // Live Hub waveform state (per-call closure, like lastChunkPerSpeaker).
+    // AUDIO_EMIT_MS = ~25 Hz IPC throttle; AUDIO_GAIN makes normal speech read as a
+    // healthy level (tune on live test). audioDebugLogged/audioErrLogged bound the
+    // one-time diagnostics so nothing floods the log — and NEVER log audio bytes.
+    const AUDIO_EMIT_MS = 40;
+    const AUDIO_GAIN    = 4;
+    let lastAudioEmit    = 0;
+    let audioDebugLogged = false;
+    let audioErrLogged   = false;
+
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     realtimeHandler = (evt: any) => {
+      // ── Live Hub waveform: mixed-audio loudness → 0..1 level (Invariant #6) ──
+      // RMS the PCM into ONE number and DISCARD the buffer. Placed above the
+      // transcript logic so it returns before any dedup/inactivity/onChunk and
+      // before the disk-writing measurement logs. The one-time debug print logs
+      // payload KEYS only — never the base64 value, never JSON.stringify(evt).
+      if (evt.event === "audio_mixed_raw.data") {
+        const nowMs = Date.now();
+        if (nowMs - lastAudioEmit < AUDIO_EMIT_MS) return;   // throttle BEFORE decode
+        lastAudioEmit = nowMs;
+        if (!audioDebugLogged) {
+          audioDebugLogged = true;
+          try {
+            const d = evt?.data ?? {};
+            const inner = d?.data ?? d;
+            console.log(
+              "[recall][audio] shape — evt keys:", Object.keys(evt ?? {}),
+              "| data keys:", Object.keys(d),
+              "| inner:", (inner && typeof inner === "object") ? Object.keys(inner) : typeof inner
+            );
+          } catch { /* keys-only; never log values */ }
+        }
+        try {
+          // Defensive field probe — confirm the exact path from the key dump on live test.
+          const b64: unknown =
+            evt?.data?.data?.buffer ?? evt?.data?.buffer ?? evt?.data?.data ?? evt?.data;
+          if (typeof b64 !== "string" || b64.length === 0) return;
+          const pcm = Buffer.from(b64, "base64");
+          if (pcm.length < 2) return;
+          let sumSq = 0;
+          const n = pcm.length >> 1;                 // Int16 sample count
+          for (let i = 0; i + 1 < pcm.length; i += 2) {
+            const s = pcm.readInt16LE(i);
+            sumSq += s * s;
+          }
+          let level = (Math.sqrt(sumSq / n) / 32767) * AUDIO_GAIN;
+          if (!Number.isFinite(level)) return;
+          level = level < 0 ? 0 : level > 1 ? 1 : level;
+          options.onAudioLevel?.(level);             // buffer goes out of scope → discarded
+        } catch (e) {
+          if (!audioErrLogged) {
+            audioErrLogged = true;
+            console.warn("[recall][audio] level decode failed:", (e as Error)?.message ?? "unknown");
+          }
+        }
+        return;
+      }
+
       const isFinal   = evt.event === "transcript.data";
       const isPartial = evt.event === "transcript.partial_data";
       if (!isFinal && !isPartial) {
