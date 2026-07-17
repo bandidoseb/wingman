@@ -82,6 +82,52 @@ Return ONLY ONE of these two JSON objects and NOTHING else — no commentary, no
 - Every belief is built / the prospect is ready to close → { "belief": null, "line": null }`;
 
 /**
+ * CONFRONTATIONALNESS DIAL (Sebastian-locked 2026-07-16) — adjusts how POINTED the dig question
+ * is, WITHOUT changing which belief it digs or whether it digs at all. Four named levels; `direct`
+ * is the DEFAULT and IS the doctrine above:
+ *   buildDigSystemPrompt('direct') === DIG_SYSTEM_PROMPT, byte-for-byte (zero-regression guarantee,
+ * asserted as a hard unit gate in the eval). Any unknown/missing value resolves to `direct`.
+ * Non-default levels append a DELIVERY INTENSITY block to the (uncached) system string, so the
+ * cached user-content prefix (Sales DNA / Belief Ladder) is untouched.
+ */
+export const CONFRONTATION_LEVELS = ["consultative", "balanced", "direct", "challenger"];
+
+/** Any unknown/missing/invalid value resolves to the default. Shared with the route + objection prompt. */
+export function normalizeConfrontation(level) {
+  return CONFRONTATION_LEVELS.includes(level) ? level : "direct";
+}
+
+// The negative space — stated in EVERY non-default block so no level can trade the invariant
+// (which belief, dig-vs-take-the-close, length, no-fabrication) for "softer" or "harder".
+const _DIG_CONF_GUARDRAIL =
+  `This section is the FINAL word on DELIVERY and overrides the tonality guidance above wherever they conflict — but ONLY on how pointed the question is. It does NOT change which belief you dig into, WHETHER you ask a question or tell the rep to take the close ({ "belief": null, "line": null } — every "readiness overrides / take the close" rule above holds exactly), the one-question-one-beat rule, the ~20-word limit, or the never-make-anything-up rules. Same belief, same thing you're surfacing — just dialed to this intensity. Output format is exactly as specified above — return only the JSON object, nothing else.`;
+
+export const DIG_CONFRONTATION_MODIFIERS = {
+  consultative:
+    `DELIVERY INTENSITY — CONSULTATIVE (softest). ${_DIG_CONF_GUARDRAIL}\n` +
+    `Ask the gentlest, most inviting version of the question. Pre-frame with permission even on lighter beliefs, keep it curious and low-pressure, and never make the prospect feel pushed. Same belief, same thing you're surfacing — just the softest way in. Never limp: it must still open a real door, not a throwaway.`,
+  balanced:
+    `DELIVERY INTENSITY — BALANCED (a notch softer than default). ${_DIG_CONF_GUARDRAIL}\n` +
+    `Ask the question plainly and warmly — clear and direct enough to move them, soft enough to stay collaborative. Same belief, same core question, just a lighter touch than full directness.`,
+  challenger:
+    `DELIVERY INTENSITY — CHALLENGER (hardest — the question MUST read clearly MORE pointed and insistent than a normal probe; if it comes out gentle or merely SHORTER, you've done it wrong). ${_DIG_CONF_GUARDRAIL}\n` +
+    `Ask it point-blank and refuse the vague answer — go straight at the hard thing and press for a specific, real answer ("be specific — what's actually broken?", "no — give me the real number", "what's the honest reason you haven't fixed this yet?"). This is about INSISTENCE, not brevity: keep the edge that makes it land, drop only the soft padding. You may still pre-frame a genuinely personal belief (Money, Support) in a few words. Pointed and confident, never rude. Same belief, same core question — its bluntest, most direct form. Never invent a fact, number, or detail to sharpen it.`,
+};
+
+/**
+ * buildDigSystemPrompt — the system prompt for a given confrontationalness level.
+ * `direct` (and any unknown/missing value) → DIG_SYSTEM_PROMPT UNCHANGED (byte-identical).
+ * Other levels → base + a DELIVERY INTENSITY block appended to the uncached system string.
+ * @param {string} [level]
+ * @returns {string}
+ */
+export function buildDigSystemPrompt(level) {
+  const norm = normalizeConfrontation(level);
+  if (norm === "direct") return DIG_SYSTEM_PROMPT;
+  return `${DIG_SYSTEM_PROMPT}\n\n${DIG_CONFRONTATION_MODIFIERS[norm]}`;
+}
+
+/**
  * buildDigUserSegments — SINGLE SOURCE OF TRUTH for the user-message shape, shared by
  * production (dig-signal.ts maps segments → content blocks) and the eval (flattens → one
  * string). Same anti-drift discipline as the objection builder.

@@ -40,6 +40,7 @@ import { streamObjectionCard,
          type ObjectionCallMemory }     from "@/lib/wingman/objection-signal";
 import { streamDigCard }                from "@/lib/wingman/dig-signal";
 import { sanitizeSalesDna }             from "@/lib/wingman/sales-dna.mjs";
+import { normalizeConfrontation }       from "@/lib/wingman/objection-prompt.mjs";
 
 // ── Directive / all-clear nudge copy (server owns it — single source). ────────
 // One plain-English line each, rendered as a single-line HEADLESS card (design language:
@@ -104,6 +105,7 @@ export async function POST(req: NextRequest) {
       call_memory,
       levers_used,
       sales_dna,
+      confrontation: confrontation_raw,
     }: {
       transcript_chunk:    string;
       live_summary?:       string;
@@ -117,7 +119,15 @@ export async function POST(req: NextRequest) {
       call_memory?:        unknown;
       levers_used?:        unknown;
       sales_dna?:          unknown;
+      confrontation?:      unknown;
     } = body;
+
+    // Confrontationalness dial (2026-07-16): untrusted client value → the normalizer maps
+    // anything unknown/missing to "direct", the default, which produces a byte-identical prompt.
+    // So a bad/absent value can never change behavior — it degrades to today's card.
+    const confrontation = normalizeConfrontation(
+      typeof confrontation_raw === "string" ? confrontation_raw : undefined,
+    );
 
     // Phase 1b (offer-aware): the rep's Sales DNA rides the same client rail as
     // live_summary — untrusted, so run it through the ONE shared sanitizer (same
@@ -248,7 +258,7 @@ export async function POST(req: NextRequest) {
           let sawTerminal = false;
           try {
             // req.signal aborts on client disconnect / dismiss / call-end → stops Sonnet (W6).
-            for await (const ev of streamObjectionCard(transcript_chunk, summary, req.signal, thread, hasMemory ? memory : undefined)) {
+            for await (const ev of streamObjectionCard(transcript_chunk, summary, req.signal, thread, hasMemory ? memory : undefined, confrontation)) {
               let alive = true;
               if (ev.kind === "delta") {
                 alive = send("delta", { textSoFar: ev.textSoFar });
@@ -307,7 +317,7 @@ export async function POST(req: NextRequest) {
 
           let sawTerminal = false;
           try {
-            for await (const ev of streamDigCard(transcript_chunk, summary, req.signal, salesDna)) {
+            for await (const ev of streamDigCard(transcript_chunk, summary, req.signal, salesDna, confrontation)) {
               let alive = true;
               if (ev.kind === "belief") {
                 alive = send("belief", { belief: ev.belief ?? null });

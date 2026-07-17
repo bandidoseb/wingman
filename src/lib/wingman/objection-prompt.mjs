@@ -80,6 +80,53 @@ Return ONLY ONE of these two JSON objects and NOTHING else — no commentary, no
 - Genuinely nothing to handle (clear engagement/agreement, pure logistics with no worry under it, early rapport with no pushback) → { "line": null }`;
 
 /**
+ * CONFRONTATIONALNESS DIAL (Sebastian-locked 2026-07-16) — adjusts how HARD the objection card
+ * presses, WITHOUT changing what it diagnoses or whether it fires. Four named levels; `direct`
+ * is the DEFAULT and IS the doctrine above:
+ *   buildObjectionSystemPrompt('direct') === OBJECTION_SYSTEM_PROMPT, byte-for-byte.
+ * That equality is the zero-regression guarantee (asserted as a hard unit gate in the eval), and
+ * it is why any unknown/missing value resolves to `direct` — old data + bad input = today's card.
+ * The three non-default levels append a DELIVERY INTENSITY block to the (uncached) system string,
+ * so the user-content cache prefix (CALL MEMORY / EXCHANGE SO FAR) is untouched.
+ */
+export const CONFRONTATION_LEVELS = ["consultative", "balanced", "direct", "challenger"];
+
+/** Any unknown/missing/invalid value resolves to the default. Single source, shared with the route. */
+export function normalizeConfrontation(level) {
+  return CONFRONTATION_LEVELS.includes(level) ? level : "direct";
+}
+
+// The negative space — stated in EVERY non-default block so no level can trade the invariant
+// (diagnosis, fire/abstain decision, length, no-fabrication) for "softer" or "harder".
+const _OBJ_CONF_GUARDRAIL =
+  `This section is the FINAL word on DELIVERY and overrides the tonality guidance above wherever they conflict — but ONLY on how hard the line lands. It does NOT change which belief you diagnose, WHETHER you speak or stay silent (every "return null / still talking / nothing standing" rule above holds exactly), the one-move-one-beat rule, the ~25-word limit, or the never-make-anything-up rules. Same read of the room, same core thing you're getting at — just dialed to this intensity. Output format is exactly as specified above — return only the JSON object, nothing else.`;
+
+export const OBJECTION_CONFRONTATION_MODIFIERS = {
+  consultative:
+    `DELIVERY INTENSITY — CONSULTATIVE (softest). ${_OBJ_CONF_GUARDRAIL}\n` +
+    `Lead with warmth and invitation, never challenge. Ask permission generously ("would it be okay if…", "can I ask you something?") and lean on soft, curious questions. Do NOT name their hesitation as avoidance and do NOT confront a wishy-washy tone head-on — offer a gentle on-ramp to the same truth instead ("what would you want to feel sure about before this is a yes?"). Press the exact same weak belief and ask the same core question — just its softest, lowest-pressure form. Never limp: it must still be a real question that moves them, not a comfortable throwaway.`,
+  balanced:
+    `DELIVERY INTENSITY — BALANCED (a notch softer than default). ${_OBJ_CONF_GUARDRAIL}\n` +
+    `Name the real issue plainly but keep it gentle and collaborative. Still pace warmly and still ask permission before a reframe; prefer an even, non-pointed question ("is it more the money, or you're not fully sure it'll work?") over a blunt call-out of their tone. Same belief, same core ask — just a lighter touch than full directness.`,
+  challenger:
+    `DELIVERY INTENSITY — CHALLENGER (hardest — the line MUST read clearly MORE confrontational than a normal direct approach; if it comes out gentle, softer, or merely SHORTER, you've done it wrong). ${_OBJ_CONF_GUARDRAIL}\n` +
+    `Turn the pressure UP — this is not about cutting words, it's about adding edge. Name what's really happening out loud, put it straight back on them, and push hard for a straight answer or the decision itself. Call out avoidance directly ("come on — be straight with me", "you keep dancing around it", "that's not a real no — what's the actual reason?") or drive to commitment ("so if we fixed that, are you in — yes or no?"). Do NOT drop the emphatic beat that gives a line its weight; drop the SOFTENERS (the permission-asks, the hedges), not the force. Stay a calm authority who genuinely cares — hard, not cruel; pressing, not desperate. Same belief, same core ask — its bluntest, highest-pressure form, unmistakably harder than a measured version. And the harder you push, the tighter the never-make-anything-up rules bind: NEVER manufacture urgency, numbers, stakes, or social proof to add force — the pressure comes from directness, never from invented facts.`,
+};
+
+/**
+ * buildObjectionSystemPrompt — the system prompt for a given confrontationalness level.
+ * `direct` (and any unknown/missing value) → OBJECTION_SYSTEM_PROMPT UNCHANGED (byte-identical).
+ * Other levels → base + a DELIVERY INTENSITY block appended to the uncached system string.
+ * @param {string} [level]
+ * @returns {string}
+ */
+export function buildObjectionSystemPrompt(level) {
+  const norm = normalizeConfrontation(level);
+  if (norm === "direct") return OBJECTION_SYSTEM_PROMPT;
+  return `${OBJECTION_SYSTEM_PROMPT}\n\n${OBJECTION_CONFRONTATION_MODIFIERS[norm]}`;
+}
+
+/**
  * buildObjectionUserSegments — SINGLE SOURCE OF TRUTH for the user-message shape,
  * shared by production (objection-signal.ts maps segments → content blocks with
  * cache_control) and the eval (which flattens segments → one string). Keeping it here,
