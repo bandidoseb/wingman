@@ -38,6 +38,7 @@ import {
 import {
   DIG_SYSTEM_PROMPT, buildDigSystemPrompt, buildDigUserSegments,
 } from "../src/lib/wingman/dig-prompt.mjs";
+import { scanTics } from "./tic-gate.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const OUT_DIR = join(__dirname, "../tasks");
@@ -375,6 +376,20 @@ async function run() {
   for (const fx of [...OBJ_ALL]) for (const l of LEVELS) { const r = gen.obj[fx.id][l]; if (r.kind === "line") cards.push({ fam: "obj", id: fx.id, level: l, line: r.line, ground: fx.ground }); }
   for (const fx of lim(DIG_NORMAL)) for (const l of LEVELS) { const r = gen.dig[fx.id][l]; if (r.kind === "line") cards.push({ fam: "dig", id: fx.id, level: l, line: r.line, ground: fx.ground }); }
 
+  // GATE 9 — TIC-FREE (deterministic; no API). The trustworthy scorer for mechanical AI tics
+  // the LLM tonality judge can't feel. HARD-fails the SHIPPED base voice (direct) ONLY — the
+  // pinned dial modifiers (consultative/balanced/challenger) still command permission-asks
+  // pending the dial-resume retune, so their tics are ADVISORIES here, not fails (else the eval
+  // would red on the very modifiers Phase 0 deliberately isn't fixing).
+  for (const c of cards) { const t = scanTics(c.line, c.fam === "dig" ? "dig" : "objection"); c.ticHard = t.hard; c.ticSoft = t.soft; }
+  const ticFails = cards.filter((c) => c.level === "direct" && c.ticHard.length);
+  const gate9 = ticFails.length === 0;
+  line(`\n[GATE 9] TIC-FREE — ${gate9 ? "✅ PASS" : "❌ FAIL"}  (direct hard-fail · other levels advisory)`);
+  ticFails.forEach((c) => line(`  ❌ ${c.fam}/${c.id}/${c.level}: "${c.line}" — tics: ${c.ticHard.join(", ")}`));
+  cards.filter((c) => c.ticHard.length && c.level !== "direct").forEach((c) => advisories.push(`tic (pinned ${c.level}) ${c.fam}/${c.id}: ${c.ticHard.join(", ")} — "${c.line}"`));
+  cards.filter((c) => c.ticSoft.length).forEach((c) => advisories.push(`tic-soft ${c.fam}/${c.id}/${c.level}: ${c.ticSoft.join(", ")} — "${c.line}"`));
+  if (!gate9) fail.push("GATE 9 tics");
+
   // GATE 5 — fabrication (dual judge, all cards)
   const judges = JUDGES();
   await mapPool(cards, async (c) => { c.fab = false; c.fabWhy = ""; for (const j of judges) { const r = await fabricationJudge(j, c.ground, c.line); if (!r.error && r.fabrication) { c.fab = true; c.fabWhy = `${j}: ${r.why || ""}`; } } });
@@ -486,7 +501,7 @@ function writeBatch(gen, groups, cards, meanTone) {
         const r = gen[fam][fx.id][l];
         if (!r || r.kind !== "line") { md.push(`- \`${l}\`: _(${r ? r.kind : "—"})_`); continue; }
         const sc = scoreOf(fam, fx.id, l);
-        const flags = [sc?.fab ? "🚩FAB" : "", sc?.tooFarVotes >= 1 ? `🚩too-far(${sc.tooFarVotes})` : ""].filter(Boolean).join(" ");
+        const flags = [sc?.fab ? "🚩FAB" : "", sc?.tooFarVotes >= 1 ? `🚩too-far(${sc.tooFarVotes})` : "", sc?.ticHard?.length ? `🚩TIC(${sc.ticHard.join(",")})` : "", sc?.ticSoft?.length ? `⚠️tic?(${sc.ticSoft.join(",")})` : ""].filter(Boolean).join(" ");
         md.push(`- \`${l}\`${sc ? ` _(t${sc.tonality.toFixed(1)})_` : ""}: ${r.line}${flags ? "  " + flags : ""}`);
       }
       md.push("");

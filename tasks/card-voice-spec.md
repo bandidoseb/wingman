@@ -46,3 +46,30 @@ question. Warm, human, conversational — never a script, never an email, never 
 Also flagged as nonsense (fix the base prompt, not just the tic): diy · consultative "what's made the
 last eighteen months feel different from this time?" — doesn't parse. Cards must always make literal
 sense.
+
+---
+
+## ROOT CAUSE (found 2026-07-17) — the tics are in the DOCTRINE, not the examples
+The few-shot examples in `objection-prompt.mjs` (lines 50–54) are actually clean. The base prompt is
+literally COMMANDING the banned behavior:
+- **Line 19** instructs: *"BEFORE you reframe or challenge them, ASK PERMISSION: 'can I share a
+  perspective?' / 'can I make a suggestion?' / 'can I be honest with you for a sec?'"* — the exact
+  permission-ask tic, written as doctrine.
+- **Line 113** (challenger modifier) hands the model *"come on — be straight with me"* verbatim.
+So swapping examples alone will NOT fix it — the model keeps obeying the doctrine lines. The fix edits
+the doctrine, not just the examples.
+
+## DOCTRINE DECISION (Sebastian, 2026-07-17) — the permission-ask line (line 19)
+First batch: **rip out the literal permission-ask phrasing/instruction**, but **keep "disarm before you
+challenge" as a one-line concept** (no canned phrasings — the model disarms via tone/pacing, warms
+before it presses, in its own words). Then **decide empirically from the batch** whether any nuance
+needs to come back. Rationale: (1) asking permission to reframe is itself slightly uncomfortable for a
+real salesperson; (2) "disarm before you challenge" is genuinely what top closers (Cole Gordon et al.)
+do — keep the intent; (3) canned phrasings are the tic, so forbid the literal words, not the concept.
+
+## PHILOSOPHY — the card is a NUDGE, not a script to recite (Sebastian, 2026-07-17)
+A good closer reads the card and **adds their own voice** — sometimes says words that aren't even on it.
+The card points the direction; the rep supplies the delivery. This means: prefer cards that are
+**directionally right and SHORT** over cards that are "perfectly worded." A too-perfect line is what
+stumps a rep into robotic recitation — the exact failure Core Rules #10/#11 forbid. Optimize the voice
+for "a real closer would run with this," not "a rep could read this verbatim and sound fine."

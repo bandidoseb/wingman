@@ -1,6 +1,24 @@
 # Current Sprint
 
-Last updated: 2026-07-15
+Last updated: 2026-07-17
+
+> **🎙️ 2026-07-17 — CORE CARD VOICE REWORK, Phase 0 DONE (base voice de-tic'd).** Log: `2026-07-17.md`.
+> **Root cause found:** the AI tics were COMMANDED by the prompt DOCTRINE, not the few-shot examples
+> (`objection-prompt.mjs:19` literally instructed the "can I ask" permission-ask; challenger modifier
+> handed it "come on"). Fixed on branch `feat/confrontation-dial` (unchanged, NOT pushed): (1) ripped the
+> permission-ask doctrine → "disarm in your own words, vary it, never standardize on one phrase"; (2)
+> swapped Sebastian's `diy·direct` gold in as the base example; (3) reworded the flow-synth
+> permission-reframe label; (4) NEW `scripts/tic-gate.mjs` — deterministic, unit-tested tic detector
+> (`scanTics(line, family)`); (5) NEW GATE 9 in `confrontation-eval.mjs` (hard-fails the shipped `direct`
+> voice only; pinned dial levels = advisories); (6) NEW `scripts/voice-batch.mjs` — the Phase 1 grind tool
+> (DIRECT-only, ✓/✗/rewrite slots → `tasks/voice-batch.md`). **RESULT: base voice is TIC-FREE (GATE 9
+> pass, zero tics on any direct card), tonality held (direct 4.88), threading intact.** Honest caveat:
+> GATE 3 (dial ordering) reds on ONE fixture (fear: balanced>challenger) — a dial-modifier inversion from
+> changing the base, predicted, deferred to dial-resume retune (NOT a base-voice problem). **🔴 NEXT =
+> Phase 1 grind (fresh energy):** `node scripts/voice-batch.mjs` → Sebastian marks ✓/✗/rewrite → Claude
+> encodes → repeat. Also rule on the dig "can I ask you something personal" pre-frame (soft-flagged; real
+> NEPQ move — keep or kill?). Process: `tasks/card-voice-gameplan.md`; bar + golds: `tasks/card-voice-spec.md`;
+> resume detail + pinned dial: `tasks/todo.md`. Voice must be nailed before un-pinning the dial.
 
 This is the first file Claude reads at session start. It answers: where are we, what's next, and what's blocking us.
 

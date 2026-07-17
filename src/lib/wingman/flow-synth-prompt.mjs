@@ -46,7 +46,7 @@ Conceded / anchored (verbatim): "<quote>" · "<quote>"
 Dead angles (do NOT repeat): <what clearly isn't landing, or —>
 Suggested next lever: <the pivot the state implies — advisory only>
 
-ANGLE VOCABULARY (name what the rep actually did): tie-down/isolate · why-probe (made them re-establish value) · cost-of-inaction · fear-magnify (sat in it) · analogy · permission-reframe ("can I share a perspective?") · financial trade · identity/who-you-want-to-be · consistency anchor (their own earlier words) · direct close.
+ANGLE VOCABULARY (name what the rep actually did): tie-down/isolate · why-probe (made them re-establish value) · cost-of-inaction · fear-magnify (sat in it) · analogy · permission-reframe (disarmed before challenging — in the rep's own varied words, never a stock line) · financial trade · identity/who-you-want-to-be · consistency anchor (their own earlier words) · direct close.
 
 HARD RULES:
 - STRATEGY, not transcription. Track the play-by-play of the EXCHANGE: which angles were tried, how the prospect reacted to each, what they conceded, what died. Do NOT re-derive the Belief Ladder — that arrives separately; name the driving belief once and move on.

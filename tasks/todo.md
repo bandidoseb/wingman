@@ -52,7 +52,49 @@ a card and thinks *this is legit*." Voice spec (his verbatim feedback + gold rew
    snapshot `tasks/prompt-snapshot-2026-07-16/` preserves the old version.
 
 **Banned tics / target voice / gold rewrites:** all in `tasks/card-voice-spec.md`.
-**Next step:** collect any more of Sebastian's do/don't phrases → pass 1 (encode + tic gate + regenerate).
+**Process game plan:** `tasks/card-voice-gameplan.md`.
+
+---
+
+## ⚙️ PHASE 0 — concrete build (this session · objection track only)
+
+Grounded in the actual files (read 2026-07-17). KEY FINDING: the tics are COMMANDED by the doctrine,
+not the examples — objection-prompt.mjs line ~19 literally instructs the permission-ask; line ~113
+(challenger) hands it "come on". So we edit the doctrine, not just the examples.
+
+### Files touched (3)
+1. **`src/lib/wingman/objection-prompt.mjs`** — rework the objection voice:
+   - (a) **Rip the permission-ask doctrine (line ~19)** — remove the literal "ASK PERMISSION: 'can I
+     share a perspective?' / 'can I make a suggestion?' / 'can I be honest…'" instruction; replace with
+     a ONE-LINE concept: *disarm before you challenge — via warmth/pacing/tone in your own words, NOT a
+     canned permission-ask.* (Keep intent, kill phrasing. Decide empirically if nuance returns.)
+   - (b) **Challenger modifier (line ~113)** — strip the banned `"come on — be straight with me"`
+     example; keep the other hard examples + swap in Sebastian's stripped challenger gold ("What did
+     that coach actually not do? Because until I know that, 'different' doesn't mean anything.").
+   - (c) **Replace base few-shot examples (lines ~50-54)** with Sebastian's gold rewrites that fit the
+     DIRECT default (acknowledge-then-flow): diy·direct, timing, send-info, competitor, trust-burned.
+2. **`scripts/tic-gate.mjs`** — NEW pure, unit-testable module. `scanTics(line, family)` →
+   `{ hard: [], soft: [] }`. Hard-ban both families: forced-empathy clichés + "come on" lead-in.
+   Hard-ban objection: "can I ask" / "can I ask you something (honestly)". Soft (dig advisory, not
+   fail): "can I ask you something personal" (legit NEPQ pre-frame, pending Sebastian's ruling).
+   Word-boundaried, case-insensitive, no deps. Precise — only Sebastian's exact flagged phrases.
+3. **`scripts/confrontation-eval.mjs`** — import `scanTics`; add **GATE 9 — TIC-FREE**: any generated
+   card with a `hard` hit → `fail`; `soft` hits → `advisories`; show `🚩TIC` inline in the batch doc.
+
+### NOT in Phase 0 (scope discipline)
+- `dig-prompt.mjs` doctrine — NOT edited. No dig gold rewrites exist yet; "can I ask you something
+  personal" is a defensible pre-frame. Generate dig cards in the batch → Sebastian critiques → dig
+  golds next session. Flagged for his ruling.
+
+### Verify
+- Typecheck gate passes · `DRY=1 node scripts/confrontation-eval.mjs` proves wiring, no API spend ·
+  GATE 0 byte-identity still passes (builder returns the NEW constant; `direct` === constant holds) ·
+  seed a known-tic string through `scanTics` (unit sanity) · full run regenerates
+  `tasks/confrontation-card-batch.md` for Sebastian to green/red-light.
+
+### Snapshot / revert
+- Old objection prompt preserved at `tasks/prompt-snapshot-2026-07-16/objection-prompt.mjs.txt`.
+  Nothing pushed; all on `feat/confrontation-dial`; no live impact until merged.
 
 ---
 
