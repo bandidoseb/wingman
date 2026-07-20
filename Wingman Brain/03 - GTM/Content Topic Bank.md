@@ -27,6 +27,7 @@ The goal is to sound like geniuses, not to hand competitors the recipe. Hard rul
 - **Why we never store audio or video.** Trust + compliance as product design.
 - **Why almost nothing fires during rapport.** Stage-aware restraint.
 - **One card at a time, never a queue.** Attention is the scarcest resource on a live call.
+- **Wingman carries the prospect's context so the rep doesn't have to.** A great discovery is 30–60 min of probing questions — and the elite closer is ALSO holding 10+ significant anchors in their head (the goal number, *why* that number, how long they've been stuck, how close they got, who burned them, the final-straw moment) AND deciding which one to resurface mid-objection. That background load is enormous and it competes with being present. Wingman lifts it: it remembers every heavy-hitting thing the prospect said and resurfaces the right anchor at the moment it wins the deal — so the rep can just flow, be present, and dig deeper instead of note-taking in their head. (Working-memory limits; presence beats note-taking. WHY only — never the HOW of how it's captured.)
 
 ### Sales science / training doctrine (credibility content)
 - **Consistency bias & socratic dialogue** — why the prospect closing themselves beats hard closing (Cialdini's *Influence*; the objection-less close).
@@ -36,6 +37,7 @@ The goal is to sound like geniuses, not to hand competitors the recipe. Hard rul
 - **Tie-downs in the prospect's exact words** — why verbatim beats paraphrase (they can't argue with their own words).
 - **Internal vs external pressure** — heaven/hell island, the gap, and why tension (not pressure) closes deals.
 - **"Don't talk them out of the sale"** — why the most dangerous moment is right after they're ready, and why a great tool tells you to STOP digging.
+- **The objection LOOP elite closers actually run — and why a generic LLM can't fake it.** Disarm → isolate the REAL objection → reopen the gap → tie down → close, looping back to re-diagnose when a new belief surfaces. Objection handling isn't one clever comeback — it's a methodical, proven, multi-turn process (Cole Gordon / Jeremy Miner-grade), and Wingman is built on it, not on a chatbot that "answers" objections generically. Every move defaults to a QUESTION that makes the prospect resolve their own objection (NEPQ), not a statement they can nod at. (WHY/philosophy only — never the prompt/lever internals.)
 
 ### Turn-taking science (Sebastian-flagged 2026-07-07 — "make us look like smart mfrs")
 - **How do you know when someone is done talking?** The turn-detection problem: silence timers vs semantic understanding — why a pause isn't the end of a thought, and why the human press beats the machine guess (for now). Source material: [Deepgram end-of-speech docs](https://developers.deepgram.com/docs/understanding-end-of-speech-detection-while-streaming), [LiveKit turn-detection post](https://livekit.com/blog/turn-detection-voice-agents-vad-endpointing-model-based-detection), [AssemblyAI turn-detection post](https://www.assemblyai.com/blog/turn-detection-endpointing-voice-agent).
