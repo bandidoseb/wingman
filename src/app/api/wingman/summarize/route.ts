@@ -61,11 +61,23 @@ export async function POST(req: NextRequest) {
     // ── Input size caps — bound Sonnet token spend ────────────────────────────
     // new_transcript accumulates since the last tick. If ticks fail repeatedly the
     // buffer grows — cap it before it becomes a runaway cost.
-    // current_summary is a fixed-size scorecard; 10K chars is very generous.
     if (new_transcript.length > 50_000) {
       return NextResponse.json({ error: "Transcript too large" }, { status: 400 });
     }
-    if (current_summary && current_summary.length > 10_000) {
+    // current_summary is the PREVIOUS tick's model output, hard-capped at
+    // BELIEF_LADDER_MAX_TOKENS (~6k chars) — so a legit scorecard can never
+    // approach 24k. Rejecting here used to fire at 10k, which risked the worst
+    // silent failure: one oversized payload → every later tick 400s → the
+    // scorecard freezes for the rest of the call while all cards read stale
+    // state. The system self-heals (the next output is re-capped), so the only
+    // job left for this guard is true abuse. Warn early so anomalies are visible.
+    if (current_summary && current_summary.length > 8_000) {
+      console.warn(
+        `[summarize] ⚠️ current_summary unusually large (${current_summary.length} chars) — ` +
+        `legit scorecards stay under ~6k. call=${call_id}`,
+      );
+    }
+    if (current_summary && current_summary.length > 24_000) {
       return NextResponse.json({ error: "Summary too large" }, { status: 400 });
     }
 

@@ -1,6 +1,6 @@
 # Confrontationalness Dial — card batch (read as the closer; flag any you wouldn't say)
 
-Generated 2026-07-20 16:15 · gen=claude-sonnet-4-6. Each card shows tonality (t), and 🚩 if a judge flagged fabrication/too-far.
+Generated 2026-07-20 20:33 · gen=claude-sonnet-4-6. Each card shows tonality (t), and 🚩 if a judge flagged fabrication/too-far.
 Per-level mean tonality: **consultative** 5.00 · **balanced** 5.00 · **direct** 5.00 · **challenger** 5.00
 
 ## Objection — single-shot

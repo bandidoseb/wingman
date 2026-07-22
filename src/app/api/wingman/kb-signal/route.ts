@@ -201,11 +201,12 @@ export async function POST(req: NextRequest) {
     }
 
     // Cap the Belief Ladder summary defensively. The summarizer caps its OUTPUT at
-    // 600 tokens (~2,400 chars); 4,000 chars is comfortable headroom that never
-    // truncates a real summary but stops an oversized/abusive payload from inflating
-    // the Haiku bill. See Wingman Brain/Beta Tuning Parameters.md. (Fix #2)
+    // BELIEF_LADDER_MAX_TOKENS = 1,500 tokens (~6,000 chars worst case); 8,000 chars
+    // is headroom that never truncates a real summary (truncation here would silently
+    // chop the tail — KEY ANCHORS/COMMITMENTS/WEAKEST LINK, exactly what the cards
+    // read) but still stops an oversized/abusive payload from inflating the AI bill.
     const summary = typeof live_summary === "string"
-      ? live_summary.slice(0, 4_000)
+      ? live_summary.slice(0, 8_000)
       : undefined;
 
     const idleGap = last === 0 ? "first" : `${Math.round((now - last) / 1000)}s`;

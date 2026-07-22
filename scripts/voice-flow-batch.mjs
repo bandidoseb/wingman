@@ -108,7 +108,7 @@ const FLOWS = [
       `  Desired "heaven": $30k/mo running his own thing · $GOAL 30000 · why that #: replace the job + freedom\n` +
       `  Final straw / emotional why: "tired of where I'm at"\n` +
       `  Core driver: Freedom\n` +
-      `▸ BELIEF LADDER  (✅ locked · 🟡 partial · ⬜ open · ⚠️ at-risk/objection)\n` +
+      `▸ BELIEF LADDER  (✅ locked · 🟡 partial · ⬜ open · ⚠️ objected)\n` +
       `  1 Pain                 ✅ — hates the grind, "tired of where I'm at"\n` +
       `  2 Doubt (can't DIY)    🟡 — tried on his own ~18 months, hasn't cracked it\n` +
       `  3 Cost (of inaction)   🟡 — 18 months lost, still stuck\n` +
@@ -116,7 +116,7 @@ const FLOWS = [
       `  5 Money                ⚠️ — has some savings, said $8k is "a stretch but doable"; then flinched at the price, "a lot of money right now"\n` +
       `  6 Support (who decides) ⬜ — not discussed\n` +
       `  7 Trust (why you)      🟡 — engaged, no strong objection\n` +
-      `▸ THEIR EXACT WORDS\n  • "that's a lot of money right now"\n  • "tired of where I'm at"\n  • "it'd be a stretch but doable"\n` +
+      `▸ KEY ANCHORS (their exact words)\n  • "that's a lot of money right now"\n  • "tired of where I'm at"\n  • "it'd be a stretch but doable"\n` +
       `▸ OPEN OBJECTIONS: price / affordability (open)\n` +
       `▸ WEAKEST LINK → 5 Money (⚠️, live objection), then 6 Support (⬜, untouched), then 2 Doubt (🟡)`,
     persona: "A 34-year-old stuck at a 9-5 making ~$6k/mo, wants to build a business to $30k/mo. The price is a real stretch but not impossible — he has some savings. He's interested but scared of the money.",
@@ -133,7 +133,7 @@ const FLOWS = [
       `  Desired "heaven": out into her own thing full-time within a year · $GOAL — · why that #: —\n` +
       `  Final straw / emotional why: —\n` +
       `  Core driver: Freedom\n` +
-      `▸ BELIEF LADDER  (✅ locked · 🟡 partial · ⬜ open · ⚠️ at-risk/objection)\n` +
+      `▸ BELIEF LADDER  (✅ locked · 🟡 partial · ⬜ open · ⚠️ objected)\n` +
       `  1 Pain                 ✅ — overwhelmed, wants out\n` +
       `  2 Doubt (can't DIY)    ⬜ — not discussed\n` +
       `  3 Cost (of inaction)   🟡 — 10 yrs busy, it never settles\n` +
@@ -141,7 +141,7 @@ const FLOWS = [
       `  5 Money                ⬜ — not discussed\n` +
       `  6 Support (who decides) ⬜ — not discussed\n` +
       `  7 Trust (why you)      🟡 — engaged\n` +
-      `▸ THEIR EXACT WORDS\n  • "now's just not a great time"\n  • "constantly busy"\n` +
+      `▸ KEY ANCHORS (their exact words)\n  • "now's just not a great time"\n  • "constantly busy"\n` +
       `▸ OPEN OBJECTIONS: timing / "next quarter" (open)\n` +
       `▸ WEAKEST LINK → break the timing stall via 3 Cost (of inaction); beliefs still open: 2 Doubt, 5 Money, 6 Support (⬜)`,
     persona: "Runs a service business she's had ~10 years — it has NEVER settled down. Genuinely interested but reflexively delays; 'next quarter' is a stall. Underneath is a fear it won't work. Warms up when the rep exposes that nothing actually changes next quarter.",
@@ -158,7 +158,7 @@ const FLOWS = [
       `  Desired "heaven": wants the outcome the program delivers · $GOAL — · why that #: —\n` +
       `  Final straw / emotional why: —\n` +
       `  Core driver: Significance\n` +
-      `▸ BELIEF LADDER  (✅ locked · 🟡 partial · ⬜ open · ⚠️ at-risk/objection)\n` +
+      `▸ BELIEF LADDER  (✅ locked · 🟡 partial · ⬜ open · ⚠️ objected)\n` +
       `  1 Pain                 ✅ — owns the problem\n` +
       `  2 Doubt (can't DIY)    🟡\n` +
       `  3 Cost (of inaction)   🟡\n` +
@@ -166,7 +166,7 @@ const FLOWS = [
       `  5 Money                🟡 — "decent chunk of money," surfaces late\n` +
       `  6 Support (who decides) ⚠️ — "need to talk to my wife"; she usually trusts his call\n` +
       `  7 Trust (why you)      ✅ — sold on the rep/offer\n` +
-      `▸ THEIR EXACT WORDS\n  • "I'd need to talk to my wife"\n  • "she usually trusts my judgment"\n` +
+      `▸ KEY ANCHORS (their exact words)\n  • "I'd need to talk to my wife"\n  • "she usually trusts my judgment"\n` +
       `▸ OPEN OBJECTIONS: spouse / "talk to my wife" (open — likely courtesy, money underneath)\n` +
       `▸ WEAKEST LINK → 6 Support (⚠️, isolate courtesy vs real gate), then 5 Money`,
     persona: "Genuinely wants to move forward and has basically decided; loops in his wife out of respect — mostly courtesy, not a hard gate. Admits she'd trust his call. The real hesitation underneath is money (stretching thin), which surfaces once the wife excuse is dissolved.",
@@ -183,7 +183,7 @@ const FLOWS = [
       `  Desired "heaven": build a land-flipping business that actually works · $GOAL — · why that #: —\n` +
       `  Final straw / emotional why: —\n` +
       `  Core driver: Certainty\n` +
-      `▸ BELIEF LADDER  (✅ locked · 🟡 partial · ⬜ open · ⚠️ at-risk/objection)\n` +
+      `▸ BELIEF LADDER  (✅ locked · 🟡 partial · ⬜ open · ⚠️ objected)\n` +
       `  1 Pain                 ✅\n` +
       `  2 Doubt (can't DIY)    ⚠️ — doubts programs work; really doubts HIS own follow-through\n` +
       `  3 Cost (of inaction)   🟡\n` +
@@ -191,7 +191,7 @@ const FLOWS = [
       `  5 Money                ⬜ — not yet discussed (surfaces later)\n` +
       `  6 Support (who decides) ⬜\n` +
       `  7 Trust (why you)      🟡 — a little guarded, "seen people not get results"\n` +
-      `▸ THEIR EXACT WORDS\n  • "seen a lot of people not really get results"\n  • courses "just sat there"\n` +
+      `▸ KEY ANCHORS (their exact words)\n  • "seen a lot of people not really get results"\n  • courses "just sat there"\n` +
       `▸ OPEN OBJECTIONS: results skepticism (open)\n` +
       `▸ WEAKEST LINK → 2 Doubt (⚠️, live objection — mirror: the variable is the person), then 5 Money & 6 Support (⬜, untouched), then 7 Trust (🟡)`,
     persona: "Skeptical because he's seen people not get results. The real issue is he's afraid HE won't follow through, projected onto 'these programs.' Has bought sit-there courses before. Concedes when the rep mirrors that the variable is the person, not the program.",
