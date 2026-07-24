@@ -1,4 +1,7 @@
 import type { Profile, Outcome, VaultObjection, VaultSignal } from "@/types";
+// Relative (not "@/…") on purpose: this module is unit-tested under vitest, which
+// has no path-alias resolver — a runtime "@/" import would fail to resolve there.
+import { confirmedOutcome } from "./outcome-stats";
 
 // ── Static label maps (defined once at module level, not per-call) ────────────
 const WEAKNESS_LABELS: Record<string, string> = {
@@ -21,7 +24,7 @@ interface RepProfileInput {
   profile: Profile;
   offerName: string | null;
   offerPrice: string | null;
-  recentCalls: Array<{ outcome: Outcome | null }>;
+  recentCalls: Array<{ outcome: Outcome | null; outcome_source?: "auto" | "manual" | null }>;
   objections: VaultObjection[];
   signals: VaultSignal[];
 }
@@ -38,12 +41,14 @@ export function buildRepProfile(input: RepProfileInput): string {
   const offer = [offerName, offerPrice].filter(Boolean).join(" · ") || "Not set";
 
   // ── Call stats from last 30 calls ─────────────────────────────────────────
+  // Count only CONFIRMED outcomes — an AI auto-mark is excluded until the rep
+  // confirms it, so unconfirmed guesses never poison the Sales DNA (the moat).
   const calls = recentCalls.slice(0, 30);
   const total = calls.length;
-  const closed = calls.filter((c) => c.outcome === "Closed").length;
-  const lost = calls.filter((c) => c.outcome === "Lost").length;
-  const dq = calls.filter((c) => c.outcome === "DQ").length;
-  const followUp = calls.filter((c) => c.outcome === "Follow Up").length;
+  const closed = calls.filter((c) => confirmedOutcome(c) === "Closed").length;
+  const lost = calls.filter((c) => confirmedOutcome(c) === "Lost").length;
+  const dq = calls.filter((c) => confirmedOutcome(c) === "DQ").length;
+  const followUp = calls.filter((c) => confirmedOutcome(c) === "Follow Up").length;
 
   const closeRate =
     total > 0 ? Math.round((closed / Math.max(total - dq, 1)) * 100) : 0;

@@ -500,6 +500,85 @@
     }
 
     /* ══════════════════════════════════════════════════════════════════════
+       LIVE HUB — END-OF-CALL MORPH (v0.1.29)
+       The one pill carries the whole call end: live → "generating debrief…" →
+       "Debrief ready — View call →" → fade. Smooth: width animates while the
+       morph content crossfades. Also the two safety-stop states (amber).
+       Width is content-driven in live/starting; the JS pins explicit px widths
+       during a morph so the transition below animates the resize.
+    ══════════════════════════════════════════════════════════════════════ */
+    /* border-box so a JS-set width in px (during the morph) matches offsetWidth
+       exactly — with the default content-box the pill would grow by its padding
+       every morph. Harmless while width is auto (live/starting). */
+    #liveHub { box-sizing: border-box; transition: width 0.34s cubic-bezier(0.22, 1, 0.36, 1); }
+
+    /* Cog is a LIVE-only affordance — never reveal it during a morph phase. */
+    #liveHub.hub-generating #hubWave,
+    #liveHub.hub-ready      #hubWave,
+    #liveHub.hub-safety     #hubWave,
+    #liveHub.hub-generating:hover #hubCog,
+    #liveHub.hub-ready:hover      #hubCog,
+    #liveHub.hub-safety:hover     #hubCog { width: 0; margin-left: 0; opacity: 0; pointer-events: none; display: none; }
+
+    /* Morph content wrapper — crossfades as a unit; hidden in live/starting. */
+    #hubMorph {
+      display: none; align-items: center; gap: 7px; margin-left: 8px;
+      opacity: 1; transition: opacity 0.16s ease; white-space: nowrap;
+    }
+    #liveHub.hub-generating #hubMorph,
+    #liveHub.hub-ready      #hubMorph,
+    #liveHub.hub-safety     #hubMorph { display: flex; }
+    #liveHub.hub-fading #hubMorph { opacity: 0; }
+
+    #hubText { font-size: 12.5px; font-weight: 500; letter-spacing: -0.01em; color: rgba(255,255,255,0.9); }
+
+    /* Generating spinner */
+    #hubSpinner {
+      width: 13px; height: 13px; flex: 0 0 auto; border-radius: 50%;
+      border: 2px solid rgba(255,255,255,0.25); border-top-color: rgba(255,255,255,0.9);
+      animation: hubSpin 0.7s linear infinite; display: none;
+    }
+    #liveHub.hub-generating #hubSpinner { display: block; }
+    @keyframes hubSpin { to { transform: rotate(360deg); } }
+
+    /* Ready — filled "View call →" capsule + mini dismiss */
+    #hubViewBtn {
+      display: none; align-items: center; gap: 5px;
+      padding: 4px 11px; border-radius: 999px; border: none;
+      background: rgba(255,255,255,0.95); color: #111214;
+      font-family: inherit; font-size: 12px; font-weight: 650; letter-spacing: -0.01em;
+      cursor: pointer; transition: background 0.14s, transform 0.1s;
+    }
+    #hubViewBtn:hover  { background: #fff; }
+    #hubViewBtn:active { transform: scale(0.97); }
+    #hubViewBtn .arr { font-size: 13px; line-height: 1; }
+    #liveHub.hub-ready #hubViewBtn { display: inline-flex; }
+
+    #hubDismiss {
+      display: none; width: 18px; height: 18px; flex: 0 0 auto;
+      align-items: center; justify-content: center; border-radius: 50%;
+      color: rgba(255,255,255,0.5); font-size: 12px; line-height: 1; cursor: pointer;
+      transition: background 0.14s, color 0.14s;
+    }
+    #hubDismiss:hover { background: rgba(255,255,255,0.12); color: rgba(255,255,255,0.9); }
+    #liveHub.hub-ready #hubDismiss { display: flex; }
+
+    /* Safety-stop — amber ICON only (no border change, per Sebastian) */
+    #hubSafetyIcon {
+      display: none; width: 15px; height: 15px; flex: 0 0 auto;
+      align-items: center; justify-content: center; color: #E0A23C;
+    }
+    #hubSafetyIcon svg { width: 15px; height: 15px; display: block; }
+    #liveHub.hub-safety #hubSafetyIcon { display: flex; }
+    #liveHub.hub-safety #hubText { color: rgba(255,255,255,0.82); }
+
+    /* Final fade-out — NAMED hubFadeOut, never `fadeOut` (a global keyframe by
+       that name exists at ~line 146; a duplicate would shadow it and yank the
+       compass/bubble on dismiss — the past #40 bug). */
+    #liveHub.hub-fadeout { animation: hubFadeOut 0.28s ease forwards; }
+    @keyframes hubFadeOut { from { opacity: 1; } to { opacity: 0; } }
+
+    /* ══════════════════════════════════════════════════════════════════════
        SHARED TOAST BASE — Detection + Manual Trigger share most styles
     ══════════════════════════════════════════════════════════════════════ */
     .wingman-toast {
@@ -676,30 +755,8 @@
     }
     .toast-end-btn:hover { opacity: 0.88; }
 
-    /* ══════════════════════════════════════════════════════════════════════
-       COMPONENT 3D — AUTO-STOP NOTIFICATION TOAST
-       Informational only — no buttons. Auto-dismisses after 4 seconds.
-       Appears when Wingman stops automatically (inactivity, cap, or call ended).
-    ══════════════════════════════════════════════════════════════════════ */
-    #autoStopIcon {
-      width: 20px;
-      height: 20px;
-      border-radius: 50%;
-      background: rgba(255, 159, 10, 0.2);
-      border: 1px solid rgba(255, 159, 10, 0.35);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      flex-shrink: 0;
-      font-size: 11px;
-      color: #ff9f0a;
-    }
-
-    #autoStopMessage {
-      font-size: 13px;
-      color: rgba(255, 255, 255, 0.65);
-      line-height: 1.4;
-    }
+    /* COMPONENT 3D (auto-stop toast) retired v0.1.29 — replaced by the Live Hub
+       pill's amber safety states. See #hubSafetyIcon / #hubText. */
 
     /* ══════════════════════════════════════════════════════════════════════
        COMPONENT 3E — APPROACHING LIMIT WARNING TOAST
@@ -782,123 +839,6 @@
        is now the only live-call presence indicator. The stage-bar JS still runs
        harmlessly on this hidden element; it is fully removed in Phase 5 cleanup. */
     #stageBar { display: none !important; }
-
-    /* ══════════════════════════════════════════════════════════════════════
-       COMPONENT 4 — POST-CALL OUTCOME CARD
-       Appears after call ends if a callId is present. Centered on screen.
-       User picks an outcome → "Saved ✓" confirmation → card fades out.
-    ══════════════════════════════════════════════════════════════════════ */
-    #outcomeCard {
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      z-index: 300;
-      display: none;
-      flex-direction: column;
-      gap: 14px;
-      width: 320px;
-      pointer-events: auto;
-
-      background: rgba(16, 16, 18, 0.95);
-      backdrop-filter: blur(28px);
-      -webkit-backdrop-filter: blur(28px);
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      border-radius: 18px;
-      padding: 20px 20px 18px;
-      box-shadow: 0 12px 48px rgba(0, 0, 0, 0.6), 0 0 0 0.5px rgba(255,255,255,0.06);
-    }
-
-    #outcomeCard.visible {
-      display: flex;
-      /* Dedicated slide-in — NOT the shared slideDown (used by the top-right toasts).
-         slideDown's `to` state is `transform: translateY(0)`, which with `forwards`
-         overrides this card's base `transform: translate(-50%, -50%)` and knocks it
-         off-center (down + right). outcomeIn keeps the centering transform in every
-         keyframe so the card stays centered while it slides in. */
-      animation: outcomeIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-    }
-
-    @keyframes outcomeIn {
-      from { opacity: 0; transform: translate(-50%, -50%) translateY(-8px); }
-      to   { opacity: 1; transform: translate(-50%, -50%); }
-    }
-
-    #outcomeCard.fade-out {
-      animation: outcomeFadeOut 0.4s ease forwards;
-    }
-
-    /* Uniquely named — this card is centered via translate(-50%,-50%), so its
-       fade must carry that transform. It previously shadowed the global plain
-       fadeOut (duplicate keyframes name — last one wins), which yanked the
-       compass menu and signal bubble up-left by half their size on dismiss. */
-    @keyframes outcomeFadeOut {
-      from { opacity: 1; transform: translate(-50%, -50%) scale(1); }
-      to   { opacity: 0; transform: translate(-50%, -50%) scale(0.97); }
-    }
-
-    #outcomeCardLabel {
-      font-size: 13px;
-      font-weight: 600;
-      color: rgba(255, 255, 255, 0.55);
-      letter-spacing: 0.04em;
-      text-transform: uppercase;
-    }
-
-    #outcomePills {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-    }
-
-    .outcome-pill {
-      padding: 7px 14px;
-      border-radius: 9px;
-      background: rgba(255, 255, 255, 0.07);
-      border: 1px solid rgba(255, 255, 255, 0.12);
-      color: rgba(255, 255, 255, 0.8);
-      font-size: 13px;
-      font-weight: 500;
-      font-family: inherit;
-      cursor: pointer;
-      transition: background 0.15s, border-color 0.15s, color 0.15s;
-      letter-spacing: -0.01em;
-    }
-
-    .outcome-pill:hover {
-      background: rgba(255, 255, 255, 0.14);
-      border-color: rgba(255, 255, 255, 0.22);
-      color: #ffffff;
-    }
-
-    .outcome-pill.closed   { border-color: rgba(52,199,89,0.4);  color: #34c759; }
-    .outcome-pill.closed:hover   { background: rgba(52,199,89,0.15);  border-color: rgba(52,199,89,0.6); }
-    .outcome-pill.followup { border-color: rgba(0,122,255,0.4);  color: #4a90e2; }
-    .outcome-pill.followup:hover { background: rgba(0,122,255,0.15);  border-color: rgba(0,122,255,0.6); }
-    .outcome-pill.dq       { border-color: rgba(142,142,147,0.4); color: #8e8e93; }
-    .outcome-pill.dq:hover       { background: rgba(142,142,147,0.12); border-color: rgba(142,142,147,0.6); }
-    .outcome-pill.noshow   { border-color: rgba(255,159,10,0.4); color: #ff9f0a; }
-    .outcome-pill.noshow:hover   { background: rgba(255,159,10,0.15); border-color: rgba(255,159,10,0.6); }
-    .outcome-pill:disabled { opacity: 0.35; cursor: default; pointer-events: none; }
-
-    #outcomeConfirm {
-      display: none;
-      align-items: center;
-      gap: 8px;
-      font-size: 14px;
-      font-weight: 600;
-      color: #34c759;
-    }
-
-    #outcomeConfirm.visible { display: flex; }
-
-    #outcomeError {
-      display: none;
-      font-size: 12px;
-      color: rgba(255, 59, 48, 0.85);
-    }
-
-    #outcomeError.visible { display: block; }
 
     /* ══════════════════════════════════════════════════════════════════════
        COMPONENT 5 — COMPASS MENU (Phase 3 hotkey-summoned)
@@ -1099,6 +1039,16 @@
         </div>
       </div>
     </div>
+
+    <!-- End-of-call morph content (generating / ready / safety). Crossfades as a
+         unit; hidden while live. The logo above persists as the visual anchor. -->
+    <div id="hubMorph">
+      <span id="hubSafetyIcon"></span>
+      <span id="hubSpinner"></span>
+      <span id="hubText"></span>
+      <button id="hubViewBtn"><span>View call</span><span class="arr">→</span></button>
+      <span id="hubDismiss" title="Dismiss">✕</span>
+    </div>
   </div>
 
   <!-- COMPONENT 3A: Call Detection Toast -->
@@ -1150,13 +1100,8 @@
     </div>
   </div>
 
-  <!-- COMPONENT 3D: Auto-Stop Notification Toast (informational, no buttons) -->
-  <div id="autoStopToast" class="wingman-toast">
-    <div class="toast-header">
-      <div id="autoStopIcon">!</div>
-      <span id="autoStopMessage">Wingman stopped.</span>
-    </div>
-  </div>
+  <!-- COMPONENT 3D retired (v0.1.29): the auto-stop toast was replaced by the
+       Live Hub pill's safety-stop states (amber icon). See #hubMorph in #liveHub. -->
 
   <!-- COMPONENT 3E: Approaching Limit Warning Toast (10 min before 2h cap) -->
   <div id="approachingLimitToast" class="wingman-toast">
@@ -1179,21 +1124,9 @@
     </div>
   </div>
 
-  <!-- COMPONENT 4: Post-Call Outcome Card -->
-  <div id="outcomeCard">
-    <div id="outcomeCardLabel">How'd it go?</div>
-    <div id="outcomePills">
-      <button class="outcome-pill closed"   data-outcome="Closed">Closed</button>
-      <button class="outcome-pill followup" data-outcome="Follow Up">Follow Up</button>
-      <button class="outcome-pill dq"       data-outcome="DQ">DQ</button>
-      <button class="outcome-pill noshow"   data-outcome="No Show">No Show</button>
-      <button class="outcome-pill"          data-outcome="Other">Other</button>
-    </div>
-    <div id="outcomeConfirm">
-      <span>✓</span><span>Saved</span>
-    </div>
-    <div id="outcomeError">Couldn't save — log it in Flight Log</div>
-  </div>
+  <!-- COMPONENT 4 retired (v0.1.29): the HUD "How'd it go?" outcome card was
+       replaced by dashboard outcome capture + AI auto-detect. Disposition now
+       lives in Flight Log; the pill deep-links there. -->
 
   <!-- COMPONENT 5: Compass Menu (Phase 3 hotkey-summoned) -->
   <div id="compassMenu">
@@ -1271,10 +1204,17 @@
     let completedStages   = [];
     let currentStage      = null;
 
-    // ── Outcome card state ────────────────────────────────────────────────
-    let outcomeCardShown   = false;  // guard — prevent showing twice
-    let outcomeCallId      = null;
-    let outcomeAutoDismiss = null;
+    // ── Live Hub end-of-call morph state (v0.1.29) ─────────────────────────
+    // hubPhase drives the pill through the call end: hidden → starting → live →
+    // generating → ready (→ fade), plus the amber `safety` branch. The morph
+    // never touches the stop chain — it's purely the HUD's end-of-call surface.
+    let hubPhase       = 'hidden';   // hidden|starting|live|generating|ready|safety
+    let hubMorphCallId = null;       // callId to deep-link "View call →"
+    let hubGenTimer    = null;       // generating dead-man timeout (6 min)
+    let hubSafetyTimer = null;       // safety-state auto-fade (8s)
+    let hubGraceTimer  = null;       // no-callId call:ended grace before hide (400ms)
+    const HUB_GEN_TIMEOUT_MS = 6 * 60 * 1000;
+    const HUB_SAFETY_MS      = 8000;
 
     // ── Compass menu state (Phase 3) ──────────────────────────────────────
     let compassHideTimer = null;
@@ -1470,6 +1410,9 @@
     let   hubPanelOpen         = false;
     let   hubDragOffsetX       = 0;
     let   hubDragOffsetY       = 0;
+    let   hubDragMoved         = false;   // true once a mousedown crosses the drag threshold
+    let   hubDownX             = 0;
+    let   hubDownY             = 0;
     let   wheelDragging        = false;   // color-wheel drag — own flag, like hubDragging
     let   hideSignalTimer      = null;
     let   readinessHideTimer   = null;   // readiness chip auto-hide (Design #2)
@@ -1486,10 +1429,11 @@
       return 'rgba(' + ((n >> 16) & 255) + ',' + ((n >> 8) & 255) + ',' + (n & 255) + ',' + a + ')';
     }
     const compassMenu          = document.getElementById('compassMenu');
-    const outcomeCard          = document.getElementById('outcomeCard');
-    const outcomePills         = document.getElementById('outcomePills');
-    const outcomeConfirm       = document.getElementById('outcomeConfirm');
-    const outcomeError         = document.getElementById('outcomeError');
+    const hubMorph             = document.getElementById('hubMorph');
+    const hubText              = document.getElementById('hubText');
+    const hubSafetyIcon        = document.getElementById('hubSafetyIcon');
+    const hubViewBtn           = document.getElementById('hubViewBtn');
+    const hubDismiss           = document.getElementById('hubDismiss');
     const detectionToast       = document.getElementById('detectionToast');
     const detectionDeployBtn   = document.getElementById('detectionDeployBtn');
     const detectionDismissBtn  = document.getElementById('detectionDismissBtn');
@@ -1503,67 +1447,108 @@
     const endCallToast         = document.getElementById('endCallToast');
     const endCallConfirmBtn    = document.getElementById('endCallConfirmBtn');
     const endCallCancelBtn     = document.getElementById('endCallCancelBtn');
-    const autoStopToast           = document.getElementById('autoStopToast');
-    const autoStopMessage         = document.getElementById('autoStopMessage');
     const approachingLimitToast   = document.getElementById('approachingLimitToast');
 
-    // ── Outcome card ──────────────────────────────────────────────────────
-    function showOutcomeCard(callId) {
-      // Self-healing: do NOT early-return when a card is already shown (Issue #35).
-      // If the rep ended call 1 without dispositioning it (its 30s auto-dismiss
-      // still pending) and then ran call 2 within that window, an early return
-      // would leave call 1's STALE card on screen — and because onCallEnd ran
-      // hideSignal() (which re-enables mouse pass-through) just before this call,
-      // the card would sit there with every tap falling through to the app
-      // underneath, then auto-dismiss unsaved. Instead we always (re)initialize
-      // for the new callId so the card is correct and clickable on every call.
-      outcomeCardShown = true;
-      outcomeCallId = callId;
+    // ── Live Hub end-of-call morph (v0.1.29) ──────────────────────────────
+    // Amber icons for the two safety-stop states (inline SVG, no border change).
+    const HUB_SAFETY = {
+      inactivity:   { icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 1l22 22"/><path d="M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V4a3 3 0 0 0-5.94-.6"/><path d="M17 16.95A7 7 0 0 1 5 12v-2m14 0v2a7 7 0 0 1-.11 1.23"/></svg>',
+                      msg:  'Wingman stopped — no talking for 20 min' },
+      max_duration: { icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
+                      msg:  'Wingman stopped — 2 hour limit' },
+    };
 
-      // Reset visual state fully — covers a prior save that left pills hidden
-      // (display:'none') or disabled, or a confirm/error message still showing.
-      outcomeConfirm.classList.remove('visible');
-      outcomeError.classList.remove('visible');
-      outcomePills.style.display = '';
-      outcomePills.querySelectorAll('.outcome-pill').forEach(b => b.disabled = false);
-
-      outcomeCard.classList.remove('fade-out');
-      outcomeCard.classList.add('visible');
-      // Capture is HOVER-based (see the outcomeCard mouseenter/mouseleave handlers),
-      // not global. The card no longer freezes the whole screen — the rep can click
-      // elsewhere or start the next call, and clicks only land on the card while the
-      // cursor is over it. Matches every other HUD popup. (Disposition can still be
-      // set later from Flight Log; the card also auto-clears in 30s / on next call.)
-
-      // Auto-dismiss after 30 seconds if user ignores it. clearTimeout first so a
-      // previous call's pending timer can't fire mid-display and yank this card away.
-      clearTimeout(outcomeAutoDismiss);
-      outcomeAutoDismiss = setTimeout(() => hideOutcomeCard(), 30000);
+    function clearHubMorphTimers() {
+      if (hubGenTimer)    { clearTimeout(hubGenTimer);    hubGenTimer    = null; }
+      if (hubSafetyTimer) { clearTimeout(hubSafetyTimer); hubSafetyTimer = null; }
+      if (hubGraceTimer)  { clearTimeout(hubGraceTimer);  hubGraceTimer  = null; }
     }
 
-    function hideOutcomeCard() {
-      clearTimeout(outcomeAutoDismiss);
-      outcomeCard.classList.add('fade-out');
+    // Enter a morph phase with a crossfade: fade the morph content out (if any),
+    // swap the phase class + content while invisible, animate the width, fade back
+    // in. `content()` mutates text/icon during the invisible window. Safe from live
+    // (no old morph content — just fades the new content in).
+    function morphTo(phase, content) {
+      const doSwap = () => {
+        // Measure the OLD width BEFORE swapping content, or from===to and the
+        // width never animates. (In the wasMorphing path the old content is still
+        // laid out — only its opacity was faded — so this is still the old width.)
+        const from = liveHub.offsetWidth;
+        liveHub.classList.remove('hub-generating', 'hub-ready', 'hub-safety',
+                                 'starting', 'live');
+        liveHub.classList.add('hub-' + phase, 'visible', 'hub-fading'); // content invisible
+        if (content) content();
+        liveHub.style.width = 'auto';                    // measure the NEW natural width
+        const to = liveHub.offsetWidth;
+        liveHub.style.width = from + 'px';
+        void liveHub.offsetWidth;                        // reflow so the next set animates
+        liveHub.style.width = to + 'px';                 // transition from→to (CSS eases it)
+        // Two frames guarantee a paint at opacity 0 before easing the new content in.
+        requestAnimationFrame(() => requestAnimationFrame(() =>
+          liveHub.classList.remove('hub-fading')));
+      };
+      const wasMorphing = liveHub.classList.contains('hub-generating') ||
+                          liveHub.classList.contains('hub-ready') ||
+                          liveHub.classList.contains('hub-safety');
+      if (wasMorphing) {
+        liveHub.classList.add('hub-fading');            // fade OLD content out first
+        setTimeout(doSwap, 150);
+      } else {
+        doSwap();                                        // from live — nothing to fade out
+      }
+    }
+
+    // Final fade + hand the window back to main. Idempotent.
+    function fadeHubOut() {
+      clearHubMorphTimers();
+      hubPhase = 'hidden';
+      hubMorphCallId = null;
+      liveHub.classList.add('hub-fadeout');
       setTimeout(() => {
-        outcomeCard.classList.remove('visible', 'fade-out');
-        outcomeCardShown = false;
-        outcomeCallId    = null;
-        if (window.hud) window.hud.setMouseIgnore(true);
-      }, 400);
+        liveHub.classList.remove('hub-fadeout', 'hub-generating', 'hub-ready',
+                                 'hub-safety', 'hub-fading', 'visible');
+        liveHub.style.width = '';                        // back to content-driven
+        if (window.hud) { restoreHubPassThrough(); window.hud.morphDone(); }
+      }, 300);
     }
 
-    // Pill clicks — pick an outcome, disable all, send IPC
-    outcomePills.addEventListener('click', (e) => {
-      const pill = e.target.closest('.outcome-pill');
-      if (!pill || !outcomeCallId) return;
+    function enterGenerating(callId) {
+      clearHubMorphTimers();
+      hubPhase = 'generating';
+      if (callId) hubMorphCallId = callId;
+      // Visibility is owned by the `.visible` class (morphTo adds it) — NOT an
+      // inline display, which would survive `.visible` removal and leave an
+      // invisible click-capturing pill after fade-out.
+      morphTo('generating', () => { hubText.textContent = 'Call saved — generating debrief…'; });
+      // Dead-man timeout: if "ready" never arrives (post-call failed / network
+      // drop / version skew), fade out quietly rather than spin forever.
+      hubGenTimer = setTimeout(fadeHubOut, HUB_GEN_TIMEOUT_MS);
+    }
 
-      const outcome = pill.dataset.outcome;
+    function enterReady(callId) {
+      clearHubMorphTimers();
+      hubPhase = 'ready';
+      if (callId) hubMorphCallId = callId;
+      morphTo('ready', () => { hubText.textContent = 'Debrief ready'; });
+      // No auto-fade — persists until View-call, ✕, or a new deploy (Sebastian).
+    }
 
-      // Disable all pills immediately — prevent double-pick
-      outcomePills.querySelectorAll('.outcome-pill').forEach(b => b.disabled = true);
+    function enterSafety(reason) {
+      clearHubMorphTimers();
+      hubPhase = 'safety';
+      hubMorphCallId = null;                            // debrief lands in the dashboard silently
+      const s = HUB_SAFETY[reason] || { icon: '', msg: 'Wingman stopped' };
+      morphTo('safety', () => { hubSafetyIcon.innerHTML = s.icon; hubText.textContent = s.msg; });
+      hubSafetyTimer = setTimeout(fadeHubOut, HUB_SAFETY_MS);
+    }
 
-      if (window.hud) window.hud.saveOutcome(outcomeCallId, outcome);
-    });
+    // "View call →" (ready) or the pill body (generating) → deep-link, then fade.
+    function openHubCall() {
+      if (window.hud) window.hud.openCall(hubMorphCallId || null);
+      fadeHubOut();
+    }
+    hubViewBtn.addEventListener('click', (e) => { e.stopPropagation(); openHubCall(); });
+    hubDismiss.addEventListener('click', (e) => { e.stopPropagation(); fadeHubOut(); });
 
     // ── Setup required toast (Zoom display name not set) ─────────────────
     const setupRequiredToast       = document.getElementById('setupRequiredToast');
@@ -1718,24 +1703,20 @@
 
     endCallCancelBtn.addEventListener('click', () => hideEndCallConfirmToast());
 
-    // ── Auto-stop notification toast ──────────────────────────────────────
-    const AUTO_STOP_MESSAGES = {
-      inactivity:    'No activity for 20 minutes — Wingman stopped.',
-      max_duration:  '2 hour limit reached — Wingman stopped.',
-      meeting_lost:  'Call ended — Wingman stopped.',
-    };
-
-    let autoStopDismissTimer = null;
-
-    function showAutoStopToast(reason) {
-      autoStopMessage.textContent = AUTO_STOP_MESSAGES[reason] || 'Wingman stopped.';
-      autoStopToast.classList.add('visible');
-      if (window.hud) window.hud.setMouseIgnore(true); // informational only — pass through
-
-      clearTimeout(autoStopDismissTimer);
-      autoStopDismissTimer = setTimeout(() => {
-        autoStopToast.classList.remove('visible');
-      }, 4000);
+    // ── Auto-stop handling ────────────────────────────────────────────────
+    // The old top-right toast is retired (v0.1.29). meeting_lost flows into the
+    // pill's generating morph (via onCallEnd + onAutoStopped); inactivity and
+    // max_duration become the pill's amber safety states (enterSafety).
+    function handleAutoStopped(reason) {
+      if (reason === 'meeting_lost') {
+        // The paired call:ended already put the pill into generating; nothing to
+        // do here (callId arrives via post-call-state). Guard: if somehow not yet
+        // generating, start it now so the rep still sees the morph.
+        if (hubPhase !== 'generating' && hubPhase !== 'ready') enterGenerating(null);
+      } else {
+        // inactivity / max_duration — the rep may still be on the call.
+        enterSafety(reason);
+      }
     }
 
     // ── Approaching limit warning toast ──────────────────────────────────
@@ -1774,7 +1755,12 @@
     // The pill is the visible "Wingman is live" presence. showHub is idempotent
     // (classList), so rapid Deploy/end cycles can't leave duplicate state.
     function showHub(mode) {
-      liveHub.classList.remove('starting', 'live');
+      clearHubMorphTimers();        // a new call supersedes any prior end-of-call morph
+      hubPhase = (mode === 'starting') ? 'starting' : 'live';
+      hubMorphCallId = null;
+      liveHub.style.width = '';     // back to content-driven width
+      liveHub.classList.remove('hub-generating', 'hub-ready', 'hub-safety',
+                               'hub-fading', 'hub-fadeout', 'starting', 'live');
       liveHub.classList.add(mode === 'starting' ? 'starting' : 'live');
       liveHub.classList.add('visible');
     }
@@ -1782,11 +1768,17 @@
     // is over the pill / panel can never leave the whole screen capturing clicks
     // (the Issue #35 class of bug). Always restore pass-through here.
     function hideHub() {
+      clearHubMorphTimers();
+      hubPhase = 'hidden';
+      hubMorphCallId = null;
       closeHubPanel(true);          // force-close panel, skip the mouse-restore (we do it below)
       hubDragging = false;
       wheelDragging = false;        // never leave a wheel-drag armed across call end
       stopAudioWave();              // cancel the rAF + fallback timer, clear inline bar transforms
-      liveHub.classList.remove('visible', 'starting', 'live', 'dragging');
+      liveHub.style.width = '';
+      liveHub.classList.remove('visible', 'starting', 'live', 'dragging',
+                               'hub-generating', 'hub-ready', 'hub-safety',
+                               'hub-fading', 'hub-fadeout');
       liveHub.style.cursor = '';
       hubCog.classList.remove('pinned');
       if (window.hud) window.hud.setMouseIgnore(true);
@@ -1815,11 +1807,6 @@
     function setLive(live) {
       isLive = live;
       if (live) {
-        // Clear any lingering post-call outcome card from the PREVIOUS call before
-        // going live (Issue #35). If the rep ended the last call without picking an
-        // outcome (its 30s auto-dismiss still pending), a dead "How'd it go?" card
-        // would otherwise float over this live call until the timer fired.
-        if (outcomeCardShown) hideOutcomeCard();
         // Hide both toasts — call is now active
         hideDetectionToast(false);
         hideManualTriggerToast(false);
@@ -1830,15 +1817,18 @@
         startTimer();
         stageBar.classList.remove('glow-red');
         stageBar.classList.add('glow-blue');
-        showHub('live');   // the Live Hub pill replaces the old ambient dot
+        showHub('live');   // the Live Hub pill replaces the old ambient dot (resets any morph)
         stopBtn.classList.add('visible');
       } else {
         liveDot.classList.remove('live');
         stopTimer();
         stageBar.classList.remove('glow-blue', 'glow-red', 'active');
         ambientDot.classList.remove('visible');
-        hideHub();         // fully tears down pill interactivity (restores click-through)
+        stopAudioWave();   // stop the waveform rAF; the pill may morph into generating next
         stopBtn.classList.remove('visible');
+        // NOTE: the pill is deliberately NOT torn down here — onCallEnd decides
+        // its fate (generating morph vs. hide). This split is what lets the pill
+        // survive call end and carry the post-call UI (v0.1.29).
       }
     }
 
@@ -2279,13 +2269,13 @@
       }
     });
 
-    // ── Toast / outcome-card hover — enable mouse capture only when cursor is over it ──
+    // ── Toast hover — enable mouse capture only when cursor is over it ──
     // These appear over a full-screen transparent window. Calling setMouseIgnore(false)
     // globally when one appears blocks ALL clicks on the screen underneath (e.g. Zoom).
     // Instead, we enable capture only on hover — same pattern as signalBubble + stageBar.
-    // The outcomeCard is included here so picking a disposition no longer freezes the
-    // whole screen — the rep can click elsewhere / deploy the next call (Issue #35).
-    [detectionToast, manualTriggerToast, deployStatusToast, endCallToast, setupRequiredToast, outcomeCard].forEach(toast => {
+    // (The Live Hub pill has its own hover-capture handlers below — the "View call"
+    // button and ✕ live inside it and are clickable while the pill is hovered.)
+    [detectionToast, manualTriggerToast, deployStatusToast, endCallToast, setupRequiredToast].forEach(toast => {
       toast.addEventListener('mouseenter', () => {
         if (window.hud) window.hud.setMouseIgnore(false);
       });
@@ -2313,10 +2303,14 @@
     })();
 
     // Drag (dedicated hubDragging — never the shared isDragging). Don't start a
-    // drag from the cog or inside the settings panel (those are click targets).
+    // drag from the cog, the settings panel, or the morph action controls
+    // (all click targets — "View call →" and the ✕ must register clean clicks).
     liveHub.addEventListener('mousedown', (e) => {
-      if (hubCog.contains(e.target) || hubPanel.contains(e.target)) return;
+      if (hubCog.contains(e.target) || hubPanel.contains(e.target) ||
+          hubViewBtn.contains(e.target) || hubDismiss.contains(e.target)) return;
       hubDragging = true;
+      hubDragMoved = false;             // distinguish a click from a real drag
+      hubDownX = e.clientX; hubDownY = e.clientY;
       const rect = liveHub.getBoundingClientRect();
       hubDragOffsetX = e.clientX - rect.left;
       hubDragOffsetY = e.clientY - rect.top;
@@ -2325,6 +2319,10 @@
     });
     document.addEventListener('mousemove', (e) => {
       if (!hubDragging) return;
+      if (!hubDragMoved &&
+          (Math.abs(e.clientX - hubDownX) > 4 || Math.abs(e.clientY - hubDownY) > 4)) {
+        hubDragMoved = true;           // crossed the click→drag threshold
+      }
       const w = liveHub.offsetWidth, h = liveHub.offsetHeight;
       const newLeft = Math.max(0, Math.min(window.innerWidth  - w,     e.clientX - hubDragOffsetX));
       const newTop  = Math.max(8, Math.min(window.innerHeight - h - 8, e.clientY - hubDragOffsetY));
@@ -2345,6 +2343,15 @@
                        e.clientY >= rect.top  && e.clientY <= rect.bottom;
         if (!isOver) restoreHubPassThrough();   // released off-pill → give clicks back to Zoom
       } catch (_) { restoreHubPassThrough(); }
+    });
+
+    // While generating, a click anywhere on the pill body (not a drag) opens the
+    // call — the debrief keeps filling in on the dashboard. The ready-state button
+    // and ✕ have their own handlers (and stopPropagation), so they never reach here.
+    liveHub.addEventListener('click', (e) => {
+      if (hubPhase !== 'generating' || hubDragMoved) return;
+      if (hubCog.contains(e.target) || hubPanel.contains(e.target)) return;
+      openHubCall();
     });
 
     // Hover gating — capture on enter, restore on leave (guards keep it from
@@ -2548,11 +2555,14 @@
 
           // Live Hub pill: a visible "Wingman is running" confirmation the moment
           // the SDK starts. setLive(true) upgrades it to the live state on call:started.
-          if (state === 'starting') {
-            showHub('starting');
+          if (state === 'searching' || state === 'starting') {
+            showHub('starting');   // also resets any leftover end-of-call morph
           } else if ((state === 'idle' || state === 'stopping') && !isLive) {
-            // Cancelled/failed deploy that never went live — don't leave the pill stuck.
-            hideHub();
+            // idle/stopping fires around EVERY call:ended too — only tear the pill
+            // down here for a deploy that died BEFORE going live (phase 'starting').
+            // During an end-of-call morph (generating/ready/safety) this MUST be
+            // ignored or it would kill the morph.
+            if (hubPhase === 'starting' || hubPhase === 'hidden') hideHub();
           }
         });
       }
@@ -2569,35 +2579,29 @@
       // Call started — transition to live mode
       window.hud.onCallStart(() => setLive(true));
 
-      // Call ended
+      // Call ended — the pill carries the end-of-call UI from here (v0.1.29).
       window.hud.onCallEnd((data) => {
-        setLive(false);
+        setLive(false);            // light teardown; does NOT hide the pill anymore
         hideSignal();
         hideEndCallConfirmToast();
-        hideCompassMenu(); // always close compass on call end
-        hidePill(false);   // Phase 3.5: clear thinking pill + ALL its timers
-        // If a callId was passed, show the outcome card
-        if (data && data.callId) {
-          showOutcomeCard(data.callId);
-        }
-      });
-
-      // Outcome save result — show "Saved ✓" or error, then fade out
-      window.hud.onOutcomeSaved((success) => {
-        clearTimeout(outcomeAutoDismiss);
-        outcomePills.style.display = 'none';
-        if (success) {
-          outcomeConfirm.classList.add('visible');
-          setTimeout(() => {
-            outcomePills.style.display = '';
-            hideOutcomeCard();
-          }, 1500);
+        hideCompassMenu();         // always close compass on call end
+        hidePill(false);           // Phase 3.5: clear thinking pill + ALL its timers
+        const callId = data && data.callId;
+        if (callId) {
+          // Manual end with a saved call → morph straight into "generating debrief".
+          enterGenerating(callId);
         } else {
-          outcomeError.classList.add('visible');
-          setTimeout(() => {
-            outcomePills.style.display = '';
-            hideOutcomeCard();
-          }, 3000);
+          // No callId. Two cases share this payload and can't be told apart yet:
+          //   (a) failed-start / no-session rollback → tear the pill down;
+          //   (b) an auto-stop whose hud:auto-stopped is about to arrive
+          //       (meeting_lost → generating, inactivity/max → amber safety).
+          // Wait one grace beat; if no auto-stop supervenes, hide for real.
+          clearHubMorphTimers();
+          hubPhase = 'ending';     // transient — keeps deploy:idle from double-hiding
+          hubGraceTimer = setTimeout(() => {
+            hubGraceTimer = null;
+            if (hubPhase === 'ending') hideHub();
+          }, 400);
         }
       });
 
@@ -2605,8 +2609,26 @@
       // expose it and main never sends a dismiss event to the HUD. A call to it here
       // threw at load and killed every registration below it (#39 root cause).
 
-      // Auto-stopped (inactivity, 2h cap, or meeting window closed)
-      window.hud.onAutoStopped(reason => showAutoStopToast(reason));
+      // Auto-stopped (inactivity, 2h cap, or meeting window closed) → pill states
+      window.hud.onAutoStopped(reason => handleAutoStopped(reason));
+
+      // Post-call pill morph — the dashboard tells us when the debrief lands.
+      if (window.hud.onPostCallState) {
+        window.hud.onPostCallState(({ phase, callId }) => {
+          // Safety states are terminal + silent — the debrief goes to the dashboard,
+          // never back to the pill (the rep may still be on the call).
+          if (hubPhase === 'safety' || hubPhase === 'ending' || hubPhase === 'hidden') return;
+          if (phase === 'generating') {
+            // Adopt the callId (auto-stop path had none). Don't downgrade ready→generating.
+            if (hubPhase === 'generating' && callId) hubMorphCallId = callId;
+          } else if (phase === 'ready') {
+            // Only from generating, and only for the call we're actually showing.
+            if (hubPhase === 'generating' && (!hubMorphCallId || !callId || callId === hubMorphCallId)) {
+              enterReady(callId || hubMorphCallId);
+            }
+          }
+        });
+      }
 
       // 10-minute warning before 2h hard cap
       window.hud.onCapWarning(() => showApproachingLimitToast());

@@ -22,9 +22,12 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ error: "call_id and outcome are required" }, { status: 400 });
     }
 
+    // A human pick always tags source='manual' — this is what promotes an
+    // AI-detected ('auto') outcome into the close-rate math (auto marks are
+    // excluded until confirmed) and drops the "auto" chip in the dashboard.
     const { error } = await supabase
       .from("calls")
-      .update({ outcome })
+      .update({ outcome, outcome_source: "manual" })
       .eq("id", call_id)
       .eq("user_id", user.id); // ownership check
 

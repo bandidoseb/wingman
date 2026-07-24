@@ -100,6 +100,9 @@ export default function DashboardClient({
     signals:    initialSignals.filter((s) => s.is_new).length,
   });
   const [pendingCall, setPendingCall] = useState<Call | null>(null);
+  // Deep-link target: a callId to open in Flight Log (from the HUD "View call →"
+  // pill, which only has an id — the full Call may not be loaded yet).
+  const [pendingCallId, setPendingCallId] = useState<string | null>(null);
 
   // ── Zoom display name — lifted to client state so the deploy gate stays current
   // when the user saves a new name in SettingsTab without a full page reload.
@@ -113,6 +116,12 @@ export default function DashboardClient({
   const [pendingOutcome, setPendingOutcome] = useState(false);
   // Tracks which call is pending so we can detect when it appears with an outcome.
   const pendingCallIdRef = useRef<string | null>(null);
+  // Drives the HUD pill's generating→ready morph, DECOUPLED from the skeleton's
+  // 2-min valve above: the post-call job can take ~4 min worst case, so a shared
+  // gate would drop the "ready" signal before the debrief lands. Fired at most
+  // once per call, given up on after 6 min.
+  const genCallIdRef   = useRef<string | null>(null);
+  const readyFiredRef  = useRef<Set<string>>(new Set());
   const [stage, setStage]         = useState<CallStageLabel>(defaultStage);
   const [startError, setStartError] = useState<string | null>(null);
   const [savedMessage, setSavedMessage] = useState<string | null>(null);
@@ -271,6 +280,18 @@ export default function DashboardClient({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // ── Deep-link to a call's Flight Log entry (HUD "View call →" pill) ──────────
+  // The pill hands us a callId (or null → just open the tab). FlightLogTab opens
+  // the entry and shows a loading skeleton that fills in as the debrief lands.
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.wingman?.onNavigateToCall) return;
+    window.wingman.onNavigateToCall((callId: string | null) => {
+      setPendingCallId(callId);
+      setTab("library");
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // ── Sync Zoom name status to Electron so tray + HUD can gate deploys ────────
   // Runs on mount (with the server-rendered value) and again whenever the name
   // is saved in SettingsTab. Main process uses this to show a "set your Zoom
@@ -375,6 +396,7 @@ export default function DashboardClient({
       setIsActive(true);
       setPendingOutcome(false);
       pendingCallIdRef.current = null;
+      genCallIdRef.current = null;   // a new call supersedes any prior generating watch
     } catch (err) {
       // #47: if Electron already started (session POST threw / returned no call_id /
       // network dropped in the gap), stop it so the recording doesn't orphan and the
@@ -437,6 +459,10 @@ export default function DashboardClient({
         setSavedMessage("Saved to Flight Log ✓");
         setTimeout(() => setSavedMessage(null), 4000);
         router.refresh();
+        // Kick the HUD pill into its "generating debrief" morph (manual end has a
+        // callId). Optional-chained — old preloads (pre-v0.1.29) simply no-op.
+        genCallIdRef.current = callId;
+        window.wingman?.postCallState?.({ phase: "generating", callId });
       } catch {
         // fail silently — call record is already saved in DB
       }
@@ -511,6 +537,13 @@ export default function DashboardClient({
         // Non-fatal — call record is already saved, this just updates stage data
         console.error("[handleAutoEnd] Failed to patch session stages");
       }
+
+      // Deliver the callId to the HUD pill so its generating→ready morph can deep-link.
+      // (meeting_lost put the pill into generating already, but with NO callId — this
+      // is how it learns which call to open. inactivity/max show the amber state and
+      // the HUD ignores this, by design.) Optional-chained for old preloads.
+      genCallIdRef.current = activeCallId;
+      window.wingman?.postCallState?.({ phase: "generating", callId: activeCallId });
 
       // Show the HUD outcome card so the rep can log the result.
       // We pass callId + a fresh token so the HUD can authenticate the save.
@@ -635,24 +668,47 @@ export default function DashboardClient({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ── Poll every 5s while skeleton is up — catches both outcome and summary ────
+  // ── Poll every 2s while skeleton is up — catches both outcome and summary ────
+  // 2s (not 5s): shrinks the lag between the debrief landing and the "Debrief
+  // ready" pill / Flight Log skeleton updating to ~1s avg. Only runs during the
+  // short generating window (no AI cost — just a DB read), then stops.
   useEffect(() => {
     if (!pendingOutcome) return;
-    const interval = setInterval(() => router.refresh(), 5000);
+    const interval = setInterval(() => router.refresh(), 2000);
     return () => clearInterval(interval);
   }, [pendingOutcome, router]);
 
-  // ── Clear skeleton only when outcome AND summary are both present ─────────────
-  // This ensures the debrief is ready before the call entry appears, so the
-  // user never needs to hard-refresh to see the full post-call data.
+  // ── Clear skeleton when the debrief (summary) lands ──────────────────────────
+  // Summary-ONLY now (was outcome && summary): the HUD outcome card is gone and
+  // the AI auto-detect abstains when unsure, so `outcome` is no longer guaranteed
+  // to ever arrive. Gating on it would leave the skeleton up forever on an
+  // unmarked call. The debrief is the real "post-call done" signal.
   useEffect(() => {
     if (!pendingOutcome || !pendingCallIdRef.current) return;
     const call = initialCalls.find((c) => c.id === pendingCallIdRef.current);
-    if (call?.outcome && call?.summary) {
+    if (call?.summary) {
       setPendingOutcome(false);
       pendingCallIdRef.current = null;
     }
   }, [initialCalls, pendingOutcome]);
+
+  // ── HUD pill: fire "ready" when the debrief lands (decoupled from skeleton) ───
+  // Watches the generating call for its `summary`, independent of pendingOutcome's
+  // 2-min valve — the post-call job can take up to ~4 min. Fires once per call
+  // (readyFiredRef), gives up after 6 min so the ref can't leak across a session.
+  useEffect(() => {
+    const id = genCallIdRef.current;
+    if (!id || readyFiredRef.current.has(id)) return;
+    const call = initialCalls.find((c) => c.id === id);
+    if (call?.summary) {
+      readyFiredRef.current.add(id);
+      genCallIdRef.current = null;
+      window.wingman?.postCallState?.({ phase: "ready", callId: id });
+    }
+  }, [initialCalls]);
+  // A lingering genCallIdRef (debrief never landed) is harmless — it's overwritten
+  // when the next call ends, and reset at call start (handleStartCall). The HUD
+  // pill's own 6-min timeout fades a stuck "generating" independently.
 
   // ── Safety valve: clear skeleton after 2 min if post-call job fails ──────────
   useEffect(() => {
@@ -1532,6 +1588,8 @@ export default function DashboardClient({
               calls={initialCalls}
               initialCall={pendingCall}
               onInitialCallConsumed={clearPendingCall}
+              initialCallId={pendingCallId}
+              onInitialCallIdConsumed={() => setPendingCallId(null)}
               userId={userId}
               isActive={isActive}
               isPendingOutcome={pendingOutcome}

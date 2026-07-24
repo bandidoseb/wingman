@@ -1,10 +1,12 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
+import { useRouter } from "next/navigation";
 import Card from "@/components/ui/Card";
 import SectionLabel from "@/components/ui/SectionLabel";
 import OutcomeBadge from "@/components/ui/OutcomeBadge";
 import type { Call } from "@/types";
+import { confirmedOutcome } from "@/lib/wingman/outcome-stats";
 
 const PILLAR_DISPLAY: Array<{ key: string; label: string; description: string }> = [
   { key: "core_problem",         label: "Core Problem",      description: "Rep dug into the real pain" },
@@ -20,6 +22,9 @@ interface Props {
   calls: Call[];
   initialCall: Call | null;
   onInitialCallConsumed: () => void;
+  /** Deep-link from the HUD "View call →" pill — an id (or null → just the tab). */
+  initialCallId?: string | null;
+  onInitialCallIdConsumed?: () => void;
   userId: string;
   isActive?: boolean;
   isPendingOutcome?: boolean;
@@ -164,7 +169,8 @@ function formatTimestamp(ts: number): string {
   return `${d.toLocaleDateString("en-US", { weekday: "long" })} ${time}`;
 }
 
-export default function FlightLogTab({ calls, initialCall, onInitialCallConsumed, userId, isActive = false, isPendingOutcome = false }: Props) {
+export default function FlightLogTab({ calls, initialCall, onInitialCallConsumed, initialCallId, onInitialCallIdConsumed, userId, isActive = false, isPendingOutcome = false }: Props) {
+  const router = useRouter();
   const [selectedCall, setSelectedCall] = useState<Call | null>(initialCall);
   const [activeDetailTab, setActiveDetailTab] = useState<"debrief" | "transcript">("debrief");
   // Tracks outcomes set inline (without a full page reload)
@@ -211,6 +217,41 @@ export default function FlightLogTab({ calls, initialCall, onInitialCallConsumed
       onInitialCallConsumed();
     }
   }, [initialCall, onInitialCallConsumed]);
+
+  // Deep-link by id (HUD "View call →"). The row may not be loaded yet on a
+  // just-ended call, so open a light placeholder that fills in from `calls` as
+  // router.refresh lands the debrief (the detail view derives from the live prop).
+  useEffect(() => {
+    if (!initialCallId) return;
+    const found = calls.find((c) => c.id === initialCallId);
+    setSelectedCall(found ?? {
+      id: initialCallId, user_id: userId, prospect_name: null, outcome: null,
+      outcome_source: null, duration: null, summary: null, missed_topics: [],
+      call_date: new Date().toISOString(), created_at: new Date().toISOString(),
+    });
+    setChatMessages([]);
+    setActiveDetailTab("debrief");
+    onInitialCallIdConsumed?.();
+  // Only react to a NEW deep-link id, not to every calls refresh.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialCallId]);
+
+  // While an open call has no debrief yet, poll for it so the skeleton fills in
+  // even when the parent isn't already polling (e.g. a deep-link opened later).
+  // Caps at ~6 min via a start-time ref so a stuck job can't refresh forever.
+  const detailPollStartRef = useRef<number | null>(null);
+  useEffect(() => {
+    const id = selectedCall?.id;
+    if (!id) { detailPollStartRef.current = null; return; }
+    const fresh = calls.find((c) => c.id === id);
+    if (fresh?.summary) { detailPollStartRef.current = null; return; }  // debrief already here
+    if (detailPollStartRef.current === null) detailPollStartRef.current = Date.now();
+    const iv = setInterval(() => {
+      if (Date.now() - (detailPollStartRef.current ?? 0) > 6 * 60 * 1000) { clearInterval(iv); return; }
+      router.refresh();
+    }, 2000);  // 2s to match the pill/skeleton poll — fills the open entry in sooner
+    return () => clearInterval(iv);
+  }, [selectedCall, calls, router]);
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
@@ -309,13 +350,14 @@ export default function FlightLogTab({ calls, initialCall, onInitialCallConsumed
     } else {
       // Global mode — strip transcript data, include pendingCallId if set
       const callSummaries = calls.map((c) => ({
-        id:            c.id,
-        prospect_name: c.prospect_name,
-        outcome:       c.outcome,
-        call_date:     c.call_date,
-        duration:      c.duration,
-        summary:       c.summary,
-        missed_topics: c.missed_topics,
+        id:             c.id,
+        prospect_name:  c.prospect_name,
+        outcome:        c.outcome,
+        outcome_source: c.outcome_source ?? null,
+        call_date:      c.call_date,
+        duration:       c.duration,
+        summary:        c.summary,
+        missed_topics:  c.missed_topics,
       }));
       const messages = [...globalMessages.slice(-9), newMessage].map((m) => ({
         role:    m.role,
@@ -460,9 +502,15 @@ export default function FlightLogTab({ calls, initialCall, onInitialCallConsumed
   };
 
   if (selectedCall) {
-    const call = selectedCall;
+    // Derive from the LIVE `calls` prop by id so an open entry fills in as the
+    // post-call job lands (router.refresh updates `calls`). `selectedCall` is only
+    // the identity anchor + fallback for a deep-linked row not yet loaded. Reading
+    // the frozen snapshot here would leave the skeleton stuck forever (SEV-5).
+    const call = calls.find((c) => c.id === selectedCall.id) ?? selectedCall;
     const stages = call.call_stages || [];
     const transcript = call.call_transcript || [];
+    // No debrief yet → show a Granola-style loading skeleton that fills in.
+    const debriefPending = !call.summary;
 
     return (
       <div style={{ maxWidth: 640, margin: "0 auto" }}>
@@ -478,16 +526,43 @@ export default function FlightLogTab({ calls, initialCall, onInitialCallConsumed
               {new Date(call.call_date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })} · {call.duration}
             </div>
           </div>
-          {effectiveOutcome(call)
-            ? <OutcomeBadge outcome={effectiveOutcome(call)!} />
-            : <OutcomePicker callId={call.id} onSaved={handleOutcomeSaved} />
-          }
+          {effectiveOutcome(call) && !editingOutcomes[call.id] ? (
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <OutcomeBadge outcome={effectiveOutcome(call)!} />
+              {!localOutcomes[call.id] && call.outcome_source === "auto" && (
+                <span title="Auto-detected by Wingman — confirm or change it"
+                  style={{ fontSize: 9.5, fontWeight: 700, letterSpacing: "0.05em", color: "#8e8e93", background: "#f2f2f7", borderRadius: 5, padding: "2px 5px", textTransform: "uppercase" }}>
+                  auto
+                </span>
+              )}
+              <button onClick={() => setEditingOutcomes((prev) => ({ ...prev, [call.id]: true }))}
+                style={{ fontSize: 10, color: "#007aff", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", padding: "2px 6px" }}>
+                {!localOutcomes[call.id] && call.outcome_source === "auto" ? "Confirm" : "Edit"}
+              </button>
+            </div>
+          ) : (
+            <OutcomePicker callId={call.id} onSaved={handleOutcomeSaved} />
+          )}
         </div>
 
         {call.summary && (
           <div style={{ background: "#fff", borderRadius: 14, padding: "16px 18px", marginBottom: 20, boxShadow: "0 1px 4px rgba(0,0,0,0.06)", border: "1px solid rgba(0,0,0,0.06)" }}>
             <div style={{ fontSize: 11, fontWeight: 600, color: "#8e8e93", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.06em" }}>AI Debrief</div>
             <div style={{ fontSize: 13.5, color: "#1c1c1e", lineHeight: 1.6 }}>{call.summary}</div>
+          </div>
+        )}
+
+        {/* Loading skeleton — the debrief hasn't landed yet. Fills in via the
+            self-refresh poll above; each section appears as its data arrives. */}
+        {debriefPending && (
+          <div style={{ background: "#fff", borderRadius: 14, padding: "16px 18px", marginBottom: 20, boxShadow: "0 1px 4px rgba(0,0,0,0.06)", border: "1px solid rgba(0,0,0,0.06)" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+              <div style={{ width: 7, height: 7, borderRadius: "50%", background: "#aeaeb2", animation: "livePulse 2s ease-in-out infinite", flexShrink: 0 }} />
+              <div style={{ fontSize: 11, fontWeight: 600, color: "#8e8e93", textTransform: "uppercase", letterSpacing: "0.06em" }}>Generating debrief…</div>
+            </div>
+            {[100, 92, 78].map((w, i) => (
+              <div key={i} style={{ height: 11, width: `${w}%`, borderRadius: 5, background: "#e5e5ea", marginBottom: i < 2 ? 9 : 0, animation: "livePulse 2s ease-in-out infinite" }} />
+            ))}
           </div>
         )}
 
@@ -641,9 +716,12 @@ export default function FlightLogTab({ calls, initialCall, onInitialCallConsumed
     );
   }
 
-  // Call list view
-  const wins = calls.filter((c) => c.outcome === "Closed").length;
-  const qualifying = calls.filter((c) => c.outcome !== "DQ").length;
+  // Call list view. Close-rate counts only CONFIRMED outcomes — an AI auto-mark
+  // (outcome_source='auto') is excluded until the rep confirms it, and a local
+  // pick made this session counts immediately (it's a manual confirmation).
+  const listOutcome = (c: Call): string | null => localOutcomes[c.id] ?? confirmedOutcome(c);
+  const wins = calls.filter((c) => listOutcome(c) === "Closed").length;
+  const qualifying = calls.filter((c) => listOutcome(c) !== "DQ").length;
 
   return (
     <div style={{ maxWidth: 600, margin: "0 auto" }}>
@@ -756,13 +834,19 @@ export default function FlightLogTab({ calls, initialCall, onInitialCallConsumed
                     <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
                       <span style={{ fontSize: 10, color: "#8e8e93", fontWeight: 600, letterSpacing: "0.06em" }}>OUTCOME</span>
                       <OutcomeBadge outcome={effectiveOutcome(call)!} />
+                      {!localOutcomes[call.id] && call.outcome_source === "auto" && (
+                        <span title="Auto-detected by Wingman — confirm or change it"
+                          style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.05em", color: "#8e8e93", background: "#f2f2f7", borderRadius: 5, padding: "2px 5px", textTransform: "uppercase" }}>
+                          auto
+                        </span>
+                      )}
                       {hoveredCallId === call.id && (
                         <button
                           onClick={(e) => { e.stopPropagation(); setEditingOutcomes((prev) => ({ ...prev, [call.id]: true })); }}
                           className="hover:bg-blue-100 rounded transition-colors"
                           style={{ fontSize: 10, color: "#007aff", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", padding: "2px 6px" }}
                         >
-                          Edit
+                          {!localOutcomes[call.id] && call.outcome_source === "auto" ? "Confirm" : "Edit"}
                         </button>
                       )}
                     </div>

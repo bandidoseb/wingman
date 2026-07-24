@@ -5,6 +5,7 @@ import Card from "@/components/ui/Card";
 import OutcomeBadge from "@/components/ui/OutcomeBadge";
 import { CardPattern, generateRandomString } from "@/components/ui/evervault-card";
 import type { Profile, Call } from "@/types";
+import { confirmedOutcome } from "@/lib/wingman/outcome-stats";
 import { getGreeting } from "@/lib/utils";
 
 interface Props {
@@ -64,8 +65,8 @@ export default function HomeTab({ profile, calls, onDebrief, isActive, isPending
     return d >= weekAgo;
   });
 
-  const totalQualifying = calls.filter((c) => c.outcome !== "DQ").length;
-  const totalClosed     = calls.filter((c) => c.outcome === "Closed").length;
+  const totalQualifying = calls.filter((c) => confirmedOutcome(c) !== "DQ").length;
+  const totalClosed     = calls.filter((c) => confirmedOutcome(c) === "Closed").length;
   const closeRate       = totalQualifying > 0 ? Math.round((totalClosed / totalQualifying) * 100) : 0;
 
   // ── Today's calls ────────────────────────────────────────────────────────
@@ -278,7 +279,17 @@ export default function HomeTab({ profile, calls, onDebrief, isActive, isPending
                   <div style={{ fontSize: 13, fontWeight: 500, color: "#1c1c1e" }}>{c.prospect_name}</div>
                   <div style={{ fontSize: 11, color: "#8e8e93", marginTop: 1 }}>{c.duration}</div>
                 </div>
-                {c.outcome && <OutcomeBadge outcome={c.outcome} />}
+                {c.outcome && (
+                  <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                    <OutcomeBadge outcome={c.outcome} />
+                    {c.outcome_source === "auto" && (
+                      <span title="Auto-detected by Wingman — confirm it in Flight Log"
+                        style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.05em", color: "#8e8e93", background: "#f2f2f7", borderRadius: 5, padding: "2px 5px", textTransform: "uppercase" }}>
+                        auto
+                      </span>
+                    )}
+                  </div>
+                )}
               </div>
               <button
                 onClick={() => onDebrief(c)}

@@ -175,6 +175,7 @@ export interface Call {
   user_id: string;
   prospect_name: string | null;
   outcome: Outcome | null;
+  outcome_source?: "auto" | "manual" | null;  // 'auto' = AI-detected (excluded from close-rate until confirmed)
   duration: string | null;
   summary: string | null;
   missed_topics: string[];
@@ -317,6 +318,15 @@ export interface WingmanBridge {
 
   // Navigate to Settings tab (sent by main when HUD "Open Settings" is clicked)
   onNavigateToSettings: (callback: () => void) => void;
+
+  // Deep-link to a call's Flight Log entry (HUD "View call →" pill). callId may be
+  // null → just open the tab. Optional: old preloads lack it (renderer no-ops).
+  onNavigateToCall?: (callback: (callId: string | null) => void) => void;
+
+  // Drive the HUD Live Hub pill's end-of-call morph (generating → ready). The
+  // renderer is the only side that learns when the debrief lands. Optional so
+  // callers optional-chain it — old preloads (pre-v0.1.29) simply no-op.
+  postCallState?: (payload: { phase: "generating" | "ready"; callId: string | null }) => Promise<void>;
 
   // Hotkey compass menu — main process tells web app which direction the rep picked
   onMenuPick:  (callback: (direction: string) => void) => void;

@@ -16,6 +16,7 @@ function buildGlobalContext(
     id: string;
     prospect_name: string | null;
     outcome: string | null;
+    outcome_source?: "auto" | "manual" | null;
     call_date: string;
     duration: string | null;
     summary: string | null;
@@ -23,10 +24,14 @@ function buildGlobalContext(
   }>
 ): string {
   const total     = callSummaries.length;
-  const closed    = callSummaries.filter((c) => c.outcome === "Closed").length;
-  const lost      = callSummaries.filter((c) => c.outcome === "Lost").length;
-  const dq        = callSummaries.filter((c) => c.outcome === "DQ").length;
-  const followUp  = callSummaries.filter((c) => c.outcome === "Follow Up").length;
+  // Stats count only CONFIRMED outcomes — an AI auto-mark is excluded until the
+  // rep confirms it, so the Coach's numbers match the Home/Intel tabs.
+  const confirmed = (c: { outcome: string | null; outcome_source?: "auto" | "manual" | null }) =>
+    c.outcome && c.outcome_source !== "auto" ? c.outcome : null;
+  const closed    = callSummaries.filter((c) => confirmed(c) === "Closed").length;
+  const lost      = callSummaries.filter((c) => confirmed(c) === "Lost").length;
+  const dq        = callSummaries.filter((c) => confirmed(c) === "DQ").length;
+  const followUp  = callSummaries.filter((c) => confirmed(c) === "Follow Up").length;
   const closeRate = total > 0 ? Math.round((closed / Math.max(total - dq, 1)) * 100) : 0;
 
   const statsLine = `CALL STATS (last ${total} calls): ${closed} closed / ${lost} lost / ${dq} DQ / ${followUp} follow-up | Close rate: ${closeRate}%`;

@@ -73,17 +73,28 @@ function resetDeploy(reason?: string): void {
   pushDeployState("idle", reason);
 }
 
-// ─── Pending outcome state ────────────────────────────────────────────────────
-// Holds the callId + access token from the most recent ended call so the
-// hud:save-outcome handler can make an authenticated API request.
-let pendingOutcomeCallId: string | null = null;
-let pendingOutcomeToken:  string | null = null;
+// ─── HUD safety-net hide timer ────────────────────────────────────────────────
+// The normal post-call hide path is the HUD's own hud:morph-done (the pill
+// finishes its end-of-call morph and asks to be hidden). This timer is the
+// backstop for a dead/stuck HUD renderer: if morph-done never arrives, hide
+// the window anyway. Cleared when a new call claims the lifecycle, when the
+// pill reaches "ready" (it persists until clicked/dismissed — the window must
+// stay), and on morph-done. Must outlast the HUD's own 6-min generating
+// timeout so the renderer always gets to resolve first.
+const HUD_SAFETY_HIDE_MS = 7 * 60_000;
+let hudSafetyHideTimer: ReturnType<typeof setTimeout> | null = null;
 
-// ─── HUD auto-hide timer ──────────────────────────────────────────────────────
-// Stored so call:end can cancel it if the user manually ends the call while
-// the auto-stop hide countdown is still running (prevents the outcome card
-// from being hidden moments after it appears).
-let hudAutoHideTimer: ReturnType<typeof setTimeout> | null = null;
+function clearHudSafetyHide(): void {
+  if (hudSafetyHideTimer) { clearTimeout(hudSafetyHideTimer); hudSafetyHideTimer = null; }
+}
+
+function armHudSafetyHide(): void {
+  clearHudSafetyHide();
+  hudSafetyHideTimer = setTimeout(() => {
+    hudWindow?.hide();
+    hudSafetyHideTimer = null;
+  }, HUD_SAFETY_HIDE_MS);
+}
 
 // ─── Zoom display name status ─────────────────────────────────────────────────
 // Synced from the web app via 'app:set-zoom-status' IPC after DashboardClient mounts.
@@ -383,8 +394,11 @@ function unregisterCallHotkey(): void {
 
 // ─── Auto-stop handler ────────────────────────────────────────────────────────
 // Called by recall.ts when any of the three safeguards fire (meeting-lost,
-// inactivity timeout, or hard cap). Ends the call, notifies both windows,
-// then hides the HUD after giving it time to show the reason toast.
+// inactivity timeout, or hard cap). Ends the call and notifies both windows.
+// The HUD's Live Hub pill carries the end-of-call UI from here (generating →
+// ready morph on meeting_lost, amber safety state on inactivity/max_duration)
+// and asks to be hidden via hud:morph-done; the safety-net timer is only the
+// dead-renderer backstop.
 function autoStopCall(reason: AutoStopReason): void {
   console.log(`[AutoStop] Reason: ${reason}`);
   callActive = false;
@@ -403,14 +417,7 @@ function autoStopCall(reason: AutoStopReason): void {
   // Tell web app the call ended automatically — uses dedicated channel so the
   // web app can patch the session WITHOUT calling endCall() again (avoids double-stop).
   mainWindow?.webContents.send("call:auto-ended");
-  // Give the HUD 4 seconds to show the reason toast before hiding.
-  // Store the timer so call:end can cancel it if the user manually ends while
-  // this countdown is running (prevents outcome card from being hidden prematurely).
-  if (hudAutoHideTimer) { clearTimeout(hudAutoHideTimer); hudAutoHideTimer = null; }
-  hudAutoHideTimer = setTimeout(() => {
-    hudWindow?.hide();
-    hudAutoHideTimer = null;
-  }, 4000);
+  armHudSafetyHide();
 }
 
 // ─── Main Window ─────────────────────────────────────────────────────────────
@@ -669,6 +676,9 @@ function setupIPC(): void {
     deployState = "searching";
     const myEpoch = deployEpoch;
     console.log("[IPC] call:start — claimed (searching)");
+    // A new call supersedes any prior call's post-call pill morph — cancel the
+    // dead-renderer safety-net hide so this call's HUD can't be yanked mid-call.
+    clearHudSafetyHide();
     hudWindow?.show();
     pushDeployState("searching");
 
@@ -753,7 +763,9 @@ function setupIPC(): void {
     return { success: true };
   });
 
-  ipcMain.handle("call:end", async (_event, callId?: string, token?: string) => {
+  // token arg kept for signature compat with old preloads — the HUD outcome card
+  // that consumed it is gone; outcome capture now lives in the dashboard.
+  ipcMain.handle("call:end", async (_event, callId?: string, _token?: string) => {
     console.log("[IPC] call:end", callId ? "(with callId)" : "(no callId)");
     callActive = false;
     // #47: seize the deploy lifecycle. Bumping the epoch supersedes any in-flight
@@ -765,11 +777,9 @@ function setupIPC(): void {
     pushDeployState("stopping");
     unregisterCallHotkey(); // close compass + release Up Arrow
 
-    // Store for use when HUD picks an outcome
-    pendingOutcomeCallId = callId ?? null;
-    pendingOutcomeToken  = token  ?? null;
-
-    // Pass callId to HUD so it knows whether to show the outcome card
+    // callId presence tells the HUD whether a real call was saved: with it the
+    // pill morphs into "generating debrief"; without it (no session was created)
+    // the pill just resets.
     hudWindow?.webContents.send("call:ended", { callId });
     trayPopover?.webContents.send("tray:call-state", false);
     stopRecallAI();
@@ -777,61 +787,15 @@ function setupIPC(): void {
     pushDeployState("idle");
 
     if (callId) {
-      // Cancel any pending auto-hide from autoStopCall — the outcome card must
-      // stay visible long enough for the user to pick an outcome.
-      if (hudAutoHideTimer) { clearTimeout(hudAutoHideTimer); hudAutoHideTimer = null; }
-      // Ensure the HUD is visible — it may have been hidden by a previous auto-stop.
+      // Keep the HUD visible for the pill morph — it may have been hidden by a
+      // previous auto-stop. The pill's morph-done (or the safety net) hides it.
       hudWindow?.show();
+      armHudSafetyHide();
     } else {
       setTimeout(() => hudWindow?.hide(), 600);
     }
 
     return { success: true };
-  });
-
-  // ── HUD outcome save — called after user picks in the post-call card ────────
-  ipcMain.handle("hud:save-outcome", async (_event, { callId, outcome }: { callId: string; outcome: string }) => {
-    console.log("[IPC] hud:save-outcome", outcome);
-
-    const appUrl = getAppUrl();
-    const token  = pendingOutcomeToken;
-
-    if (!token) {
-      console.warn("[hud:save-outcome] No token available — cannot save");
-      hudWindow?.webContents.send("hud:outcome-saved", false);
-      return;
-    }
-
-    try {
-      const res = await fetch(`${appUrl}/api/wingman/hud-outcome`, {
-        method:  "PATCH",
-        headers: {
-          "Content-Type":  "application/json",
-          "Authorization": `Bearer ${token}`,
-        },
-        body: JSON.stringify({ call_id: callId, outcome }),
-      });
-
-      const ok = res.ok;
-      hudWindow?.webContents.send("hud:outcome-saved", ok);
-
-      if (ok) {
-        // Clear pending state — outcome is saved
-        pendingOutcomeCallId = null;
-        pendingOutcomeToken  = null;
-        // Tell the dashboard to refresh so the disposition pill appears immediately
-        mainWindow?.webContents.send("call:outcome-updated");
-        // Hide HUD after the card shows its confirmation (1.5s handled in HUD)
-        setTimeout(() => hudWindow?.hide(), 2200);
-      }
-    } catch (err) {
-      console.error("[hud:save-outcome] fetch failed:", err);
-      hudWindow?.webContents.send("hud:outcome-saved", false);
-      // Clear pending state even on failure — a stale token from a previous call
-      // should not be used for future saves (Supabase tokens expire after 1 hour).
-      pendingOutcomeCallId = null;
-      pendingOutcomeToken  = null;
-    }
   });
 
   // ── Zoom name status sync — web app reports on mount + on name save ────────
@@ -870,6 +834,54 @@ function setupIPC(): void {
   ipcMain.handle("hud:confirm-end-call", () => {
     console.log("[IPC] hud:confirm-end-call");
     mainWindow?.webContents.send("shortcut:toggle-call");
+  });
+
+  // ── HUD "View call →" → show dashboard on that call's Flight Log entry ──────
+  // Clone of hud:open-settings: surface the dashboard (create it if destroyed,
+  // wait for load) then deep-link to the call. callId null → just open Flight Log.
+  ipcMain.handle("hud:open-call", (_event, callId?: string | null) => {
+    console.log("[IPC] hud:open-call", callId ?? "(no callId)");
+    hudWindow?.hide();
+    clearHudSafetyHide();
+    if (!mainWindow || mainWindow.isDestroyed()) {
+      createMainWindow();
+      mainWindow!.webContents.once("did-finish-load", () => {
+        mainWindow?.webContents.send("navigate:call", { callId: callId ?? null });
+      });
+    } else {
+      mainWindow.show();
+      mainWindow.focus();
+      mainWindow.webContents.send("navigate:call", { callId: callId ?? null });
+    }
+  });
+
+  // ── HUD pill finished its end-of-call morph → hide the HUD window ───────────
+  // The pill owns the post-call UI; when it fades out (dismissed, viewed, or
+  // timed out) it tells main to hide. Also clears the dead-renderer safety net.
+  ipcMain.handle("hud:morph-done", () => {
+    console.log("[IPC] hud:morph-done");
+    clearHudSafetyHide();
+    hudWindow?.hide();
+  });
+
+  // ── Dashboard → HUD post-call pill state relay ─────────────────────────────
+  // The renderer is the only process that knows when the async post-call job's
+  // debrief has landed (it polls the call record). It drives the pill's
+  // generating→ready morph through here. Guard isDestroyed() — a teardown could
+  // race this. On a valid "ready" the pill persists until the user acts, so the
+  // safety-net hide must NOT fire under it → clear it.
+  ipcMain.handle("wingman:post-call-state", (_event, payload: { phase?: string; callId?: string | null }) => {
+    const phase  = payload?.phase;
+    const callId = payload?.callId ?? null;
+    if (phase !== "generating" && phase !== "ready") {
+      console.warn("[wingman:post-call-state] ignored — bad phase:", phase);
+      return;
+    }
+    console.log("[IPC] wingman:post-call-state", phase, callId ?? "(no callId)");
+    if (phase === "ready") clearHudSafetyHide();
+    if (hudWindow && !hudWindow.isDestroyed()) {
+      hudWindow.webContents.send("hud:post-call-state", { phase, callId });
+    }
   });
 
   // ── HUD visibility ──────────────────────────────────────────────────────────
