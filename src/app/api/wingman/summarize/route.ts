@@ -6,6 +6,7 @@ import {
   BELIEF_LADDER_MAX_TOKENS,
 } from "@/lib/wingman/belief-ladder";
 import { buildSummarizerDnaSystemBlock } from "@/lib/wingman/sales-dna.mjs";
+import * as devlog from "@/lib/wingman/devlog";
 
 // ── Per-user rate limit ───────────────────────────────────────────────────────
 // Each summarize tick calls Claude Sonnet (paid). Reject calls faster than once
@@ -190,6 +191,16 @@ export async function POST(req: NextRequest) {
           `in=${usage.input_tokens} out=${usage.output_tokens} call=${call_id}`,
         );
       }
+
+      // Flight Recorder (dev-only, no-op in prod): capture this summarizer tick RAW.
+      // Diffs / hallucination-watch / belief-ladder trajectory are all derived OFFLINE
+      // from these lines — nothing is computed on this paid tick. Never blocks/throws.
+      devlog.append(call_id, "server", "summarizer-tick", {
+        window:      new_transcript,
+        prevSummary: current_summary ?? null,
+        output:      summary,
+        usage,
+      });
     } finally {
       clearTimeout(timeoutId);
     }

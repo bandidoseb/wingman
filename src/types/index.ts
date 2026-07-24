@@ -327,6 +327,10 @@ export interface WingmanBridge {
   // · "unsupported" = arrow not built yet. Card arrival clears the pill.
   sendSummonState: (payload: { state: "thinking" | "error" | "unsupported" | "idle"; slot?: string }) => Promise<void>;
 
+  // Flight Recorder (dev-only) — stitch main's log to the server's by callId.
+  // Optional: absent on older preloads → renderer just skips the link (no crash).
+  devlogLink?:    (callId: string) => void;
+
   // Phase C — Objection Flow mode. Optional so a renderer running against an
   // older preload (dev hot-reload skew) degrades to compass-only, never crashes.
   flowOpened?:    () => void;

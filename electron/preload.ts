@@ -243,6 +243,11 @@ contextBridge.exposeInMainWorld("wingman", {
     }
   },
 
+  // ── Flight Recorder (dev-only) ───────────────────────────────────────────
+  /** Stitch the main-process log (Deepgram partials/presses) to the server log for
+   *  this call. Fire-and-forget; main no-ops unless the dev gate is on. */
+  devlogLink: (callId: string) => ipcRenderer.send("devlog:link", callId),
+
   // ── Objection Flow mode (Phase C) ────────────────────────────────────────
   /** Thread opened/advanced (or threaded press) — main arms single-↑ mode + re-arms its 2-min idle timer. */
   flowOpened: () => ipcRenderer.send("flow:open"),

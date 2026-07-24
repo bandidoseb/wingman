@@ -43,3 +43,6 @@ dist/
 # Electron build output only — build/ resources folder IS committed
 build/icon.ico
 
+# Flight Recorder dev-only telemetry (local call logs — never commit)
+dev-logs/
+

@@ -19,6 +19,7 @@ import { getDefaultStage } from "@/lib/wingman/poll-intervals";
 import { parseSSEBuffer } from "@/lib/wingman/sse-parse";
 import { HOT_PARTIAL_MS, SETTLE_WAIT_MS } from "@/lib/wingman/live-tail";
 import { scoreReadiness, BELIEF_DISPLAY } from "@/lib/wingman/close-readiness.mjs";
+import { logDevEvent } from "@/lib/wingman/devlog-client";
 import { useWingmanPoller } from "@/hooks/useWingmanPoller";
 import { useRecallTranscript } from "@/hooks/useRecallTranscript";
 
@@ -368,6 +369,9 @@ export default function DashboardClient({
 
       if (!data.call_id) throw new Error("Failed to start");
       setCallId(data.call_id);
+      // Flight Recorder (dev-only): stitch main's log (partials/presses) to this call.
+      // Fire-and-forget; main no-ops unless its dev gate is on.
+      window.wingman?.devlogLink?.(data.call_id);
       setIsActive(true);
       setPendingOutcome(false);
       pendingCallIdRef.current = null;
@@ -758,6 +762,7 @@ export default function DashboardClient({
       // Existing pill keeps counting — sending nothing here is correct (a second
       // "thinking" would reset the visible counter mid-generation).
       console.log("[Wingman] Menu pick dropped — card generation already in flight");
+      logDevEvent(callIdRef.current, "press-dropped", { slot: direction, reason: "generating" });
       return;
     }
     if (!callId || !isActiveRef.current) return;
@@ -978,6 +983,9 @@ export default function DashboardClient({
           ...(threadBody ?? {}),
           // Earlier flows' learnings (Step 2) — omitted when empty (first objection of the call).
           ...callMemoryBody,
+          // Flight Recorder key (dev-only) — server logs the card+context under this call.
+          // Server-side devlog is gated off in prod, so this is inert there.
+          call_id:          callIdRef.current ?? undefined,
           // No current_stage: post-Phase-1 the live stage tracker is gone, so this
           // would be a stale "Rapport". The Belief Ladder (live_summary) carries it. (Fix #1)
         }),
@@ -1237,6 +1245,9 @@ export default function DashboardClient({
           // Phase 1b: the offer context for the dig card (server sanitizes + gates;
           // byte-stable across presses so the cached DNA prefix keeps hitting).
           sales_dna:        profile.sales_dna ?? undefined,
+          // Flight Recorder key (dev-only) — server logs the dig card+context under this
+          // call. Server-side devlog is gated off in prod, so this is inert there.
+          call_id:          callIdRef.current ?? undefined,
         }),
         signal: controller.signal,
       });
@@ -1387,6 +1398,11 @@ export default function DashboardClient({
       const readiness = scoreReadiness(summary);
       // showReadiness in the HUD clears the pill + reuses the single card slot (one-card invariant).
       window.wingman?.sendReadiness({ state: readiness.state, label: readiness.label, gap: readiness.gap, note: readiness.note, seq });
+      // Flight Recorder (dev-only): the → close readiness read the server never sees.
+      logDevEvent(callIdRef.current, "readiness", {
+        state: readiness.state, label: readiness.label, gap: readiness.gap, note: readiness.note,
+        summaryPresent: !!summary,
+      });
     } catch (err) {
       console.error("[Wingman] handleClosePick error:", err);
       window.wingman?.sendSummonState({ state: "error", slot: direction });
@@ -1405,6 +1421,10 @@ export default function DashboardClient({
   useEffect(() => {
     if (typeof window === "undefined" || !window.wingman) return;
     window.wingman.onMenuPick((direction: string) => {
+      // Flight Recorder (dev-only): the ONE physical-press entry — coalesce re-fires re-enter
+      // the handlers directly, bypassing this, so exactly one "press" is logged per press.
+      // Non-fires (throttle/abstain) are derived OFFLINE by joining these against card events.
+      logDevEvent(callIdRef.current, "press", { slot: direction });
       handleMenuPickRef.current(direction);
     });
     return () => { window.wingman?.offMenuPick(); };

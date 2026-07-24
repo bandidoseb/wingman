@@ -41,6 +41,7 @@ import { streamObjectionCard,
 import { streamDigCard }                from "@/lib/wingman/dig-signal";
 import { sanitizeSalesDna }             from "@/lib/wingman/sales-dna.mjs";
 import { normalizeConfrontation }       from "@/lib/wingman/objection-prompt.mjs";
+import * as devlog                       from "@/lib/wingman/devlog";
 
 // ── Directive / all-clear nudge copy (server owns it — single source). ────────
 // One plain-English line each, rendered as a single-line HEADLESS card (design language:
@@ -106,6 +107,7 @@ export async function POST(req: NextRequest) {
       levers_used,
       sales_dna,
       confrontation: confrontation_raw,
+      call_id,
     }: {
       transcript_chunk:    string;
       live_summary?:       string;
@@ -120,6 +122,7 @@ export async function POST(req: NextRequest) {
       levers_used?:        unknown;
       sales_dna?:          unknown;
       confrontation?:      unknown;
+      call_id?:            string; // Flight Recorder key (dev-only); undefined = no capture
     } = body;
 
     // Confrontationalness dial (2026-07-16): untrusted client value → the normalizer maps
@@ -257,23 +260,33 @@ export async function POST(req: NextRequest) {
           try { controller.enqueue(encoder.encode(": ok\n\n")); } catch { return; } // flush; bail if already closed
 
           let sawTerminal = false;
+          // Flight Recorder capture (dev-only) — populated as events flow, logged in finally.
+          const capT0 = Date.now();
+          let capTtft: number | null = null;
+          let capOutcome = "error";
+          let capLine: string | null = null;
+          let capLever: string | undefined;
           try {
             // req.signal aborts on client disconnect / dismiss / call-end → stops Sonnet (W6).
             for await (const ev of streamObjectionCard(transcript_chunk, summary, req.signal, thread, hasMemory ? memory : undefined, confrontation)) {
               let alive = true;
               if (ev.kind === "delta") {
+                if (capTtft === null) capTtft = Date.now() - capT0;
                 alive = send("delta", { textSoFar: ev.textSoFar });
               } else if (ev.kind === "done") {
                 alive = send("done", { line: ev.line, lever: ev.lever });
+                capOutcome = "done"; capLine = ev.line; capLever = ev.lever;
                 sawTerminal = true;
               } else if (ev.kind === "lever-info") {
                 continue; // B4 internal event — wrapper-filtered; defensive skip, never an error frame
               } else if (ev.kind === "abstain") {
                 // Nothing standing — server owns the copy. Empty header → headless single-line card.
                 alive = send("nudge", { header: "", text: NUDGE_LINE });
+                capOutcome = "abstain";
                 sawTerminal = true;
               } else {
                 alive = send("error", {});
+                capOutcome = "error";
                 sawTerminal = true;
               }
               if (!alive) break; // client disconnected — abort the generator (its finally stops Sonnet)
@@ -284,6 +297,16 @@ export async function POST(req: NextRequest) {
             send("error", {}); // guarded — no-op if the client already left
           } finally {
             try { controller.close(); } catch { /* already closed */ }
+            // Log AFTER close — fire-and-forget, gated, never throws. call_id undefined → no-op.
+            // A dismiss / call-end / client-disconnect aborts req.signal → distinguish that from a
+            // real model error so the dev log's error-rate + adoption signal stays clean.
+            if (call_id) devlog.append(call_id, "server", "card", {
+              slot: "objection", beat: beatNumber,
+              outcome: capOutcome === "error" && req.signal.aborted ? "aborted" : capOutcome,
+              line: capLine, lever: capLever, ttftMs: capTtft, totalMs: Date.now() - capT0,
+              transcriptChunk: transcript_chunk, summary, confrontation,
+              hasThread: !!thread, hasMemory,
+            });
           }
         },
       });
@@ -317,22 +340,33 @@ export async function POST(req: NextRequest) {
           try { controller.enqueue(encoder.encode(": ok\n\n")); } catch { return; }
 
           let sawTerminal = false;
+          // Flight Recorder capture (dev-only) — populated as events flow, logged in finally.
+          const capT0 = Date.now();
+          let capTtft: number | null = null;
+          let capOutcome = "error";
+          let capLine: string | null = null;
+          let capBelief: string | null = null;
           try {
             for await (const ev of streamDigCard(transcript_chunk, summary, req.signal, salesDna, confrontation)) {
               let alive = true;
               if (ev.kind === "belief") {
+                capBelief = ev.belief ?? null;
                 alive = send("belief", { belief: ev.belief ?? null });
               } else if (ev.kind === "delta") {
+                if (capTtft === null) capTtft = Date.now() - capT0;
                 alive = send("delta", { textSoFar: ev.textSoFar });
               } else if (ev.kind === "done") {
                 alive = send("done", { line: ev.line, belief: ev.belief ?? null });
+                capOutcome = "done"; capLine = ev.line; capBelief = ev.belief ?? capBelief;
                 sawTerminal = true;
               } else if (ev.kind === "nudge") {
                 // { line:null } → prospect is ready. Empty header → headless single-line card.
                 alive = send("nudge", { header: "", text: DIG_TAKE_CLOSE_LINE });
+                capOutcome = "nudge";
                 sawTerminal = true;
               } else {
                 alive = send("error", {});
+                capOutcome = "error";
                 sawTerminal = true;
               }
               if (!alive) break; // client disconnected — abort the generator (its finally stops Sonnet)
@@ -343,6 +377,15 @@ export async function POST(req: NextRequest) {
             send("error", {});
           } finally {
             try { controller.close(); } catch { /* already closed */ }
+            // Log AFTER close — fire-and-forget, gated, never throws. call_id undefined → no-op.
+            // aborted (dismiss/call-end/disconnect) is not a model error — label it distinctly.
+            if (call_id) devlog.append(call_id, "server", "card", {
+              slot: "dig",
+              outcome: capOutcome === "error" && req.signal.aborted ? "aborted" : capOutcome,
+              line: capLine, belief: capBelief,
+              ttftMs: capTtft, totalMs: Date.now() - capT0,
+              transcriptChunk: transcript_chunk, summary, confrontation,
+            });
           }
         },
       });
@@ -357,7 +400,14 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // ── answer / close — raw-chunk KB path, unchanged until Phase 4b/4c. ──
+    // ── ⚠️ DEAD CODE (as of 2026-07-22) — no client path reaches this. ──────────
+    // This was the planned answer/close "raw-chunk KB path" (Phase 4b/4c). Reality
+    // diverged: `main.ts` only ever sends slot "objection" | "dig" here; → close is
+    // the client-side readiness chip (no fetch); ← answer is still a "coming soon"
+    // pill. So searchKnowledge()→generateSignalCard() below NEVER runs live. Kept
+    // only until Phase 5 dead-code removal (#37), which rips it + the KB imports out.
+    // Do NOT wire ← answer to this path — answer is a direct general-LLM call (no
+    // embed/KB); the embedding round-trip here would add ~0.5-1s of latency. ────────
     const tPipeline  = Date.now();
     let   branch: "kb" | "raw-fallback" = "raw-fallback";
     let   card: SignalCardResult | null = null;

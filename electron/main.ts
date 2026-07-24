@@ -13,7 +13,7 @@ import {
 import * as path from "path";
 import { autoUpdater } from "electron-updater";
 import { initRecallAI, stopRecallAI, setupRecallAI, hasMeetingDetected, waitForMeeting, cancelWaitForMeeting, AutoStopReason } from "./recall";
-import { logMeasurement } from "./measurement-log";
+import { logMeasurement, linkDevlogCallId } from "./measurement-log";
 
 // ─── App URLs ────────────────────────────────────────────────────────────────
 const PROD_URL = "https://app.meetwingman.ai";
@@ -875,6 +875,12 @@ function setupIPC(): void {
   // invisible. Remove when #39 is closed.
   ipcMain.on("hud:log", (_event, msg: string) => {
     console.log(`[HUD] ${msg}`);
+  });
+
+  // ── Flight Recorder (dev-only): stitch main's log to the server's by callId. ──
+  // linkDevlogCallId no-ops unless the dev gate is on (!app.isPackaged && WINGMAN_DEVLOG).
+  ipcMain.on("devlog:link", (_event, callId?: string) => {
+    if (typeof callId === "string" && callId) linkDevlogCallId(callId);
   });
 
   // ── Detection toast dismissed — hide HUD (call never started) ──────────────
