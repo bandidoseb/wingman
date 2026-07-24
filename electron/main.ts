@@ -430,6 +430,12 @@ function createMainWindow(): void {
       contextIsolation:  true,
       nodeIntegration:   false,
       webSecurity:       true,
+      // The dashboard renderer IS the live-call engine (25s transcript saves, 2-min Belief
+      // Ladder summarizer, close-readiness waits) and it sits HIDDEN behind Zoom during every
+      // call. Without this, Chromium's background timer throttling batches its timers (down to
+      // ~1 wakeup/min after 5 min hidden) — proven cause of Known Issue #53's 40s compass
+      // freeze and of silently late transcript saves. Never throttle this window.
+      backgroundThrottling: false,
     },
   });
 

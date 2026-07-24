@@ -456,4 +456,40 @@ Prospect: Up and down honestly. Some months are great, some are dead. It all dep
     targetBelief: "Pain",
     forbidBeliefs: ["Money", "Support"],
   },
+  {
+    id: 15,
+    label: "#52 REGRESSION: all-open ladder + small-talk transcript — must DIG, never take-close",
+    expect: "question",
+    // The Known Issue #52 shape (Flight Recorder call 928e4249): every belief still ⬜ open,
+    // transcript is early-call chatter with zero discovery and ZERO readiness words. The model
+    // returned {null,null} here 4/4 times ("take the close" — its only escape hatch), which the
+    // HUD rendered as "They're ready — go for the close." A server gate now blocks that line on
+    // a cold ladder; THIS fixture pins the prompt side: on an early call the right move is the
+    // opening Pain question, not silence.
+    context: `LIVE CALL MEMORY
+Stage: — · Elapsed: 2m · Syntax: —
+▸ THE GAP
+  Current "hell":   —
+  Desired "heaven": — · $GOAL — · why that #: —
+  Final straw / emotional why: —
+  Core driver: —
+▸ BELIEF LADDER  (✅ locked · 🟡 partial · ⬜ open · ⚠️ objected)
+  1 Pain                 ⬜ open — no sales conversation detected yet
+  2 Doubt (can't DIY)    ⬜ open — —
+  3 Cost (of inaction)   ⬜ open — —
+  4 Desire               ⬜ open — —
+  5 Money                ⬜ open — —
+  6 Support (who decides) ⬜ open — —
+  7 Trust (why you)      ⬜ open — —
+▸ KEY ANCHORS (their exact words)
+  — (no sales dialogue detected)
+▸ OPEN OBJECTIONS: none
+▸ WEAKEST LINK → all beliefs open — no prospect conversation has begun`,
+    transcript: `Rep: Hey, can you hear me okay? I think my mic was cutting out for a second there.
+Prospect: Yeah you're good now. Sorry, I was just grabbing a coffee, it's been one of those mornings.
+Rep: No worries at all. Give me one sec to pull things up.
+Prospect: All good, take your time.`,
+    targetBelief: "Pain",
+    forbidBeliefs: ["Money", "Support"],
+  },
 ];

@@ -1,5 +1,19 @@
 [
   {
+    "id": "2026-07-24-compass-freeze-and-dig-fixes",
+    "date": "2026-07-24",
+    "category": "fix",
+    "title": "The compass never freezes — and the dig card stops jumping the gun",
+    "summary": "Two live-call bugs the new Flight Recorder caught on its very first runs are fixed. Pressing → Close used to lock every hotkey for up to 40 seconds; it now answers in milliseconds. And the ↓ Dig card can no longer say “go for the close” before discovery has even started.",
+    "changes": [
+      "→ Close readiness now answers instantly when your Belief Ladder is already fresh — no more frozen compass mid-call",
+      "Fixed a hidden macOS slowdown that was quietly delaying transcript saves and Belief Ladder updates on every call",
+      "↓ Dig on an untouched call now says “Start discovery.” instead of a false “they're ready — go for the close”",
+      "The legit early close (“how do we get started?”) still works — the fix only blocks the impossible case",
+      "Verified live: the readiness chip landed in 3 milliseconds on the exact scenario that froze for 42 seconds"
+    ]
+  },
+  {
     "id": "2026-07-15-close-readiness-chip",
     "date": "2026-07-15",
     "category": "feature",

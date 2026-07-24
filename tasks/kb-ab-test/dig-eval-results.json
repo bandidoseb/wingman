@@ -1,11 +1,11 @@
 {
   "meta": {
-    "date": "2026-07-20T20:29:13.875Z",
+    "date": "2026-07-24T13:23:50.338Z",
     "digModel": "claude-sonnet-4-6",
     "judgeModel": "claude-sonnet-4-6",
     "cross": false,
     "repeat": 1,
-    "n": 14
+    "n": 15
   },
   "gate": {
     "pass": true,
@@ -15,7 +15,7 @@
     "gD": true,
     "gE": true,
     "gF": true,
-    "tone": 4.583333333333333,
+    "tone": 4.615384615384615,
     "rightBeliefRate": 1,
     "falseSilence": 0,
     "wrongDig": 0,
@@ -30,20 +30,20 @@
       "rep": 0,
       "card": {
         "belief": "Desire",
-        "line": "What does it look like when it's actually working — like what's the goal, what are you trying to get to?",
+        "line": "What does consistent look like for you — like if you fixed this, what's the goal?",
         "tookClose": false
       },
       "contract": "ok",
       "score": {
         "tonality": 4,
         "brevity": 2,
-        "one_question": 2,
+        "one_question": 1,
         "is_question": 2,
         "right_belief": 2,
         "no_windup": 2,
         "fabrication": false,
         "order_violation": false,
-        "rationale": "Hits Desire (⬜ weakest link) cleanly and conversationally, inviting the prospect to paint their own heaven without asserting any specifics."
+        "rationale": "Nails the weakest link (Desire/⬜) in plain conversational language, though the 'like if you fixed this' clause adds slight padding that a top closer would trim."
       },
       "crossScore": null,
       "targetBelief": "Desire"
@@ -55,7 +55,7 @@
       "rep": 0,
       "card": {
         "belief": "Trust",
-        "line": "What did you actually need from him that you weren't getting?",
+        "line": "What did he promise you he'd actually do?",
         "tookClose": false
       },
       "contract": "ok",
@@ -68,7 +68,7 @@
         "no_windup": 2,
         "fabrication": false,
         "order_violation": false,
-        "rationale": "Perfect trust dig — clean, warm, uses their exact setup to surface what 'good' looks like before positioning, hitting the ⚠️ weakest link with zero wind-up."
+        "rationale": "Perfectly aimed at the ⚠️ Trust wound — pulls out exactly what was promised vs. delivered, in plain casual language, with zero wind-up."
       },
       "crossScore": null,
       "targetBelief": "Trust"
@@ -85,7 +85,7 @@
       },
       "contract": "ok",
       "score": {
-        "tonality": 5,
+        "tonality": 4,
         "brevity": 2,
         "one_question": 2,
         "is_question": 2,
@@ -93,7 +93,7 @@
         "no_windup": 2,
         "fabrication": false,
         "order_violation": false,
-        "rationale": "Mirrors the prospect's own language ('where you want it to be'), hits Pain squarely, clean single question with zero wind-up — textbook elite discovery dig."
+        "rationale": "Crisp, natural question aimed squarely at sharpening the vague Pain anchor using the prospect's own words — exactly right."
       },
       "crossScore": null,
       "targetBelief": "Pain"
@@ -105,7 +105,7 @@
       "rep": 0,
       "card": {
         "belief": "Pain",
-        "line": "what's the worst part of 'tight' right now, day to day?",
+        "line": "what's the worst part of managing it right now?",
         "tookClose": false
       },
       "contract": "ok",
@@ -118,7 +118,7 @@
         "no_windup": 2,
         "fabrication": false,
         "order_violation": false,
-        "rationale": "Textbook Pain dig — mirrors his own word 'tight,' grounds it in daily reality, zero wind-up, no fabricated specifics, squarely targets the weakest link."
+        "rationale": "Clean, warm, direct shot at Pain — mirrors 'managing' back and invites him to own the real cost without fabricating anything."
       },
       "crossScore": null,
       "targetBelief": "Pain"
@@ -160,7 +160,7 @@
       "rep": 0,
       "card": {
         "belief": "Money",
-        "line": "Can I ask you something personal? What would you need to be bringing in to make an investment like this a no-brainer?",
+        "line": "Can I ask you something personal? What would you need to be making to where investing in something like this is a complete no-brainer?",
         "tookClose": false
       },
       "contract": "ok",
@@ -173,7 +173,7 @@
         "no_windup": 2,
         "fabrication": false,
         "order_violation": false,
-        "rationale": "Textbook elite closer move — warm permission-ask leads into a clean, personal money-readiness probe that hits the exact weakest link with zero fabrication and no order violation (pain is fully locked)."
+        "rationale": "Textbook Money probe — warm permission-ask leads into a clean ROI-anchored question that hits the only open belief at exactly the right moment."
       },
       "crossScore": null,
       "targetBelief": "Money"
@@ -185,7 +185,7 @@
       "rep": 0,
       "card": {
         "belief": "Pain",
-        "line": "What's the biggest thing holding the agency back right now?",
+        "line": "What's the biggest challenge in the agency right now?",
         "tookClose": false
       },
       "contract": "ok",
@@ -198,7 +198,7 @@
         "no_windup": 2,
         "fabrication": false,
         "order_violation": false,
-        "rationale": "Textbook opening Pain probe — short, warm, open-ended, goes straight to the biggest friction with zero wind-up or fabricated specifics."
+        "rationale": "Textbook opening pain-probe — clean, natural, perfectly timed after prospect intro, no fabrication, no order issue."
       },
       "crossScore": null,
       "targetBelief": null
@@ -223,7 +223,7 @@
         "no_windup": 2,
         "fabrication": false,
         "order_violation": false,
-        "rationale": "Clean, natural opener that picks up the prospect's own words ('doing more') and aims directly at the weakest belief (Pain ⬜), no fabrication or order issues."
+        "rationale": "Clean, natural question that goes straight at the open Pain belief using the prospect's own language ('doing more') — textbook weakest-link digging."
       },
       "crossScore": null,
       "targetBelief": "Pain"
@@ -235,20 +235,20 @@
       "rep": 0,
       "card": {
         "belief": "Desire",
-        "line": "What's 'more' look like — like if you hit the goal, what's that number?",
+        "line": "What's 'more' look like — like is there a number you're actually shooting for?",
         "tookClose": false
       },
       "contract": "ok",
       "score": {
-        "tonality": 4,
+        "tonality": 5,
         "brevity": 2,
-        "one_question": 1,
+        "one_question": 2,
         "is_question": 2,
         "right_belief": 2,
         "no_windup": 2,
         "fabrication": false,
         "order_violation": false,
-        "rationale": "Nails the weakest link — pins a real number behind the vague 'make more' — but stacks a mild second question ('what's that number') after already asking 'what does more look like,' costing a point on one_question."
+        "rationale": "Pulls the prospect's own word 'more' back at them and drives straight at the missing number in Desire — textbook weakest-link targeting in a natural, conversational voice."
       },
       "crossScore": null,
       "targetBelief": "Desire"
@@ -260,57 +260,7 @@
       "rep": 0,
       "card": {
         "belief": "Cost",
-        "line": "what has staying at that same number actually cost you over those 18 months?",
-        "tookClose": false
-      },
-      "contract": "ok",
-      "score": {
-        "tonality": 5,
-        "brevity": 2,
-        "one_question": 2,
-        "is_question": 2,
-        "right_belief": 2,
-        "no_windup": 2,
-        "fabrication": false,
-        "order_violation": false,
-        "rationale": "Textbook Cost dig — hits the weakest belief precisely, uses their own framing ('same number,' '18 months'), clean and conversational with zero wind-up."
-      },
-      "crossScore": null,
-      "targetBelief": "Cost"
-    },
-    {
-      "id": 12,
-      "label": "OFFER-AWARE root-driver chunk-down: 'quit my job' → the cash-flow number",
-      "expect": "question",
-      "rep": 0,
-      "card": {
-        "belief": "Desire",
-        "line": "What's the number that actually lets you walk out?",
-        "tookClose": false
-      },
-      "contract": "ok",
-      "score": {
-        "tonality": 5,
-        "brevity": 2,
-        "one_question": 2,
-        "is_question": 2,
-        "right_belief": 2,
-        "no_windup": 2,
-        "fabrication": false,
-        "order_violation": false,
-        "rationale": "Perfectly targets the weakest link — chunks 'quit my job' down to a real cash-flow number — in nine words, zero wind-up, sounds exactly like an elite closer."
-      },
-      "crossScore": null,
-      "targetBelief": "Desire"
-    },
-    {
-      "id": 13,
-      "label": "FABRICATION TRAP: DNA is full of numbers the prospect never said",
-      "expect": "question",
-      "rep": 0,
-      "card": {
-        "belief": "Pain",
-        "line": "what's the worst part of that — not being on the product side?",
+        "line": "What has staying stuck at that same number actually cost you over the past year and a half?",
         "tookClose": false
       },
       "contract": "ok",
@@ -323,19 +273,19 @@
         "no_windup": 2,
         "fabrication": false,
         "order_violation": false,
-        "rationale": "Targets Pain (🟡 weakest link) cleanly — mirrors the prospect's own words about product neglect to surface the emotional cost; warm, brief, no wind-up."
+        "rationale": "Locks directly onto the weakest belief (Cost/inaction), uses their own anchor ('year and a half'), clean and conversational — loses one tonality point for being slightly clinical but overall strong."
       },
       "crossScore": null,
-      "targetBelief": "Pain"
+      "targetBelief": "Cost"
     },
     {
-      "id": 14,
-      "label": "OFFER-AWARE regression guard: order discipline holds with DNA present",
+      "id": 12,
+      "label": "OFFER-AWARE root-driver chunk-down: 'quit my job' → the cash-flow number",
       "expect": "question",
       "rep": 0,
       "card": {
-        "belief": "Pain",
-        "line": "what does a dead month actually look like for you?",
+        "belief": "Desire",
+        "line": "What does quitting look like — like what's the number you'd need to actually pull the trigger?",
         "tookClose": false
       },
       "contract": "ok",
@@ -348,7 +298,82 @@
         "no_windup": 2,
         "fabrication": false,
         "order_violation": false,
-        "rationale": "Targets Pain exactly as directed, uses the prospect's own word 'dead,' invites emotional specificity in 9 clean words — textbook elite-closer digging."
+        "rationale": "Perfectly aimed at the weakest link — chunks 'quit my job' down to a real cash-flow number in natural, conversational closer language with zero wind-up."
+      },
+      "crossScore": null,
+      "targetBelief": "Desire"
+    },
+    {
+      "id": 13,
+      "label": "FABRICATION TRAP: DNA is full of numbers the prospect never said",
+      "expect": "question",
+      "rep": 0,
+      "card": {
+        "belief": "Pain",
+        "line": "What's the worst part of that — like what's actually slipping because you're stuck on calls?",
+        "tookClose": false
+      },
+      "contract": "ok",
+      "score": {
+        "tonality": 5,
+        "brevity": 2,
+        "one_question": 2,
+        "is_question": 2,
+        "right_belief": 2,
+        "no_windup": 2,
+        "fabrication": false,
+        "order_violation": false,
+        "rationale": "Perfectly targets the weak Pain belief by surfacing what's slipping — uses the prospect's own frame, warm and conversational, no wind-up, no fabricated specifics."
+      },
+      "crossScore": null,
+      "targetBelief": "Pain"
+    },
+    {
+      "id": 14,
+      "label": "OFFER-AWARE regression guard: order discipline holds with DNA present",
+      "expect": "question",
+      "rep": 0,
+      "card": {
+        "belief": "Pain",
+        "line": "what's a dead month actually look like for you?",
+        "tookClose": false
+      },
+      "contract": "ok",
+      "score": {
+        "tonality": 5,
+        "brevity": 2,
+        "one_question": 2,
+        "is_question": 2,
+        "right_belief": 2,
+        "no_windup": 2,
+        "fabrication": false,
+        "order_violation": false,
+        "rationale": "Textbook pain-deepening question — uses their exact words ('dead month'), no wind-up, forces the prospect to paint the emotional reality of the problem they only lightly acknowledged."
+      },
+      "crossScore": null,
+      "targetBelief": "Pain"
+    },
+    {
+      "id": 15,
+      "label": "#52 REGRESSION: all-open ladder + small-talk transcript — must DIG, never take-close",
+      "expect": "question",
+      "rep": 0,
+      "card": {
+        "belief": "Pain",
+        "line": "What's going on that made you want to jump on a call today?",
+        "tookClose": false
+      },
+      "contract": "ok",
+      "score": {
+        "tonality": 5,
+        "brevity": 2,
+        "one_question": 2,
+        "is_question": 2,
+        "right_belief": 2,
+        "no_windup": 2,
+        "fabrication": false,
+        "order_violation": false,
+        "rationale": "Textbook opener — warm, natural, direct, opens Pain cleanly at the right moment with zero fabrication or ordering risk."
       },
       "crossScore": null,
       "targetBelief": "Pain"
