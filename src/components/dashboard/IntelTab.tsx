@@ -4,6 +4,7 @@ import { useState } from "react";
 import Card from "@/components/ui/Card";
 import SectionLabel from "@/components/ui/SectionLabel";
 import type { Call } from "@/types";
+import { confirmedOutcome } from "@/lib/wingman/outcome-stats";
 import { thermalColor } from "@/lib/utils";
 
 type FilterKey = "today" | "week" | "month" | "year" | "all";
@@ -27,7 +28,7 @@ function filterCalls(calls: Call[], filter: FilterKey): Call[] {
 }
 
 function computeStageScores(calls: Call[]): Record<string, number> {
-  const qualifying = calls.filter((c) => c.outcome !== "DQ");
+  const qualifying = calls.filter((c) => confirmedOutcome(c) !== "DQ");
   const stageCounts: Record<string, { complete: number; total: number }> = {};
   STAGE_ORDER.forEach((s) => { stageCounts[s] = { complete: 0, total: 0 }; });
 
@@ -54,11 +55,11 @@ export default function IntelTab({ calls }: Props) {
   const [hoveredPoint, setHoveredPoint] = useState<number | null>(null);
 
   const filtered = filterCalls(calls, filter);
-  const qualifying = filtered.filter((c) => c.outcome !== "DQ");
-  const won = filtered.filter((c) => c.outcome === "Closed").length;
-  const lost = filtered.filter((c) => c.outcome === "Lost").length;
-  const followup = filtered.filter((c) => c.outcome === "Follow Up" || c.outcome === "Set").length;
-  const dq = filtered.filter((c) => c.outcome === "DQ").length;
+  const qualifying = filtered.filter((c) => confirmedOutcome(c) !== "DQ");
+  const won = filtered.filter((c) => confirmedOutcome(c) === "Closed").length;
+  const lost = filtered.filter((c) => confirmedOutcome(c) === "Lost").length;
+  const followup = filtered.filter((c) => { const o = confirmedOutcome(c); return o === "Follow Up" || o === "Set"; }).length;
+  const dq = filtered.filter((c) => confirmedOutcome(c) === "DQ").length;
   const closeRate = qualifying.length > 0 ? Math.round((won / qualifying.length) * 100) : 0;
 
   const stages = computeStageScores(filtered);

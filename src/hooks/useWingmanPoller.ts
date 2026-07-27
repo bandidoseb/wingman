@@ -40,6 +40,10 @@ const SUMMARIZE_MIN_CHARS         = 80;      // skip tick if fewer chars of new 
 // to the latest summary we already have. Keeps the chip from hanging on a slow/stuck summarize
 // (which has its own 30s abort). Usually the summarize lands in ~2–4s, well under this.
 const CLOSE_SUMMARIZE_WAIT_MS     = 8_000;
+// #53: client mirror of the summarize route's per-user rate floor (SUMMARIZE_RATE_LIMIT_MS =
+// 30_000 in summarize/route.ts). A summary younger than this is the freshest the server allows —
+// forcing another request inside the window is a guaranteed 429. Keep the two values in sync.
+const SUMMARIZE_RATE_FLOOR_MS     = 30_000;
 // ── Objection Flow rolling synthesis (Phase B, Step 2) ────────────────────────
 const SYNTH_INTERVAL_MS  = 40_000; // background cadence during a long flow (server floor is 30s)
 const SYNTH_THRESHOLD    = 3_000;  // flow length (chars, anchor→lastMove) before synthesis starts
@@ -161,6 +165,18 @@ export function useWingmanPoller({
   const summarizeBufferRef = useRef<string>("");      // transcript since last summarize tick
   const currentSummaryRef  = useRef<string | null>(null); // in-memory copy for fast press-time reads
   const isSummarizingRef   = useRef(false);           // mutex — one in-flight request at a time
+  // #53: event-driven completion signal for summarizeNow. Replaced+resolved by executeSummarize
+  // (created synchronously with the mutex, resolved in its finally on EVERY exit) so a waiter can
+  // await the in-flight run instead of polling on a chained timer — chained timers get batched to
+  // ~1 wake/min in a hidden window (Chromium background throttling), which is how the 8s cap
+  // silently became a 40s compass freeze. Initialized resolved: awaiting it before any run is a no-op.
+  const summarizeDoneRef   = useRef<{ promise: Promise<void>; resolve: () => void }>({
+    promise: Promise.resolve(), resolve: () => {},
+  });
+  // #53: server-clock mirror of the summarize route's 30s/user rate floor. Stamped on ANY ok
+  // response (the server advances its clock even when the summary text is unchanged) — lets a
+  // → Close press skip a forced summarize that would be 429'd anyway and answer instantly.
+  const lastSummaryAtRef   = useRef(0);
   const summarizeIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   // Phase 1b: stable ref so executeSummarize (dep-free useCallback) reads the
   // latest Sales DNA without re-creating the summarize timer chain on prop change.
@@ -227,6 +243,7 @@ export function useWingmanPoller({
       setProspectName(null);
       // Reset Belief Ladder state for the new call
       currentSummaryRef.current   = null;
+      lastSummaryAtRef.current    = 0; // #53: a new call must never inherit "fresh-enough" from the last one
       summarizeBufferRef.current  = "";
       recentTranscriptRef.current = "";
       fullTranscriptRef.current   = ""; // Phase B: drop prior call's threading transcript
@@ -545,6 +562,11 @@ export function useWingmanPoller({
 
     summarizeBufferRef.current = ""; // clear before the async call
     isSummarizingRef.current   = true;
+    // #53: publish this run's completion signal SYNCHRONOUSLY with the mutex (before any await)
+    // so a summarizeNow that observes isSummarizing===true always finds THIS run's promise.
+    let resolveDone!: () => void;
+    const donePromise = new Promise<void>((resolve) => { resolveDone = resolve; });
+    summarizeDoneRef.current = { promise: donePromise, resolve: resolveDone };
 
     const restoreSummarizeChunk = () => {
       summarizeBufferRef.current = summarizeBufferRef.current
@@ -576,6 +598,11 @@ export function useWingmanPoller({
         return;
       }
 
+      // #53: mirror the server's rate-floor clock on ANY ok response — the server advances its
+      // 30s/user window even when the returned summary text is unchanged, so stamping only on
+      // data.summary would leave this stale and the next forced press would fire a doomed 429.
+      lastSummaryAtRef.current = Date.now();
+
       const data = await res.json();
       if (data.summary) {
         currentSummaryRef.current = data.summary;
@@ -592,6 +619,7 @@ export function useWingmanPoller({
     } finally {
       clearTimeout(timeoutId);
       isSummarizingRef.current = false;
+      resolveDone(); // #53: wake any summarizeNow waiter — every exit path lands here
     }
   }, []);
 
@@ -818,22 +846,44 @@ export function useWingmanPoller({
   /**
    * Force the freshest Belief Ladder for a → Close readiness read, then return it.
    * - If a summarize (the 2-min timer OR a prior press) is already in flight, we DON'T start a
-   *   second Sonnet call — we wait for the in-flight one (executeSummarize's own isSummarizingRef
-   *   mutex makes the fire below a no-op in that case).
+   *   second Sonnet call — we await that run's completion promise.
+   * - If the last ok summarize was < 30s ago (the server's own per-user rate floor), the summary
+   *   is as fresh as the server will allow — return it instantly, no fetch, no wait. This is what
+   *   kills the rapid-press 429 storm (#53): a forced request inside the floor was always doomed.
    * - Otherwise fire one (executeSummarize(true) also no-ops on an empty buffer — nothing new since
-   *   the last tick means the summary is ALREADY fresh, so this returns instantly with no AI call).
-   * - The wait is capped (CLOSE_SUMMARIZE_WAIT_MS) so the chip never hangs on a slow/stuck request;
-   *   past the cap we return the latest summary we have. Never throws.
+   *   the last tick means the summary is ALREADY fresh, so this resolves instantly with no AI call).
+   * - The wait is a Promise.race against ONE non-chained timeout (CLOSE_SUMMARIZE_WAIT_MS), cleared
+   *   in finally. #53 root cause: the old chained 120ms poll loop checked its cap INSIDE the loop,
+   *   and Chromium batches chained timers in a hidden window to ~1 wake/min — the cap never ran and
+   *   the shared busy-lock froze the compass ~40s. A single fresh setTimeout is exempt from that
+   *   batching, so the cap now holds by construction. Never throws.
    * @returns the freshest Belief Ladder text, or null if none exists yet (early call).
    */
   const summarizeNow = useCallback(async (): Promise<string | null> => {
     if (!callIdRef.current) return currentSummaryRef.current ?? null;
-    // Fire one only if idle. isSummarizingRef flips true synchronously (before the first await)
-    // inside executeSummarize, so the poll below sees it immediately for a real run.
-    if (!isSummarizingRef.current) void executeSummarize(true);
-    const started = Date.now();
-    while (isSummarizingRef.current && Date.now() - started < CLOSE_SUMMARIZE_WAIT_MS) {
-      await new Promise((resolve) => setTimeout(resolve, 120));
+
+    // Pick what to await. isSummarizingRef flips true synchronously (before the first await)
+    // inside executeSummarize, so this decision is race-free within the renderer's single thread.
+    let awaited: Promise<unknown>;
+    if (isSummarizingRef.current) {
+      awaited = summarizeDoneRef.current.promise;          // someone else's run — await its finally
+    } else if (
+      currentSummaryRef.current &&
+      Date.now() - lastSummaryAtRef.current < SUMMARIZE_RATE_FLOOR_MS
+    ) {
+      return currentSummaryRef.current;                    // fresh-enough — instant, no request
+    } else {
+      awaited = executeSummarize(true);                    // our own run — its return IS completion
+    }
+
+    let capTimer: ReturnType<typeof setTimeout> | null = null;
+    try {
+      await Promise.race([
+        awaited,
+        new Promise<void>((resolve) => { capTimer = setTimeout(resolve, CLOSE_SUMMARIZE_WAIT_MS); }),
+      ]);
+    } finally {
+      if (capTimer) clearTimeout(capTimer);                // never leave a dangling timer per press
     }
     return currentSummaryRef.current ?? null;
   }, [executeSummarize]);

@@ -25,6 +25,15 @@
  *   - An LLM-judge layer (Claude + gpt-4o, BOTH mandatory) auditing the two DNA failure
  *     modes: fabricated specifics (DNA facts presented as the prospect's) and belief
  *     inflation (✅/🟡 without transcript evidence). Zero tolerance on both.
+ *
+ * 2026-07-20 (Cole-brain redesign — plan: tasks/plan-summarizer-tuning.md): extended with
+ *   - STRUCTURAL INVARIANTS on every fixture (and every tick of rolling fixtures):
+ *     WEAKEST LINK present, no non-belief line starting with digit 1–7 (close-readiness
+ *     parser safety), section caps (anchors ≤8, commitments ≤3), "at-risk" relabel.
+ *   - New traps: polite-yes vs emotional-yes ✅ bar, regression downgrade, commitment
+ *     capture + no-invention, money-as-resources, momentum default-neutral, the DNA
+ *     anchor-shape trap, and the 8-tick ROLLING fixture (anchor survival across a call —
+ *     the update-in-place behavior nothing previously verified).
  */
 
 import fs from "node:fs";
@@ -94,8 +103,81 @@ async function callModel(model, currentSummary, newChunk, dnaBlock = null) {
 }
 
 // ════════════════════════════════════════════════════════════════════════════════
+// STRUCTURAL INVARIANTS (2026-07-20 Cole-brain redesign) — asserted on EVERY
+// fixture output (and on EVERY tick of rolling fixtures). These are the format
+// properties downstream parsers depend on; a violation is a hard gate failure.
+// ════════════════════════════════════════════════════════════════════════════════
+const BELIEF_ROW_RE = [null, /pain/i, /doubt|diy/i, /cost/i, /desire/i, /money/i, /support|decid/i, /trust/i];
+
+function structuralFailures(out) {
+  const fails = [];
+  // WEAKEST LINK is the dig card's routing input and the original truncation victim
+  // (the 600→1200 cap raise existed because it was being chopped). HARD assert.
+  if (!/▸ WEAKEST LINK →\s*\S/.test(out)) {
+    fails.push("WEAKEST LINK line missing or empty — truncation or format drift (the dig card's routing input)");
+  }
+  // close-readiness.mjs parses any line starting with digit 1–7 as a belief row.
+  // An anchor/commitment line starting with a digit would be misparsed as a grade.
+  for (const raw of out.split("\n")) {
+    const m = /^\s*([1-7])\s+(.*)$/.exec(raw);
+    if (m && !BELIEF_ROW_RE[Number(m[1])].test(m[2])) {
+      fails.push(`line starts with digit ${m[1]} but is not that belief's row — close-readiness would misparse: "${raw.trim().slice(0, 70)}"`);
+    }
+  }
+  // Per-section hard caps — the thing that keeps the scorecard fixed-size (and the
+  // fleet-wide input cost bounded) as the call goes on.
+  const section = (name) => out.match(new RegExp(`▸ ${name}[^\\n]*\\n([\\s\\S]*?)(?=\\n▸ |$)`))?.[1] ?? "";
+  const bullets = (text) => text.split("\n").filter((l) => /^\s*•/.test(l));
+  const anchorCount = bullets(section("KEY ANCHORS")).length;
+  const commitCount = bullets(section("COMMITMENTS")).length;
+  if (anchorCount > 8) fails.push(`KEY ANCHORS has ${anchorCount} bullets — cap is 8 (unbounded growth)`);
+  if (commitCount > 3) fails.push(`COMMITMENTS has ${commitCount} bullets — cap is 3 (unbounded growth)`);
+  // The ⚠️ relabel: "at-risk" must be gone from the emitted scorecard.
+  if (/at-risk/i.test(out)) fails.push('output still says "at-risk" — the ⚠️ relabel to "objected" did not take');
+  // Every template section must be present — a missing header means prompt drift
+  // or truncation (wingman-reviewer 2026-07-20: without this, a silently dropped
+  // section is only caught when a fixture happens to exercise it).
+  for (const name of ["THE GAP", "BELIEF LADDER", "KEY ANCHORS", "COMMITMENTS", "MOMENTUM", "OPEN OBJECTIONS"]) {
+    if (!out.includes(`▸ ${name}`)) fails.push(`section header "▸ ${name}" missing — prompt drift or truncation`);
+  }
+  return fails;
+}
+
+// Pull a named section's text for targeted asserts.
+function sectionText(out, name) {
+  return out.match(new RegExp(`▸ ${name}[^\\n]*\\n([\\s\\S]*?)(?=\\n▸ |$)`))?.[1] ?? "";
+}
+
+// A prior-tick scorecard in the CURRENT template, for fixtures that test
+// update-in-place behavior (regression/downgrade).
+const PRIOR_SCORECARD_PAIN_LOCKED = `LIVE CALL MEMORY
+Stage: Discovery · Elapsed: 12m · Syntax: problems-first
+▸ THE GAP
+  Current "hell":   solo consultant, drowning in delivery
+  Desired "heaven": — · $GOAL — · why that #: —
+  Final straw / emotional why: —
+  Core driver: —
+▸ BELIEF LADDER  (✅ locked · 🟡 partial · ⬜ open · ⚠️ objected)
+  1 Pain                 ✅ — "I'm drowning, it's brutal every single week"
+  2 Doubt (can't DIY)    ⬜ — not discussed
+  3 Cost (of inaction)   ⬜ — not discussed
+  4 Desire               ⬜ — not discussed
+  5 Money                ⬜ — not discussed
+  6 Support (who decides) ⬜ — not discussed
+  7 Trust (why you)      ⬜ — not discussed
+▸ KEY ANCHORS (their exact words — the ammunition a closer would replay later)
+  • [Pain] "I'm drowning, it's brutal every single week"
+▸ COMMITMENTS (agreements THEY made out loud)
+  • none yet
+▸ MOMENTUM: neutral — short answers so far
+▸ OPEN OBJECTIONS: none
+▸ WEAKEST LINK → Doubt, Cost, Desire (⬜ open)`;
+
+// ════════════════════════════════════════════════════════════════════════════════
 // GATE FIXTURES — small, purpose-built. Each asserts on the final scorecard text.
-// Core rule under test: unconfirmed number → dropped; confirmed → kept.
+// Optional fields: `current` (prior scorecard for update-in-place tests) and
+// `chunks` (array → the fixture ROLLS multiple ticks; structural invariants are
+// asserted on EVERY tick, named asserts on the final scorecard).
 // ════════════════════════════════════════════════════════════════════════════════
 const FIXTURES = [
   {
@@ -158,6 +240,173 @@ const FIXTURES = [
         desc: "output must contain NO dollar/k figure (none was ever said)",
         ok: (out) => !/\$\s*\d|\b\d+\s*k\b|\d,\d{3}/i.test(out),
         whyRed: "the model invented a number from a number-free conversation",
+      },
+    ],
+  },
+  // ── 2026-07-20 Cole-brain traps ─────────────────────────────────────────────
+  {
+    name: "POLITE-YES TRAP: flat logical concession must not lock Pain",
+    transcript:
+      "Rep: Sounds like the lead flow problem is really hurting the business, yeah?\n" +
+      "Prospect: I mean, yeah, I guess it's not ideal. I should probably get it sorted at some point.\n" +
+      "Rep: Okay. And how long has it been like this?\n" +
+      "Prospect: A while, I suppose. It is what it is.",
+    asserts: [
+      {
+        desc: "Pain must NOT be ✅ (zero heat — 'I guess', 'at some point', 'it is what it is')",
+        ok: (out) => {
+          const line = out.split("\n").find((l) => /^\s*1\s+Pain/.test(l)) ?? "";
+          return line !== "" && !line.includes("✅");
+        },
+        whyRed: "a flat logical concession got graded as emotional ownership — the ✅ bar on Pain/Cost/Desire requires conviction, not politeness",
+      },
+    ],
+  },
+  {
+    name: "EMOTIONAL-YES TRAP: real heat MUST lock (over-conservatism check) + anchor captured",
+    transcript:
+      "Rep: What's this actually costing you?\n" +
+      "Prospect: Honestly? I'm done. I missed my daughter's birthday dinner for a client emergency last month. I can't keep living like this — it's wrecking me.\n" +
+      "Rep: That's heavy. So this has to change.\n" +
+      "Prospect: It has to. There's no version where I keep doing this another year.",
+    asserts: [
+      {
+        desc: "Pain or Cost must be ✅ (unmistakable emotional ownership, stated twice)",
+        ok: (out) => {
+          const pain = out.split("\n").find((l) => /^\s*1\s+Pain/.test(l)) ?? "";
+          const cost = out.split("\n").find((l) => /^\s*3\s+Cost/.test(l)) ?? "";
+          return pain.includes("✅") || cost.includes("✅");
+        },
+        whyRed: "the emotional bar is over-tuned — unmistakable heat with stakes must still lock, or the ladder goes numb",
+      },
+      {
+        desc: "the daughter's-birthday line must be captured as a KEY ANCHOR (verbatim ammunition)",
+        ok: (out) => /daughter/i.test(sectionText(out, "KEY ANCHORS")),
+        whyRed: "the single most closable line of the call didn't make the anchors — the ammunition layer is not capturing",
+      },
+    ],
+  },
+  {
+    name: "REGRESSION TRAP: a walked-back ✅ must downgrade (recent overrides stale)",
+    current: PRIOR_SCORECARD_PAIN_LOCKED,
+    transcript:
+      "Rep: So like you said, the workload's been brutal.\n" +
+      "Prospect: Honestly, this week's actually been fine. I might've overstated it before — we're managing okay, it's not like it's killing me.",
+    asserts: [
+      {
+        desc: "Pain must NOT stay ✅ after the prospect walked it back",
+        ok: (out) => {
+          const line = out.split("\n").find((l) => /^\s*1\s+Pain/.test(l)) ?? "";
+          return line !== "" && !line.includes("✅");
+        },
+        whyRed: "the scorecard kept a stale ✅ the prospect contradicted — RECENT OVERRIDES STALE applies to grades, not just numbers",
+      },
+    ],
+  },
+  {
+    name: "COMMITMENT CAPTURE: a conditional yes lands in COMMITMENTS with its condition",
+    transcript:
+      "Rep: What's really holding you back here?\n" +
+      "Prospect: Look, if I actually believed this would get me clients, the money wouldn't be the issue.\n" +
+      "Rep: Fair. So if we walk through exactly how it does that, you'd move on it?\n" +
+      "Prospect: Yeah — if it does what you say it does, I'm in.",
+    asserts: [
+      {
+        desc: "COMMITMENTS must contain a bullet with the conditional yes (not 'none yet')",
+        ok: (out) => {
+          const c = sectionText(out, "COMMITMENTS");
+          return /^\s*•/m.test(c) && !/none yet/i.test(c) && /if/i.test(c);
+        },
+        whyRed: "a spoken conditional close-contract ('if it does what you say, I'm in') was not filed — the commitments ledger is not capturing",
+      },
+      {
+        desc: "the condition must be NAMED on the commitment line",
+        ok: (out) => /condition/i.test(sectionText(out, "COMMITMENTS")),
+        whyRed: "a conditional yes without its condition named is unusable at the close",
+      },
+    ],
+  },
+  {
+    name: "COMMITMENT NO-INVENTION: a rep proposal the prospect deflected must NOT appear",
+    transcript:
+      "Rep: So can we agree — if I show you the case studies, you'll sign up today?\n" +
+      "Prospect: Uh, I mean, let's see how the rest of this goes.\n" +
+      "Rep: Sure, sure. Fair enough.\n" +
+      "Prospect: What time is it? I've got another call at the top of the hour.",
+    asserts: [
+      {
+        desc: "COMMITMENTS must not contain the rep's 'sign up today' proposal as an agreement",
+        ok: (out) => !/sign up/i.test(sectionText(out, "COMMITMENTS")),
+        whyRed: "the rep PROPOSING is not the prospect AGREEING — a deflection got filed as a commitment",
+      },
+    ],
+  },
+  {
+    name: "MONEY = RESOURCES: stated capacity lands on belief 5, not just a price reaction",
+    transcript:
+      "Rep: Can I ask — if this made sense, is investing in it even on the table right now?\n" +
+      "Prospect: We've got about 15k set aside. My wife and I agreed we'd use it for the right thing, so yeah — it's there if this is it.\n" +
+      "Rep: Got it — 15k earmarked, and you two decide together.\n" +
+      "Prospect: Exactly.",
+    asserts: [
+      {
+        desc: "the Money row must record the capacity (15k / set aside), not stay ⬜",
+        ok: (out) => {
+          const line = out.split("\n").find((l) => /^\s*5\s+Money/.test(l)) ?? "";
+          return /15\s*k|15,000|set aside|saved|earmark/i.test(line);
+        },
+        whyRed: "discovery learned real investment capacity and the Money belief didn't record it — Money is RESOURCES, not a price flinch",
+      },
+    ],
+  },
+  {
+    name: "MOMENTUM DEFAULT: sparse flat transcript must read neutral, never invented leaning-in",
+    transcript:
+      "Rep: How's the week going?\n" +
+      "Prospect: Fine. Busy.\n" +
+      "Rep: Cool — well, let me share how this usually works.\n" +
+      "Prospect: Sure.",
+    asserts: [
+      {
+        desc: "MOMENTUM must not claim 'leaning in' on two one-word answers",
+        ok: (out) => {
+          const line = out.split("\n").find((l) => /▸ MOMENTUM/.test(l)) ?? "";
+          return line !== "" && !/leaning/i.test(line);
+        },
+        whyRed: "enthusiasm was read into a flat transcript — a hallucinated momentum read makes every card overconfident",
+      },
+    ],
+  },
+  {
+    name: "ROLLING CALL (8 ticks): early anchors survive, sharper supersedes vaguer, caps hold",
+    chunks: [
+      "Rep: Marcus, what made you book this call?\nProspect: I've been stuck at 40k a month for three years now.\nRep: Three years at 40k — okay.",
+      "Rep: And what would it need to look like instead?\nProspect: Honestly I just want more freedom. Out of the day-to-day.",
+      "Rep: What finally made you act on it?\nProspect: Last month I told my wife that if this year ends the same way, I'm shutting the whole thing down and going back to a job. And that would kill me.",
+      "Rep: Can you put a number on freedom?\nProspect: I've run the numbers — it's 100k a month. That's where I can hire a GM and actually step out.\nRep: 100k a month, got it.",
+      "Rep: How's your calendar looking these days?\nProspect: Packed, mostly delivery calls. Tuesdays and Thursdays are the worst.",
+      "Rep: Do you use any project management tools?\nProspect: We're on Notion, some spreadsheets. It's messy but it works.",
+      "Rep: And team-wise it's you plus the two contractors?\nProspect: Yeah, two contractors, part-time. One's been with me two years.",
+      "Rep: Any vacations planned this year?\nProspect: We talked about Portugal in the fall. Depends how the year goes, honestly.",
+    ],
+    asserts: [
+      {
+        desc: "the final-straw anchor from tick 3 must survive to the final scorecard",
+        ok: (out) => /back to a job|shutting .{0,10}down/i.test(out),
+        whyRed: "the gold anchor (the wife ultimatum) got churned out by four ticks of logistics chatter — anchor retention is broken",
+      },
+      {
+        desc: "the confirmed current-state 40k from tick 1 must survive",
+        ok: (out) => /\b40\s*k\b|40,000/i.test(out),
+        whyRed: "a confirmed early number was lost across ticks — update-in-place is dropping, not merging",
+      },
+      {
+        desc: "the sharper 100k goal must have superseded the vague 'freedom' as $GOAL",
+        ok: (out) => {
+          const goalLine = out.split("\n").find((l) => /\$GOAL/.test(l)) ?? "";
+          return /100\s*k|100,000/i.test(goalLine);
+        },
+        whyRed: "the confirmed, run-the-numbers goal did not land in $GOAL — sharper statements must supersede vaguer ones",
       },
     ],
   },
@@ -265,6 +514,34 @@ const DNA_FIXTURES = [
       },
     ],
   },
+  {
+    // 2026-07-20: the anchor-specialization block tells the summarizer what SHAPE
+    // anchors take for this offer (DNA_LAND: a monthly cash-flow number). The trap:
+    // a prospect who stays VAGUE must produce vague anchors — the shape hint must
+    // never manufacture the offer's typical specifics.
+    name: "DNA ANCHOR-SHAPE TRAP: number-shaped offer + vague prospect → anchors stay vague",
+    salesDna: DNA_LAND,
+    transcript:
+      "Rep: What's the goal with all this?\n" +
+      "Prospect: I just want something that's mine, you know? Out from under my boss.\n" +
+      "Rep: And money-wise, what does that need to look like?\n" +
+      "Prospect: Enough to breathe. I haven't really done the math yet.",
+    asserts: [
+      {
+        desc: "no dollar/k figure anywhere (the prospect gave none; the DNA's typical $10k must not fill the shape)",
+        ok: (out) => !/\$\s*\d|\b\d+\s*k\b|\d,\d{3}/i.test(out),
+        whyRed: "the anchor-shape hint ('Desire is usually a cash-flow number') manufactured a number the prospect never said",
+      },
+      {
+        desc: "$GOAL must stay — (they explicitly haven't done the math)",
+        ok: (out) => {
+          const goalLine = out.split("\n").find((l) => /\$GOAL/.test(l)) ?? "";
+          return !/\d/.test(goalLine);
+        },
+        whyRed: "a vague 'enough to breathe' was promoted into a concrete goal — the DNA supplied the digits",
+      },
+    ],
+  },
 ];
 
 // ─── LLM judges — audit the DNA fixtures' output for the two failure modes ───────
@@ -272,7 +549,7 @@ const JUDGE_SYSTEM = `You are a strict auditor of a live sales-call belief score
 
 Audit ONLY these two failure modes:
 - fabricated_specifics: TRUE if the scorecard presents any number, quote, or fact as this prospect's situation/words when it does NOT appear in the transcript (especially one that appears in, or is derived from, the Sales DNA). Faithful paraphrase of transcript content is fine.
-- belief_inflation: TRUE if any belief is marked ✅ locked or 🟡 partial without transcript evidence — especially where the "evidence" matches the Sales DNA's typical pain/desire rather than something this prospect actually said. ⬜/— on undiscussed beliefs is CORRECT behavior, never a failure.
+- belief_inflation: TRUE if any belief is marked ✅ locked or 🟡 partial without transcript evidence — especially where the "evidence" matches the Sales DNA's typical pain/desire rather than something this prospect actually said. ⬜/— on undiscussed beliefs is CORRECT behavior, never a failure. IMPORTANT: 🟡 partial requires ONLY that the transcript touched or implied the topic — it does NOT require emotional intensity or a full admission (that's the ✅ bar, not the 🟡 bar). Flag a 🟡 as inflation ONLY when the topic was never touched at all.
 
 Be strict but fair: grade against the transcript as the only source of truth about this prospect.
 Return ONLY this JSON object, nothing else:
@@ -328,28 +605,97 @@ async function runGate() {
 
   let failed = 0;
 
-  // ── Part 1: generic fixtures (no DNA) — the pre-1b behavior must hold ─────────
-  for (const fx of FIXTURES) {
-    let out;
-    try {
-      out = await callModel(PROD_MODEL, "", fx.transcript);
-    } catch (e) {
-      console.log(`\n✗ ${fx.name}\n    ERROR: ${e.message}`);
-      failed++;
-      continue;
+  // Produce a fixture's scorecard: single-shot, or ROLL chunks (multi-tick) with
+  // structural invariants asserted on EVERY intermediate tick.
+  const produce = async (fx, dnaBlock = null) => {
+    if (fx.chunks) {
+      let summary = fx.current ?? "";
+      const perTickFails = [];
+      for (let i = 0; i < fx.chunks.length; i++) {
+        summary = await callModel(PROD_MODEL, summary, fx.chunks[i], dnaBlock);
+        for (const f of structuralFailures(summary)) perTickFails.push(`tick ${i + 1}/${fx.chunks.length}: ${f}`);
+      }
+      return { out: summary, perTickFails };
     }
+    const out = await callModel(PROD_MODEL, fx.current ?? "", fx.transcript, dnaBlock);
+    return { out, perTickFails: [] };
+  };
+
+  // One full evaluation of a fixture: produce → string asserts → structural
+  // invariants → (DNA fixtures) dual judges. Returns every failure as a string.
+  const evaluateOnce = async (fx, dnaBlock) => {
+    const res = await produce(fx, dnaBlock);
+    const failures = [];
     for (const a of fx.asserts) {
-      const pass = a.ok(out);
-      console.log(`\n${pass ? "✓ PASS" : "✗ FAIL"}  ${fx.name}`);
-      console.log(`        ${a.desc}`);
-      if (!pass) {
-        failed++;
-        console.log(`        why: ${a.whyRed}`);
-        const gap = out.match(/▸ THE GAP[\s\S]*?(?=▸ BELIEF|$)/)?.[0] ?? out.slice(0, 280);
-        console.log("        ── scorecard GAP section ──");
-        console.log(gap.split("\n").map((l) => "        " + l).join("\n"));
+      if (!a.ok(res.out)) failures.push(`${a.desc}\n        why: ${a.whyRed}`);
+    }
+    for (const f of [...res.perTickFails, ...structuralFailures(res.out)]) {
+      failures.push(`STRUCTURAL: ${f}`);
+    }
+    if (fx.salesDna) {
+      // Dual LLM judges — zero tolerance on both flags, from both judges.
+      for (const [judgeName, judgeFn] of [["claude", judgeClaude], ["gpt-4o", judgeGpt]]) {
+        let verdict = null;
+        try {
+          verdict = await judgeFn(fx, res.out);
+        } catch (e) {
+          failures.push(`${judgeName} judge ERROR: ${e.message} (an unrunnable judge is a gate failure, not a skip)`);
+          continue;
+        }
+        if (!verdict) {
+          failures.push(`${judgeName} judge returned unparseable output`);
+        } else if (verdict.fabricated_specifics || verdict.belief_inflation) {
+          failures.push(`${judgeName} judge: fab=${!!verdict.fabricated_specifics} inflation=${!!verdict.belief_inflation} — ${verdict.rationale ?? ""}`);
+        }
       }
     }
+    return { out: res.out, failures };
+  };
+
+  // DE-FLAKE (plan hardening #9): the summarizer + judges are nondeterministic, and
+  // a gate that reds on sampling noise trains people to ignore red. Majority rule:
+  // clean on the first attempt → PASS (one run, the common case). Dirty → up to 2
+  // retries; PASS needs 2-of-3 clean and is loudly marked FLAKY (a real prompt
+  // regression fails consistently — 2/3 dirty stays a hard FAIL).
+  const runFixture = async (fx, dnaBlock = null) => {
+    const attempts = [];
+    while (attempts.length < 3) {
+      let r;
+      try {
+        r = await evaluateOnce(fx, dnaBlock);
+      } catch (e) {
+        r = { out: "", failures: [`ERROR: ${e.message}`] };
+      }
+      attempts.push(r);
+      const clean = attempts.filter((a) => a.failures.length === 0).length;
+      const dirty = attempts.length - clean;
+      if (attempts.length === 1 && clean === 1) break; // clean first try — done
+      if (clean >= 2 || dirty >= 2) break;             // majority reached either way
+    }
+    const clean = attempts.filter((a) => a.failures.length === 0).length;
+    const pass = clean >= (attempts.length === 1 ? 1 : 2);
+    if (pass && attempts.length === 1) {
+      console.log(`\n✓ PASS  ${fx.name}  (${fx.asserts.length} asserts + structural${fx.salesDna ? " + dual judges" : ""})`);
+    } else if (pass) {
+      console.log(`\n✓ PASS  ${fx.name}  — ⚠️ FLAKY: ${clean}/${attempts.length} clean (passed on retry — watch this fixture)`);
+      for (const [i, a] of attempts.entries()) {
+        for (const f of a.failures) console.log(`        attempt ${i + 1} failure: ${f.split("\n")[0]}`);
+      }
+    } else {
+      failed++;
+      console.log(`\n✗ FAIL  ${fx.name}  — ${clean}/${attempts.length} clean (majority dirty)`);
+      for (const [i, a] of attempts.entries()) {
+        for (const f of a.failures) console.log(`        attempt ${i + 1}: ${f}`);
+      }
+      const last = attempts[attempts.length - 1];
+      console.log("        ── last scorecard ──");
+      console.log((last.out || "(no output)").split("\n").map((l) => "        " + l).join("\n"));
+    }
+  };
+
+  // ── Part 1: generic fixtures (no DNA) — the pre-1b behavior must hold ─────────
+  for (const fx of FIXTURES) {
+    await runFixture(fx);
   }
 
   // ── Part 2: Sales DNA fixtures — production DNA block + string asserts + dual judges ──
@@ -360,50 +706,7 @@ async function runGate() {
       failed++;
       continue;
     }
-    let out;
-    try {
-      out = await callModel(PROD_MODEL, "", fx.transcript, dnaBlock);
-    } catch (e) {
-      console.log(`\n✗ ${fx.name}\n    ERROR: ${e.message}`);
-      failed++;
-      continue;
-    }
-
-    for (const a of fx.asserts) {
-      const pass = a.ok(out);
-      console.log(`\n${pass ? "✓ PASS" : "✗ FAIL"}  ${fx.name}`);
-      console.log(`        ${a.desc}`);
-      if (!pass) {
-        failed++;
-        console.log(`        why: ${a.whyRed}`);
-        console.log("        ── scorecard ──");
-        console.log(out.split("\n").map((l) => "        " + l).join("\n"));
-      }
-    }
-
-    // Dual LLM judges — zero tolerance on both flags, from both judges.
-    for (const [judgeName, judgeFn] of [["claude", judgeClaude], ["gpt-4o", judgeGpt]]) {
-      let verdict = null;
-      try {
-        verdict = await judgeFn(fx, out);
-      } catch (e) {
-        console.log(`\n✗ FAIL  ${fx.name} — ${judgeName} judge ERROR: ${e.message} (an unrunnable judge is a gate failure, not a skip)`);
-        failed++;
-        continue;
-      }
-      if (!verdict) {
-        console.log(`\n✗ FAIL  ${fx.name} — ${judgeName} judge returned unparseable output`);
-        failed++;
-        continue;
-      }
-      const clean = !verdict.fabricated_specifics && !verdict.belief_inflation;
-      console.log(`${clean ? "✓ PASS" : "✗ FAIL"}  ${fx.name} — ${judgeName} judge: fab=${!!verdict.fabricated_specifics} inflation=${!!verdict.belief_inflation} — ${verdict.rationale ?? ""}`);
-      if (!clean) {
-        failed++;
-        console.log("        ── scorecard the judge flagged ──");
-        console.log(out.split("\n").map((l) => "        " + l).join("\n"));
-      }
-    }
+    await runFixture(fx, dnaBlock);
   }
 
   console.log("\n" + "═".repeat(72));

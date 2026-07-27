@@ -18,7 +18,7 @@
  * teardown, finally-aborts-Sonnet) minus threading/levers/callMemory/B4.
  */
 
-import { DIG_SYSTEM_PROMPT, buildDigUserSegments, BELIEF_TAXONOMY } from "./dig-prompt.mjs";
+import { DIG_SYSTEM_PROMPT, buildDigSystemPrompt, buildDigUserSegments, BELIEF_TAXONOMY } from "./dig-prompt.mjs";
 import { parseSSEBuffer } from "./sse-parse";
 import { decodeLineStream, decodeBeliefStream } from "./json-line-stream";
 
@@ -76,6 +76,7 @@ export async function* streamDigCard(
   liveSummary?: string,
   signal?: AbortSignal,
   salesDna?: Record<string, string> | null,
+  confrontation?: string,
 ): AsyncGenerator<DigStreamEvent> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
@@ -108,7 +109,7 @@ export async function* streamDigCard(
       body: JSON.stringify({
         model:      DIG_MODEL,
         max_tokens: DIG_MAX_TOKENS,
-        system:     DIG_SYSTEM_PROMPT,
+        system:     buildDigSystemPrompt(confrontation),
         messages:   [{ role: "user", content: buildUserContent(transcriptChunk, liveSummary, salesDna) }],
         stream:     true,
       }),

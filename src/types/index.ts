@@ -43,6 +43,7 @@ export interface Profile {
   call_weakness?: string | null;
   deal_loss_stage?: string | null;
   sales_dna?: SalesDna | null;
+  card_style?: CardStyle | null;
   chat_messages_today?: number;
   chat_reset_date?: string | null;
   zoom_display_name?: string | null;
@@ -74,6 +75,19 @@ export interface SalesDna {
   trust?: string | null;            // Q9 — why your way is different
   money?: string | null;            // Q10 — how you know they can afford it
   support?: string | null;          // Q11
+}
+
+// ── Card Style (delivery preferences) ─────────────────────────────────────────
+// Per-user DELIVERY dials — how the live cards SOUND, kept SEPARATE from sales_dna
+// (which is offer/discovery CONTENT). Stored as its own flexible jsonb blob on
+// profiles.card_style so adding the formality dial later needs no migration.
+// The confrontationalness dial (2026-07-16) adjusts how HARD cards press, never
+// what they diagnose. "direct" is the default and reproduces today's card exactly.
+export type ConfrontationLevel = "consultative" | "balanced" | "direct" | "challenger";
+
+export interface CardStyle {
+  confrontation?: ConfrontationLevel | null; // how hard the cards press (default "direct")
+  // formality?: FormalityLevel | null;       // (follow-on dial — same rails)
 }
 
 // Completeness — "briefed" means EVERY question addressed (Sebastian, 2026-07-11;
@@ -161,6 +175,7 @@ export interface Call {
   user_id: string;
   prospect_name: string | null;
   outcome: Outcome | null;
+  outcome_source?: "auto" | "manual" | null;  // 'auto' = AI-detected (excluded from close-rate until confirmed)
   duration: string | null;
   summary: string | null;
   missed_topics: string[];
@@ -304,6 +319,15 @@ export interface WingmanBridge {
   // Navigate to Settings tab (sent by main when HUD "Open Settings" is clicked)
   onNavigateToSettings: (callback: () => void) => void;
 
+  // Deep-link to a call's Flight Log entry (HUD "View call →" pill). callId may be
+  // null → just open the tab. Optional: old preloads lack it (renderer no-ops).
+  onNavigateToCall?: (callback: (callId: string | null) => void) => void;
+
+  // Drive the HUD Live Hub pill's end-of-call morph (generating → ready). The
+  // renderer is the only side that learns when the debrief lands. Optional so
+  // callers optional-chain it — old preloads (pre-v0.1.29) simply no-op.
+  postCallState?: (payload: { phase: "generating" | "ready"; callId: string | null }) => Promise<void>;
+
   // Hotkey compass menu — main process tells web app which direction the rep picked
   onMenuPick:  (callback: (direction: string) => void) => void;
   offMenuPick: () => void;
@@ -312,6 +336,10 @@ export interface WingmanBridge {
   // "thinking" = generation started · "error" = failed/timed out (retry hint)
   // · "unsupported" = arrow not built yet. Card arrival clears the pill.
   sendSummonState: (payload: { state: "thinking" | "error" | "unsupported" | "idle"; slot?: string }) => Promise<void>;
+
+  // Flight Recorder (dev-only) — stitch main's log to the server's by callId.
+  // Optional: absent on older preloads → renderer just skips the link (no crash).
+  devlogLink?:    (callId: string) => void;
 
   // Phase C — Objection Flow mode. Optional so a renderer running against an
   // older preload (dev hot-reload skew) degrades to compass-only, never crashes.

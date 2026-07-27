@@ -2,11 +2,18 @@
 
 A running log of every major architectural or product decision made on Wingman. Append only — never delete. Each entry captures the decision, the date, the reasoning, and any alternatives that were rejected.
 
-Last updated: 2026-07-11
+Last updated: 2026-07-20
 
 ---
 
 ## 2026
+
+### 2026-07-20 — Tune the SUMMARIZER (belief ladder) before judging more card outputs; keep the 4 belief states but relabel ⚠️ "at-risk" → "objected"
+**Decision:** Sequencing: **fix the belief-ladder summarizer FIRST**, then resume grading the dig/objection outputs — the summary (`calls.live_summary`) is the foundation every live card reads, so judging card quality on an unrefined foundation is backwards. Scope of the summarizer session (self-contained brief: `tasks/plan-summarizer-tuning.md`), Sebastian-confirmed via a Cole-Gordon-lens audit: **(a) keep all four belief states** (✅ locked / 🟡 partial / ⬜ open / ⚠️) — they encode WHAT TO DO (⬜/🟡 → dig to build; ⚠️ → handle the objection), so don't collapse them; **(b) relabel ⚠️ "at-risk/objection" → "objected"/"contested"** — because an unlocked belief is itself a LATENT objection (⬜/🟡 are also "at risk"), so "at-risk" reads predictive when ⚠️ actually means "already fired"; **(c) raise the ✅ bar to EMOTIONAL ownership on Pain/Desire/Cost** (a logical concession ≠ locked); **(d) protect the ✅ = prospect-affirmed-in-their-own-words bar** (rep asserting ≠ locked — the load-bearing correctness). All gated by `test-belief-ladder.mjs` GREEN + plan-reviewer. Also decided: the objection card should FAVOR QUESTIONS over statements (NEPQ self-persuasion), and payment-terms belong in a Sales DNA configurator that conditionally suppresses the `financial-trade` lever for reps who don't offer plans.
+**Why:** Belief framing drives every downstream card, so getting the states/labels right is upstream of everything (Cole: every belief not locked in discovery becomes an objection at the close). Keeping the 4 states (vs collapsing unlocked→at-risk) preserves the build-vs-handle signal that picks the right card. The ⚠️ relabel removes the exact ambiguity Sebastian surfaced (reactive-fired vs latent-loaded). Emotional-ownership grading reflects "people buy emotionally, justify logically." Summarizer prompt is behind a hard eval gate → no drive-by edits; it rides its own session.
+**Status:** Queued as the immediate next session (`tasks/plan-summarizer-tuning.md`). Nothing else was removed from the sprint — the summarizer budged to the front.
+
+---
 
 ### 2026-07-11 — Offer-Aware moat SHIPPED (Phase 1b): Sales DNA injected as an interpretive LENS, never evidence; zero-fabrication is the ship gate; all-or-nothing inject
 **Decision:** The rep's captured Sales DNA now feeds the LIVE cards (belief-ladder summarizer + dig card), shipped PR #45. Three sub-decisions locked: (1) the DNA is framed to the model as **AVERAGES about the typical prospect — an interpretive lens to MAP the live prospect's words to beliefs, NEVER evidence.** It may never supply a number/quote/fact the transcript didn't; the fence ships inside the block text. (2) **Zero fabrication is the hard ship gate** — `test-belief-ladder.mjs` must be GREEN with a Claude + gpt-4o dual-judge before shipping (Sebastian-locked); adversarial number-stuffing traps in both evals. (3) **All-or-nothing inject threshold** — the block injects only when EVERY Sales DNA question is answered; a lone field skews the card worse than no context. The same `salesDnaComplete` helper gates the 1c Deploy gate → one definition of "briefed". Delivery: client-pass on every rail (no hot-path DB read) + prompt caching + warm-at-deploy priming (60s spend debounce). The NUMBER CONFIDENCE rule (3.6b) was pulled forward into the same summarizer prompt (a green gate was impossible without it).

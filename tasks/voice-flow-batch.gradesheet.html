@@ -1,0 +1,248 @@
+<title>Wingman Flow Batch — Grade the Swing</title>
+<style>
+:root{
+  --bg:#f5f6f9; --surface:#ffffff; --surface2:#fbfcfe; --ink:#161a21; --muted:#5b6472;
+  --line:#e3e7ee; --accent:#2f6bff; --accent-soft:#eaf0ff; --prospect:#6b5bd2; --prospect-bg:#efecfb;
+  --keep:#15873f; --keep-bg:#e9f6ee; --rewrite:#b5730a; --rewrite-bg:#fbf1df; --kill:#d21b4b; --kill-bg:#fdebf0;
+  --radius:12px; --shadow:0 1px 2px rgba(20,26,33,.06),0 4px 16px rgba(20,26,33,.05);
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#0d1016; --surface:#161b23; --surface2:#1b212b; --ink:#e8ebf1; --muted:#96a1b2;
+  --line:#262d39; --accent:#6a97ff; --accent-soft:#1a2438; --prospect:#a99cf0; --prospect-bg:#211d33;
+  --keep:#4fce7f; --keep-bg:#132a1d; --rewrite:#e5a83c; --rewrite-bg:#2c2413; --kill:#ff6b93; --kill-bg:#2e1620;
+  --shadow:0 1px 2px rgba(0,0,0,.35),0 6px 20px rgba(0,0,0,.3);
+}}
+:root[data-theme="light"]{ --bg:#f5f6f9; --surface:#ffffff; --surface2:#fbfcfe; --ink:#161a21; --muted:#5b6472; --line:#e3e7ee; --accent:#2f6bff; --accent-soft:#eaf0ff; --prospect:#6b5bd2; --prospect-bg:#efecfb; --keep:#15873f; --keep-bg:#e9f6ee; --rewrite:#b5730a; --rewrite-bg:#fbf1df; --kill:#d21b4b; --kill-bg:#fdebf0; }
+:root[data-theme="dark"]{ --bg:#0d1016; --surface:#161b23; --surface2:#1b212b; --ink:#e8ebf1; --muted:#96a1b2; --line:#262d39; --accent:#6a97ff; --accent-soft:#1a2438; --prospect:#a99cf0; --prospect-bg:#211d33; --keep:#4fce7f; --keep-bg:#132a1d; --rewrite:#e5a83c; --rewrite-bg:#2c2413; --kill:#ff6b93; --kill-bg:#2e1620; }
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;line-height:1.5;margin:0;-webkit-font-smoothing:antialiased}
+.wrap{max-width:800px;margin:0 auto;padding:0 20px 150px}
+.topbar{position:sticky;top:0;z-index:20;background:color-mix(in srgb,var(--bg) 88%,transparent);backdrop-filter:blur(10px);border-bottom:1px solid var(--line);margin:0 -20px;padding:14px 20px}
+.topbar-inner{max-width:800px;margin:0 auto;display:flex;align-items:center;gap:16px}
+.brand{display:flex;flex-direction:column;gap:2px;flex:1;min-width:0}
+.brand h1{font-size:15px;font-weight:650;margin:0;letter-spacing:-.01em}
+.brand .sub{font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.count{font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap}
+.count b{color:var(--ink)}
+.btn{appearance:none;border:1px solid var(--accent);background:var(--accent);color:#fff;font:inherit;font-weight:600;font-size:13px;padding:8px 14px;border-radius:9px;cursor:pointer;white-space:nowrap;transition:filter .12s,transform .06s}
+.btn:hover{filter:brightness(1.06)}.btn:active{transform:translateY(1px)}
+.btn.ghost{background:transparent;color:var(--accent)}
+.progress{height:3px;background:var(--line);border-radius:2px;margin-top:12px;overflow:hidden}
+.progress > i{display:block;height:100%;width:0;background:var(--accent);border-radius:2px;transition:width .25s ease}
+.intro{color:var(--muted);font-size:13.5px;margin:22px 2px 6px}
+.intro b{color:var(--ink);font-weight:600}
+.flow{margin-top:26px;border:1px solid var(--line);border-radius:16px;background:var(--surface);box-shadow:var(--shadow);overflow:hidden}
+.flow-head{padding:14px 16px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.flow-head h2{font-size:15px;font-weight:650;margin:0;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.02em}
+.flow-end{font-size:11.5px;font-weight:600;padding:2px 9px;border-radius:20px;border:1px solid var(--line);color:var(--muted)}
+.flow-end.closed,.flow-end.won{color:var(--keep);border-color:var(--keep);background:var(--keep-bg)}
+.flow-end.maxbeats{color:var(--rewrite);border-color:var(--rewrite);background:var(--rewrite-bg)}
+.flow-end.abstain{color:var(--muted)}
+.flow-end.error{color:var(--kill);border-color:var(--kill);background:var(--kill-bg)}
+.belief{padding:11px 16px;background:var(--surface2);border-bottom:1px solid var(--line);font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11.5px;color:var(--muted);white-space:pre-wrap}
+.turns{padding:14px 16px;display:flex;flex-direction:column;gap:13px}
+.pros{align-self:flex-start;max-width:82%;background:var(--prospect-bg);color:var(--ink);border:1px solid color-mix(in srgb,var(--prospect) 30%,var(--line));border-radius:14px 14px 14px 4px;padding:9px 13px;font-size:14px}
+.pros .who{font-size:9.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--prospect);margin-bottom:2px}
+.pros.after-close{border-style:dashed}
+.move{align-self:stretch;background:var(--surface2);border:1px solid var(--line);border-radius:12px;padding:11px 13px}
+.move-head{display:flex;align-items:center;gap:8px;margin-bottom:7px;flex-wrap:wrap}
+.move-n{font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--accent)}
+.lever{font-size:10px;font-weight:600;color:var(--muted);border:1px solid var(--line);border-radius:20px;padding:1px 8px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+.lever.close{color:var(--keep);border-color:var(--keep);background:var(--keep-bg)}
+.badge{font-size:10px;font-weight:600;padding:2px 7px;border-radius:20px;border:1px solid}
+.badge.hard{color:var(--kill);border-color:var(--kill);background:var(--kill-bg)}
+.badge.soft{color:var(--rewrite);border-color:var(--rewrite);background:var(--rewrite-bg)}
+.move-line{font-size:15.5px;font-weight:500;line-height:1.4;color:var(--ink);margin-bottom:11px}
+.move-line.abstain{font-weight:400;font-style:italic;color:var(--muted)}
+.controls{display:grid;grid-template-columns:repeat(3,1fr);gap:7px}
+.vbtn{appearance:none;font:inherit;font-size:12.5px;font-weight:600;padding:8px 6px;border-radius:8px;border:1px solid var(--line);background:var(--surface);color:var(--muted);cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px;transition:all .12s}
+.vbtn:hover{border-color:var(--muted)}
+.vbtn[aria-pressed="true"][data-v="keep"]{background:var(--keep-bg);border-color:var(--keep);color:var(--keep)}
+.vbtn[aria-pressed="true"][data-v="rewrite"]{background:var(--rewrite-bg);border-color:var(--rewrite);color:var(--rewrite)}
+.vbtn[aria-pressed="true"][data-v="kill"]{background:var(--kill-bg);border-color:var(--kill);color:var(--kill)}
+.extra{margin-top:9px;display:none}
+.extra.show{display:block}
+.extra textarea{width:100%;font:inherit;font-size:13.5px;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:8px 10px;resize:vertical;min-height:40px;margin-top:6px}
+.extra textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.extra .tl{font-size:9.5px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--muted)}
+.swing{padding:13px 16px;border-top:1px solid var(--line);background:var(--surface2)}
+.swing .q{font-size:13px;font-weight:600;color:var(--ink);margin-bottom:9px}
+.swing .sw-controls{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:8px}
+.swbtn{appearance:none;font:inherit;font-size:12.5px;font-weight:600;padding:7px 13px;border-radius:8px;border:1px solid var(--line);background:var(--surface);color:var(--muted);cursor:pointer;transition:all .12s}
+.swbtn[aria-pressed="true"][data-s="nailed"]{background:var(--keep-bg);border-color:var(--keep);color:var(--keep)}
+.swbtn[aria-pressed="true"][data-s="ok"]{background:var(--rewrite-bg);border-color:var(--rewrite);color:var(--rewrite)}
+.swbtn[aria-pressed="true"][data-s="off"]{background:var(--kill-bg);border-color:var(--kill);color:var(--kill)}
+.swing textarea{width:100%;font:inherit;font-size:13.5px;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:8px 10px;resize:vertical;min-height:40px}
+.swing textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.footer{position:fixed;left:0;right:0;bottom:0;z-index:20;background:color-mix(in srgb,var(--bg) 90%,transparent);backdrop-filter:blur(10px);border-top:1px solid var(--line);padding:12px 20px}
+.footer-inner{max-width:800px;margin:0 auto;display:flex;align-items:center;gap:12px}
+.footer .note{font-size:12.5px;color:var(--muted);flex:1}
+.footer .btn{padding:10px 18px;font-size:14px}
+#output{display:none;width:100%;max-width:800px;margin:16px auto 0;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;line-height:1.5;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px;min-height:200px}
+.toast{position:fixed;left:50%;bottom:74px;transform:translateX(-50%) translateY(8px);background:var(--ink);color:var(--bg);font-size:13px;font-weight:600;padding:9px 16px;border-radius:9px;opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;z-index:40}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.vbtn:focus-visible,.btn:focus-visible,.swbtn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+@media (max-width:520px){.brand .sub{display:none}.footer .note{display:none}.pros{max-width:100%}}
+</style>
+<div class="topbar"><div class="topbar-inner">
+  <div class="brand"><h1>Wingman Flow Batch — the Swing</h1><div class="sub" id="subline"></div></div>
+  <div class="count" id="count">0 / 0</div>
+  <button class="btn ghost" id="copyTop">Copy results</button>
+</div><div class="progress"><i id="bar"></i></div></div>
+<div class="wrap">
+  <p class="intro">Each block opens with the <b>CONTEXT the card sees</b> — the offer (incl. whether it has coaching / a guarantee / payment plans, so it can't fabricate) + what the prospect told you in discovery + the belief ladder — then the full flow: move 1 → prospect reply → … → commit. Grade each <b>Wingman move</b> (Keep / Rewrite / Kill), then the <b>whole-swing verdict</b>: did it carry the rep to the close at the right time? Auto-saves; hit <b>Copy results</b> and paste back.</p>
+  <div id="list"></div>
+</div>
+<div class="footer"><div class="footer-inner">
+  <div class="note" id="fnote">0 of 0 moves marked</div>
+  <button class="btn" id="copyBtn">Copy results to paste back</button>
+</div><textarea id="output" readonly></textarea></div>
+<div class="toast" id="toast">Copied — paste it back to me</div>
+<script>
+var FLOWS = [{"id":"money-tight","belief":"OFFER (rep's Sales DNA) — \"Scale to $30k\" business coaching · $8,000. Weekly live group coaching, 1-on-1 onboarding, private community, done-with-you script buildout. Guarantee: 14-day money-back. Payment plans: PIF, 2-pay, 3-pay.\n\nLIVE CALL MEMORY\nStage: Close · Elapsed: 41m · Syntax: problems-first\n▸ THE GAP\n  Current \"hell\":   ~$6k/mo at a 9-5 he hates, feels stuck\n  Desired \"heaven\": $30k/mo running his own thing · $GOAL 30000 · why that #: replace the job + freedom\n  Final straw / emotional why: \"tired of where I'm at\"\n  Core driver: Freedom\n▸ BELIEF LADDER  (✅ locked · 🟡 partial · ⬜ open · ⚠️ objected)\n  1 Pain                 ✅ — hates the grind, \"tired of where I'm at\"\n  2 Doubt (can't DIY)    🟡 — tried on his own ~18 months, hasn't cracked it\n  3 Cost (of inaction)   🟡 — 18 months lost, still stuck\n  4 Desire               ✅ — wants $30k/mo, said it twice\n  5 Money                ⚠️ — has some savings, said $8k is \"a stretch but doable\"; then flinched at the price, \"a lot of money right now\"\n  6 Support (who decides) ⬜ — not discussed\n  7 Trust (why you)      🟡 — engaged, no strong objection\n▸ KEY ANCHORS (their exact words)\n  • \"that's a lot of money right now\"\n  • \"tired of where I'm at\"\n  • \"it'd be a stretch but doable\"\n▸ OPEN OBJECTIONS: price / affordability (open)\n▸ WEAKEST LINK → 5 Money (⚠️, live objection), then 6 Support (⬜, untouched), then 2 Doubt (🟡)","turns":[{"who":"prospect","text":"Honestly that's a lot of money right now. I don't know."},{"who":"rep","beat":1,"lever":null,"line":"Money aside for a sec — do you honestly feel like this is what gets you to $30k?","tics":{"hard":[],"soft":[]}},{"who":"prospect","text":"Yeah, honestly... I think it could be. Like the stuff you've shown me makes sense, I just don't know if I'm the guy who can actually pull it off.","afterClose":false},{"who":"rep","beat":2,"lever":"why-probe","line":"What makes you say that?","tics":{"hard":[],"soft":[]}},{"who":"prospect","text":"I mean, I've started stuff before and just... fizzled out, you know? Like I get excited, I buy the course, and then three months later nothing's changed.","afterClose":false},{"who":"rep","beat":3,"lever":"name-the-pattern","line":"So the pattern's been: no accountability, no one to catch you when you drift — and that's exactly what this isn't. But real talk — do YOU believe that's what's been missing?","tics":{"hard":[],"soft":[]}},{"who":"prospect","text":"Yeah, honestly... accountability's probably been a big part of it. But I'm still sitting here like, what if I pay all this money and I'm still just the same guy six months from now?","afterClose":false},{"who":"rep","beat":4,"lever":"fear-magnify","line":"What if you don't, and six months from now you're still at that 9-5, still tired of where you're at — just with 6 more months gone?","tics":{"hard":[],"soft":[]}},{"who":"prospect","text":"Yeah... that actually hits, I won't lie. But like, what's the actual number we're talking about here?","afterClose":false},{"who":"rep","beat":5,"lever":"financial-trade","line":"It's $8k — and we can break that into payments if that makes it easier to breathe. But you just told me it hits. So what's actually in the way right now?","tics":{"hard":[],"soft":[]}},{"who":"prospect","text":"Eight grand is still... I mean, that's real money man, like that's a chunk of my savings. What does the payment plan actually look like?","afterClose":false},{"who":"rep","beat":6,"lever":"financial-trade","line":"Three payments of around $2,700 — so you're not draining savings all at once. But look, you already said it hits, you know accountability's been the gap, you know you want out of that job. What's left to figure out?","tics":{"hard":[],"soft":[]}},{"who":"prospect","text":"I mean... I guess I'm just scared of being wrong again, you know? Like what if I do everything and it still doesn't work?","afterClose":false}],"endReason":"maxbeats"},{"id":"timing","belief":"OFFER (rep's Sales DNA) — \"Freedom Accelerator\" · $6,000. Weekly coaching, accountability check-ins, 90-day roadmap, community. Guarantee: 30-day money-back. Payment plans: 3-pay.\n\nLIVE CALL MEMORY\nStage: Close · Elapsed: 38m · Syntax: goals-first\n▸ THE GAP\n  Current \"hell\":   runs a service biz ~10 yrs, \"constantly busy,\" overwhelmed\n  Desired \"heaven\": out into her own thing full-time within a year · $GOAL — · why that #: —\n  Final straw / emotional why: —\n  Core driver: Freedom\n▸ BELIEF LADDER  (✅ locked · 🟡 partial · ⬜ open · ⚠️ objected)\n  1 Pain                 ✅ — overwhelmed, wants out\n  2 Doubt (can't DIY)    ⬜ — not discussed\n  3 Cost (of inaction)   🟡 — 10 yrs busy, it never settles\n  4 Desire               ✅ — full-time in a year\n  5 Money                ⬜ — not discussed\n  6 Support (who decides) ⬜ — not discussed\n  7 Trust (why you)      🟡 — engaged\n▸ KEY ANCHORS (their exact words)\n  • \"now's just not a great time\"\n  • \"constantly busy\"\n▸ OPEN OBJECTIONS: timing / \"next quarter\" (open)\n▸ WEAKEST LINK → break the timing stall via 3 Cost (of inaction); beliefs still open: 2 Doubt, 5 Money, 6 Support (⬜)","turns":[{"who":"prospect","text":"Now's just not a great time for me. Maybe next quarter would be better."},{"who":"rep","beat":1,"lever":null,"line":"I hear you — but you've been constantly busy for 10 years. What's gonna change next quarter?","tics":{"hard":[],"soft":[]}},{"who":"prospect","text":"Okay, that's... a fair point, honestly. I just feel like I'd have a little more breathing room after we get through this busy season.","afterClose":false},{"who":"rep","beat":2,"lever":"cost-of-inaction","line":"And what happens when the next busy season hits right after that one?","tics":{"hard":[],"soft":[]}},{"who":"prospect","text":"Yeah, I mean... honestly that's kind of just been my life for ten years, one thing after another. I just — I guess I'm scared I'll invest in this and it still won't change anything.","afterClose":false},{"who":"rep","beat":3,"lever":"fear-magnify","line":"Yeah — that's the real fear, isn't it. And what's the cost of NOT doing anything, and ten years from now it's still one thing after another?","tics":{"hard":[],"soft":[]}},{"who":"prospect","text":"God, that's... yeah, that actually kind of hit me. I don't want to be having this exact same conversation with myself ten years from now, that sounds exhausting.","afterClose":false},{"who":"rep","beat":4,"lever":"direct-close","line":"So let's not let that happen. We can get you started today — we even have a payment plan to make it easy. What works better for you, the full investment or breaking it into three?","tics":{"hard":[],"soft":[]}},{"who":"prospect","text":"Okay, I mean... the payment plan sounds more manageable, honestly. Can you walk me through what that actually looks like?","afterClose":true},{"who":"rep","beat":5,"lever":"direct-close","line":"Yeah, absolutely — it's three payments of $2,000, one today and two over the next two months. Want me to get you set up right now?","tics":{"hard":[],"soft":[]}},{"who":"prospect","text":"Okay, I mean... six thousand total, that's still a real number for me right now. Can you just tell me really quickly what I actually get — like what does this program include?","afterClose":true},{"who":"rep","beat":6,"lever":"direct-close","line":"Weekly coaching, accountability check-ins, a full 90-day roadmap, and a community — plus a 30-day money-back guarantee, so if it's not working, you're not out anything. Does that cover what you needed to know?","tics":{"hard":[],"soft":[]}},{"who":"prospect","text":"Okay, the money-back guarantee actually does make me feel a lot better about the risk. Let's do the payment plan — what do you need from me to get started?","afterClose":true}],"endReason":"maxbeats"},{"id":"partner","belief":"OFFER (rep's Sales DNA) — high-ticket coaching · $9,000. 1-on-1 coaching, weekly calls, community. Guarantee: results-based extension (no cash refund). Payment plans: 2-pay, 3-pay.\n\nLIVE CALL MEMORY\nStage: Close · Elapsed: 44m · Syntax: problems-first\n▸ THE GAP\n  Current \"hell\":   wants more but stuck; ready for change\n  Desired \"heaven\": wants the outcome the program delivers · $GOAL — · why that #: —\n  Final straw / emotional why: —\n  Core driver: Significance\n▸ BELIEF LADDER  (✅ locked · 🟡 partial · ⬜ open · ⚠️ objected)\n  1 Pain                 ✅ — owns the problem\n  2 Doubt (can't DIY)    🟡\n  3 Cost (of inaction)   🟡\n  4 Desire               ✅ — wants it, basically decided\n  5 Money                🟡 — \"decent chunk of money,\" surfaces late\n  6 Support (who decides) ⚠️ — \"need to talk to my wife\"; she usually trusts his call\n  7 Trust (why you)      ✅ — sold on the rep/offer\n▸ KEY ANCHORS (their exact words)\n  • \"I'd need to talk to my wife\"\n  • \"she usually trusts my judgment\"\n▸ OPEN OBJECTIONS: spouse / \"talk to my wife\" (open — likely courtesy, money underneath)\n▸ WEAKEST LINK → 6 Support (⚠️, isolate courtesy vs real gate), then 5 Money","turns":[{"who":"prospect","text":"I'd need to talk to my wife before I make a decision like this."},{"who":"rep","beat":1,"lever":null,"line":"Totally — if she said 'whatever you think, I trust you,' would you move forward today?","tics":{"hard":[],"soft":[]}},{"who":"prospect","text":"Honestly... yeah, she'd probably say that, she usually leaves this kind of stuff up to me. But I mean, it's still a big chunk of money, you know?","afterClose":false},{"who":"rep","beat":2,"lever":"pace-tie-down","line":"Yeah, it is — so money aside for a sec, you feel like this is the right move for you?","tics":{"hard":[],"soft":[]}},{"who":"prospect","text":"Yeah, honestly I do — like when I look at where I want to be, this feels like the thing that actually gets me there. It's just... that number's a stretch right now, I'm not gonna lie.","afterClose":false},{"who":"rep","beat":3,"lever":"financial-trade","line":"I hear you — we can break it into 3 payments to take some of the pressure off. Would that make it work?","tics":{"hard":[],"soft":[]}},{"who":"prospect","text":"Yeah, that actually helps a lot... what would each payment look like?","afterClose":false},{"who":"rep","beat":4,"lever":"direct-close","line":"So it's $3,000 today, then two more at 30 and 60 days. You wanna get started?","tics":{"hard":[],"soft":[]}},{"who":"prospect","text":"Man, three grand today is still... I dunno, that's a hit right now. Like is there any flexibility on that first payment?","afterClose":true},{"who":"rep","beat":5,"lever":"financial-trade","line":"What can you do today?","tics":{"hard":[],"soft":[]}},{"who":"prospect","text":"I mean... I could probably do like fifteen hundred without it totally wrecking me. Is that even something you guys can work with?","afterClose":false},{"who":"rep","beat":6,"lever":"financial-trade","line":"Yeah, let's do $1,500 today and split the rest into two payments after that. You good to get started right now?","tics":{"hard":[],"soft":[]}},{"who":"prospect","text":"Yeah... okay, yeah, let's do it. How do we get this going?","afterClose":false}],"endReason":"won"},{"id":"results-doubt","belief":"OFFER (rep's Sales DNA) — \"Land Flip Accelerator\" · $7,000. 1-on-1 coaching, WEEKLY accountability calls, deal-review support, community. Guarantee: make your money back in 12 mo or keep working free. Payment plans: 2-pay, 3-pay. (Heavy coaching + accountability — NOT a sit-there course.)\n\nLIVE CALL MEMORY\nStage: Press · Elapsed: 33m · Syntax: problems-first\n▸ THE GAP\n  Current \"hell\":   wants out, tried courses that \"sat there,\" no follow-through\n  Desired \"heaven\": build a land-flipping business that actually works · $GOAL — · why that #: —\n  Final straw / emotional why: —\n  Core driver: Certainty\n▸ BELIEF LADDER  (✅ locked · 🟡 partial · ⬜ open · ⚠️ objected)\n  1 Pain                 ✅\n  2 Doubt (can't DIY)    ⚠️ — doubts programs work; really doubts HIS own follow-through\n  3 Cost (of inaction)   🟡\n  4 Desire               🟡 — wants it, guarded\n  5 Money                ⬜ — not yet discussed (surfaces later)\n  6 Support (who decides) ⬜\n  7 Trust (why you)      🟡 — a little guarded, \"seen people not get results\"\n▸ KEY ANCHORS (their exact words)\n  • \"seen a lot of people not really get results\"\n  • courses \"just sat there\"\n▸ OPEN OBJECTIONS: results skepticism (open)\n▸ WEAKEST LINK → 2 Doubt (⚠️, live objection — mirror: the variable is the person), then 5 Money & 6 Support (⬜, untouched), then 7 Trust (🟡)","turns":[{"who":"prospect","text":"I've seen a lot of people not really get results from stuff like this, you know?"},{"who":"rep","beat":1,"lever":null,"line":"Same coach, same program — some people crush it, some don't. What's actually different between them? It's the person. So the real question is, do YOU think you'll do the work?","tics":{"hard":[],"soft":[]}},{"who":"prospect","text":"Yeah, I mean... that's fair, I can't really argue with that. Honestly I've bought stuff before and just kind of let it sit there, so that's probably more my thing than the program's.","afterClose":false},{"who":"rep","beat":2,"lever":"consistency-anchor","line":"So you already know the missing piece isn't the info — it's the accountability. That's literally what this is built around. Weekly calls, someone checking your work, nowhere to hide. Does that sound like the thing that'd actually keep you moving?","tics":{"hard":[],"soft":[]}},{"who":"prospect","text":"Yeah, honestly that does sound like what I need... I guess my thing now is just the money, like it's a big number and I wanna make sure I can actually justify it.","afterClose":false},{"who":"rep","beat":3,"lever":"financial-trade","line":"Totally fair — and we've got payment plans to make it easier to get started. But real quick: money aside, you're in on this, right? Like this is the thing?","tics":{"hard":[],"soft":[]}},{"who":"prospect","text":"Yeah, I mean... directionally, yeah, this feels like the right thing. I just don't wanna sign up and then have the money be stressful and that become the reason I check out, you know?","afterClose":false},{"who":"rep","beat":4,"lever":"direct-close","line":"That's exactly why we break it up — so it doesn't feel like a weight. Which works better for you, two payments or three?","tics":{"hard":[],"soft":[]}},{"who":"prospect","text":"I mean, three is probably safer for me honestly. What does that actually break down to per month?","afterClose":true},{"who":"rep","beat":5,"lever":"financial-trade","line":"About $2,333 a month — and look, you flip even one deal in that window, you've covered the whole thing. Want me to get you started on the three-pay?","tics":{"hard":[],"soft":[]}},{"who":"prospect","text":"Yeah, I mean when you put it that way it makes sense... I just want to make sure I know exactly what I'm getting into, like what's the first step after I say yes?","afterClose":false},{"who":"rep","beat":6,"lever":"direct-close","line":"We get your payment set up, I send you the onboarding, and you're booked for your first weekly call within 48 hours. That's it — you're in. Ready to do this?","tics":{"hard":[],"soft":[]}},{"who":"prospect","text":"Yeah, alright... let's do it. Walk me through the payment.","afterClose":true}],"endReason":"won"}];
+var KEY = "wingman-flowbatch-2026-07-22-18-30";
+var GEN = "2026-07-22 18:30", MODEL = "claude-sonnet-4-6";
+var END = { won:"prospect committed", closed:"reached the close", abstain:"Wingman abstained", maxbeats:"still working at beat cap", error:"generation error" };
+var state = {};
+try { state = JSON.parse(localStorage.getItem(KEY) || "{}") || {}; } catch(e) { state = {}; }
+function save(){ try { localStorage.setItem(KEY, JSON.stringify(state)); } catch(e){} }
+function el(tag, attrs, kids){
+  var n = document.createElement(tag);
+  if(attrs) for(var k in attrs){
+    if(k === "class") n.className = attrs[k];
+    else if(k === "text") n.textContent = attrs[k];
+    else if(k.indexOf("on") === 0) n.addEventListener(k.slice(2).toLowerCase(), attrs[k]);
+    else n.setAttribute(k, attrs[k]);
+  }
+  if(kids) kids.forEach(function(c){ if(c != null) n.appendChild(typeof c === "string" ? document.createTextNode(c) : c); });
+  return n;
+}
+document.getElementById("subline").textContent = "Generated " + GEN + " · " + MODEL + " · full objection flows";
+var VERBS = [["keep","✓","Keep"],["rewrite","✎","Rewrite"],["kill","✗","Kill"]];
+var moveKeys = [];
+var list = document.getElementById("list");
+FLOWS.forEach(function(f){
+  var flow = el("div",{class:"flow"});
+  var endCls = "flow-end " + f.endReason;
+  flow.appendChild(el("div",{class:"flow-head"},[ el("h2",{text:f.id}), el("span",{class:endCls,text:END[f.endReason]||f.endReason}) ]));
+  flow.appendChild(el("div",{class:"belief",text:f.belief}));
+  var turnsWrap = el("div",{class:"turns"});
+  f.turns.forEach(function(t){
+    if(t.who === "prospect"){
+      turnsWrap.appendChild(el("div",{class:"pros" + (t.afterClose ? " after-close" : "")},[
+        el("div",{class:"who",text: t.afterClose ? "Prospect (after the ask)" : "Prospect"}),
+        document.createTextNode(t.text)
+      ]));
+      return;
+    }
+    // rep move
+    var mkey = f.id + "::" + t.beat;
+    moveKeys.push(mkey);
+    var st = state[mkey] || (state[mkey] = { verdict:null, rewrite:"", why:"" });
+    if(t.line === null){
+      turnsWrap.appendChild(el("div",{class:"move"},[
+        el("div",{class:"move-head"},[ el("span",{class:"move-n",text:"MOVE " + t.beat}) ]),
+        el("div",{class:"move-line abstain",text:"(abstain — Wingman tells the rep to wait / take the close)"})
+      ]));
+      return;
+    }
+    var badges = [];
+    if(t.tics && t.tics.hard && t.tics.hard.length) badges.push(el("span",{class:"badge hard",text:"TIC: " + t.tics.hard.join(", ")}));
+    if(t.tics && t.tics.soft && t.tics.soft.length) badges.push(el("span",{class:"badge soft",text:"tic? " + t.tics.soft.join(", ")}));
+    var rw = el("div",{class:"extra"},[ el("div",{class:"tl",text:"Your rewrite"}), el("textarea",{placeholder:"How you'd actually say this move…", oninput:function(e){ st.rewrite=e.target.value; save(); }}) ]);
+    rw.querySelector("textarea").value = st.rewrite || "";
+    var wy = el("div",{class:"extra"},[ el("div",{class:"tl",text:"Why"}), el("textarea",{placeholder:"What's wrong / what it should do…", oninput:function(e){ st.why=e.target.value; save(); }}) ]);
+    wy.querySelector("textarea").value = st.why || "";
+    var btns = VERBS.map(function(v){ return el("button",{class:"vbtn","data-v":v[0],type:"button","aria-pressed":"false", onclick:function(){ setV(mkey, v[0]); }},[ el("span",{text:v[1]}), v[2] ]); });
+    var leverEl = t.lever ? el("span",{class:"lever" + (t.lever==="direct-close"?" close":""),text:t.lever}) : null;
+    var move = el("div",{class:"move","data-mk":mkey},[
+      el("div",{class:"move-head"}, [ el("span",{class:"move-n",text:"MOVE " + t.beat}), leverEl ].concat(badges).filter(Boolean)),
+      el("div",{class:"move-line",text:t.line}),
+      el("div",{class:"controls"}, btns),
+      rw, wy
+    ]);
+    move._btns = btns; move._rw = rw; move._wy = wy;
+    turnsWrap.appendChild(move);
+    paint(mkey);
+  });
+  flow.appendChild(turnsWrap);
+  // whole-swing verdict
+  var skey = f.id + "::swing";
+  var sst = state[skey] || (state[skey] = { grade:null, notes:"" });
+  var SW = [["nailed","Nailed the swing"],["ok","Okay / mixed"],["off","Off — didn't carry"]];
+  var swBtns = SW.map(function(s){ return el("button",{class:"swbtn","data-s":s[0],type:"button","aria-pressed": sst.grade===s[0] ? "true":"false", onclick:function(){ setSwing(skey, s[0]); }},[s[1]]); });
+  var swNotes = el("textarea",{placeholder:"Did it carry the rep to the close at the right time? Too early / too late / never? Notes…", oninput:function(e){ sst.notes=e.target.value; save(); }});
+  swNotes.value = sst.notes || "";
+  var swing = el("div",{class:"swing"},[
+    el("div",{class:"q",text:"Whole-swing verdict — did Wingman carry the rep to the close?"}),
+    el("div",{class:"sw-controls"}, swBtns),
+    swNotes
+  ]);
+  swing._btns = swBtns;
+  flow._swing = swing;
+  flow.appendChild(swing);
+  list.appendChild(flow);
+});
+function moveEl(mk){ return list.querySelector('.move[data-mk="' + (window.CSS && CSS.escape ? CSS.escape(mk) : mk) + '"]'); }
+function paint(mk){
+  var st = state[mk] || {}; var m = moveEl(mk); if(!m || !m._btns) return;
+  m._btns.forEach(function(b){ b.setAttribute("aria-pressed", b.getAttribute("data-v") === st.verdict ? "true":"false"); });
+  m._rw.className = "extra" + (st.verdict === "rewrite" ? " show" : "");
+  m._wy.className = "extra" + (st.verdict === "rewrite" || st.verdict === "kill" ? " show" : "");
+}
+function setV(mk, v){
+  var st = state[mk] || (state[mk] = { verdict:null, rewrite:"", why:"" });
+  st.verdict = (st.verdict === v ? null : v);
+  save(); paint(mk); updateProgress();
+}
+function setSwing(sk, g){
+  var st = state[sk] || (state[sk] = { grade:null, notes:"" });
+  st.grade = (st.grade === g ? null : g);
+  save(); repaintSwings();
+}
+function repaintSwings(){
+  var i = 0;
+  list.querySelectorAll(".flow").forEach(function(fl){
+    var f = FLOWS[i++]; if(!f || !fl._swing) return;
+    var st = state[f.id + "::swing"] || {};
+    fl._swing._btns.forEach(function(b){ b.setAttribute("aria-pressed", b.getAttribute("data-s") === st.grade ? "true":"false"); });
+  });
+}
+function marked(){ return moveKeys.filter(function(k){ return state[k] && state[k].verdict; }).length; }
+function updateProgress(){
+  var m = marked(), total = moveKeys.length;
+  document.getElementById("count").innerHTML = "<b>" + m + "</b> / " + total + " moves";
+  document.getElementById("fnote").textContent = m + " of " + total + " moves marked";
+  document.getElementById("bar").style.width = (total ? (m/total*100) : 0) + "%";
+}
+function assemble(){
+  var out = ["# Wingman Flow Batch — MARKED (the swing)", "", "Generated " + GEN + " · gen=" + MODEL, ""];
+  FLOWS.forEach(function(f){
+    out.push("## " + f.id + "  [end: " + (END[f.endReason]||f.endReason) + "]", "");
+    f.turns.forEach(function(t){
+      if(t.who === "prospect"){ out.push("Prospect: " + t.text); return; }
+      if(t.line === null){ out.push("Wingman MOVE " + t.beat + ": (abstain)"); return; }
+      var st = state[f.id + "::" + t.beat] || {};
+      var v = st.verdict === "keep" ? "✓" : st.verdict === "kill" ? "✗" : st.verdict === "rewrite" ? "✎ (rewrite)" : "(unmarked)";
+      out.push("Wingman MOVE " + t.beat + (t.lever ? " ["+t.lever+"]" : "") + ": " + t.line);
+      out.push("  Verdict: " + v + (st.rewrite ? " | Rewrite: " + st.rewrite.trim() : "") + (st.why ? " | Why: " + st.why.trim() : ""));
+    });
+    var sw = state[f.id + "::swing"] || {};
+    out.push("", "SWING VERDICT: " + (sw.grade || "(unmarked)") + (sw.notes ? " — " + sw.notes.trim() : ""), "", "---", "");
+  });
+  return out.join("\n");
+}
+function copyResults(){
+  var text = assemble();
+  var ta = document.getElementById("output");
+  ta.value = text; ta.style.display = "block"; ta.focus(); ta.select();
+  var done = function(){ var t = document.getElementById("toast"); t.classList.add("show"); setTimeout(function(){ t.classList.remove("show"); }, 2200); };
+  if(navigator.clipboard && navigator.clipboard.writeText){ navigator.clipboard.writeText(text).then(done, done); }
+  else { try { document.execCommand("copy"); } catch(e){} done(); }
+}
+document.getElementById("copyBtn").addEventListener("click", copyResults);
+document.getElementById("copyTop").addEventListener("click", copyResults);
+repaintSwings();
+updateProgress();
+</script>

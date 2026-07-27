@@ -44,7 +44,7 @@ Wingman is a Mac desktop app (Electron + Next.js) that acts as a real-time AI co
 | Web/dashboard | Next.js (App Router) | Dashboard UI, API routes, auth |
 | Live audio | Recall.ai | Joins the call, streams transcript |
 | Transcription | Deepgram (inside Recall.ai) | Speech to text |
-| AI — live | Claude **Sonnet** (objection card — SHIPPED 2026-06-29; Haiku still on answer/dig/close) | Signal card generation (objection = context-driven prompt, NO KB; KB kept for the Coach) |
+| AI — live | Claude **Sonnet** (objection + dig cards — streaming, NO KB) | Signal cards: **objection**/**dig** = Sonnet, NO KB · **close** = client-side readiness chip (no AI) · **answer** = NOT built yet. KB kept for the **Coach only**. *(Reconciled 2026-07-22 — the old "Haiku still on answer/dig/close" was stale; see line ~196.)* |
 | AI — post-call | Claude Sonnet | Call grading, debrief, Sales DNA update |
 | Database | Supabase | Users, calls, Sales DNA JSON, KB embeddings |
 | Vector search | pgvector (in Supabase) | KB retrieval — **Wingman Coach only** since 2026-06-21 (no longer live objection cards) |
@@ -193,7 +193,7 @@ A user can:
 
 ## AI Architecture (RAG Pipeline)
 
-> ✅ **SHIPPED 2026-06-29.** The **objection** card no longer uses this RAG/KB path — it's a context-driven **Sonnet** prompt (diagnose the weak Belief Ladder belief → uncertainty-first tie-down anchored to the prospect's own words → one spoken line, NO embed/KB) in `src/lib/wingman/objection-signal.ts`, wired in `kb-signal/route.ts` (the Groq distiller is kept only as the "no standing objection → nudge" gate). The KB stays for the **Wingman Coach** (Mission Intel) and the still-KB answer/dig/close slots. The diagram below describes those OTHER slots (Haiku + KB); the objection slot is Sonnet with no retrieval. Full narrative: `Wingman Brain/01 - Build Log/2026-06-29.md` + Decisions Log 2026-06-29.
+> ✅ **SHIPPED 2026-06-29.** The **objection** card no longer uses this RAG/KB path — it's a context-driven **Sonnet** prompt (diagnose the weak Belief Ladder belief → uncertainty-first tie-down anchored to the prospect's own words → one spoken line, NO embed/KB) in `src/lib/wingman/objection-signal.ts`, wired in `kb-signal/route.ts` (the Groq distiller is kept only as the "no standing objection → nudge" gate). The KB stays for the **Wingman Coach** (Mission Intel) **ONLY**. *(Reconciled 2026-07-22 — the old "still-KB answer/dig/close slots" claim was STALE and WRONG: **dig** is now Sonnet streaming (no KB), **close** is the client-side readiness chip (no AI/KB, PR #50), and **answer** was never built. The `searchKnowledge`→`generateSignalCard` block in `kb-signal/route.ts` is **DEAD CODE** — no client path reaches it — slated for **Phase 5 dead-code removal (#37)**.)* The objection slot is Sonnet with no retrieval. Full narrative: `Wingman Brain/01 - Build Log/2026-06-29.md` + Decisions Log 2026-06-29.
 
 ```
 Recall.ai transcript stream

@@ -4,6 +4,7 @@ import { PLANS } from "@/lib/stripe";
 import { FREE_CALL_LIMIT } from "@/lib/constants";
 import { warmUpPipeline } from "@/lib/wingman/pipeline-warmup";
 import { sanitizeSalesDna } from "@/lib/wingman/sales-dna.mjs";
+import * as devlog from "@/lib/wingman/devlog";
 
 // ── Warm-up debounce (Phase 1b reviewer 🟡) ─────────────────────────────────
 // warmUpPipeline fires paid requests (embed ping, Haiku/Sonnet pings, and — with
@@ -128,6 +129,15 @@ export async function POST(req: NextRequest) {
       .single();
 
     if (error) throw error;
+
+    // Flight Recorder (dev-only, no-op in prod): the call HEADER — the Sales DNA the
+    // cards will read from + when it started. Opens this call's log file. Never blocks.
+    devlog.append(call.id, "server", "header", {
+      prospectName: prospect_name || "Live Call",
+      salesDna:     salesDna ?? null,
+      startedAt:    call.call_date,
+      nodeEnv:      process.env.NODE_ENV,
+    });
 
     // Phase 3.5 (#38) + 1b: fire-and-forget pipeline warm-up — opens TLS/connection
     // pools to OpenAI/Anthropic/Groq, kicks the in-memory KB load, and (when the

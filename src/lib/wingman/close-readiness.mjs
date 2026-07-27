@@ -22,7 +22,7 @@
 
 /** @typedef {"not-ready"|"continue"|"almost"|"ready"} ReadinessState */
 /** @typedef {"locked"|"partial"|"open"|"atrisk"} BeliefStatus */
-/** @typedef {{ state: ReadinessState, label: string, gap: string[], note?: string }} Readiness */
+/** @typedef {{ state: ReadinessState, label: string, gap: string[], cold: boolean, note?: string }} Readiness */
 
 // Cold-start line — shown instead of a gap list when NOTHING has been covered yet. Naming a top-2
 // gap when the rep has touched nothing is misleading (it implies only those 2 matter). Mirrors the
@@ -178,9 +178,25 @@ export function scoreReadiness(summary) {
   else                                               state = "continue";
 
   // Cold start = every belief still open (nothing touched). Show an honest note, not a fake 2-gap.
+  // `cold` is also exposed on the return (#52): the dig nudge gate in kb-signal uses it to block
+  // the take-close line on a ladder with zero discovery — same engine, so the arrows agree.
   const cold = BELIEFS.every((b) => st[b.id] === "open");
-  if (cold) return { state, label: READINESS_LABELS[state], gap: [], note: COLD_START_NOTE };
+  if (cold) return { state, label: READINESS_LABELS[state], gap: [], cold, note: COLD_START_NOTE };
 
   const gap = state === "ready" ? [] : buildGap(st);
-  return { state, label: READINESS_LABELS[state], gap };
+  return { state, label: READINESS_LABELS[state], gap, cold };
+}
+
+/**
+ * #52 dig nudge gate — is this ladder showing ZERO discovery? True when the summary is
+ * missing/blank OR every belief parses as ⬜ open. Used by kb-signal's dig branch to block the
+ * "take the close" nudge on a cold call (a take-close with nothing built is never real — it's the
+ * model's escape hatch on a degenerate transcript). Deliberately NARROW: one touched belief (even
+ * a single 🟡) returns false, preserving the verbal-readiness override ("how do we get started?"
+ * early in a call → the doctrine says take the close, and this gate must never eat it).
+ * @param {string} [summary] the live_summary text
+ * @returns {boolean}
+ */
+export function isColdLadder(summary) {
+  return !summary?.trim() || scoreReadiness(summary).cold;
 }

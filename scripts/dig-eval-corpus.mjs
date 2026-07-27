@@ -26,7 +26,7 @@ Stage: Discovery · Elapsed: 12m · Syntax: problems-first
   Desired "heaven": — · $GOAL — · why that #: —
   Final straw / emotional why: —
   Core driver: —
-▸ BELIEF LADDER  (✅ locked · 🟡 partial · ⬜ open · ⚠️ at-risk/objection)
+▸ BELIEF LADDER  (✅ locked · 🟡 partial · ⬜ open · ⚠️ objected)
   1 Pain                 ✅ — "I never know where the next client's coming from"
   2 Doubt (can't DIY)    ✅ — "courses didn't move the needle for me"
   3 Cost (of inaction)   🟡 — stress mentioned, not quantified
@@ -34,7 +34,7 @@ Stage: Discovery · Elapsed: 12m · Syntax: problems-first
   5 Money                ⬜ — not discussed
   6 Support (who decides) ⬜ — not discussed
   7 Trust (why you)      ⬜ — not discussed
-▸ THEIR EXACT WORDS
+▸ KEY ANCHORS (their exact words)
   • "I never know where the next client's coming from"
   • "feast or famine, every single month"
 ▸ OPEN OBJECTIONS: none
@@ -55,7 +55,7 @@ Stage: Press · Elapsed: 20m · Syntax: problems-first
   Desired "heaven": $40k/mo · $GOAL 40000 · why that #: hire a team, stop doing everything
   Final straw / emotional why: "I'm burnt out doing it all myself"
   Core driver: Certainty
-▸ BELIEF LADDER  (✅ locked · 🟡 partial · ⬜ open · ⚠️ at-risk/objection)
+▸ BELIEF LADDER  (✅ locked · 🟡 partial · ⬜ open · ⚠️ objected)
   1 Pain                 ✅ — "burnt out doing it all myself"
   2 Doubt (can't DIY)    ✅ — "I've plateaued, can't figure out the next level"
   3 Cost (of inaction)   ✅ — "another year like this and I'm done"
@@ -63,7 +63,7 @@ Stage: Press · Elapsed: 20m · Syntax: problems-first
   5 Money                🟡 — has budget, not confirmed ready
   6 Support (who decides) ✅ — sole decision-maker
   7 Trust (why you)      ⚠️ — "I paid $20k for a coach last year and got nothing"
-▸ THEIR EXACT WORDS
+▸ KEY ANCHORS (their exact words)
   • "I paid $20k for a coach last year and got nothing"
   • "burnt out doing it all myself"
 ▸ OPEN OBJECTIONS: skepticism from past coach — open
@@ -84,7 +84,7 @@ Stage: Discovery · Elapsed: 6m · Syntax: —
   Desired "heaven": — · $GOAL — · why that #: —
   Final straw / emotional why: —
   Core driver: —
-▸ BELIEF LADDER  (✅ locked · 🟡 partial · ⬜ open · ⚠️ at-risk/objection)
+▸ BELIEF LADDER  (✅ locked · 🟡 partial · ⬜ open · ⚠️ objected)
   1 Pain                 🟡 — "things could be better" (vague)
   2 Doubt (can't DIY)    ⬜ — not discussed
   3 Cost (of inaction)   ⬜ — not discussed
@@ -92,7 +92,7 @@ Stage: Discovery · Elapsed: 6m · Syntax: —
   5 Money                ⬜ — not discussed
   6 Support (who decides) ⬜ — not discussed
   7 Trust (why you)      ⬜ — not discussed
-▸ THEIR EXACT WORDS
+▸ KEY ANCHORS (their exact words)
   • "things could be better"
 ▸ OPEN OBJECTIONS: none
 ▸ WEAKEST LINK → Pain (🟡) — it's soft and vague; sharpen the real problem before moving on`,
@@ -112,7 +112,7 @@ Stage: Discovery · Elapsed: 10m · Syntax: problems-first
   Desired "heaven": — · $GOAL — · why that #: —
   Final straw / emotional why: —
   Core driver: —
-▸ BELIEF LADDER  (✅ locked · 🟡 partial · ⬜ open · ⚠️ at-risk/objection)
+▸ BELIEF LADDER  (✅ locked · 🟡 partial · ⬜ open · ⚠️ objected)
   1 Pain                 🟡 — "things are tight, but we're managing" — not fully owned
   2 Doubt (can't DIY)    ⚠️ — "I've been doing this seven years" (thinks he can figure it out)
   3 Cost (of inaction)   ⬜ — not discussed
@@ -120,7 +120,7 @@ Stage: Discovery · Elapsed: 10m · Syntax: problems-first
   5 Money                ⬜ — not discussed
   6 Support (who decides) ⬜ — not discussed
   7 Trust (why you)      ⬜ — not discussed
-▸ THEIR EXACT WORDS
+▸ KEY ANCHORS (their exact words)
   • "things are tight, but we're managing"
   • "I've been doing this seven years"
 ▸ OPEN OBJECTIONS: none
@@ -141,7 +141,7 @@ Stage: Confirm · Elapsed: 28m · Syntax: problems-first
   Desired "heaven": $50k/mo · $GOAL 50000 · why that #: buy back his time, hire a team
   Final straw / emotional why: "missed my kid's recital for a client call"
   Core driver: Significance
-▸ BELIEF LADDER  (✅ locked · 🟡 partial · ⬜ open · ⚠️ at-risk/objection)
+▸ BELIEF LADDER  (✅ locked · 🟡 partial · ⬜ open · ⚠️ objected)
   1 Pain                 ✅ — "missed my kid's recital"
   2 Doubt (can't DIY)    ✅ — "I've tried on my own for two years"
   3 Cost (of inaction)   ✅ — "another year of this isn't an option"
@@ -149,7 +149,7 @@ Stage: Confirm · Elapsed: 28m · Syntax: problems-first
   5 Money                ✅ — "I've got the budget set aside"
   6 Support (who decides) ✅ — "it's just my call"
   7 Trust (why you)      ✅ — "this is exactly the structure I've been missing"
-▸ THEIR EXACT WORDS
+▸ KEY ANCHORS (their exact words)
   • "this is exactly the structure I've been missing"
   • "I've got the budget set aside"
 ▸ OPEN OBJECTIONS: none
@@ -170,7 +170,7 @@ Stage: Confirm · Elapsed: 25m · Syntax: goals-first
   Desired "heaven": $30k/mo · $GOAL 30000 · why that #: replace the day job, go full time
   Final straw / emotional why: "I'm done being stuck"
   Core driver: Certainty
-▸ BELIEF LADDER  (✅ locked · 🟡 partial · ⬜ open · ⚠️ at-risk/objection)
+▸ BELIEF LADDER  (✅ locked · 🟡 partial · ⬜ open · ⚠️ objected)
   1 Pain                 ✅ — "capped out, can't grow past $12k on my own"
   2 Doubt (can't DIY)    ✅ — "clearly what I'm doing isn't enough"
   3 Cost (of inaction)   ✅ — "I'm done being stuck"
@@ -178,7 +178,7 @@ Stage: Confirm · Elapsed: 25m · Syntax: goals-first
   5 Money                🟡 — hasn't confirmed budget, but no resistance
   6 Support (who decides) ✅ — sole decision-maker
   7 Trust (why you)      ✅ — "you get it, this is the right fit"
-▸ THEIR EXACT WORDS
+▸ KEY ANCHORS (their exact words)
   • "you get it, this is the right fit"
   • "I'm done being stuck"
 ▸ OPEN OBJECTIONS: none
@@ -199,7 +199,7 @@ Stage: Confirm · Elapsed: 26m · Syntax: problems-first
   Desired "heaven": $60k/mo · $GOAL 60000 · why that #: scale without burning out
   Final straw / emotional why: "I can't keep working 70-hour weeks"
   Core driver: Growth
-▸ BELIEF LADDER  (✅ locked · 🟡 partial · ⬜ open · ⚠️ at-risk/objection)
+▸ BELIEF LADDER  (✅ locked · 🟡 partial · ⬜ open · ⚠️ objected)
   1 Pain                 ✅ — "70-hour weeks, no systems"
   2 Doubt (can't DIY)    ✅ — "I've hit a ceiling I can't break alone"
   3 Cost (of inaction)   ✅ — "I'll burn out if nothing changes"
@@ -207,7 +207,7 @@ Stage: Confirm · Elapsed: 26m · Syntax: problems-first
   5 Money                ⬜ — not discussed at all
   6 Support (who decides) ✅ — "just me"
   7 Trust (why you)      ✅ — "this is the system I've been missing"
-▸ THEIR EXACT WORDS
+▸ KEY ANCHORS (their exact words)
   • "I can't keep working 70-hour weeks"
   • "this is the system I've been missing"
 ▸ OPEN OBJECTIONS: none
@@ -239,7 +239,7 @@ Stage: Discovery · Elapsed: 5m · Syntax: —
   Desired "heaven": — · $GOAL — · why that #: —
   Final straw / emotional why: —
   Core driver: —
-▸ BELIEF LADDER  (✅ locked · 🟡 partial · ⬜ open · ⚠️ at-risk/objection)
+▸ BELIEF LADDER  (✅ locked · 🟡 partial · ⬜ open · ⚠️ objected)
   1 Pain                 ⬜ — not surfaced yet
   2 Doubt (can't DIY)    ⬜ — not discussed
   3 Cost (of inaction)   ⬜ — not discussed
@@ -247,7 +247,7 @@ Stage: Discovery · Elapsed: 5m · Syntax: —
   5 Money                ⬜ — not discussed
   6 Support (who decides) ⬜ — not discussed
   7 Trust (why you)      ⬜ — not discussed
-▸ THEIR EXACT WORDS
+▸ KEY ANCHORS (their exact words)
   • (none captured yet)
 ▸ OPEN OBJECTIONS: none
 ▸ WEAKEST LINK → Pain (⬜) — nothing surfaced yet; find the problem first`,
@@ -267,7 +267,7 @@ Stage: Discovery · Elapsed: 14m · Syntax: goals-first
   Desired "heaven": "grow, make more" (vague) · $GOAL — · why that #: —
   Final straw / emotional why: —
   Core driver: —
-▸ BELIEF LADDER  (✅ locked · 🟡 partial · ⬜ open · ⚠️ at-risk/objection)
+▸ BELIEF LADDER  (✅ locked · 🟡 partial · ⬜ open · ⚠️ objected)
   1 Pain                 ✅ — "inconsistent, stuck at $10k"
   2 Doubt (can't DIY)    🟡 — hinted, not owned
   3 Cost (of inaction)   ⬜ — not discussed
@@ -275,7 +275,7 @@ Stage: Discovery · Elapsed: 14m · Syntax: goals-first
   5 Money                ⬜ — not discussed
   6 Support (who decides) ⬜ — not discussed
   7 Trust (why you)      ⬜ — not discussed
-▸ THEIR EXACT WORDS
+▸ KEY ANCHORS (their exact words)
   • "I want to grow, make more"
   • "stuck at ten grand a month"
 ▸ OPEN OBJECTIONS: none
@@ -296,7 +296,7 @@ Stage: Press · Elapsed: 18m · Syntax: problems-first
   Desired "heaven": $45k/mo · $GOAL 45000 · why that #: buy a house, more freedom
   Final straw / emotional why: —
   Core driver: —
-▸ BELIEF LADDER  (✅ locked · 🟡 partial · ⬜ open · ⚠️ at-risk/objection)
+▸ BELIEF LADDER  (✅ locked · 🟡 partial · ⬜ open · ⚠️ objected)
   1 Pain                 ✅ — "plateaued 18 months, can't break through"
   2 Doubt (can't DIY)    ✅ — "I've tried everything I know"
   3 Cost (of inaction)   ⬜ — not discussed
@@ -304,7 +304,7 @@ Stage: Press · Elapsed: 18m · Syntax: problems-first
   5 Money                ⬜ — not discussed
   6 Support (who decides) ✅ — sole decision-maker
   7 Trust (why you)      🟡 — warming up
-▸ THEIR EXACT WORDS
+▸ KEY ANCHORS (their exact words)
   • "plateaued for a year and a half"
   • "$45k would let us finally buy a house"
 ▸ OPEN OBJECTIONS: none
@@ -344,7 +344,7 @@ Stage: Discovery · Elapsed: 11m · Syntax: problems-first
   Desired "heaven": "quit my job" (vague) · $GOAL — · why that #: —
   Final straw / emotional why: —
   Core driver: —
-▸ BELIEF LADDER  (✅ locked · 🟡 partial · ⬜ open · ⚠️ at-risk/objection)
+▸ BELIEF LADDER  (✅ locked · 🟡 partial · ⬜ open · ⚠️ objected)
   1 Pain                 ✅ — "I dread Monday mornings, every single week"
   2 Doubt (can't DIY)    🟡 — hinted at stalled self-efforts
   3 Cost (of inaction)   ⬜ — not discussed
@@ -352,7 +352,7 @@ Stage: Discovery · Elapsed: 11m · Syntax: problems-first
   5 Money                ⬜ — not discussed
   6 Support (who decides) ⬜ — not discussed
   7 Trust (why you)      ⬜ — not discussed
-▸ THEIR EXACT WORDS
+▸ KEY ANCHORS (their exact words)
   • "I dread Monday mornings, every single week"
   • "I just want to quit my job"
 ▸ OPEN OBJECTIONS: none
@@ -390,7 +390,7 @@ Stage: Discovery · Elapsed: 9m · Syntax: goals-first
   Desired "heaven": — · $GOAL — · why that #: —
   Final straw / emotional why: —
   Core driver: —
-▸ BELIEF LADDER  (✅ locked · 🟡 partial · ⬜ open · ⚠️ at-risk/objection)
+▸ BELIEF LADDER  (✅ locked · 🟡 partial · ⬜ open · ⚠️ objected)
   1 Pain                 🟡 — "my calendar is just calls, back to back" — not yet costed
   2 Doubt (can't DIY)    ⬜ — not discussed
   3 Cost (of inaction)   ⬜ — not discussed
@@ -398,7 +398,7 @@ Stage: Discovery · Elapsed: 9m · Syntax: goals-first
   5 Money                ⬜ — not discussed
   6 Support (who decides) ⬜ — not discussed
   7 Trust (why you)      ⬜ — not discussed
-▸ THEIR EXACT WORDS
+▸ KEY ANCHORS (their exact words)
   • "my calendar is just calls, back to back"
 ▸ OPEN OBJECTIONS: none
 ▸ WEAKEST LINK → Pain (🟡) — owned lightly; what is it actually costing him?`,
@@ -436,7 +436,7 @@ Stage: Discovery · Elapsed: 7m · Syntax: problems-first
   Desired "heaven": — · $GOAL — · why that #: —
   Final straw / emotional why: —
   Core driver: —
-▸ BELIEF LADDER  (✅ locked · 🟡 partial · ⬜ open · ⚠️ at-risk/objection)
+▸ BELIEF LADDER  (✅ locked · 🟡 partial · ⬜ open · ⚠️ objected)
   1 Pain                 🟡 — "some months are great, some are dead" — not yet owned
   2 Doubt (can't DIY)    ⬜ — not discussed
   3 Cost (of inaction)   ⬜ — not discussed
@@ -444,7 +444,7 @@ Stage: Discovery · Elapsed: 7m · Syntax: problems-first
   5 Money                ⬜ — not discussed
   6 Support (who decides) ⬜ — not discussed
   7 Trust (why you)      ⬜ — not discussed
-▸ THEIR EXACT WORDS
+▸ KEY ANCHORS (their exact words)
   • "some months are great, some are dead"
 ▸ OPEN OBJECTIONS: none
 ▸ WEAKEST LINK → Pain (🟡) — lightly owned; make the inconsistency real before anything else`,
@@ -453,6 +453,42 @@ Prospect: Up and down honestly. Some months are great, some are dead. It all dep
     // Regression guard: the DNA mentions money-qualification and a $20k figure — the card
     // must STILL respect order (Pain is 🟡, call is early: no Money/Support questions) and
     // must not import the $20k. DNA context never overrides the order doctrine.
+    targetBelief: "Pain",
+    forbidBeliefs: ["Money", "Support"],
+  },
+  {
+    id: 15,
+    label: "#52 REGRESSION: all-open ladder + small-talk transcript — must DIG, never take-close",
+    expect: "question",
+    // The Known Issue #52 shape (Flight Recorder call 928e4249): every belief still ⬜ open,
+    // transcript is early-call chatter with zero discovery and ZERO readiness words. The model
+    // returned {null,null} here 4/4 times ("take the close" — its only escape hatch), which the
+    // HUD rendered as "They're ready — go for the close." A server gate now blocks that line on
+    // a cold ladder; THIS fixture pins the prompt side: on an early call the right move is the
+    // opening Pain question, not silence.
+    context: `LIVE CALL MEMORY
+Stage: — · Elapsed: 2m · Syntax: —
+▸ THE GAP
+  Current "hell":   —
+  Desired "heaven": — · $GOAL — · why that #: —
+  Final straw / emotional why: —
+  Core driver: —
+▸ BELIEF LADDER  (✅ locked · 🟡 partial · ⬜ open · ⚠️ objected)
+  1 Pain                 ⬜ open — no sales conversation detected yet
+  2 Doubt (can't DIY)    ⬜ open — —
+  3 Cost (of inaction)   ⬜ open — —
+  4 Desire               ⬜ open — —
+  5 Money                ⬜ open — —
+  6 Support (who decides) ⬜ open — —
+  7 Trust (why you)      ⬜ open — —
+▸ KEY ANCHORS (their exact words)
+  — (no sales dialogue detected)
+▸ OPEN OBJECTIONS: none
+▸ WEAKEST LINK → all beliefs open — no prospect conversation has begun`,
+    transcript: `Rep: Hey, can you hear me okay? I think my mic was cutting out for a second there.
+Prospect: Yeah you're good now. Sorry, I was just grabbing a coffee, it's been one of those mornings.
+Rep: No worries at all. Give me one sec to pull things up.
+Prospect: All good, take your time.`,
     targetBelief: "Pain",
     forbidBeliefs: ["Money", "Support"],
   },

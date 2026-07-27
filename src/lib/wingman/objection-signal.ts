@@ -24,7 +24,7 @@
  * with no confirmation signal the "if unsure, don't say the digits" default holds.
  */
 
-import { OBJECTION_SYSTEM_PROMPT, buildObjectionUserSegments, LEVER_TAXONOMY } from "./objection-prompt.mjs";
+import { OBJECTION_SYSTEM_PROMPT, buildObjectionSystemPrompt, buildObjectionUserSegments, LEVER_TAXONOMY } from "./objection-prompt.mjs";
 import { parseSSEBuffer } from "./sse-parse";
 import { decodeLineStream, decodeLeverStream, stripWrappingQuotes } from "./json-line-stream";
 
@@ -156,6 +156,7 @@ async function generateObjectionAttempt(
   thread?: ObjectionThread,
   callMemory?: ObjectionCallMemory,
   leverToAvoid?: string,
+  confrontation?: string,
 ): Promise<ObjectionCardResult> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
@@ -186,7 +187,7 @@ async function generateObjectionAttempt(
       body: JSON.stringify({
         model:      OBJECTION_MODEL,
         max_tokens: OBJECTION_MAX_TOKENS,
-        system:     OBJECTION_SYSTEM_PROMPT,
+        system:     buildObjectionSystemPrompt(confrontation),
         messages:   [{ role: "user", content: userContent }],
       }),
       signal: controller.signal,
@@ -230,16 +231,17 @@ export async function generateObjectionCard(
   liveSummary?: string,
   thread?: ObjectionThread,
   callMemory?: ObjectionCallMemory,
+  confrontation?: string,
 ): Promise<ObjectionCardResult> {
   const levers = (thread?.leversUsed ?? []).filter((v) => LEVER_TAXONOMY.includes(v));
   const lastLever = levers.length ? levers[levers.length - 1] : undefined;
   const guardActive = !!(thread && Number(thread.beatNumber) > 1 && lastLever && lastLever !== "direct-close");
 
-  const first = await generateObjectionAttempt(transcriptChunk, liveSummary, thread, callMemory);
+  const first = await generateObjectionAttempt(transcriptChunk, liveSummary, thread, callMemory, undefined, confrontation);
   if (!guardActive || first.status !== "line" || !first.lever || first.lever !== lastLever) return first;
 
   console.log(`[generateObjectionCard] lever "${lastLever}" repeated back-to-back — retrying once`);
-  const second = await generateObjectionAttempt(transcriptChunk, liveSummary, thread, callMemory, lastLever);
+  const second = await generateObjectionAttempt(transcriptChunk, liveSummary, thread, callMemory, lastLever, confrontation);
   // Humility valve: ship attempt 2 whatever it is; fall back to attempt 1 only on hard error.
   return second.status === "error" ? first : second;
 }
@@ -280,6 +282,7 @@ async function* streamObjectionAttempt(
   thread?: ObjectionThread,
   callMemory?: ObjectionCallMemory,
   leverToAvoid?: string,
+  confrontation?: string,
 ): AsyncGenerator<ObjectionStreamEvent> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
@@ -316,7 +319,7 @@ async function* streamObjectionAttempt(
       body: JSON.stringify({
         model:      OBJECTION_MODEL,
         max_tokens: OBJECTION_MAX_TOKENS,
-        system:     OBJECTION_SYSTEM_PROMPT,
+        system:     buildObjectionSystemPrompt(confrontation),
         messages:   [{ role: "user", content: buildUserContent(transcriptChunk, liveSummary, thread, callMemory, leverToAvoid) }],
         stream:     true,
       }),
@@ -437,6 +440,7 @@ export async function* streamObjectionCard(
   signal?: AbortSignal,
   thread?: ObjectionThread,
   callMemory?: ObjectionCallMemory,
+  confrontation?: string,
 ): AsyncGenerator<ObjectionStreamEvent> {
   const levers = (thread?.leversUsed ?? []).filter((v) => LEVER_TAXONOMY.includes(v));
   const lastLever = levers.length ? levers[levers.length - 1] : undefined;
@@ -455,7 +459,7 @@ export async function* streamObjectionCard(
       let retry = false;
       let decided = !guardActive || attempt === 2; // no guard → pure passthrough
 
-      const inner = streamObjectionAttempt(transcriptChunk, liveSummary, outer.signal, thread, callMemory, leverToAvoid);
+      const inner = streamObjectionAttempt(transcriptChunk, liveSummary, outer.signal, thread, callMemory, leverToAvoid, confrontation);
       for await (const ev of inner) {
         if (ev.kind === "lever-info") { attemptLever = ev.lever; continue; } // internal — never forwarded
         if (!decided && (ev.kind === "delta" || ev.kind === "done")) {

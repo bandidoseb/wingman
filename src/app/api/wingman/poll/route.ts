@@ -107,7 +107,7 @@ export async function POST(req: NextRequest) {
           .single(),
         service
           .from("calls")
-          .select("outcome, call_stages(*)")
+          .select("outcome, outcome_source, call_stages(*)")
           .eq("user_id", user.id)
           .order("call_date", { ascending: false })
           .limit(30),

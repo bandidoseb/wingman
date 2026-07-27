@@ -1,0 +1,205 @@
+<title>Wingman Voice Batch — Grade Sheet</title>
+<style>
+:root{
+  --bg:#f5f6f9; --surface:#ffffff; --surface2:#fbfcfe; --ink:#161a21; --muted:#5b6472;
+  --line:#e3e7ee; --accent:#2f6bff; --accent-soft:#eaf0ff;
+  --keep:#15873f; --keep-bg:#e9f6ee; --rewrite:#b5730a; --rewrite-bg:#fbf1df; --kill:#d21b4b; --kill-bg:#fdebf0;
+  --radius:12px; --shadow:0 1px 2px rgba(20,26,33,.06),0 4px 16px rgba(20,26,33,.05);
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#0d1016; --surface:#161b23; --surface2:#1b212b; --ink:#e8ebf1; --muted:#96a1b2;
+  --line:#262d39; --accent:#6a97ff; --accent-soft:#1a2438;
+  --keep:#4fce7f; --keep-bg:#132a1d; --rewrite:#e5a83c; --rewrite-bg:#2c2413; --kill:#ff6b93; --kill-bg:#2e1620;
+  --shadow:0 1px 2px rgba(0,0,0,.35),0 6px 20px rgba(0,0,0,.3);
+}}
+:root[data-theme="light"]{
+  --bg:#f5f6f9; --surface:#ffffff; --surface2:#fbfcfe; --ink:#161a21; --muted:#5b6472;
+  --line:#e3e7ee; --accent:#2f6bff; --accent-soft:#eaf0ff;
+  --keep:#15873f; --keep-bg:#e9f6ee; --rewrite:#b5730a; --rewrite-bg:#fbf1df; --kill:#d21b4b; --kill-bg:#fdebf0;
+}
+:root[data-theme="dark"]{
+  --bg:#0d1016; --surface:#161b23; --surface2:#1b212b; --ink:#e8ebf1; --muted:#96a1b2;
+  --line:#262d39; --accent:#6a97ff; --accent-soft:#1a2438;
+  --keep:#4fce7f; --keep-bg:#132a1d; --rewrite:#e5a83c; --rewrite-bg:#2c2413; --kill:#ff6b93; --kill-bg:#2e1620;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;line-height:1.5;margin:0;-webkit-font-smoothing:antialiased}
+.wrap{max-width:760px;margin:0 auto;padding:0 20px 140px}
+.topbar{position:sticky;top:0;z-index:20;background:color-mix(in srgb,var(--bg) 88%,transparent);backdrop-filter:blur(10px);border-bottom:1px solid var(--line);margin:0 -20px;padding:14px 20px}
+.topbar-inner{max-width:760px;margin:0 auto;display:flex;align-items:center;gap:16px}
+.brand{display:flex;flex-direction:column;gap:2px;flex:1;min-width:0}
+.brand h1{font-size:15px;font-weight:650;margin:0;letter-spacing:-.01em}
+.brand .sub{font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.count{font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap}
+.count b{color:var(--ink)}
+.btn{appearance:none;border:1px solid var(--accent);background:var(--accent);color:#fff;font:inherit;font-weight:600;font-size:13px;padding:8px 14px;border-radius:9px;cursor:pointer;white-space:nowrap;transition:filter .12s,transform .06s}
+.btn:hover{filter:brightness(1.06)}.btn:active{transform:translateY(1px)}
+.btn.ghost{background:transparent;color:var(--accent)}
+.progress{height:3px;background:var(--line);border-radius:2px;margin-top:12px;overflow:hidden}
+.progress > i{display:block;height:100%;width:0;background:var(--accent);border-radius:2px;transition:width .25s ease}
+.intro{color:var(--muted);font-size:13.5px;margin:22px 2px 6px}
+.intro b{color:var(--ink);font-weight:600}
+.sec{margin-top:26px}
+.sec > h2{font-size:12px;font-weight:650;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);margin:0 2px 12px;display:flex;align-items:center;gap:9px}
+.sec > h2::after{content:"";flex:1;height:1px;background:var(--line)}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:16px 16px 14px;margin-bottom:14px;transition:border-color .15s}
+.card[data-v="keep"]{border-color:color-mix(in srgb,var(--keep) 55%,var(--line))}
+.card[data-v="rewrite"]{border-color:color-mix(in srgb,var(--rewrite) 55%,var(--line))}
+.card[data-v="kill"]{border-color:color-mix(in srgb,var(--kill) 55%,var(--line))}
+.chead{display:flex;align-items:center;gap:8px;margin-bottom:11px}
+.cid{font-size:12px;font-weight:600;letter-spacing:.04em;color:var(--muted);font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+.badge{font-size:10.5px;font-weight:600;letter-spacing:.03em;padding:2px 7px;border-radius:20px;border:1px solid}
+.badge.hard{color:var(--kill);border-color:var(--kill);background:var(--kill-bg)}
+.badge.soft{color:var(--rewrite);border-color:var(--rewrite);background:var(--rewrite-bg)}
+.lbl{font-size:10px;font-weight:650;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:3px}
+.prospect{font-style:italic;color:var(--muted);font-size:14px;margin-bottom:12px;padding-left:11px;border-left:2px solid var(--line)}
+.line{font-size:16.5px;font-weight:500;line-height:1.42;color:var(--ink);margin-bottom:14px;letter-spacing:-.005em}
+.line.abstain{font-weight:400;font-style:italic;color:var(--muted)}
+.controls{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.vbtn{appearance:none;font:inherit;font-size:13px;font-weight:600;padding:9px 6px;border-radius:9px;border:1px solid var(--line);background:var(--surface2);color:var(--muted);cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;transition:all .12s}
+.vbtn:hover{border-color:var(--muted)}
+.vbtn .ic{font-size:14px;line-height:1}
+.vbtn[aria-pressed="true"][data-v="keep"]{background:var(--keep-bg);border-color:var(--keep);color:var(--keep)}
+.vbtn[aria-pressed="true"][data-v="rewrite"]{background:var(--rewrite-bg);border-color:var(--rewrite);color:var(--rewrite)}
+.vbtn[aria-pressed="true"][data-v="kill"]{background:var(--kill-bg);border-color:var(--kill);color:var(--kill)}
+.extra{margin-top:11px;display:none}
+.extra.show{display:block}
+.extra textarea{width:100%;font:inherit;font-size:14px;color:var(--ink);background:var(--surface2);border:1px solid var(--line);border-radius:9px;padding:9px 11px;resize:vertical;min-height:44px;margin-top:8px}
+.extra textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.extra .tl{font-size:10px;font-weight:650;letter-spacing:.09em;text-transform:uppercase;color:var(--muted)}
+.footer{position:fixed;left:0;right:0;bottom:0;z-index:20;background:color-mix(in srgb,var(--bg) 90%,transparent);backdrop-filter:blur(10px);border-top:1px solid var(--line);padding:12px 20px}
+.footer-inner{max-width:760px;margin:0 auto;display:flex;align-items:center;gap:12px}
+.footer .note{font-size:12.5px;color:var(--muted);flex:1}
+.footer .btn{padding:10px 18px;font-size:14px}
+#output{display:none;width:100%;max-width:760px;margin:16px auto 0;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;line-height:1.5;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px;min-height:180px}
+.toast{position:fixed;left:50%;bottom:74px;transform:translateX(-50%) translateY(8px);background:var(--ink);color:var(--bg);font-size:13px;font-weight:600;padding:9px 16px;border-radius:9px;opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;z-index:40}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.vbtn:focus-visible,.btn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+@media (max-width:520px){.brand .sub{display:none}.footer .note{display:none}}
+</style>
+<div class="topbar"><div class="topbar-inner">
+  <div class="brand"><h1>Wingman Voice Batch</h1><div class="sub" id="subline"></div></div>
+  <div class="count" id="count">0 / 0</div>
+  <button class="btn ghost" id="copyTop">Copy results</button>
+</div><div class="progress"><i id="bar"></i></div></div>
+<div class="wrap">
+  <p class="intro">Read each card as the closer and mark it — <b>Keep</b> if you'd say it, <b>Rewrite</b> to give me the better line, <b>Kill</b> if it's the wrong move. Add a one-line <b>why</b> on the reds. Your marks save automatically. When you're done, hit <b>Copy results</b> and paste the block back to me.</p>
+  <div id="list"></div>
+</div>
+<div class="footer"><div class="footer-inner">
+  <div class="note" id="fnote">0 of 0 marked</div>
+  <button class="btn" id="copyBtn">Copy results to paste back</button>
+</div><textarea id="output" readonly></textarea></div>
+<div class="toast" id="toast">Copied — paste it back to me</div>
+<script>
+var CARDS = [{"fam":"Objection","id":"money-tight","prospect":"Honestly that's a lot of money right now. I don't know.","line":"Money aside for a sec — do you honestly feel like this is what gets you to those $30k months?","hard":[],"soft":[]},{"fam":"Objection","id":"money-anchor","prospect":"I mean… that's a lot more than I was expecting to spend on this.","line":"Money aside for a sec — do you honestly feel like this is what gets you there?","hard":[],"soft":[]},{"fam":"Objection","id":"think","prospect":"Yeah this sounds good, let me think about it and get back to you.","line":"What specifically are you gonna think about?","hard":[],"soft":[]},{"fam":"Objection","id":"trust-burned","prospect":"I've done a coaching thing before and it was a waste. How's this any different?","line":"That last one — what did they not do that you actually needed?","hard":[],"soft":[]},{"fam":"Objection","id":"fear","prospect":"I mean… this is a big decision. What if it doesn't work out for me?","line":"Yeah — it is a big decision. But what's the alternative… staying miserable in that job?","hard":[],"soft":[]},{"fam":"Objection","id":"partner","prospect":"I'd need to talk to my wife before I make a decision like this.","line":"Totally fair — if she said 'whatever you think, I trust you,' would you move forward today?","hard":[],"soft":[]},{"fam":"Objection","id":"timing","prospect":"Now's just not a great time for me. Maybe next quarter would be better.","line":"What changes next quarter?","hard":[],"soft":[]},{"fam":"Objection","id":"send-info","prospect":"Can you just send me some information and I'll look it over on my own time?","line":"You're literally talking to the source of the info right now — so what's really making you want to slip out?","hard":[],"soft":[]},{"fam":"Objection","id":"diy","prospect":"Honestly I feel like I could probably just figure this out on my own.","line":"You probably could — but you've been at this 18 months already. If you could figure it out on your own, why haven't you yet?","hard":[],"soft":[]},{"fam":"Objection","id":"competitor","prospect":"I'm actually looking at a couple other options too, so I'm not sure yet.","line":"That's fair — what would the right one actually have to do for you that the others aren't?","hard":[],"soft":[]},{"fam":"Objection","id":"skeptic","prospect":"How do I actually know this'll work for someone like me?","line":"Honestly, I can't promise you that — nobody can. What I can ask is, what about your situation makes you feel like it wouldn't?","hard":[],"soft":[]},{"fam":"Objection","id":"wishy-washy","prospect":"Yeah… maybe. I don't know, I'm not really sure about it.","line":"Not sure about what specifically?","hard":[],"soft":[]},{"fam":"Objection","id":"too-busy","prospect":"I'm slammed right now, I really don't have time to take on something new.","line":"Being slammed is exactly why you're here though — so what happens if that doesn't change?","hard":[],"soft":[]},{"fam":"Objection","id":"results-doubt","prospect":"I've seen a lot of people not really get results from stuff like this, you know?","line":"Sure — but same program, same coach, some people crush it, some don't. What's the variable? The person. So do you think you're gonna do the work?","hard":[],"soft":[]},{"fam":"Dig","id":"open-pain","prospect":"Things are just kind of stuck right now, you know?","line":"What's the biggest thing that's got you stuck?","hard":[],"soft":[]},{"fam":"Dig","id":"deepen-desire","prospect":"I just want to be making more money, more consistently.","line":"What's 'more money' look like — like if you hit that goal, what's that number?","hard":[],"soft":[]},{"fam":"Dig","id":"cost","prospect":"Yeah it's been about two years at this same spot honestly.","line":"What has that cost you over the past two years?","hard":[],"soft":[]},{"fam":"Dig","id":"doubt-diy","prospect":"I've bought a few courses and tried to do it myself but it just hasn't clicked.","line":"What's kept it from clicking — like what's the part that just hasn't worked?","hard":[],"soft":[]},{"fam":"Dig","id":"trust-why","prospect":"I've tried programs before that overpromised, so I'm a little cautious.","line":"What did they overpromise?","hard":[],"soft":[]},{"fam":"Dig","id":"support","prospect":"Yeah this is the kind of thing I'd want to get right.","line":"Can I ask you something personal? Is this a decision you'd make on your own, or is someone else in it with you?","hard":[],"soft":["can-i-ask"]},{"fam":"Dig","id":"money-qualifier","prospect":"Yeah honestly everything you're saying makes a lot of sense to me.","line":"Can I ask you something personal? What would you need to be bringing in to make this a no-brainer for you?","hard":[],"soft":["can-i-ask"]},{"fam":"Dig","id":"vague","prospect":"I don't know, I just want things to be better than they are now.","line":"What does better look like — like if everything went right, what's the goal?","hard":[],"soft":[]}];
+var KEY = "wingman-voicebatch-2026-07-22-18-23";
+var GEN = "2026-07-22 18:23", MODEL = "claude-sonnet-4-6";
+var state = {};
+try { state = JSON.parse(localStorage.getItem(KEY) || "{}") || {}; } catch(e) { state = {}; }
+function save(){ try { localStorage.setItem(KEY, JSON.stringify(state)); } catch(e){} }
+function el(tag, attrs, kids){
+  var n = document.createElement(tag);
+  if(attrs) for(var k in attrs){
+    if(k === "class") n.className = attrs[k];
+    else if(k === "text") n.textContent = attrs[k];
+    else if(k.indexOf("on") === 0) n.addEventListener(k.slice(2).toLowerCase(), attrs[k]);
+    else n.setAttribute(k, attrs[k]);
+  }
+  if(kids) kids.forEach(function(c){ if(c != null) n.appendChild(typeof c === "string" ? document.createTextNode(c) : c); });
+  return n;
+}
+document.getElementById("subline").textContent = "Generated " + GEN + " · " + MODEL + " · direct base voice";
+var VERBS = [["keep","✓","Keep"],["rewrite","✎","Rewrite"],["kill","✗","Kill"]];
+var list = document.getElementById("list");
+var lastFam = null;
+CARDS.forEach(function(c){
+  if(c.fam !== lastFam){
+    lastFam = c.fam;
+    list.appendChild(el("div",{class:"sec"},[ el("h2",{text:c.fam + " — direct"}) ]));
+  }
+  var sec = list.lastChild;
+  var st = state[c.id] || (state[c.id] = { verdict:null, rewrite:"", why:"" });
+  var badges = [];
+  if(c.hard && c.hard.length) badges.push(el("span",{class:"badge hard",text:"TIC: " + c.hard.join(", ")}));
+  if(c.soft && c.soft.length) badges.push(el("span",{class:"badge soft",text:"tic? " + c.soft.join(", ")}));
+  var rewriteWrap = el("div",{class:"extra"},[
+    el("div",{class:"tl",text:"Your rewrite"}),
+    el("textarea",{placeholder:"How you'd actually say it…", oninput:function(e){ st.rewrite = e.target.value; save(); }})
+  ]);
+  rewriteWrap.querySelector("textarea").value = st.rewrite || "";
+  var whyWrap = el("div",{class:"extra"},[
+    el("div",{class:"tl",text:"Why (one line)"}),
+    el("textarea",{placeholder:"What's wrong / what it should do…", oninput:function(e){ st.why = e.target.value; save(); }})
+  ]);
+  whyWrap.querySelector("textarea").value = st.why || "";
+  var btns = VERBS.map(function(v){
+    return el("button",{class:"vbtn","data-v":v[0],type:"button","aria-pressed":"false", onclick:function(){ setVerdict(c.id, v[0]); }},[
+      el("span",{class:"ic",text:v[1]}), v[2]
+    ]);
+  });
+  var card = el("div",{class:"card","data-id":c.id},[
+    el("div",{class:"chead"},[ el("span",{class:"cid",text:c.id}) ].concat(badges)),
+    el("div",{class:"lbl",text:"Prospect"}),
+    el("div",{class:"prospect",text:c.prospect}),
+    el("div",{class:"lbl",text:"Wingman says"}),
+    el("div",{class: c.line === null ? "line abstain" : "line", text: c.line === null ? "(abstain — take the close)" : c.line}),
+    el("div",{class:"controls"}, btns),
+    rewriteWrap, whyWrap
+  ]);
+  card._btns = btns; card._rw = rewriteWrap; card._wy = whyWrap;
+  sec.appendChild(card);
+  paint(c.id);
+});
+function cardEl(id){ return list.querySelector('.card[data-id="' + id + '"]'); }
+function paint(id){
+  var st = state[id] || {}; var card = cardEl(id); if(!card) return;
+  card.setAttribute("data-v", st.verdict || "");
+  card._btns.forEach(function(b){ b.setAttribute("aria-pressed", b.getAttribute("data-v") === st.verdict ? "true" : "false"); });
+  card._rw.className = "extra" + (st.verdict === "rewrite" ? " show" : "");
+  card._wy.className = "extra" + (st.verdict === "rewrite" || st.verdict === "kill" ? " show" : "");
+}
+function setVerdict(id, v){
+  var st = state[id] || (state[id] = { verdict:null, rewrite:"", why:"" });
+  st.verdict = (st.verdict === v ? null : v);
+  save(); paint(id); updateProgress();
+  if(st.verdict === "rewrite"){ var t = cardEl(id)._rw.querySelector("textarea"); if(t) t.focus(); }
+}
+function marked(){ return CARDS.filter(function(c){ return state[c.id] && state[c.id].verdict; }).length; }
+function updateProgress(){
+  var m = marked(), total = CARDS.length;
+  document.getElementById("count").innerHTML = "<b>" + m + "</b> / " + total;
+  document.getElementById("fnote").textContent = m + " of " + total + " marked" + (m === total ? " — all done ✓" : "");
+  document.getElementById("bar").style.width = (total ? (m/total*100) : 0) + "%";
+}
+function assemble(){
+  var out = ["# Wingman Voice Batch — MARKED", "", "Generated " + GEN + " · gen=" + MODEL + " · marked in grade sheet", ""];
+  var fam = null;
+  CARDS.forEach(function(c){
+    if(c.fam !== fam){ fam = c.fam; out.push("## " + c.fam + " — direct", ""); }
+    var st = state[c.id] || {};
+    var v = st.verdict === "keep" ? "✓" : st.verdict === "kill" ? "✗" : st.verdict === "rewrite" ? "✎ (rewrite)" : "";
+    out.push("### " + c.id);
+    out.push('Prospect: "' + c.prospect + '"');
+    out.push("Card: **" + (c.line === null ? "(abstain — take the close)" : c.line) + "**");
+    out.push("Verdict: " + v);
+    out.push("Rewrite: " + (st.rewrite || "").trim());
+    out.push("Why: " + (st.why || "").trim());
+    out.push("");
+  });
+  return out.join("\n");
+}
+function copyResults(){
+  var text = assemble();
+  var ta = document.getElementById("output");
+  ta.value = text; ta.style.display = "block";
+  ta.focus(); ta.select();
+  var done = function(){ var t = document.getElementById("toast"); t.classList.add("show"); setTimeout(function(){ t.classList.remove("show"); }, 2200); };
+  if(navigator.clipboard && navigator.clipboard.writeText){ navigator.clipboard.writeText(text).then(done, done); }
+  else { try { document.execCommand("copy"); } catch(e){} done(); }
+}
+document.getElementById("copyBtn").addEventListener("click", copyResults);
+document.getElementById("copyTop").addEventListener("click", copyResults);
+updateProgress();
+</script>

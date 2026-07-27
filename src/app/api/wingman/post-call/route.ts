@@ -23,6 +23,7 @@ const POST_CALL_SYSTEM_PROMPT = `You are analyzing a completed sales call transc
 Return valid JSON only with this exact structure:
 {
   "debrief": "2-3 sentence summary. What worked, what was missed, key moments. Be specific and actionable.",
+  "outcome": { "value": "Closed", "confidence": "high" },
   "objections_raised": ["short objection phrase", ...],
   "missed_topics": ["topic name", ...],
   "pillar_coverage": {
@@ -62,6 +63,16 @@ Rules for stages — evaluate the rep against the 6-stage high-ticket close fram
 * status: exactly "complete" or "skipped" — "complete" only if the rep meaningfully reached and handled that stage; "skipped" if skipped or barely touched
 * note: ≤60 chars, specific to this call — what happened in that stage, or why it was missed
 * Judge only what the transcript supports — do not assume a stage happened off-transcript
+
+Rules for outcome — predict the call's result, but ONLY from explicit evidence:
+* value: exactly one of "Closed" | "Lost" | "Follow Up" | "DQ" | "No Show" | null
+  - "Closed": the prospect clearly committed to buy/pay/start now (e.g. "let's do it", "send me the link", "I'm in", gave payment details)
+  - "Lost": the prospect clearly declined — a definite no, not a hesitation
+  - "Follow Up": they want another conversation, time to think, or to talk to someone before deciding
+  - "DQ": clearly not a fit / doesn't qualify (no budget, wrong problem, not the decision maker with no path forward)
+  - "No Show": the prospect never meaningfully joined or engaged
+  - null: the transcript does NOT make the result clear — this is the correct answer whenever you are not certain
+* confidence: "high" ONLY when a specific spoken line makes the result unambiguous. Anything inferred, hedged, or read-between-the-lines → "low", or set value to null. When unsure, choose null / "low". NEVER guess an outcome to seem helpful — a wrong guess is worse than none.
 
 Other rules:
 * debrief: plain English, 2-3 sentences, specific to this call, direct and honest
@@ -299,7 +310,10 @@ export async function POST(req: NextRequest) {
 
     const claudeRes = await callSonnetWithRetry(apiKey, {
       model:      "claude-sonnet-4-6",
-      max_tokens: 1_536,
+      // 1900 (was 1536): the schema grew by the `outcome` object, and the whole
+      // response is a single JSON.parse — a truncated tail loses EVERYTHING
+      // (debrief, pillars, stages). Headroom is near-zero cost on an async job.
+      max_tokens: 1_900,
       system:     POST_CALL_SYSTEM_PROMPT,
       messages:   [{
         role:    "user",
@@ -317,6 +331,7 @@ export async function POST(req: NextRequest) {
 
     let analysis: {
       debrief:           string;
+      outcome?:          { value?: string | null; confidence?: string };
       objections_raised: string[];
       missed_topics:     string[];
       pillar_coverage?:  unknown;
@@ -372,6 +387,38 @@ export async function POST(req: NextRequest) {
         // Non-fatal — log and continue so the debrief still gets written
         console.error(`[post-call] vault upsert failed for "${rawObjection}":`, objErr);
       }
+    }
+
+    // ── 5b. Outcome auto-detect (v0.1.29) ────────────────────────────────────
+    //        Predict the result from the SAME Sonnet pass and mark it — but ONLY
+    //        on HIGH confidence AND only when the rep hasn't dispositioned it
+    //        (`.is("outcome", null)` → a manual pick always wins; a concurrent
+    //        manual save makes this match 0 rows, which is correct, not an error).
+    //        Tagged `outcome_source='auto'` so the dashboard shows an "auto" chip
+    //        and keeps it OUT of close-rate math until the rep confirms (Sebastian's
+    //        "a wrong auto-guess must never poison stats" rule). Values are gated to
+    //        the live `calls_outcome_check` set. supabase-js does NOT throw on a
+    //        constraint violation — we read `error` or a bad value fails silently.
+    //        Runs BEFORE the debrief write so the auto mark is present the moment
+    //        the dashboard sees `summary` land.
+    const AI_OUTCOME_VALUES = new Set(["Closed", "Lost", "Follow Up", "DQ", "No Show"]);
+    try {
+      const oc   = analysis.outcome;
+      const val  = oc && typeof oc.value === "string" ? oc.value.trim() : null;
+      const conf = oc && typeof oc.confidence === "string" ? oc.confidence : null;
+      if (val && conf === "high" && AI_OUTCOME_VALUES.has(val)) {
+        const { data: outRows, error: outErr } = await service
+          .from("calls")
+          .update({ outcome: val, outcome_source: "auto" })
+          .eq("id", call_id)
+          .eq("user_id", user.id)
+          .is("outcome", null)          // never clobber a manual pick
+          .select("id");
+        if (outErr) console.error(`[post-call] outcome auto-detect write failed for call ${call_id}:`, outErr.message);
+        else console.log(`[post-call] outcome ${outRows?.length ? `auto-set → ${val}` : "left as-is (already marked)"} for call ${call_id}`);
+      }
+    } catch (outErr) {
+      console.error(`[post-call] outcome auto-detect threw for call ${call_id}:`, outErr);
     }
 
     // ── 6a. Write debrief + missed topics back to call record ────────────────

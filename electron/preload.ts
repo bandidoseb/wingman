@@ -36,6 +36,20 @@ ipcRenderer.on("call:auto-ended", () => {
   if (_autoEndedCallback) _autoEndedCallback();
 });
 
+// ── Navigate-to-call event buffering ──────────────────────────────────────────
+// Sent by main when the HUD "View call →" pill is clicked (deep-link to a Flight
+// Log entry). Buffered like shortcut:toggle-call because main may create the
+// dashboard window and fire this on did-finish-load, before React registers the
+// listener. Replays the moment the web app calls onNavigateToCall(callback).
+let _navigateToCallCallback: ((callId: string | null) => void) | null = null;
+let _pendingNavigateToCall: { callId: string | null } | null = null;
+
+ipcRenderer.on("navigate:call", (_e, payload: { callId?: string | null }) => {
+  const callId = payload?.callId ?? null;
+  if (_navigateToCallCallback) _navigateToCallCallback(callId);
+  else _pendingNavigateToCall = { callId }; // buffer until web app registers
+});
+
 // ── Named IPC handler references ─────────────────────────────────────────────
 // Stored so we can call ipcRenderer.removeListener(channel, handler) precisely.
 // Using removeAllListeners(channel) is too broad — it would silently remove any
@@ -243,6 +257,11 @@ contextBridge.exposeInMainWorld("wingman", {
     }
   },
 
+  // ── Flight Recorder (dev-only) ───────────────────────────────────────────
+  /** Stitch the main-process log (Deepgram partials/presses) to the server log for
+   *  this call. Fire-and-forget; main no-ops unless the dev gate is on. */
+  devlogLink: (callId: string) => ipcRenderer.send("devlog:link", callId),
+
   // ── Objection Flow mode (Phase C) ────────────────────────────────────────
   /** Thread opened/advanced (or threaded press) — main arms single-↑ mode + re-arms its 2-min idle timer. */
   flowOpened: () => ipcRenderer.send("flow:open"),
@@ -305,6 +324,26 @@ contextBridge.exposeInMainWorld("wingman", {
   onNavigateToSettings: (callback: () => void) => {
     ipcRenderer.on("navigate:settings", () => callback());
   },
+
+  // ── Navigate to a specific call (HUD "View call →" deep-link) ──────────────
+  // Buffered above so an early fire (window just created) is not lost. callId may
+  // be null → open the Flight Log tab without selecting a specific call.
+  onNavigateToCall: (callback: (callId: string | null) => void) => {
+    _navigateToCallCallback = callback;
+    if (_pendingNavigateToCall) {
+      const { callId } = _pendingNavigateToCall;
+      _pendingNavigateToCall = null;
+      callback(callId);
+    }
+  },
+
+  // ── Post-call pill state → main → HUD ──────────────────────────────────────
+  // The renderer is the only process that learns when the async debrief lands
+  // (it polls the call record). It drives the Live Hub pill's generating→ready
+  // morph through main. New in v0.1.29 — callers optional-chain this so older
+  // preloads (which lack it) simply no-op.
+  postCallState: (payload: { phase: "generating" | "ready"; callId: string | null }) =>
+    ipcRenderer.invoke("wingman:post-call-state", payload),
 
   // ── Environment detection ────────────────────────────────────────────────
   /** True when running inside the Electron desktop app (not a browser tab) */
@@ -385,14 +424,17 @@ contextBridge.exposeInMainWorld("hud", {
 
   confirmEndCall: () => ipcRenderer.invoke("hud:confirm-end-call"),
 
-  /** Send the picked outcome to main process to save via API */
-  saveOutcome: (callId: string, outcome: string) =>
-    ipcRenderer.invoke("hud:save-outcome", { callId, outcome }),
-
-  /** Fired by main process after the outcome save attempt completes */
-  onOutcomeSaved: (callback: (success: boolean) => void) => {
-    ipcRenderer.on("hud:outcome-saved", (_event, success) => callback(success));
+  // ── Post-call pill morph (v0.1.29) ─────────────────────────────────────────
+  /** Receive generating→ready phase updates for the Live Hub end-of-call morph. */
+  onPostCallState: (callback: (payload: { phase: "generating" | "ready"; callId: string | null }) => void) => {
+    ipcRenderer.on("hud:post-call-state", (_event, payload) => callback(payload));
   },
+
+  /** "View call →" clicked — ask main to surface the dashboard on that call. */
+  openCall: (callId: string | null) => ipcRenderer.invoke("hud:open-call", callId),
+
+  /** The pill finished its end-of-call fade — main hides the HUD window. */
+  morphDone: () => ipcRenderer.invoke("hud:morph-done"),
 
   onAutoStopped: (callback: (reason: string) => void) => {
     ipcRenderer.on("hud:auto-stopped", (_event, reason) => callback(reason));

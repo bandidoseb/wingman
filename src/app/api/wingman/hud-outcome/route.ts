@@ -8,6 +8,11 @@ import { createClient } from "@supabase/supabase-js";
  * outcome in the post-call "How'd it go?" card. Unlike the dashboard outcome
  * endpoint, this uses Bearer token auth because the HUD runs outside the
  * browser cookie context.
+ *
+ * RETAINED for v0.1.28-and-earlier app compatibility: the HUD outcome card was
+ * removed in v0.1.29 (outcome moved to the dashboard + AI auto-detect), but
+ * installed older apps still PATCH this. Slated for Phase-5 removal once v0.1.29
+ * is the floor. A pick here is a human choice → outcome_source='manual'.
  */
 export async function PATCH(req: NextRequest) {
   try {
@@ -41,7 +46,7 @@ export async function PATCH(req: NextRequest) {
 
     const { error } = await supabase
       .from("calls")
-      .update({ outcome })
+      .update({ outcome, outcome_source: "manual" })
       .eq("id", call_id)
       .eq("user_id", user.id); // ownership check — user can only update their own calls
 

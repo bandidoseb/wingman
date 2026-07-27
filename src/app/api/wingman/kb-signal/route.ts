@@ -26,6 +26,11 @@
  * connection-cooling probe: if slow presses correlate with long gaps, build the
  * periodic keep-warm (see tasks/todo.md, Phase 3.5 plan).
  *
+ * Flight Recorder invariant (dev-only): EVERY terminal path that answers a press —
+ * streamed card, static nudge, throttle, rejection, error — appends a "card" record
+ * via devlog.append() so a logged press can never lack an outcome in the call film.
+ * All appends are fire-and-forget no-ops unless WINGMAN_DEVLOG=1 outside production.
+ *
  * Warm latency goal: 1.5–2s press-to-card (Sebastian, 2026-06-11).
  */
 
@@ -40,6 +45,9 @@ import { streamObjectionCard,
          type ObjectionCallMemory }     from "@/lib/wingman/objection-signal";
 import { streamDigCard }                from "@/lib/wingman/dig-signal";
 import { sanitizeSalesDna }             from "@/lib/wingman/sales-dna.mjs";
+import { normalizeConfrontation }       from "@/lib/wingman/objection-prompt.mjs";
+import * as devlog                       from "@/lib/wingman/devlog";
+import { isColdLadder }                  from "@/lib/wingman/close-readiness.mjs";
 
 // ── Directive / all-clear nudge copy (server owns it — single source). ────────
 // One plain-English line each, rendered as a single-line HEADLESS card (design language:
@@ -50,6 +58,12 @@ const DIG_TAKE_CLOSE_LINE = "They're ready — go for the close.";     // ↓ pr
 // ↓ pressed before anyone has spoken (zero transcript) — the one deliberate exception to the
 // always-a-question dig doctrine: there's no speech to build a question from. Generic, not scripted.
 const DIG_TOO_EARLY_LINE  = "Start the conversation.";
+// #52: ↓ pressed, Sonnet returned {null,null} ("take the close") but the Belief Ladder shows ZERO
+// discovery (missing summary, or every belief ⬜ open). A take-close claim with nothing built is
+// never real — it's the model's only escape hatch on a degenerate call (mic test, no prospect).
+// Deterministic gate, deliberately NARROW: any ladder with even one touched belief passes through
+// untouched, preserving the verbal-readiness doctrine ("how do we start?" early → take the close).
+const DIG_START_DISCOVERY_LINE = "Start discovery.";                 // wording Sebastian-locked 2026-07-24
 
 // The objection slot streams (SSE). force-dynamic keeps it off any cached/static path;
 // nodejs runtime so the ReadableStream + per-request abort behave predictably on Railway.
@@ -66,12 +80,38 @@ type Slot = typeof VALID_SLOTS[number];
 const RATE_LIMIT_MS = 3_000;
 const rateLimitMap  = new Map<string, number>();
 
+/**
+ * Flight Recorder helper for the two pre-body-parse returns (401/429). Those branches
+ * return before req.json() runs, so the film would lose the press outcome. Gated on
+ * devlogEnabled() BEFORE touching the body — in prod (or dev without the flag) the
+ * request path stays byte-identical to today (no body read, no await). Never throws.
+ */
+async function devlogPreBodyOutcome(req: NextRequest, outcome: string): Promise<void> {
+  if (!devlog.devlogEnabled()) return;
+  try {
+    const b = await req.json().catch(() => null) as { call_id?: unknown; slot?: unknown } | null;
+    if (typeof b?.call_id === "string") {
+      devlog.append(b.call_id, "server", "card", {
+        slot: typeof b.slot === "string" ? b.slot : "objection",
+        outcome, line: null, ttftMs: null, totalMs: 0,
+      });
+    }
+  } catch { /* telemetry must never affect the response */ }
+}
+
 export async function POST(req: NextRequest) {
+  // Flight Recorder capture for the catch-all 500 at the bottom — hoisted out of the
+  // try so the catch can attribute the error to the call/slot once the body has parsed.
+  let capCallId: string | undefined;
+  let capSlot:   string | undefined;
   try {
     // ── Auth ────────────────────────────────────────────────────────────────
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (!user) {
+      await devlogPreBodyOutcome(req, "unauthorized"); // dev-only no-op in prod
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
 
     // ── Per-user rate limit ──────────────────────────────────────────────────
     const now  = Date.now();
@@ -80,6 +120,7 @@ export async function POST(req: NextRequest) {
       // Pressed faster than the cost guard allows. This is NOT a failure — return a
       // distinct 429 so the client resolves the pill QUIETLY (no "couldn't pull that"
       // error). The client also throttles before sending, so this is the edge backstop.
+      await devlogPreBodyOutcome(req, "throttled"); // dev-only no-op in prod
       return NextResponse.json({ ok: false, throttled: true }, { status: 429 });
     }
     rateLimitMap.set(user.id, now);
@@ -104,6 +145,8 @@ export async function POST(req: NextRequest) {
       call_memory,
       levers_used,
       sales_dna,
+      confrontation: confrontation_raw,
+      call_id,
     }: {
       transcript_chunk:    string;
       live_summary?:       string;
@@ -117,7 +160,17 @@ export async function POST(req: NextRequest) {
       call_memory?:        unknown;
       levers_used?:        unknown;
       sales_dna?:          unknown;
+      confrontation?:      unknown;
+      call_id?:            string; // Flight Recorder key (dev-only); undefined = no capture
     } = body;
+    capCallId = typeof call_id === "string" ? call_id : undefined;
+
+    // Confrontationalness dial (2026-07-16): untrusted client value → the normalizer maps
+    // anything unknown/missing to "direct", the default, which produces a byte-identical prompt.
+    // So a bad/absent value can never change behavior — it degrades to today's card.
+    const confrontation = normalizeConfrontation(
+      typeof confrontation_raw === "string" ? confrontation_raw : undefined,
+    );
 
     // Phase 1b (offer-aware): the rep's Sales DNA rides the same client rail as
     // live_summary — untrusted, so run it through the ONE shared sanitizer (same
@@ -156,12 +209,32 @@ export async function POST(req: NextRequest) {
     const activeSlot: Slot = VALID_SLOTS.includes(slot as Slot)
       ? (slot as Slot)
       : "objection";
+    capSlot = activeSlot;
+
+    // Cap the Belief Ladder summary defensively. The summarizer caps its OUTPUT at
+    // BELIEF_LADDER_MAX_TOKENS = 1,500 tokens (~6,000 chars worst case); 8,000 chars
+    // is headroom that never truncates a real summary (truncation here would silently
+    // chop the tail — KEY ANCHORS/COMMITMENTS/WEAKEST LINK, exactly what the cards
+    // read) but still stops an oversized/abusive payload from inflating the AI bill.
+    // (Computed BEFORE the early returns below so their Flight Recorder records carry it.)
+    const summary = typeof live_summary === "string"
+      ? live_summary.slice(0, 8_000)
+      : undefined;
 
     // Empty transcript — nothing to work with. For the objection slot, answer
     // with the honest static nudge (the rep pressed before anyone spoke — that
     // is not an error, so don't trigger the client's retry pill).
     if (!transcript_chunk?.trim()) {
       if (activeSlot === "objection") {
+        // Flight Recorder: mirror the streaming branch's card record so the film shows
+        // the static nudge that rendered. Fire-and-forget, dev-only no-op otherwise.
+        if (call_id) devlog.append(call_id, "server", "card", {
+          slot: "objection", beat: beatNumber,
+          outcome: "nudge", line: NUDGE_LINE,
+          ttftMs: null, totalMs: 0,
+          transcriptChunk: transcript_chunk ?? "", summary, confrontation,
+          hasThread: false, hasMemory,
+        });
         return NextResponse.json({
           ok:            true,
           signal_header: "",           // empty → HUD renders the single-line headless card
@@ -173,6 +246,12 @@ export async function POST(req: NextRequest) {
       // would treat as a failed pull and show the retry pill on the wrong arrow). Generic
       // "get started" line — no speech yet to build a real question from.
       if (activeSlot === "dig") {
+        if (call_id) devlog.append(call_id, "server", "card", {
+          slot: "dig",
+          outcome: "nudge", line: DIG_TOO_EARLY_LINE, belief: null,
+          ttftMs: null, totalMs: 0,
+          transcriptChunk: transcript_chunk ?? "", summary, confrontation,
+        });
         return NextResponse.json({
           ok:            true,
           signal_header: "",           // empty → HUD renders the single-line headless card
@@ -180,6 +259,11 @@ export async function POST(req: NextRequest) {
           signal_type:   "Nudge",
         });
       }
+      // answer/close with an empty transcript — the client renders nothing for a bare
+      // { ok: true }, but the press still needs an outcome in the film.
+      if (call_id) devlog.append(call_id, "server", "card", {
+        slot: activeSlot, outcome: "none", line: null, ttftMs: null, totalMs: 0,
+      });
       return NextResponse.json({ ok: true });
     }
 
@@ -187,16 +271,15 @@ export async function POST(req: NextRequest) {
     // upstream, but guard here as well against unexpected payloads.
     if (transcript_chunk.length > 3_500) {
       console.warn("[kb-signal] transcript_chunk exceeded 3,500 chars — rejecting");
+      // Flight Recorder: the film must show the press was answered by the size guard
+      // (renders as a silent no-card on the client → retry pill).
+      if (call_id) devlog.append(call_id, "server", "card", {
+        slot: activeSlot, outcome: "rejected", reason: "transcript_too_long",
+        line: null, ttftMs: null, totalMs: 0,
+        transcriptChunkLength: transcript_chunk.length, summary, confrontation,
+      });
       return NextResponse.json({ ok: true });
     }
-
-    // Cap the Belief Ladder summary defensively. The summarizer caps its OUTPUT at
-    // 600 tokens (~2,400 chars); 4,000 chars is comfortable headroom that never
-    // truncates a real summary but stops an oversized/abusive payload from inflating
-    // the Haiku bill. See Wingman Brain/Beta Tuning Parameters.md. (Fix #2)
-    const summary = typeof live_summary === "string"
-      ? live_summary.slice(0, 4_000)
-      : undefined;
 
     const idleGap = last === 0 ? "first" : `${Math.round((now - last) / 1000)}s`;
 
@@ -246,23 +329,33 @@ export async function POST(req: NextRequest) {
           try { controller.enqueue(encoder.encode(": ok\n\n")); } catch { return; } // flush; bail if already closed
 
           let sawTerminal = false;
+          // Flight Recorder capture (dev-only) — populated as events flow, logged in finally.
+          const capT0 = Date.now();
+          let capTtft: number | null = null;
+          let capOutcome = "error";
+          let capLine: string | null = null;
+          let capLever: string | undefined;
           try {
             // req.signal aborts on client disconnect / dismiss / call-end → stops Sonnet (W6).
-            for await (const ev of streamObjectionCard(transcript_chunk, summary, req.signal, thread, hasMemory ? memory : undefined)) {
+            for await (const ev of streamObjectionCard(transcript_chunk, summary, req.signal, thread, hasMemory ? memory : undefined, confrontation)) {
               let alive = true;
               if (ev.kind === "delta") {
+                if (capTtft === null) capTtft = Date.now() - capT0;
                 alive = send("delta", { textSoFar: ev.textSoFar });
               } else if (ev.kind === "done") {
                 alive = send("done", { line: ev.line, lever: ev.lever });
+                capOutcome = "done"; capLine = ev.line; capLever = ev.lever;
                 sawTerminal = true;
               } else if (ev.kind === "lever-info") {
                 continue; // B4 internal event — wrapper-filtered; defensive skip, never an error frame
               } else if (ev.kind === "abstain") {
                 // Nothing standing — server owns the copy. Empty header → headless single-line card.
                 alive = send("nudge", { header: "", text: NUDGE_LINE });
+                capOutcome = "abstain";
                 sawTerminal = true;
               } else {
                 alive = send("error", {});
+                capOutcome = "error";
                 sawTerminal = true;
               }
               if (!alive) break; // client disconnected — abort the generator (its finally stops Sonnet)
@@ -273,6 +366,16 @@ export async function POST(req: NextRequest) {
             send("error", {}); // guarded — no-op if the client already left
           } finally {
             try { controller.close(); } catch { /* already closed */ }
+            // Log AFTER close — fire-and-forget, gated, never throws. call_id undefined → no-op.
+            // A dismiss / call-end / client-disconnect aborts req.signal → distinguish that from a
+            // real model error so the dev log's error-rate + adoption signal stays clean.
+            if (call_id) devlog.append(call_id, "server", "card", {
+              slot: "objection", beat: beatNumber,
+              outcome: capOutcome === "error" && req.signal.aborted ? "aborted" : capOutcome,
+              line: capLine, lever: capLever, ttftMs: capTtft, totalMs: Date.now() - capT0,
+              transcriptChunk: transcript_chunk, summary, confrontation,
+              hasThread: !!thread, hasMemory,
+            });
           }
         },
       });
@@ -306,22 +409,37 @@ export async function POST(req: NextRequest) {
           try { controller.enqueue(encoder.encode(": ok\n\n")); } catch { return; }
 
           let sawTerminal = false;
+          // Flight Recorder capture (dev-only) — populated as events flow, logged in finally.
+          const capT0 = Date.now();
+          let capTtft: number | null = null;
+          let capOutcome = "error";
+          let capLine: string | null = null;
+          let capBelief: string | null = null;
           try {
-            for await (const ev of streamDigCard(transcript_chunk, summary, req.signal, salesDna)) {
+            for await (const ev of streamDigCard(transcript_chunk, summary, req.signal, salesDna, confrontation)) {
               let alive = true;
               if (ev.kind === "belief") {
+                capBelief = ev.belief ?? null;
                 alive = send("belief", { belief: ev.belief ?? null });
               } else if (ev.kind === "delta") {
+                if (capTtft === null) capTtft = Date.now() - capT0;
                 alive = send("delta", { textSoFar: ev.textSoFar });
               } else if (ev.kind === "done") {
                 alive = send("done", { line: ev.line, belief: ev.belief ?? null });
+                capOutcome = "done"; capLine = ev.line; capBelief = ev.belief ?? capBelief;
                 sawTerminal = true;
               } else if (ev.kind === "nudge") {
-                // { line:null } → prospect is ready. Empty header → headless single-line card.
-                alive = send("nudge", { header: "", text: DIG_TAKE_CLOSE_LINE });
+                // { line:null } → prospect is ready → take the close. #52 gate: a take-close on a
+                // ladder with ZERO discovery (no summary, or every belief ⬜ open) is never real —
+                // render "Start discovery." instead. isColdLadder runs the SAME pure engine the
+                // → close chip runs client-side, so the two arrows can't disagree about "cold".
+                const nudgeText  = isColdLadder(summary) ? DIG_START_DISCOVERY_LINE : DIG_TAKE_CLOSE_LINE;
+                alive = send("nudge", { header: "", text: nudgeText });
+                capOutcome = "nudge"; capLine = nudgeText; // Flight Recorder sees which line rendered
                 sawTerminal = true;
               } else {
                 alive = send("error", {});
+                capOutcome = "error";
                 sawTerminal = true;
               }
               if (!alive) break; // client disconnected — abort the generator (its finally stops Sonnet)
@@ -332,6 +450,15 @@ export async function POST(req: NextRequest) {
             send("error", {});
           } finally {
             try { controller.close(); } catch { /* already closed */ }
+            // Log AFTER close — fire-and-forget, gated, never throws. call_id undefined → no-op.
+            // aborted (dismiss/call-end/disconnect) is not a model error — label it distinctly.
+            if (call_id) devlog.append(call_id, "server", "card", {
+              slot: "dig",
+              outcome: capOutcome === "error" && req.signal.aborted ? "aborted" : capOutcome,
+              line: capLine, belief: capBelief,
+              ttftMs: capTtft, totalMs: Date.now() - capT0,
+              transcriptChunk: transcript_chunk, summary, confrontation,
+            });
           }
         },
       });
@@ -346,7 +473,14 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // ── answer / close — raw-chunk KB path, unchanged until Phase 4b/4c. ──
+    // ── ⚠️ DEAD CODE (as of 2026-07-22) — no client path reaches this. ──────────
+    // This was the planned answer/close "raw-chunk KB path" (Phase 4b/4c). Reality
+    // diverged: `main.ts` only ever sends slot "objection" | "dig" here; → close is
+    // the client-side readiness chip (no fetch); ← answer is still a "coming soon"
+    // pill. So searchKnowledge()→generateSignalCard() below NEVER runs live. Kept
+    // only until Phase 5 dead-code removal (#37), which rips it + the KB imports out.
+    // Do NOT wire ← answer to this path — answer is a direct general-LLM call (no
+    // embed/KB); the embedding round-trip here would add ~0.5-1s of latency. ────────
     const tPipeline  = Date.now();
     let   branch: "kb" | "raw-fallback" = "raw-fallback";
     let   card: SignalCardResult | null = null;
@@ -375,9 +509,20 @@ export async function POST(req: NextRequest) {
       // Generation failed (timeout / API error / unparseable) — return empty ok.
       // DashboardClient gates on card content and shows the retry pill (never dead air).
       console.error("[kb-signal] Card generation failed");
+      if (call_id) devlog.append(call_id, "server", "card", {
+        slot: activeSlot, outcome: "error", line: null,
+        ttftMs: null, totalMs: Date.now() - tPipeline,
+        transcriptChunk: transcript_chunk, summary, branch,
+      });
       return NextResponse.json({ ok: true });
     }
 
+    if (call_id) devlog.append(call_id, "server", "card", {
+      slot: activeSlot, outcome: "done",
+      line: [card.headline, card.subtext].filter(Boolean).join(" — "),
+      ttftMs: null, totalMs: Date.now() - tPipeline,
+      transcriptChunk: transcript_chunk, summary, branch,
+    });
     return NextResponse.json({
       ok:            true,
       signal_header: card.headline,
@@ -387,6 +532,15 @@ export async function POST(req: NextRequest) {
 
   } catch (err) {
     console.error("[kb-signal] Error:", err);
+    // Flight Recorder: a mid-route throw (bad JSON body, Supabase hiccup, …) answers the
+    // press with a 500 → the client shows the retry pill. Attribute it in the film when the
+    // body parsed far enough to know the call. Streaming-branch errors never reach here —
+    // they resolve inside their stream's finally with their own card record.
+    if (capCallId) devlog.append(capCallId, "server", "card", {
+      slot: capSlot ?? "unknown", outcome: "error", line: null,
+      ttftMs: null, totalMs: 0,
+      error: err instanceof Error ? err.message : String(err),
+    });
     return NextResponse.json({ ok: false }, { status: 500 });
   }
 }
