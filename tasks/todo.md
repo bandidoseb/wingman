@@ -8,7 +8,16 @@ Prior todo (#52/#53, complete) superseded — narrative lives in `Wingman Brain/
 **Invariants #3/#4/#5 apply: this changes NOTIFICATIONS only — the stop chain
 (stopRecallAI / autoStopCall / deployEpoch) is never touched.**
 
----
+## Files (5)
+### 1. `src/app/api/wingman/recall-upload-token/route.ts` — OPT-IN, no-op for old apps
+- Parse the request body DEFENSIVELY (route reads no body today — an unguarded `await req.json()` would
+  THROW on old apps' empty-body requests and break token minting for everyone):
+  `let wantAudio=false; try { wantAudio = (await req.json())?.wantAudioLevel === true; } catch {}`
+- Conditionally add the event (line ~101):
+  `events: ["transcript.data","transcript.partial_data", ...(wantAudio ? ["audio_mixed_raw.data"] : [])]`
+- WHY opt-in: Railway deploys this route to 100% of users on merge. Opt-in keeps every existing install
+  BYTE-IDENTICAL (they send no body → no audio sub) until the new desktop app ships. Decouples the
+  money-path deploy risk entirely.
 
 ## Reviewer catches that reshaped the plan (why it looks this way)
 
