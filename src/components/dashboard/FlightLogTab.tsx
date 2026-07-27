@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import Card from "@/components/ui/Card";
 import SectionLabel from "@/components/ui/SectionLabel";
 import OutcomeBadge from "@/components/ui/OutcomeBadge";
-import type { Call } from "@/types";
+import type { Call, TranscriptLine } from "@/types";
 import { confirmedOutcome } from "@/lib/wingman/outcome-stats";
 
 const PILLAR_DISPLAY: Array<{ key: string; label: string; description: string }> = [
@@ -169,6 +169,26 @@ function formatTimestamp(ts: number): string {
   return `${d.toLocaleDateString("en-US", { weekday: "long" })} ${time}`;
 }
 
+/**
+ * True while a call could still legitimately be waiting on its post-call debrief.
+ *
+ * A missing `summary` is NOT proof the job is running: post-call skips any call with
+ * no transcript (a test deploy, a mic-only session, a failed job), so those rows stay
+ * summary-less forever. Treating them as "pending" meant a permanent fake spinner and
+ * a 2s `router.refresh()` — the dashboard's full-transcript query for 20 calls — for
+ * six minutes, re-armed every time the rep reopened the entry.
+ *
+ * The window is deliberately generous: `call_date` is the call's START time, so even a
+ * maxed-out 2-hour recording plus job time lands well inside it.
+ */
+const DEBRIEF_WINDOW_MS = 4 * 60 * 60 * 1000;
+function awaitingDebrief(call: Call | null | undefined): boolean {
+  if (!call || call.summary) return false;
+  const started = new Date(call.call_date).getTime();
+  if (!Number.isFinite(started)) return false;
+  return Date.now() - started < DEBRIEF_WINDOW_MS;
+}
+
 export default function FlightLogTab({ calls, initialCall, onInitialCallConsumed, initialCallId, onInitialCallIdConsumed, userId, isActive = false, isPendingOutcome = false }: Props) {
   const router = useRouter();
   const [selectedCall, setSelectedCall] = useState<Call | null>(initialCall);
@@ -236,19 +256,81 @@ export default function FlightLogTab({ calls, initialCall, onInitialCallConsumed
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialCallId]);
 
+  // Transcripts no longer arrive with the dashboard load (they're the heavy half of
+  // a call — see dashboard/page.tsx). Fetched per call when its detail view opens,
+  // cached for the life of the tab so reopening is instant.
+  //
+  // `provisional` marks a transcript fetched while the call was still generating:
+  // transcript rows flush every ~25s, so a fetch racing the final flush can miss the
+  // tail of the call. A provisional entry is refetched once the call's summary lands
+  // (the debrief only exists after the transcript is fully written) — whether the
+  // rep kept the call open (detail poll refresh) or closed and reopened it later.
+  const [transcriptCache, setTranscriptCache] = useState<Record<string, { rows: TranscriptLine[]; provisional: boolean }>>({});
+  const [transcriptLoadingId, setTranscriptLoadingId] = useState<string | null>(null);
+  useEffect(() => {
+    const id = selectedCall?.id;
+    if (!id) return;
+    const fresh = calls.find((c) => c.id === id) ?? selectedCall;
+    const entry = transcriptCache[id];
+    // Skip when cached — unless the entry is provisional and the debrief has since
+    // landed, which means the full transcript is now available.
+    if (entry && !(entry.provisional && fresh?.summary)) return;
+    let cancelled = false;
+    setTranscriptLoadingId(id);
+    (async () => {
+      try {
+        const res = await fetch(`/api/calls/${id}?include=transcript`);
+        if (!res.ok) return;  // keep "No transcript available." — never a stuck spinner
+        const body = (await res.json()) as { transcript?: TranscriptLine[] };
+        if (!cancelled) {
+          setTranscriptCache((prev) => ({
+            ...prev,
+            [id]: { rows: body.transcript ?? [], provisional: awaitingDebrief(fresh) },
+          }));
+        }
+      } catch {
+        // Network hiccup → fall through to the empty state; reopening retries.
+      } finally {
+        if (!cancelled) setTranscriptLoadingId((cur) => (cur === id ? null : cur));
+      }
+    })();
+    return () => { cancelled = true; };
+    // transcriptCache in deps is what re-arms the provisional refetch; the write
+    // inside is loop-safe because the guard above skips every settled entry.
+  }, [selectedCall, calls, transcriptCache]);
+
   // While an open call has no debrief yet, poll for it so the skeleton fills in
   // even when the parent isn't already polling (e.g. a deep-link opened later).
-  // Caps at ~6 min via a start-time ref so a stuck job can't refresh forever.
+  // Polls the LIGHT endpoint (~1KB) — never router.refresh(), which re-runs the
+  // full dashboard load. One real refresh fires when the debrief lands.
+  // Caps at ~6 min via a start-time ref so a stuck job can't poll forever.
   const detailPollStartRef = useRef<number | null>(null);
   useEffect(() => {
     const id = selectedCall?.id;
     if (!id) { detailPollStartRef.current = null; return; }
-    const fresh = calls.find((c) => c.id === id);
-    if (fresh?.summary) { detailPollStartRef.current = null; return; }  // debrief already here
+    // Fall back to the selected anchor for a deep-linked row not in `calls` yet.
+    const fresh = calls.find((c) => c.id === id) ?? selectedCall;
+    // Covers both "debrief already landed" and "this call will never get one".
+    if (!awaitingDebrief(fresh)) { detailPollStartRef.current = null; return; }
     if (detailPollStartRef.current === null) detailPollStartRef.current = Date.now();
-    const iv = setInterval(() => {
+    let inFlight = false;
+    const iv = setInterval(async () => {
       if (Date.now() - (detailPollStartRef.current ?? 0) > 6 * 60 * 1000) { clearInterval(iv); return; }
-      router.refresh();
+      if (inFlight) return;  // a slow response must not stack requests
+      inFlight = true;
+      try {
+        const res = await fetch(`/api/calls/${id}`);
+        if (!res.ok) return;
+        const body = (await res.json()) as { call?: { summary?: string | null } };
+        if (body.call?.summary) {
+          clearInterval(iv);
+          router.refresh();  // the one full refresh — flows the debrief into `calls`
+        }
+      } catch {
+        // Poll tick lost to a network blip — the next tick retries.
+      } finally {
+        inFlight = false;
+      }
     }, 2000);  // 2s to match the pill/skeleton poll — fills the open entry in sooner
     return () => clearInterval(iv);
   }, [selectedCall, calls, router]);
@@ -467,11 +549,20 @@ export default function FlightLogTab({ calls, initialCall, onInitialCallConsumed
       content: m.text,
     }));
 
+    // The list rows no longer carry call_transcript (dropped from the dashboard
+    // query) — but the single_call coach builds its TRANSCRIPT block from this
+    // payload. Graft the on-open fetch back in, or Wingman silently coaches from
+    // the summary alone.
+    const callWithTranscript: Call = {
+      ...call,
+      call_transcript: transcriptCache[call.id]?.rows ?? call.call_transcript ?? [],
+    };
+
     // Kick off API immediately — hold typing indicator 2s so it looks like Wingman is reading
     const fetchPromise = fetch("/api/ai/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ mode: "single_call", messages, call }),
+      body: JSON.stringify({ mode: "single_call", messages, call: callWithTranscript }),
     });
 
     await new Promise<void>(resolve => setTimeout(resolve, 2000));
@@ -508,9 +599,15 @@ export default function FlightLogTab({ calls, initialCall, onInitialCallConsumed
     // the frozen snapshot here would leave the skeleton stuck forever (SEV-5).
     const call = calls.find((c) => c.id === selectedCall.id) ?? selectedCall;
     const stages = call.call_stages || [];
-    const transcript = call.call_transcript || [];
-    // No debrief yet → show a Granola-style loading skeleton that fills in.
-    const debriefPending = !call.summary;
+    // Cache first (the on-open fetch), then any transcript already on the row
+    // (e.g. a snapshot passed via initialCall) as a fallback.
+    const transcript = transcriptCache[call.id]?.rows ?? call.call_transcript ?? [];
+    const transcriptLoading = transcriptLoadingId === call.id && transcript.length === 0;
+    // Debrief still in flight → Granola-style skeleton that fills in. An OLD call with
+    // no summary never got one (no transcript / failed job) and gets a plain note
+    // instead, so the spinner can't hang forever. Same predicate drives the poll above.
+    const debriefPending = awaitingDebrief(call);
+    const debriefMissing = !call.summary && !debriefPending;
 
     return (
       <div style={{ maxWidth: 640, margin: "0 auto" }}>
@@ -563,6 +660,14 @@ export default function FlightLogTab({ calls, initialCall, onInitialCallConsumed
             {[100, 92, 78].map((w, i) => (
               <div key={i} style={{ height: 11, width: `${w}%`, borderRadius: 5, background: "#e5e5ea", marginBottom: i < 2 ? 9 : 0, animation: "livePulse 2s ease-in-out infinite" }} />
             ))}
+          </div>
+        )}
+
+        {/* No debrief was ever generated for this call (no transcript captured). */}
+        {debriefMissing && (
+          <div style={{ background: "#fff", borderRadius: 14, padding: "16px 18px", marginBottom: 20, boxShadow: "0 1px 4px rgba(0,0,0,0.06)", border: "1px solid rgba(0,0,0,0.06)" }}>
+            <div style={{ fontSize: 11, fontWeight: 600, color: "#8e8e93", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.06em" }}>AI Debrief</div>
+            <div style={{ fontSize: 13, color: "#8e8e93", lineHeight: 1.5 }}>No debrief for this call — no transcript was captured.</div>
           </div>
         )}
 
@@ -651,7 +756,9 @@ export default function FlightLogTab({ calls, initialCall, onInitialCallConsumed
         {activeDetailTab === "transcript" && (
           <Card>
             <SectionLabel>Transcript</SectionLabel>
-            {transcript.length === 0 ? (
+            {transcriptLoading ? (
+              <div style={{ fontSize: 13, color: "#8e8e93" }}>Loading transcript…</div>
+            ) : transcript.length === 0 ? (
               <div style={{ fontSize: 13, color: "#8e8e93" }}>No transcript available.</div>
             ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>

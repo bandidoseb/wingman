@@ -671,10 +671,40 @@ export default function DashboardClient({
   // ── Poll every 2s while skeleton is up — catches both outcome and summary ────
   // 2s (not 5s): shrinks the lag between the debrief landing and the "Debrief
   // ready" pill / Flight Log skeleton updating to ~1s avg. Only runs during the
-  // short generating window (no AI cost — just a DB read), then stops.
+  // short generating window, then stops.
+  //
+  // Polls GET /api/calls/[id] (~1KB) and fires ONE router.refresh() when the
+  // debrief lands — the refresh flows the summary into initialCalls, which the
+  // skeleton-clear and pill-ready watchers below key off, exactly as before.
+  // (This used to BE router.refresh() every tick: the full dashboard load, 20
+  // calls × transcripts, ~3MB × 60 ticks per call — Session-1 review finding.)
   useEffect(() => {
     if (!pendingOutcome) return;
-    const interval = setInterval(() => router.refresh(), 2000);
+    const id = pendingCallIdRef.current;
+    if (!id) {
+      // No call id to ask about (legacy path) — keep the old behavior rather
+      // than silently never updating. Rare, and bounded by the 2-min valve.
+      const interval = setInterval(() => router.refresh(), 2000);
+      return () => clearInterval(interval);
+    }
+    let inFlight = false;
+    const interval = setInterval(async () => {
+      if (inFlight) return;  // a slow response must not stack requests
+      inFlight = true;
+      try {
+        const res = await fetch(`/api/calls/${id}`);
+        if (!res.ok) return;
+        const body = (await res.json()) as { call?: { summary?: string | null } };
+        if (body.call?.summary) {
+          clearInterval(interval);
+          router.refresh();
+        }
+      } catch {
+        // Lost tick — next one retries. The 2-min valve bounds the whole loop.
+      } finally {
+        inFlight = false;
+      }
+    }, 2000);
     return () => clearInterval(interval);
   }, [pendingOutcome, router]);
 

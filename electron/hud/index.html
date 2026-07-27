@@ -1209,6 +1209,14 @@
     // generating → ready (→ fade), plus the amber `safety` branch. The morph
     // never touches the stop chain — it's purely the HUD's end-of-call surface.
     let hubPhase       = 'hidden';   // hidden|starting|live|generating|ready|safety
+    // Latched by enterSafety for the REST of the call's teardown: an auto-stop
+    // (inactivity / 2h cap) means the rep may still be live on the meeting, so no
+    // end-of-call morph (generating/ready) may ever appear for THIS call. A phase
+    // check is not enough — the amber pill self-fades to 'hidden' after ~8s, and on
+    // a slow network the renderer's follow-up call:ended (with callId) can land
+    // AFTER that fade. Only the next call (showHub) resets it; hideHub must NOT,
+    // because the fade path runs straight through hideHub.
+    let hubSafetyClaimed = false;
     let hubMorphCallId = null;       // callId to deep-link "View call →"
     let hubGenTimer    = null;       // generating dead-man timeout (6 min)
     let hubSafetyTimer = null;       // safety-state auto-fade (8s)
@@ -1536,6 +1544,7 @@
     function enterSafety(reason) {
       clearHubMorphTimers();
       hubPhase = 'safety';
+      hubSafetyClaimed = true;                          // block all later morphs this call
       hubMorphCallId = null;                            // debrief lands in the dashboard silently
       const s = HUB_SAFETY[reason] || { icon: '', msg: 'Wingman stopped' };
       morphTo('safety', () => { hubSafetyIcon.innerHTML = s.icon; hubText.textContent = s.msg; });
@@ -1756,6 +1765,7 @@
     // (classList), so rapid Deploy/end cycles can't leave duplicate state.
     function showHub(mode) {
       clearHubMorphTimers();        // a new call supersedes any prior end-of-call morph
+      hubSafetyClaimed = false;     // fresh call → the previous auto-stop's claim ends here
       hubPhase = (mode === 'starting') ? 'starting' : 'live';
       hubMorphCallId = null;
       liveHub.style.width = '';     // back to content-driven width
@@ -2587,6 +2597,12 @@
         hideCompassMenu();         // always close compass on call end
         hidePill(false);           // Phase 3.5: clear thinking pill + ALL its timers
         const callId = data && data.callId;
+        // An auto-stop (inactivity / 2h cap) claimed this call's teardown with its
+        // amber safety pill — the rep may still be live on the meeting. The renderer's
+        // end-call PATCH re-emits call:ended WITH a callId up to ~10s+ later (flush
+        // timeout); without this latch that event would morph into a "Debrief ready"
+        // pill parked on screen mid-call. (Latch, not a phase check — see its decl.)
+        if (hubSafetyClaimed) return;
         if (callId) {
           // Manual end with a saved call → morph straight into "generating debrief".
           enterGenerating(callId);
@@ -2616,7 +2632,10 @@
       if (window.hud.onPostCallState) {
         window.hud.onPostCallState(({ phase, callId }) => {
           // Safety states are terminal + silent — the debrief goes to the dashboard,
-          // never back to the pill (the rep may still be on the call).
+          // never back to the pill (the rep may still be on the call). The latch
+          // covers the post-fade window where hubPhase alone would lie ('hidden'
+          // here also bails, but belt-and-suspenders — see hubSafetyClaimed decl).
+          if (hubSafetyClaimed) return;
           if (hubPhase === 'safety' || hubPhase === 'ending' || hubPhase === 'hidden') return;
           if (phase === 'generating') {
             // Adopt the callId (auto-stop path had none). Don't downgrade ready→generating.
