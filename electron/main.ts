@@ -873,12 +873,17 @@ function setupIPC(): void {
   ipcMain.handle("wingman:post-call-state", (_event, payload: { phase?: string; callId?: string | null }) => {
     const phase  = payload?.phase;
     const callId = payload?.callId ?? null;
-    if (phase !== "generating" && phase !== "ready") {
+    if (phase !== "generating" && phase !== "ready" && phase !== "none") {
       console.warn("[wingman:post-call-state] ignored — bad phase:", phase);
       return;
     }
     console.log("[IPC] wingman:post-call-state", phase, callId ?? "(no callId)");
     if (phase === "ready") clearHudSafetyHide();
+    // NOTE: "none" deliberately does NOT clear the safety-net hide. This message comes
+    // from the DASHBOARD renderer, so it proves nothing about the HUD renderer — which
+    // is the exact thing the net guards. A hung HUD would never run enterNoDebrief,
+    // never fade, never send hud:morph-done, and clearing here would strand the overlay
+    // on screen forever. The healthy path clears it via hud:morph-done ~8s later.
     if (hudWindow && !hudWindow.isDestroyed()) {
       hudWindow.webContents.send("hud:post-call-state", { phase, callId });
     }

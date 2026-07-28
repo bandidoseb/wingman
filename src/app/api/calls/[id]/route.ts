@@ -38,6 +38,33 @@ export async function GET(
     if (error) throw error;
     if (!call) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
+    // transcriptRows — lets a poller tell "still generating" apart from
+    // "nothing is coming", which `summary` alone cannot express: post-call returns
+    // { skipped: "no transcript" } and writes NOTHING, so a call that captured no audio
+    // sat in "generating debrief…" until the HUD's 6-minute dead-man timer.
+    //
+    // This reports FACTS, not a verdict. The server cannot distinguish "zero rows
+    // forever" from "zero rows so far" — transcript saves are still in flight around
+    // call end (flushBuffer early-returns when the 25s auto-save is mid-request, so its
+    // resolution does NOT prove rows are committed). The caller owns that judgment,
+    // because only the caller knows how long ago the call ended. Deciding it here would
+    // permanently hide a real debrief on a slow save.
+    //
+    // (An earlier version keyed off `call.duration != null` as proof the flush had
+    // finished. `duration` is never written by any client — it would have been dead
+    // code that shipped looking fixed.)
+    // (No debriefStatus field — it would only restate `call.summary`, which every
+    // caller already reads off the row.)
+    let transcriptRows: number | null = null;
+    if (!call.summary) {
+      const { count, error: cErr } = await supabase
+        .from("call_transcript")
+        .select("id", { count: "exact", head: true })
+        .eq("call_id", id);
+      // On error leave null — callers treat unknown as "keep waiting", never as "none".
+      if (!cErr) transcriptRows = count ?? 0;
+    }
+
     if (req.nextUrl.searchParams.get("include") === "transcript") {
       // Ownership proven above, so scoping by call_id is safe here.
       const { data: transcript, error: tErr } = await supabase
@@ -46,10 +73,10 @@ export async function GET(
         .eq("call_id", id)
         .order("sequence_order", { ascending: true });
       if (tErr) throw tErr;
-      return NextResponse.json({ call, transcript: transcript ?? [] });
+      return NextResponse.json({ call, transcript: transcript ?? [], transcriptRows });
     }
 
-    return NextResponse.json({ call });
+    return NextResponse.json({ call, transcriptRows });
   } catch (err) {
     console.error("GET /api/calls/[id] error:", err);
     return NextResponse.json({ error: "Failed to load call" }, { status: 500 });

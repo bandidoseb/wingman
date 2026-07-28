@@ -342,7 +342,7 @@ contextBridge.exposeInMainWorld("wingman", {
   // (it polls the call record). It drives the Live Hub pill's generating→ready
   // morph through main. New in v0.1.29 — callers optional-chain this so older
   // preloads (which lack it) simply no-op.
-  postCallState: (payload: { phase: "generating" | "ready"; callId: string | null }) =>
+  postCallState: (payload: { phase: "generating" | "ready" | "none"; callId: string | null }) =>
     ipcRenderer.invoke("wingman:post-call-state", payload),
 
   // ── Environment detection ────────────────────────────────────────────────
@@ -425,8 +425,8 @@ contextBridge.exposeInMainWorld("hud", {
   confirmEndCall: () => ipcRenderer.invoke("hud:confirm-end-call"),
 
   // ── Post-call pill morph (v0.1.29) ─────────────────────────────────────────
-  /** Receive generating→ready phase updates for the Live Hub end-of-call morph. */
-  onPostCallState: (callback: (payload: { phase: "generating" | "ready"; callId: string | null }) => void) => {
+  /** Receive generating→ready/none phase updates for the Live Hub end-of-call morph. */
+  onPostCallState: (callback: (payload: { phase: "generating" | "ready" | "none"; callId: string | null }) => void) => {
     ipcRenderer.on("hud:post-call-state", (_event, payload) => callback(payload));
   },
 

@@ -6,7 +6,7 @@ import Card from "@/components/ui/Card";
 import SectionLabel from "@/components/ui/SectionLabel";
 import OutcomeBadge from "@/components/ui/OutcomeBadge";
 import type { Call, TranscriptLine } from "@/types";
-import { confirmedOutcome } from "@/lib/wingman/outcome-stats";
+import { confirmedOutcome, NO_DEBRIEF_GRACE_MS } from "@/lib/wingman/outcome-stats";
 
 const PILLAR_DISPLAY: Array<{ key: string; label: string; description: string }> = [
   { key: "core_problem",         label: "Core Problem",      description: "Rep dug into the real pain" },
@@ -267,6 +267,9 @@ export default function FlightLogTab({ calls, initialCall, onInitialCallConsumed
   // rep kept the call open (detail poll refresh) or closed and reopened it later.
   const [transcriptCache, setTranscriptCache] = useState<Record<string, { rows: TranscriptLine[]; provisional: boolean }>>({});
   const [transcriptLoadingId, setTranscriptLoadingId] = useState<string | null>(null);
+  // Calls the server has confirmed will never get a debrief (no transcript captured).
+  // Server-confirmed, so it beats awaitingDebrief's time-based guess immediately.
+  const [noDebriefIds, setNoDebriefIds] = useState<Set<string>>(() => new Set());
   useEffect(() => {
     const id = selectedCall?.id;
     if (!id) return;
@@ -305,6 +308,7 @@ export default function FlightLogTab({ calls, initialCall, onInitialCallConsumed
   // full dashboard load. One real refresh fires when the debrief lands.
   // Caps at ~6 min via a start-time ref so a stuck job can't poll forever.
   const detailPollStartRef = useRef<number | null>(null);
+  const detailPollIdRef    = useRef<string | null>(null);   // which call the clock belongs to
   useEffect(() => {
     const id = selectedCall?.id;
     if (!id) { detailPollStartRef.current = null; return; }
@@ -312,6 +316,14 @@ export default function FlightLogTab({ calls, initialCall, onInitialCallConsumed
     const fresh = calls.find((c) => c.id === id) ?? selectedCall;
     // Covers both "debrief already landed" and "this call will never get one".
     if (!awaitingDebrief(fresh)) { detailPollStartRef.current = null; return; }
+    // The server already told us nothing is coming — don't re-poll on reopen.
+    if (noDebriefIds.has(id)) { detailPollStartRef.current = null; return; }
+    // A different call than last tick → restart the grace clock. Carrying the previous
+    // call's start over would make this one's 30s window already expired on tick one.
+    if (detailPollIdRef.current !== id) {
+      detailPollIdRef.current = id;
+      detailPollStartRef.current = null;
+    }
     if (detailPollStartRef.current === null) detailPollStartRef.current = Date.now();
     let inFlight = false;
     const iv = setInterval(async () => {
@@ -321,10 +333,21 @@ export default function FlightLogTab({ calls, initialCall, onInitialCallConsumed
       try {
         const res = await fetch(`/api/calls/${id}`);
         if (!res.ok) return;
-        const body = (await res.json()) as { call?: { summary?: string | null } };
+        const body = (await res.json()) as {
+          call?: { summary?: string | null };
+          transcriptRows?: number | null;
+        };
         if (body.call?.summary) {
           clearInterval(iv);
           router.refresh();  // the one full refresh — flows the debrief into `calls`
+        } else if (
+          body.transcriptRows === 0 &&
+          Date.now() - (detailPollStartRef.current ?? 0) >= NO_DEBRIEF_GRACE_MS
+        ) {
+          // Zero rows, and long enough after the call that no save is still landing →
+          // swap the skeleton for the honest note instead of spinning to the 6-min cap.
+          clearInterval(iv);
+          setNoDebriefIds((prev) => (prev.has(id) ? prev : new Set(prev).add(id)));
         }
       } catch {
         // Poll tick lost to a network blip — the next tick retries.
@@ -553,16 +576,30 @@ export default function FlightLogTab({ calls, initialCall, onInitialCallConsumed
     // query) — but the single_call coach builds its TRANSCRIPT block from this
     // payload. Graft the on-open fetch back in, or Wingman silently coaches from
     // the summary alone.
-    const callWithTranscript: Call = {
-      ...call,
-      call_transcript: transcriptCache[call.id]?.rows ?? call.call_transcript ?? [],
-    };
+    const cached = transcriptCache[call.id];
+    const rows = cached?.rows ?? call.call_transcript ?? [];
+    const callWithTranscript: Call = { ...call, call_transcript: rows };
+
+    // Tell the coach what we actually KNOW, because an empty array is ambiguous now
+    // that list rows don't carry transcripts. "empty" is a proven absence — a settled
+    // (non-provisional) fetch that returned zero rows. A provisional entry was fetched
+    // while the call was still being written, so its emptiness proves nothing yet.
+    // noDebriefIds is SERVER-confirmed zero rows past the grace window — strictly
+    // stronger proof than a settled cache entry, and the only proof available on this
+    // exact path: a no-transcript call never gets a summary, so its cache entry stays
+    // provisional forever. Without it the UI would show "no transcript was captured"
+    // while the coach said "it may still be saving — try reopening", on the primary
+    // scenario this whole feature exists for.
+    const transcriptStatus: "present" | "empty" | "unknown" =
+      rows.length ? "present"
+      : (cached && !cached.provisional) || noDebriefIds.has(call.id) ? "empty"
+      : "unknown";
 
     // Kick off API immediately — hold typing indicator 2s so it looks like Wingman is reading
     const fetchPromise = fetch("/api/ai/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ mode: "single_call", messages, call: callWithTranscript }),
+      body: JSON.stringify({ mode: "single_call", messages, call: callWithTranscript, transcriptStatus }),
     });
 
     await new Promise<void>(resolve => setTimeout(resolve, 2000));
@@ -606,7 +643,7 @@ export default function FlightLogTab({ calls, initialCall, onInitialCallConsumed
     // Debrief still in flight → Granola-style skeleton that fills in. An OLD call with
     // no summary never got one (no transcript / failed job) and gets a plain note
     // instead, so the spinner can't hang forever. Same predicate drives the poll above.
-    const debriefPending = awaitingDebrief(call);
+    const debriefPending = awaitingDebrief(call) && !noDebriefIds.has(call.id);
     const debriefMissing = !call.summary && !debriefPending;
 
     return (
