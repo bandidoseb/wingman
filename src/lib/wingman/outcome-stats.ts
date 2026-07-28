@@ -18,3 +18,18 @@ export function confirmedOutcome(
   if (call.outcome && call.outcome_source !== "auto") return call.outcome;
   return null;
 }
+
+/**
+ * How long after a call ends before "zero transcript rows" may be treated as final.
+ *
+ * post-call skips any call with no transcript and writes nothing, so `summary` stays
+ * null forever and the HUD pill / Flight Log skeleton would spin to their 6-minute
+ * dead-man timers. Zero rows is only conclusive once no save can still be landing:
+ * transcript saves in flight at call end are bounded by flushBuffer's 10s abort (it
+ * early-returns when the 25s auto-save is mid-request, so awaiting it proves nothing),
+ * making this a 3× margin — and still 12× faster than the dead-man timers.
+ *
+ * Lives here (not in DashboardClient) because FlightLogTab needs it too and
+ * DashboardClient imports FlightLogTab — importing back would be circular.
+ */
+export const NO_DEBRIEF_GRACE_MS = 30_000;

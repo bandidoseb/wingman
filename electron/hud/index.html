@@ -1541,13 +1541,38 @@
       // No auto-fade — persists until View-call, ✕, or a new deploy (Sebastian).
     }
 
+    // No debrief is coming — nothing was captured (nobody spoke / no transcript). Say
+    // so briefly and fade, rather than claim "generating debrief…" until the 6-minute
+    // dead-man timer. Reuses the safety chrome: terminal, self-fading, no View-call
+    // button (there is nothing to view). Same doctrine as the dig card's quiet state —
+    // when Wingman has nothing, it says so instead of pretending.
+    function enterNoDebrief() {
+      clearHubMorphTimers();
+      hubPhase = 'safety';                 // terminal + self-fading, and blocks re-morph
+      hubSafetyClaimed = true;             // hardening: nothing may re-morph this call,
+                                           // including a late call:ended (cleared by showHub)
+      hubMorphCallId = null;
+      morphTo('safety', () => {
+        // Hide the icon slot outright — the safety chrome lays it out at 15px with a
+        // 7px gap, so an empty innerHTML would leave a 22px hole left of the text.
+        hubSafetyIcon.innerHTML = '';
+        hubSafetyIcon.style.display = 'none';
+        hubText.textContent = 'No debrief — nothing was recorded';
+      });
+      hubSafetyTimer = setTimeout(fadeHubOut, HUB_SAFETY_MS);
+    }
+
     function enterSafety(reason) {
       clearHubMorphTimers();
       hubPhase = 'safety';
       hubSafetyClaimed = true;                          // block all later morphs this call
       hubMorphCallId = null;                            // debrief lands in the dashboard silently
       const s = HUB_SAFETY[reason] || { icon: '', msg: 'Wingman stopped' };
-      morphTo('safety', () => { hubSafetyIcon.innerHTML = s.icon; hubText.textContent = s.msg; });
+      morphTo('safety', () => {
+        hubSafetyIcon.style.display = '';   // undo enterNoDebrief's hide — real safety states have icons
+        hubSafetyIcon.innerHTML = s.icon;
+        hubText.textContent = s.msg;
+      });
       hubSafetyTimer = setTimeout(fadeHubOut, HUB_SAFETY_MS);
     }
 
@@ -2644,6 +2669,12 @@
             // Only from generating, and only for the call we're actually showing.
             if (hubPhase === 'generating' && (!hubMorphCallId || !callId || callId === hubMorphCallId)) {
               enterReady(callId || hubMorphCallId);
+            }
+          } else if (phase === 'none') {
+            // Nothing was captured → no debrief will ever land. Same guards as 'ready':
+            // only from generating, only for the call this pill is actually showing.
+            if (hubPhase === 'generating' && (!hubMorphCallId || !callId || callId === hubMorphCallId)) {
+              enterNoDebrief();
             }
           }
         });

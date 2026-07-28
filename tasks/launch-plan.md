@@ -10,10 +10,20 @@
 
 Goal: 5–10 hand-picked closers ("**Test Pilots**") using Wingman free on real calls, giving feedback. No website, no Stripe needed for this track.
 
-### Session 1 — Ship the backlog 🚢
-- Push `feat/confrontation-dial` (~5 sessions of finished local work: voice Phase 0, summarizer Cole-brain, Flight Recorder, bugs #52/#53, post-call flow, dial [pinned/inert])
-- PR → CI green → wingman-reviewer → merge → cut + **publish** v0.1.29
-- ⚠️ Needs Sebastian's explicit "yes" before any push (Hard Rule 0)
+### Session 1 — Ship the backlog 🚢 ✅ DONE 2026-07-27
+- PR #54 (feature payload) + PR #55 (version bump) both merged to main → Railway auto-deployed the web half
+- **v0.1.29 published LIVE** to `bandidoseb/wingman-releases` (draft=false, signed + notarized, `latest-mac.yml` present → auto-update works). Build 11m50s.
+- Two `wingman-reviewer` rounds before merge caught: (1) auto-stop safety pill clobbered → permanent "Debrief ready" over a live call [`hubSafetyClaimed` latch]; (2) post-call polling re-ran the full dashboard load (20 calls × transcripts, ~180MB per call ended) → light `GET /api/calls/[id]`, ~2000× cut; (3) SELF-INFLICTED regression — dropping transcripts from the list query silently starved "Ask Wingman" of its transcript context.
+- Merge snag resolved: PR #53 was squash-merged to main, so the branch's identical Live Hub work conflicted (12 HUD + 3 doc). Each inspected; branch was a strict superset everywhere except the deliberate post-call morph change.
+- Migration 011 shipped (outcome_source confirmed present in prod). Migration 010 (card_style) intentionally NOT run — dial is inert.
+- ⚠️ STILL UNPROVEN ON A REAL CALL (→ Session 8 dogfood): HUD safety latch (needs a 2-hr call or 20-min silence), post-call pill morph on a real call end, AI outcome auto-detect quality, #52 cold-ladder dig fix.
+
+### Session 1b — Flight Log redesign 🗂️ (NEW, from v0.1.29 live test 2026-07-27)
+Sebastian's call: decide what the Flight Log SHOWS before fixing how it displays — fixing labels inside a section we're about to delete is wasted work.
+- **Redundancy:** "Topics Missed Before Pitch" is a third rendering of data already shown twice — its `press stage/confirm stage/pitch/close` chips are just the incomplete rows of STAGE BREAKDOWN, and `cant_diy/investment readiness/why you` are just the unchecked rows of FRAMEWORK COVERAGE. Candidate for deletion.
+- **Raw internal keys leaking to users:** `cant_diy`, `investment_readiness`, `why_you` appear BOTH in the AI debrief prose AND the missed-topics chips. Cause: `post-call/route.ts` defines the pillars to the model in snake_case (lines ~31-92), so it echoes them. Fix = prompt rule (never emit internal keys) + a display-side key→label mapper as a backstop. `PILLARS` in `FlightLogTab.tsx` already holds the human labels.
+- Granola-referenced visual pass. Design Language spec is the north star.
+- ⚠️ Do NOT patch the underscores before this session — they live in a section that may not survive it.
 
 ### Session 2 — Replay Harness (the voice-grind engine) 🎯
 The centerpiece. Sit for hours testing real card outputs without being on a call.

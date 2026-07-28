@@ -4,6 +4,7 @@ import { useState, useCallback, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import type { Profile, Call, VaultObjection, VaultSignal, CallStageLabel } from "@/types";
+import { NO_DEBRIEF_GRACE_MS } from "@/lib/wingman/outcome-stats";
 import Sidebar from "@/components/dashboard/Sidebar";
 import HomeTab from "@/components/dashboard/HomeTab";
 import FlightLogTab from "@/components/dashboard/FlightLogTab";
@@ -688,16 +689,40 @@ export default function DashboardClient({
       return () => clearInterval(interval);
     }
     let inFlight = false;
+    // Polling starts at call end, so this measures time-since-end — the only reference
+    // point that makes "zero transcript rows" conclusive. Transcript saves in flight at
+    // call end are bounded by flushBuffer's 10s abort, so 30s is comfortably past them.
+    // Declaring "none" earlier would kill the pill on a real call whose save was slow.
+    const pollStart = Date.now();
     const interval = setInterval(async () => {
       if (inFlight) return;  // a slow response must not stack requests
       inFlight = true;
       try {
         const res = await fetch(`/api/calls/${id}`);
         if (!res.ok) return;
-        const body = (await res.json()) as { call?: { summary?: string | null } };
+        const body = (await res.json()) as {
+          call?: { summary?: string | null };
+          transcriptRows?: number | null;
+        };
         if (body.call?.summary) {
           clearInterval(interval);
           router.refresh();
+        } else if (body.transcriptRows === 0 && Date.now() - pollStart >= NO_DEBRIEF_GRACE_MS) {
+          // Nothing was captured and enough time has passed that nothing will be.
+          // Resolve the pill NOW instead of letting it claim "generating debrief…"
+          // until the 6-min dead-man timer.
+          clearInterval(interval);
+          setPendingOutcome(false);
+          pendingCallIdRef.current = null;
+          if (genCallIdRef.current === id) {
+            genCallIdRef.current = null;
+            readyFiredRef.current.add(id);   // never fire "ready" for this call later
+            window.wingman?.postCallState?.({ phase: "none", callId: id });
+          }
+          // No router.refresh() here: post-call skipped, so nothing on the server has
+          // changed since the refresh at call end ~30s ago. setPendingOutcome(false)
+          // above already clears the skeleton — a refresh would re-run the full
+          // dashboard load for zero new data.
         }
       } catch {
         // Lost tick — next one retries. The 2-min valve bounds the whole loop.

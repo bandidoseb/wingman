@@ -326,7 +326,9 @@ export interface WingmanBridge {
   // Drive the HUD Live Hub pill's end-of-call morph (generating → ready). The
   // renderer is the only side that learns when the debrief lands. Optional so
   // callers optional-chain it — old preloads (pre-v0.1.29) simply no-op.
-  postCallState?: (payload: { phase: "generating" | "ready"; callId: string | null }) => Promise<void>;
+  // "none" = post-call produced nothing (no transcript captured) — the pill must stop
+  // claiming it's generating a debrief that will never arrive.
+  postCallState?: (payload: { phase: "generating" | "ready" | "none"; callId: string | null }) => Promise<void>;
 
   // Hotkey compass menu — main process tells web app which direction the rep picked
   onMenuPick:  (callback: (direction: string) => void) => void;

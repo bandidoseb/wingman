@@ -50,7 +50,14 @@ function buildGlobalContext(
 /**
  * Builds full context for a single-call coaching session.
  * No word cap — Wingman's 2-hour hard stop is the natural ceiling.
+ *
+ * transcriptStatus is the CLIENT's knowledge about the transcript, and it is not
+ * inferable from the payload: since the dashboard list query stopped carrying
+ * transcripts, an empty `call_transcript` means "not loaded here" far more often
+ * than "does not exist". Only "empty" is a proven absence.
  */
+type TranscriptStatus = "present" | "empty" | "unknown";
+
 function buildSingleCallContext(call: {
   prospect_name: string | null;
   outcome: string | null;
@@ -60,7 +67,7 @@ function buildSingleCallContext(call: {
   missed_topics: string[];
   call_stages?:     Array<{ name: string; status: string; note: string | null; display_order: number }>;
   call_transcript?: Array<{ speaker: string; text: string; sequence_order: number }>;
-}): string {
+}, transcriptStatus: TranscriptStatus = "unknown"): string {
   const date  = new Date(call.call_date).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
   const lines: string[] = [
     `CALL: ${call.prospect_name ?? "Unknown Prospect"} — ${date} — ${call.duration ?? "unknown duration"} — Outcome: ${call.outcome ?? "not set"}`,
@@ -88,6 +95,26 @@ function buildSingleCallContext(call: {
       .map((l) => `${l.speaker}: ${l.text}`)
       .join("\n");
     lines.push(`\nTRANSCRIPT:\n${transcript}`);
+  } else if (transcriptStatus === "empty") {
+    // PROVEN absent — the client fetched this call's transcript and got zero rows.
+    // Silently omitting it left the model a one-line context, which CORE_PROMPT's
+    // "ask ONE short question instead of guessing" turned into "what call are you
+    // referring to?" while the rep stared at that exact call.
+    lines.push(
+      `\nTRANSCRIPT: none — nothing was captured for this call (the recording produced no transcript). ` +
+      `Nobody has any record of what was said. Say so plainly if asked what happened; do NOT ask which call they mean.`,
+    );
+  } else {
+    // NOT proven absent — just not in this payload. List rows no longer carry
+    // transcripts, and the on-open fetch may still be in flight, may have failed, or
+    // may have run while the call was still being written. Claiming "nothing was
+    // captured" here would confidently deny a real call — strictly worse than the
+    // bug this fixes. Say what's true: it isn't available right now.
+    lines.push(
+      `\nTRANSCRIPT: not available in this context right now (it may still be saving, or it failed to load). ` +
+      `Do NOT claim the call was never recorded, and do NOT ask which call they mean — you know which call this is. ` +
+      `Work from the debrief above if it's there; otherwise say you can't pull the transcript up right now and suggest reopening the call.`,
+    );
   }
 
   return lines.join("\n");
@@ -170,6 +197,14 @@ const CORE_PROMPT = [
   `- Never say "the knowledge base" or reference any system. You're their coach, period.`,
 ].join("\n");
 
+// single_call mode ONLY. The rep opened one specific call and is looking at it — the
+// call is already identified, so the CORE_PROMPT "ask ONE short question instead of
+// guessing" escape hatch must not turn into "which call do you mean?". Static, so it
+// sits in the cached prefix ahead of the call context without disturbing the cache.
+const SINGLE_CALL_INSTRUCTIONS = `\n---\nTHIS CALL ONLY:
+- The rep is looking at ONE specific call — the one in the context above. Every question is about THAT call. NEVER ask which call they mean, and never ask them to paste a transcript or notes; you either have the transcript above or it does not exist.
+- If the context says the transcript is none, do not guess or ask around it. Tell them straight that nothing was captured for this call, so there's nothing to review — and if it's worth a sentence, why that happens (nobody spoke, or the recording never picked anything up).`;
+
 const CALL_TRIAGE_INSTRUCTIONS = `\n---\nCALL TRIAGE — follow these steps exactly, in order:
 
 STEP 1 — User asks about a specific call: Identify the best match from the call list above. Ask for confirmation only — e.g. "Are you talking about the call with [Name] on [Date]?" Do NOT include CALL_MATCH. Do NOT offer to dive deeper yet.
@@ -222,7 +257,7 @@ export async function POST(req: NextRequest) {
     }
 
     // ── Parse body ─────────────────────────────────────────────────────────────
-    const { mode, messages, callSummaries, call, pendingCallId } = await req.json();
+    const { mode, messages, callSummaries, call, pendingCallId, transcriptStatus } = await req.json();
 
     if (!mode || !Array.isArray(messages) || messages.length === 0) {
       return NextResponse.json({ error: "mode and messages required" }, { status: 400 });
@@ -238,7 +273,10 @@ export async function POST(req: NextRequest) {
     if (mode === "global" && Array.isArray(callSummaries)) {
       contextStr = buildGlobalContext(callSummaries);
     } else if (mode === "single_call" && call) {
-      contextStr = buildSingleCallContext(call);
+      // Untrusted input — anything but the two known values means "not proven".
+      const ts: TranscriptStatus =
+        transcriptStatus === "present" || transcriptStatus === "empty" ? transcriptStatus : "unknown";
+      contextStr = buildSingleCallContext(call, ts);
     }
 
     // ── KB search (non-fatal — coaching works without it) ─────────────────────
@@ -265,6 +303,7 @@ export async function POST(req: NextRequest) {
     if (usePromptCaching) {
       const blocks: SystemBlock[] = [
         { type: "text", text: CORE_PROMPT },
+        { type: "text", text: SINGLE_CALL_INSTRUCTIONS },
         { type: "text", text: `\n---\n${contextStr}`, cache_control: { type: "ephemeral" } },
       ];
       if (kbContext) {
@@ -277,6 +316,9 @@ export async function POST(req: NextRequest) {
     } else {
       // String system prompt (global mode)
       const parts = [CORE_PROMPT];
+      // Only with context — the instructions reference "the context above", so
+      // pushing them when the client sent no `call` would describe nothing.
+      if (mode === "single_call" && contextStr) parts.push(SINGLE_CALL_INSTRUCTIONS);
       if (contextStr)                parts.push(`\n---\n${contextStr}`);
       if (mode === "global")         parts.push(CALL_TRIAGE_INSTRUCTIONS);
       if (kbContext)                 parts.push(`\n---\nCOACHING INSIGHTS (weave these naturally into your response — never quote or attribute them):\n${kbContext}`);
