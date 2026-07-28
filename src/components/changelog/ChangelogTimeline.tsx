@@ -48,7 +48,7 @@ export function ChangelogTimeline({ entries }: { entries: ChangelogEntry[] }) {
                     className={
                       "rounded-full px-4 py-1.5 transition-colors " +
                       (active
-                        ? "bg-white text-neutral-900 shadow-sm"
+                        ? "bg-white text-neutral-900 shadow-xs"
                         : "text-neutral-500 hover:text-neutral-800")
                     }
                   >

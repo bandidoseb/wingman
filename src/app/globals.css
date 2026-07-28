@@ -1,6 +1,230 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import 'tailwindcss';
+
+@custom-variant dark (&:is(.dark *));
+
+/*
+  `inline` is LOAD-BEARING — do not drop it.
+
+  Every --color-* below points at a runtime token (`rgb(var(--paper))`) whose value
+  is swapped by the `.dark` block further down. With a plain `@theme`, Tailwind
+  emits `--color-paper: rgb(var(--paper))` on :root, CSS resolves it there once
+  against the LIGHT tokens, and every element inherits that frozen light value —
+  so dark mode silently does nothing unless `.dark` happens to sit on <html>.
+  Measured before this was added: `.dark` on <html> → rgb(23,22,19) ✓, but `.dark`
+  on any wrapper element → rgb(250,248,244) ✗.
+
+  `inline` substitutes the reference straight into the utility instead
+  (`background-color: rgb(var(--paper))`), so it resolves at the element and works
+  at any nesting depth. This is what shadcn's own v4 setup does.
+*/
+@theme inline {
+  --color-paper: rgb(var(--paper));
+
+  --color-surface: rgb(var(--surface));
+  --color-surface-sunken: rgb(var(--surface-sunken));
+
+  --color-ink-1: rgb(var(--ink-1));
+  --color-ink-2: rgb(var(--ink-2));
+  --color-ink-3: rgb(var(--ink-3));
+
+  --color-line: rgb(var(--line));
+  --color-line-strong: rgb(var(--line-strong));
+
+  --color-signal: rgb(var(--signal));
+  --color-signal-hover: rgb(var(--signal-hover));
+  --color-signal-weak: rgb(var(--signal-weak));
+  --color-signal-on: rgb(var(--signal-on));
+
+  --color-positive: rgb(var(--positive));
+  --color-positive-weak: rgb(var(--positive-weak));
+
+  --color-warning: rgb(var(--warning));
+  --color-warning-weak: rgb(var(--warning-weak));
+
+  --color-critical: rgb(var(--critical));
+  --color-critical-weak: rgb(var(--critical-weak));
+
+  --color-score-0: rgb(var(--score-0));
+  --color-score-1: rgb(var(--score-1));
+  --color-score-2: rgb(var(--score-2));
+  --color-score-3: rgb(var(--score-3));
+
+  --color-background: rgb(var(--background));
+  --color-foreground: rgb(var(--foreground));
+
+  --color-card: rgb(var(--card));
+  --color-card-foreground: rgb(var(--card-foreground));
+
+  --color-popover: rgb(var(--popover));
+  --color-popover-foreground: rgb(var(--popover-foreground));
+
+  --color-primary: rgb(var(--primary));
+  --color-primary-foreground: rgb(var(--primary-foreground));
+
+  --color-secondary: rgb(var(--secondary));
+  --color-secondary-foreground: rgb(var(--secondary-foreground));
+
+  --color-muted: rgb(var(--muted));
+  --color-muted-foreground: rgb(var(--muted-foreground));
+
+  --color-accent: rgb(var(--accent));
+  --color-accent-foreground: rgb(var(--accent-foreground));
+
+  --color-destructive: rgb(var(--destructive));
+  --color-destructive-foreground: rgb(var(--destructive-foreground));
+
+  --color-border: rgb(var(--border));
+  --color-input: rgb(var(--input));
+  --color-ring: rgb(var(--ring));
+
+  --color-sidebar: rgb(var(--sidebar));
+  --color-sidebar-foreground: rgb(var(--sidebar-foreground));
+  --color-sidebar-primary: rgb(var(--sidebar-primary));
+  --color-sidebar-primary-foreground: rgb(var(--sidebar-primary-foreground));
+  --color-sidebar-accent: rgb(var(--sidebar-accent));
+  --color-sidebar-accent-foreground: rgb(var(--sidebar-accent-foreground));
+  --color-sidebar-border: rgb(var(--sidebar-border));
+  --color-sidebar-ring: rgb(var(--sidebar-ring));
+
+  --font-sans: var(--font-sans);
+  --font-mono: var(--font-mono);
+
+  --text-display: 32px;
+  --text-display--line-height: 1.15;
+  --text-display--letter-spacing: -0.022em;
+  --text-display--font-weight: 700;
+  --text-h1: 24px;
+  --text-h1--line-height: 1.2;
+  --text-h1--letter-spacing: -0.02em;
+  --text-h1--font-weight: 650;
+  --text-h2: 20px;
+  --text-h2--line-height: 1.25;
+  --text-h2--letter-spacing: -0.015em;
+  --text-h2--font-weight: 600;
+  --text-h3: 17px;
+  --text-h3--line-height: 1.35;
+  --text-h3--letter-spacing: -0.01em;
+  --text-h3--font-weight: 600;
+  --text-body: 15px;
+  --text-body--line-height: 1.55;
+  --text-body--letter-spacing: -0.006em;
+  --text-small: 13px;
+  --text-small--line-height: 1.45;
+  --text-label: 11px;
+  --text-label--line-height: 1.2;
+  --text-label--letter-spacing: 0.09em;
+  --text-label--font-weight: 600;
+
+  --radius-tight: var(--r-sm);
+  --radius-control: var(--r-md);
+  --radius-card: var(--r-lg);
+  --radius-panel: var(--r-xl);
+  --radius-pill: var(--r-full);
+
+  --shadow-raised: var(--e-sm);
+  --shadow-float: var(--e-md);
+  --shadow-overlay: var(--e-lg);
+
+  --ease-wm: var(--ease);
+
+  --transition-duration-1: var(--dur-1);
+  --transition-duration-2: var(--dur-2);
+  --transition-duration-3: var(--dur-3);
+
+  --animate-fade-up: fadeUp 0.28s cubic-bezier(0.22, 1, 0.36, 1) both;
+  --animate-accordion-down: accordionDown 0.22s cubic-bezier(0.22, 1, 0.36, 1)
+    both;
+  --animate-glow-blue: glowBlue 2.4s ease-in-out infinite;
+  --animate-glow-red: glowRed 1.6s ease-in-out infinite;
+  --animate-blink: blink 1.2s infinite;
+  --animate-typing-bounce: typingBounce 1.2s infinite ease-in-out;
+
+  @keyframes fadeUp {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  @keyframes accordionDown {
+    from {
+      opacity: 0;
+      transform: translateY(-6px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  @keyframes glowBlue {
+    0%,
+    100% {
+      box-shadow:
+        0 2px 24px rgba(0, 122, 255, 0.2),
+        0 0 0 1.5px rgba(0, 122, 255, 0.25);
+    }
+    50% {
+      box-shadow:
+        0 2px 36px rgba(0, 122, 255, 0.38),
+        0 0 0 1.5px rgba(0, 122, 255, 0.45);
+    }
+  }
+  @keyframes glowRed {
+    0%,
+    100% {
+      box-shadow:
+        0 2px 24px rgba(192, 57, 43, 0.25),
+        0 0 0 1.5px rgba(192, 57, 43, 0.32);
+    }
+    50% {
+      box-shadow:
+        0 2px 36px rgba(192, 57, 43, 0.45),
+        0 0 0 1.5px rgba(192, 57, 43, 0.55);
+    }
+  }
+  @keyframes blink {
+    0%,
+    100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0;
+    }
+  }
+  @keyframes typingBounce {
+    0%,
+    60%,
+    100% {
+      transform: translateY(0);
+      opacity: 0.4;
+    }
+    30% {
+      transform: translateY(-5px);
+      opacity: 1;
+    }
+  }
+}
+
+/*
+  Tailwind v4 changed the default border color to `currentcolor`. The upgrade
+  codemod dropped in a compat shim pointing at `--color-gray-200`; we don't want
+  Tailwind's grey, we want our hairline token — and we already had a `* {}` rule
+  saying exactly that, so the shim was a second, conflicting declaration of the
+  same thing. Consolidated here, on the codemod's fuller selector list (which
+  correctly covers pseudo-elements, as v3's preflight did).
+*/
+@layer base {
+  *,
+  ::after,
+  ::before,
+  ::backdrop,
+  ::file-selector-button {
+    border-color: rgb(var(--border));
+  }
+}
 
 /* ============================================================================
    WINGMAN DESIGN TOKENS — the single source of truth for color/type/space/motion
@@ -12,8 +236,13 @@
    COLOR FORMAT: tokens are space-separated RGB CHANNELS, not hex.
      - In Tailwind:  bg-surface, text-ink-2, border-line  (opacity works: text-ink-1/70)
      - In raw CSS:   color: rgb(var(--ink-1));   <- note the rgb() wrapper
-   This is the Tailwind v3 pattern (project is on tailwind 3.4.1) and is what
-   makes the /50 opacity modifier work on every token.
+   The channel split is a leftover from Tailwind v3, where `<alpha-value>` was the
+   only way to get opacity modifiers. On v4 (current) opacity goes through
+   color-mix(), so hex would work too — but the channels are kept because they cost
+   nothing and flattening them would touch every token and every raw-CSS use at once.
+
+   Tailwind config now lives in the `@theme inline` block ABOVE, not in a JS file.
+   `tailwind.config.ts` was deleted in the v4 migration; v4 auto-detects content.
 
    NAMING NOTE: the spec calls the accent "signal blue" and names it `--accent`.
    Here it is `--signal`, because shadcn reserves `--accent` for its neutral
@@ -182,18 +411,20 @@
   }
 }
 
-/* ============================================================================
+@layer utilities {
+  /* ============================================================================
    BASE ELEMENTS
    ========================================================================== */
 
-* {
-  box-sizing: border-box;
+  * {
+    box-sizing: border-box;
+  }
 }
 
 @layer base {
-  * {
-    border-color: rgb(var(--border));
-  }
+  /* border-color for `*` is declared once, up top, alongside the v4 shim it
+     replaced — not here. Two competing `*` rules is how you get a hairline that
+     changes colour depending on which one the bundler emits last. */
   html {
     font-family: var(--font-sans);
   }

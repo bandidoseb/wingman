@@ -190,7 +190,7 @@ export default function HomeTab({
             onMouseLeave={() => setCardHovered(false)}
           >
             <CardPattern mouseX={mouseX} mouseY={mouseY} randomString={randomString} />
-            <div className="absolute inset-0 z-[5] pointer-events-none bg-gradient-to-r from-ink-1 via-ink-1/90 to-ink-1/10" />
+            <div className="absolute inset-0 z-5 pointer-events-none bg-linear-to-r from-ink-1 via-ink-1/90 to-ink-1/10" />
 
             <button
               onClick={dismissDna}

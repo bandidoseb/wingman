@@ -27,7 +27,7 @@ const shell = [
 const interactiveShell = [
   "w-full text-left cursor-pointer",
   "hover:border-line-strong hover:shadow-float",
-  "outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-signal",
+  "outline-hidden focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-signal",
   "disabled:pointer-events-none disabled:opacity-50",
 ].join(" ");
 

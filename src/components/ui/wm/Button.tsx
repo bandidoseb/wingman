@@ -22,7 +22,7 @@ const buttonVariants = cva(
     "inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap",
     "rounded-control font-medium",
     "transition-colors duration-2 ease-wm",
-    "outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-signal",
+    "outline-hidden focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-signal",
     "disabled:pointer-events-none disabled:opacity-50",
     "[&_svg]:pointer-events-none [&_svg]:shrink-0",
   ].join(" "),

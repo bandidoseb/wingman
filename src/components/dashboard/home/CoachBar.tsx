@@ -147,7 +147,7 @@ export default function CoachBar({
     // z-10: the Sales DNA banner above has z-indexed children (scrim, dismiss ✕)
     // in the root stacking context — without this they paint OVER the bar as it
     // scrolls past, drawing a dark band across the input and stealing clicks.
-    <div className="sticky bottom-0 z-10 pt-6 pb-2 bg-gradient-to-t from-paper via-paper to-transparent">
+    <div className="sticky bottom-0 z-10 pt-6 pb-2 bg-linear-to-t from-paper via-paper to-transparent">
       {/* Conversation — only present once there's something to show. */}
       {messages.length > 0 && (
         <div className="mb-3 max-h-80 overflow-y-auto flex flex-col gap-2">
@@ -190,7 +190,7 @@ export default function CoachBar({
           onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } }}
           disabled={atLimit}
           placeholder={atLimit ? "Daily coaching limit reached — resets at midnight" : "Ask Wingman about your calls…"}
-          className="flex-1 bg-transparent border-0 outline-none text-body text-ink-1 placeholder:text-ink-3 disabled:cursor-not-allowed"
+          className="flex-1 bg-transparent border-0 outline-hidden text-body text-ink-1 placeholder:text-ink-3 disabled:cursor-not-allowed"
           aria-label="Ask Wingman"
         />
         <span className="text-[11px] text-ink-3 tabular-nums shrink-0" title="Coaching messages used today">

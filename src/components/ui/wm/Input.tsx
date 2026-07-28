@@ -7,9 +7,9 @@ const base = [
   "w-full bg-surface text-ink-1 placeholder:text-ink-3",
   "border border-line-strong rounded-control",
   "transition-colors duration-2 ease-wm",
-  "outline-none focus-visible:border-signal focus-visible:ring-2 focus-visible:ring-signal/25",
+  "outline-hidden focus-visible:border-signal focus-visible:ring-2 focus-visible:ring-signal/25",
   "disabled:opacity-50 disabled:cursor-not-allowed",
-  "aria-[invalid=true]:border-critical aria-[invalid=true]:ring-2 aria-[invalid=true]:ring-critical/20",
+  "aria-invalid:border-critical aria-invalid:ring-2 aria-invalid:ring-critical/20",
 ].join(" ");
 
 /** Wingman text input — Design Language §6. All tokens, visible focus state. */

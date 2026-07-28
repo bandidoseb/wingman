@@ -759,7 +759,7 @@ export default function FlightLogTab({ calls, initialCall, onInitialCallConsumed
           return (
             <Card style={{ marginTop: 12 }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
-                <SectionLabel className="!mb-0">Framework Coverage</SectionLabel>
+                <SectionLabel className="mb-0!">Framework Coverage</SectionLabel>
                 <div style={{ fontSize: 11.5, fontWeight: 600, color: coveredCount >= 6 ? "#34c759" : coveredCount >= 4 ? "#ff9500" : "#ff3b30" }}>
                   {coveredCount}/{PILLAR_DISPLAY.length}
                 </div>
@@ -877,7 +877,7 @@ export default function FlightLogTab({ calls, initialCall, onInitialCallConsumed
       {/* Mission Intel — entry point, opens modal */}
       <Card style={{ marginBottom: 14 }}>
         <div style={{ marginBottom: 10 }}>
-          <SectionLabel className="!mb-0">Mission Intel — Ask Your Wingman</SectionLabel>
+          <SectionLabel className="mb-0!">Mission Intel — Ask Your Wingman</SectionLabel>
         </div>
 
         {/* Quick-send buttons — always visible */}
@@ -920,7 +920,7 @@ export default function FlightLogTab({ calls, initialCall, onInitialCallConsumed
       {/* Call list */}
       <Card>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-          <SectionLabel className="!mb-0">All Calls — {calls.length}</SectionLabel>
+          <SectionLabel className="mb-0!">All Calls — {calls.length}</SectionLabel>
           <div style={{ fontSize: 11.5, color: "#8e8e93", fontWeight: 500 }}>{wins}/{qualifying} closed</div>
         </div>
         {/* Live call skeleton — green dot, actively recording */}
@@ -987,7 +987,7 @@ export default function FlightLogTab({ calls, initialCall, onInitialCallConsumed
                       {hoveredCallId === call.id && (
                         <button
                           onClick={(e) => { e.stopPropagation(); setEditingOutcomes((prev) => ({ ...prev, [call.id]: true })); }}
-                          className="hover:bg-blue-100 rounded transition-colors"
+                          className="hover:bg-blue-100 rounded-sm transition-colors"
                           style={{ fontSize: 10, color: "#007aff", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", padding: "2px 6px" }}
                         >
                           {!localOutcomes[call.id] && call.outcome_source === "auto" ? "Confirm" : "Edit"}
@@ -995,7 +995,7 @@ export default function FlightLogTab({ calls, initialCall, onInitialCallConsumed
                       )}
                     </div>
                   )}
-                  <span className="hover:bg-blue-100 rounded transition-colors" style={{ fontSize: 11.5, color: "#007aff", fontWeight: 600, whiteSpace: "nowrap", padding: "2px 6px", borderRadius: 6 }}>View →</span>
+                  <span className="hover:bg-blue-100 rounded-sm transition-colors" style={{ fontSize: 11.5, color: "#007aff", fontWeight: 600, whiteSpace: "nowrap", padding: "2px 6px", borderRadius: 6 }}>View →</span>
                 </div>
               </div>
               {call.summary && <div style={{ fontSize: 12, color: "#8e8e93", lineHeight: 1.4 }}>{call.summary}</div>}
