@@ -1,12 +1,14 @@
 "use client";
-import { useState, useEffect, type CSSProperties } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useMotionValue } from "framer-motion";
-import Card from "@/components/ui/Card";
-import OutcomeBadge from "@/components/ui/OutcomeBadge";
 import { CardPattern, generateRandomString } from "@/components/ui/evervault-card";
 import type { Profile, Call } from "@/types";
-import { confirmedOutcome } from "@/lib/wingman/outcome-stats";
 import { getGreeting } from "@/lib/utils";
+import { getSalesDnaStatus } from "@/lib/wingman/sales-dna-status";
+import { chatMessagesUsedToday } from "@/lib/wingman/chat-quota";
+import Card from "@/components/ui/wm/Card";
+import OutcomeConfirm from "@/components/dashboard/home/OutcomeConfirm";
+import CoachBar from "@/components/dashboard/home/CoachBar";
 
 interface Props {
   profile: Profile;
@@ -25,282 +27,291 @@ interface Props {
   onCancelSearch?: () => void;
 }
 
-// #47: shared base so every Deploy-card control (Deploy / Looking / Starting / End)
-// is the exact same size — the fixed-width slot + this identical box = no resizing.
-const deployControlBase: CSSProperties = {
-  width: "100%", boxSizing: "border-box", height: 46,
-  display: "flex", alignItems: "center", justifyContent: "center", gap: 9,
-  padding: "0 16px", border: "none", borderRadius: 12,
-  fontSize: 14, fontWeight: 600, fontFamily: "inherit", letterSpacing: "-0.01em", whiteSpace: "nowrap",
-};
-const spinnerStyle: CSSProperties = {
-  width: 14, height: 14, borderRadius: "50%", flexShrink: 0,
-  border: "2px solid rgba(255,255,255,0.35)", borderTopColor: "#fff",
-  animation: "wmSpin 0.7s linear infinite",
-};
+/** #47: one fixed-size slot so the control never resizes between states. */
+const CONTROL = "h-10 w-[200px] shrink-0 inline-flex items-center justify-center gap-2 rounded-control px-4 text-small font-semibold whitespace-nowrap transition-colors duration-2 ease-wm";
 
-export default function HomeTab({ profile, calls, onDebrief, isActive, isPendingOutcome = false, savedMessage, onDeploy, onEndCall, onPersonalize, deployPhase = "idle", stillLooking = false, onCancelSearch }: Props) {
-  const { greeting, sub } = getGreeting();
+export default function HomeTab({
+  profile, calls, onDebrief, isActive, isPendingOutcome = false, savedMessage,
+  onDeploy, onEndCall, onPersonalize, deployPhase = "idle", stillLooking = false, onCancelSearch,
+}: Props) {
+  const { greeting } = getGreeting();
   const mouseX = useMotionValue(0);
   const mouseY = useMotionValue(0);
   const [randomString, setRandomString] = useState("");
   const [cardHovered, setCardHovered] = useState(false);
-  const [btnHovered, setBtnHovered] = useState(false);
+  const [dnaDismissed, setDnaDismissed] = useState(false);
 
+  // Outcomes confirmed in this session. We deliberately do NOT router.refresh()
+  // after a save: on the dashboard that re-runs the full 20-calls-with-transcripts
+  // query (the ~180MB/2000× regression from PR #54). The server copy is already
+  // correct; this just keeps the UI honest until the next natural load.
+  const [confirmed, setConfirmed] = useState<Record<string, string>>({});
+
+  useEffect(() => { setRandomString(generateRandomString(1500)); }, []);
+
+  const dnaKey = `wm.dnaBannerDismissed.${profile.id}`;
   useEffect(() => {
-    setRandomString(generateRandomString(1500));
-  }, []);
+    try { setDnaDismissed(localStorage.getItem(dnaKey) === "1"); } catch { /* private mode */ }
+  }, [dnaKey]);
 
-  function onPersonalizeMouseMove({ currentTarget, clientX, clientY }: React.MouseEvent) {
+  const dismissDna = () => {
+    setDnaDismissed(true);
+    try { localStorage.setItem(dnaKey, "1"); } catch { /* private mode — hidden for this view only */ }
+  };
+
+  function onDnaMouseMove({ currentTarget, clientX, clientY }: React.MouseEvent) {
     const { left, top } = currentTarget.getBoundingClientRect();
     mouseX.set(clientX - left);
     mouseY.set(clientY - top);
     setRandomString(generateRandomString(1500));
   }
 
-  // ── Stats ────────────────────────────────────────────────────────────────
-  const thisWeekCalls = calls.filter((c) => {
-    const d = new Date(c.call_date);
-    const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-    return d >= weekAgo;
-  });
+  const dna = getSalesDnaStatus(profile.sales_dna);
+  const showDna = dna.state !== "complete" && !dnaDismissed;
 
-  const totalQualifying = calls.filter((c) => confirmedOutcome(c) !== "DQ").length;
-  const totalClosed     = calls.filter((c) => confirmedOutcome(c) === "Closed").length;
-  const closeRate       = totalQualifying > 0 ? Math.round((totalClosed / totalQualifying) * 100) : 0;
+  // Apply this session's confirmations over the server data ONCE, for every
+  // consumer. Applying it only to today's rows would leave the Coach and the
+  // Flight Log hand-off reading `outcome_source: "auto"` for a call the rep just
+  // confirmed — so the Coach would answer "what's my close rate" ignoring the
+  // click they made two seconds ago, and Flight Log would re-ask them to confirm.
+  const callsWithConfirmed = useMemo(
+    () =>
+      calls.map((c) =>
+        confirmed[c.id]
+          ? { ...c, outcome: confirmed[c.id] as Call["outcome"], outcome_source: "manual" as const }
+          : c
+      ),
+    [calls, confirmed]
+  );
 
-  // ── Today's calls ────────────────────────────────────────────────────────
-  const today      = new Date().toDateString();
-  const todayCalls = calls.filter((c) => new Date(c.call_date).toDateString() === today);
+  const today = new Date().toDateString();
+  const todayCalls = callsWithConfirmed.filter(
+    (c) => new Date(c.call_date).toDateString() === today
+  );
+
+  /** Returns false when the id isn't in the loaded list, so the caller can say so. */
+  const openCall = (callId: string): boolean => {
+    const c = callsWithConfirmed.find((x) => x.id === callId);
+    if (!c) return false;
+    onDebrief(c);
+    return true;
+  };
+
+  const usedToday = chatMessagesUsedToday(profile);
+
+  const showStatusStrip = isActive || deployPhase !== "idle";
 
   return (
-    <div style={{ maxWidth: 580, margin: "0 auto" }}>
-      {/* Greeting */}
-      <div style={{ marginBottom: 24 }}>
-        <div style={{ fontSize: 26, fontWeight: 700, color: "#1c1c1e", letterSpacing: "-0.03em" }}>{greeting}.</div>
-        <div style={{ fontSize: 14, color: "#8e8e93", marginTop: 3 }}>{sub}</div>
-      </div>
+    <div className="max-w-[640px] mx-auto flex flex-col min-h-[calc(100vh-96px)]">
+      {/* The Coach bar is sticky but stays in flow, so nothing is unreachable at
+          full scroll — content just fades under it on the way down (the Granola
+          behaviour). This is breathing room so the last card doesn't sit flush
+          against the input. */}
+      <div className="flex-1 pb-2">
+        {/* ── Header: greeting left, Deploy right ─────────────────────────── */}
+        <div className="flex items-start justify-between gap-6 mb-6">
+          <h1 className="text-h1 text-ink-1">{greeting}.</h1>
 
-      {/* Stats strip — 3 pills */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 12 }}>
-        {[
-          { label: "Total Closes",    value: totalClosed },
-          { label: "Close Rate",      value: `${closeRate}%` },
-          { label: "Calls This Week", value: thisWeekCalls.length },
-        ].map((stat) => (
-          <div
-            key={stat.label}
-            style={{
-              background: "#fff",
-              borderRadius: 14,
-              padding: "14px 16px",
-              border: "1px solid rgba(0,0,0,0.06)",
-            }}
-          >
-            <div style={{ fontSize: 22, fontWeight: 700, color: "#1c1c1e", letterSpacing: "-0.03em" }}>{stat.value}</div>
-            <div style={{ fontSize: 11, color: "#8e8e93", fontWeight: 500, marginTop: 3 }}>{stat.label}</div>
-          </div>
-        ))}
-      </div>
-
-      {/* Deploy / End Call card */}
-      <Card style={{ marginBottom: 12, padding: "28px 28px" }}>
-        {/* minHeight keeps the card the exact same height in every state (idle has
-            the ⌃⇧W hint row; live doesn't) so it never grows/shrinks — #47 solidity */}
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, minHeight: 64 }}>
-          <div>
+          {/* Fixed height (#47 solidity): the ⌃⇧W hint row only exists in the idle
+              state, so without this the header collapses ~24px the instant Deploy
+              is pressed and everything below jumps up. */}
+          <div className="flex flex-col items-end gap-1.5 h-16 shrink-0">
             {isActive ? (
-              <>
-                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 5 }}>
-                  <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#34c759", animation: "livePulse 2s ease-in-out infinite" }} />
-                  <div style={{ fontSize: 18, fontWeight: 700, color: "#1c1c1e", letterSpacing: "-0.02em" }}>Wingman is live.</div>
-                </div>
-                <div style={{ fontSize: 13, color: "#8e8e93", lineHeight: 1.5 }}>Recording and coaching in real time.</div>
-                {savedMessage && (
-                  <div style={{ fontSize: 12, fontWeight: 600, color: "#34c759", marginTop: 8 }}>{savedMessage}</div>
-                )}
-              </>
-            ) : deployPhase === "searching" ? (
-              // #47: Recall only detects the meeting when its window is on the
-              // current desktop/Space — tell the rep to swipe to it so they don't
-              // just sit there wondering why nothing happens.
-              <>
-                <div style={{ fontSize: 18, fontWeight: 700, color: "#1c1c1e", letterSpacing: "-0.02em", marginBottom: 5 }}>Looking for your call…</div>
-                <div style={{ fontSize: 13, color: "#8e8e93", lineHeight: 1.5, maxWidth: 380 }}>
-                  Swipe to your call window — Wingman starts automatically.
-                </div>
-              </>
-            ) : (
-              <>
-                <div style={{ fontSize: 18, fontWeight: 700, color: "#1c1c1e", letterSpacing: "-0.02em", marginBottom: 5 }}>Wingman is standing by.</div>
-                <div style={{ fontSize: 13, color: "#8e8e93", lineHeight: 1.5 }}>Wingman listens live and guides you through every stage.</div>
-                <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 10 }}>
-                  {["⌃", "⇧", "W"].map((k) => (
-                    <span key={k} style={{
-                      display: "inline-flex", alignItems: "center", justifyContent: "center",
-                      background: "#f2f2f7", border: "1px solid rgba(0,0,0,0.12)",
-                      borderRadius: 5, fontSize: 11, fontWeight: 600, color: "#3c3c43",
-                      width: 22, height: 20, fontFamily: "inherit",
-                      boxShadow: "0 1px 0 rgba(0,0,0,0.14)",
-                    }}>{k}</span>
-                  ))}
-                  <span style={{ fontSize: 11, color: "#aeaeb2", marginLeft: 4 }}>to deploy instantly</span>
-                </div>
-              </>
-            )}
-          </div>
-          {/* #47: every state fills ONE fixed-width slot so the button never changes
-              size and the left text never reflows between states (solidity). */}
-          <div style={{ width: 240, flexShrink: 0, display: "flex", justifyContent: "flex-end" }}>
-            {isActive ? (
-              <button onClick={onEndCall} style={{ ...deployControlBase, background: "#ff3b30", color: "#fff", cursor: "pointer", boxShadow: "0 4px 16px rgba(255,59,48,0.3)" }}>
+              <button onClick={onEndCall} className={`${CONTROL} bg-critical text-white hover:bg-critical/90`}>
                 End Call
               </button>
             ) : deployPhase === "searching" ? (
-              // Arm-and-waiting for the call. The whole pill is the Cancel target.
-              <button onClick={onCancelSearch} title="Cancel" style={{ ...deployControlBase, background: "#1c1c1e", color: "#fff", cursor: "pointer", boxShadow: "0 4px 16px rgba(0,0,0,0.15)", gap: 8, fontSize: 13 }}>
-                <span style={spinnerStyle} />
-                {stillLooking ? "Still looking…" : "Looking for your call…"}
-                <span style={{ marginLeft: 2, fontSize: 13, color: "rgba(255,255,255,0.55)", lineHeight: 1 }}>✕</span>
+              <button onClick={onCancelSearch} title="Cancel" className={`${CONTROL} bg-ink-1 text-paper hover:bg-ink-2`}>
+                <span className="h-3.5 w-3.5 rounded-pill border-2 border-paper/35 border-t-paper animate-spin" />
+                {stillLooking ? "Still looking…" : "Looking…"}
+                <span className="text-ink-3">✕</span>
               </button>
             ) : deployPhase === "starting" ? (
-              // Meeting found, recording spinning up. Locked, no cancel.
-              <div style={{ ...deployControlBase, background: "#1c1c1e", color: "#fff", opacity: 0.9 }}>
-                <span style={spinnerStyle} />
+              <div className={`${CONTROL} bg-ink-1 text-paper opacity-90`}>
+                <span className="h-3.5 w-3.5 rounded-pill border-2 border-paper/35 border-t-paper animate-spin" />
                 Starting…
               </div>
             ) : (
-              <button onClick={onDeploy} style={{ ...deployControlBase, background: "#1c1c1e", color: "#fff", cursor: "pointer", boxShadow: "0 4px 16px rgba(0,0,0,0.15)" }}>
-                Deploy Wingman
-              </button>
+              <>
+                <button onClick={onDeploy} className={`${CONTROL} bg-ink-1 text-paper hover:bg-ink-2`}>
+                  Deploy Wingman
+                </button>
+                <div className="flex items-center gap-1">
+                  {["⌃", "⇧", "W"].map((k) => (
+                    <span key={k} className="inline-flex items-center justify-center w-[20px] h-[18px] rounded-tight bg-surface-sunken border border-line-strong text-[10px] font-semibold text-ink-2">
+                      {k}
+                    </span>
+                  ))}
+                  <span className="text-[11px] text-ink-3 ml-1">to deploy</span>
+                </div>
+              </>
             )}
           </div>
         </div>
-      </Card>
 
-      {/* Personalize Wingman hero card — Evervault hover effect */}
-      <div style={{ marginBottom: 12 }} className="group/card" onMouseMove={onPersonalizeMouseMove} onMouseEnter={() => setCardHovered(true)} onMouseLeave={() => setCardHovered(false)}>
-        <Card style={{ padding: 0, overflow: "hidden", border: "none", position: "relative", background: "#1c1c1e" }}>
-          {/* Evervault pattern — invisible at rest, reveals on hover following the mouse */}
-          <CardPattern mouseX={mouseX} mouseY={mouseY} randomString={randomString} />
-          {/* Readability scrim — dark on text side, fades out toward button so effect still shows */}
-          <div style={{
-            position: "absolute", inset: 0, zIndex: 5, pointerEvents: "none",
-            background: "linear-gradient(to right, rgba(28,28,30,0.95) 0%, rgba(28,28,30,0.92) 35%, rgba(28,28,30,0.5) 65%, rgba(28,28,30,0.1) 100%)",
-          }} />
-          {/* Content */}
-          <div style={{ position: "relative", zIndex: 10, isolation: "isolate", padding: "24px 28px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16 }}>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 16, fontWeight: 700, color: "#fff", letterSpacing: "-0.02em", marginBottom: 6 }}>
-                Build your Sales DNA
+        {/* ── Live / searching status strip ───────────────────────────────────
+            Carries the guidance that used to live in the big Deploy card. The
+            "swipe to your call window" line is load-bearing (#47): Recall only
+            detects the meeting when its window is on the current Space, so
+            without it a rep just sits there wondering why nothing happens. */}
+        {showStatusStrip && (
+          <Card className="mb-3 px-4 py-3 flex items-center gap-3">
+            {isActive ? (
+              <>
+                <span className="h-2 w-2 rounded-pill bg-positive shrink-0" style={{ animation: "livePulse 2s ease-in-out infinite" }} />
+                <div className="flex-1">
+                  <div className="text-small font-semibold text-ink-1">Wingman is live.</div>
+                  <div className="text-small text-ink-3">Recording and coaching in real time.</div>
+                </div>
+                {savedMessage && <span className="text-small font-semibold text-positive">{savedMessage}</span>}
+              </>
+            ) : (
+              <>
+                <span className="h-3.5 w-3.5 rounded-pill border-2 border-line-strong border-t-ink-2 animate-spin shrink-0" />
+                <div className="flex-1">
+                  <div className="text-small font-semibold text-ink-1">
+                    {deployPhase === "starting" ? "Starting up…" : "Looking for your call…"}
+                  </div>
+                  {deployPhase === "searching" && (
+                    <div className="text-small text-ink-3">Swipe to your call window — Wingman starts automatically.</div>
+                  )}
+                </div>
+              </>
+            )}
+          </Card>
+        )}
+
+        {/* ── Sales DNA banner — pinned until the anchors are filled ───────── */}
+        {showDna && (
+          <div
+            className="group/card relative mb-3 rounded-card overflow-hidden bg-ink-1"
+            onMouseMove={onDnaMouseMove}
+            onMouseEnter={() => setCardHovered(true)}
+            onMouseLeave={() => setCardHovered(false)}
+          >
+            <CardPattern mouseX={mouseX} mouseY={mouseY} randomString={randomString} />
+            <div className="absolute inset-0 z-[5] pointer-events-none bg-gradient-to-r from-ink-1 via-ink-1/90 to-ink-1/10" />
+
+            <button
+              onClick={dismissDna}
+              aria-label="Dismiss"
+              className="absolute top-2.5 right-2.5 z-20 h-6 w-6 rounded-pill grid place-items-center text-paper/40 hover:text-paper hover:bg-paper/10 transition-colors duration-2 ease-wm"
+            >
+              ✕
+            </button>
+
+            <div className="relative z-10 isolate px-7 py-6 flex items-center justify-between gap-4">
+              <div className="flex-1">
+                <div className="text-h3 text-paper mb-1.5">
+                  {dna.state === "empty" ? "Build your Sales DNA" : "Finish your Sales DNA"}
+                </div>
+                <div className="text-small text-paper/55 leading-relaxed">
+                  The more Wingman knows your offer and how you sell, the sharper every card gets.
+                  {dna.state === "partial" && ` ${dna.filledCount} of ${dna.totalCount} answered.`}
+                </div>
               </div>
-              <div style={{ fontSize: 13, color: "rgba(255,255,255,0.55)", lineHeight: 1.55 }}>
-                The more Wingman knows your offer and how you sell, the sharper every card gets. Brief it once — who you sell to, and how you run discovery.
+              <button
+                onClick={onPersonalize}
+                className={`shrink-0 px-4 py-2.5 rounded-control text-small font-semibold transition-colors duration-2 ease-wm ${
+                  cardHovered ? "bg-paper text-ink-1" : "bg-paper/10 text-paper border border-paper/15"
+                }`}
+              >
+                Go →
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ── Calendar — coming soon ──────────────────────────────────────────
+            Schematic grey rows on purpose. Fake meeting names behind a blur read
+            as either a bug or a bait-and-switch; empty labelled bars read as
+            "this is the shape of a thing that isn't built yet", which is true. */}
+        <Card className="mb-3 px-5 py-4">
+          <div className="flex items-center justify-between mb-3">
+            <span className="t-label text-ink-3">Coming up</span>
+            <span className="text-[10px] font-semibold uppercase tracking-wider text-ink-3 bg-surface-sunken rounded-pill px-2 py-0.5">
+              Coming soon
+            </span>
+          </div>
+
+          <div aria-hidden="true" className="flex flex-col gap-2.5 opacity-50">
+            {[0, 1].map((i) => (
+              <div key={i} className="flex items-center gap-3">
+                <div className="h-9 w-9 rounded-control bg-surface-sunken shrink-0" />
+                <div className="flex-1 flex flex-col gap-1.5">
+                  <div className="h-2.5 rounded-pill bg-surface-sunken" style={{ width: i === 0 ? "45%" : "60%" }} />
+                  <div className="h-2 rounded-pill bg-surface-sunken" style={{ width: i === 0 ? "25%" : "18%" }} />
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <p className="text-small text-ink-3 mt-3.5">
+            Calendar sync — coming soon. Wingman will show your day and remind you before each call.
+          </p>
+        </Card>
+
+        {/* ── Today ──────────────────────────────────────────────────────── */}
+        <Card className="mb-3 px-5 py-4">
+          <div className="t-label text-ink-3 mb-3">Today</div>
+
+          {isActive && (
+            <div className="flex items-center gap-3 py-2.5 border-b border-line last:border-0">
+              <span className="h-8 w-8 rounded-pill bg-positive-weak grid place-items-center shrink-0">
+                <span className="h-2 w-2 rounded-pill bg-positive" style={{ animation: "livePulse 2s ease-in-out infinite" }} />
+              </span>
+              <div className="flex-1">
+                <div className="text-small font-semibold text-ink-1">Live call in progress…</div>
+                <div className="text-[11px] font-medium text-positive">Recording now</div>
               </div>
             </div>
-            <button
-              onClick={onPersonalize}
-              onMouseEnter={() => setBtnHovered(true)}
-              onMouseLeave={() => setBtnHovered(false)}
-              style={{
-                flexShrink: 0,
-                padding: "10px 18px",
-                borderRadius: 10,
-                fontSize: 13,
-                fontWeight: 600,
-                fontFamily: "inherit",
-                cursor: "pointer",
-                whiteSpace: "nowrap",
-                // 3 states: dark (card idle) → frosted (card hovered) → solid white (button hovered)
-                background: !cardHovered ? "rgba(255,255,255,0.10)" : btnHovered ? "#fff" : "rgba(255,255,255,0.18)",
-                color: !cardHovered ? "#fff" : btnHovered ? "#1c1c1e" : "#fff",
-                border: !cardHovered ? "1px solid rgba(255,255,255,0.15)" : btnHovered ? "none" : "1px solid rgba(255,255,255,0.3)",
-                transition: "background 0.15s ease, color 0.15s ease, border 0.15s ease",
-              }}
+          )}
+
+          {!isActive && isPendingOutcome && (
+            <div className="flex items-center gap-3 py-2.5 border-b border-line last:border-0">
+              <span className="h-8 w-8 rounded-pill bg-surface-sunken grid place-items-center shrink-0">
+                <span className="h-2 w-2 rounded-pill bg-ink-3" style={{ animation: "livePulse 2s ease-in-out infinite" }} />
+              </span>
+              <div className="flex-1">
+                <div className="text-small font-semibold text-ink-1">Processing call…</div>
+                <div className="text-[11px] text-ink-3">Waiting for outcome</div>
+              </div>
+            </div>
+          )}
+
+          {todayCalls.length === 0 && !isActive && !isPendingOutcome && (
+            <div className="text-small text-ink-3 py-1">No calls yet today.</div>
+          )}
+
+          {todayCalls.map((c, i) => (
+            <div
+              key={c.id}
+              className={`flex items-center gap-3 py-2.5 ${i < todayCalls.length - 1 ? "border-b border-line" : ""}`}
             >
-              Go →
-            </button>
-          </div>
+              <span className="h-8 w-8 rounded-pill bg-surface-sunken grid place-items-center text-small font-semibold text-ink-2 shrink-0">
+                {(c.prospect_name || "?")[0]}
+              </span>
+              <button onClick={() => onDebrief(c)} className="flex-1 text-left min-w-0 group/row">
+                <div className="text-small font-medium text-ink-1 truncate group-hover/row:text-signal transition-colors duration-2 ease-wm">
+                  {c.prospect_name}
+                </div>
+                {c.duration && <div className="text-[11px] text-ink-3 tabular-nums">{c.duration}</div>}
+              </button>
+              <OutcomeConfirm
+                call={c}
+                onSaved={(callId, outcome) => setConfirmed((p) => ({ ...p, [callId]: outcome }))}
+              />
+            </div>
+          ))}
         </Card>
       </div>
 
-      {/* Today section */}
-      <Card style={{ marginBottom: 12 }}>
-        <div style={{ fontSize: 11, fontWeight: 600, color: "#8e8e93", letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 12 }}>
-          Today
-        </div>
-        {/* Live call skeleton — green dot, actively recording */}
-        {isActive && (
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "11px 0", borderBottom: todayCalls.length > 0 ? "1px solid rgba(0,0,0,0.06)" : "none" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 12, flex: 1 }}>
-              <div style={{ width: 34, height: 34, borderRadius: "50%", background: "#e5f7eb", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#34c759", animation: "livePulse 2s ease-in-out infinite" }} />
-              </div>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 13, fontWeight: 600, color: "#1c1c1e" }}>Live Call in Progress…</div>
-                <div style={{ fontSize: 11, color: "#34c759", marginTop: 1, fontWeight: 500 }}>Recording now</div>
-              </div>
-            </div>
-            <div style={{ width: 56, height: 22, borderRadius: 6, background: "#e5e5ea", animation: "livePulse 2s ease-in-out infinite" }} />
-          </div>
-        )}
-        {/* Processing skeleton — call ended, waiting for disposition */}
-        {!isActive && isPendingOutcome && (
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "11px 0", borderBottom: todayCalls.length > 0 ? "1px solid rgba(0,0,0,0.06)" : "none" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 12, flex: 1 }}>
-              <div style={{ width: 34, height: 34, borderRadius: "50%", background: "#f2f2f7", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#aeaeb2", animation: "livePulse 2s ease-in-out infinite" }} />
-              </div>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 13, fontWeight: 600, color: "#1c1c1e" }}>Processing call…</div>
-                <div style={{ fontSize: 11, color: "#8e8e93", marginTop: 1 }}>Waiting for outcome</div>
-              </div>
-            </div>
-            <div style={{ width: 56, height: 22, borderRadius: 6, background: "#e5e5ea", animation: "livePulse 2s ease-in-out infinite" }} />
-          </div>
-        )}
-        {!isActive && todayCalls.length === 0 ? (
-          <div style={{ fontSize: 13, color: "#aeaeb2", padding: "4px 0 8px" }}>No calls yet today.</div>
-        ) : todayCalls.length > 0 ? (
-          todayCalls.map((c, i) => (
-            <div
-              key={c.id}
-              style={{
-                display: "flex", alignItems: "center", justifyContent: "space-between",
-                padding: "11px 0",
-                borderBottom: i < todayCalls.length - 1 ? "1px solid rgba(0,0,0,0.06)" : "none",
-              }}
-            >
-              <div style={{ display: "flex", alignItems: "center", gap: 12, flex: 1 }}>
-                <div style={{ width: 34, height: 34, borderRadius: "50%", background: "#e5e5ea", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 600, color: "#8e8e93", flexShrink: 0 }}>
-                  {(c.prospect_name || "?")[0]}
-                </div>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 13, fontWeight: 500, color: "#1c1c1e" }}>{c.prospect_name}</div>
-                  <div style={{ fontSize: 11, color: "#8e8e93", marginTop: 1 }}>{c.duration}</div>
-                </div>
-                {c.outcome && (
-                  <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
-                    <OutcomeBadge outcome={c.outcome} />
-                    {c.outcome_source === "auto" && (
-                      <span title="Auto-detected by Wingman — confirm it in Flight Log"
-                        style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.05em", color: "#8e8e93", background: "#f2f2f7", borderRadius: 5, padding: "2px 5px", textTransform: "uppercase" }}>
-                        auto
-                      </span>
-                    )}
-                  </div>
-                )}
-              </div>
-              <button
-                onClick={() => onDebrief(c)}
-                style={{ background: "#e5e5ea", border: "1px solid rgba(0,0,0,0.06)", borderRadius: 7, padding: "4px 10px", fontSize: 11, fontWeight: 500, color: "#1c1c1e", fontFamily: "inherit", cursor: "pointer", marginLeft: 8, flexShrink: 0 }}
-              >
-                Debrief →
-              </button>
-            </div>
-          ))
-        ) : null}
-      </Card>
+      {/* ── Coach bar, pinned bottom ─────────────────────────────────────── */}
+      <CoachBar
+        calls={callsWithConfirmed}
+        usedToday={usedToday}
+        onOpenCall={openCall}
+      />
     </div>
   );
 }

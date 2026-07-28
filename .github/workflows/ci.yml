@@ -30,3 +30,9 @@ jobs:
 
       - name: Unit tests
         run: npm test
+
+      # Design Language §5b — colors must come from tokens in src/app/globals.css.
+      # Ratchet, not a hard gate: existing debt is baselined, only INCREASES fail.
+      # After migrating a screen, run `npm run token-lint -- --update` to tighten it.
+      - name: Token lint (color literals)
+        run: npm run token-lint

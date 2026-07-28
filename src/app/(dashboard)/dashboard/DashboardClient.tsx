@@ -21,6 +21,7 @@ import { parseSSEBuffer } from "@/lib/wingman/sse-parse";
 import { HOT_PARTIAL_MS, SETTLE_WAIT_MS } from "@/lib/wingman/live-tail";
 import { scoreReadiness, BELIEF_DISPLAY } from "@/lib/wingman/close-readiness.mjs";
 import { logDevEvent } from "@/lib/wingman/devlog-client";
+import { chatMessagesUsedToday } from "@/lib/wingman/chat-quota";
 import { useWingmanPoller } from "@/hooks/useWingmanPoller";
 import { useRecallTranscript } from "@/hooks/useRecallTranscript";
 
@@ -1608,7 +1609,7 @@ export default function DashboardClient({
           userId={userId}
           callsUsed={profile.calls_used ?? 0}
           callLimit={FREE_CALL_LIMIT}
-          chatMessagesToday={profile.chat_messages_today ?? 0}
+          chatMessagesToday={chatMessagesUsedToday(profile)}
         />
 
         <div
