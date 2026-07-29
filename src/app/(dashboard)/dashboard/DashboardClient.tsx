@@ -1581,7 +1581,7 @@ export default function DashboardClient({
     <div
       style={{
         minHeight:  "100vh",
-        background: "#f7f5f2",
+        background: "rgb(var(--paper))",
         fontFamily: "-apple-system, 'SF Pro Display', BlinkMacSystemFont, sans-serif",
       }}
     >
@@ -1592,7 +1592,7 @@ export default function DashboardClient({
         @keyframes accordionDown { from{opacity:0;transform:translateY(-6px)} to{opacity:1;transform:translateY(0)} }
         .accordion-body { animation: accordionDown 0.22s cubic-bezier(0.22,1,0.36,1) both }
         @keyframes typingBounce { 0%,60%,100%{transform:translateY(0);opacity:0.4} 30%{transform:translateY(-5px);opacity:1} }
-        .typing-dot { width:7px;height:7px;border-radius:50%;background:#aaa;display:inline-block;animation:typingBounce 1.2s infinite ease-in-out; }
+        .typing-dot { width:7px;height:7px;border-radius:50%;background:rgb(var(--ink-3));display:inline-block;animation:typingBounce 1.2s infinite ease-in-out; }
         .typing-dot:nth-child(1){animation-delay:0s}
         .typing-dot:nth-child(2){animation-delay:0.2s}
         .typing-dot:nth-child(3){animation-delay:0.4s}
@@ -1604,11 +1604,11 @@ export default function DashboardClient({
       {startError && (
         <div style={{
           position: "fixed", top: 0, left: 0, right: 0, zIndex: 1000,
-          background: "#ff3b30", color: "#fff", padding: "10px 20px",
+          background: "rgb(var(--critical))", color: "rgb(var(--surface))", padding: "10px 20px",
           fontSize: 13, fontWeight: 500, textAlign: "center",
         }}>
           {startError}
-          <button onClick={() => setStartError(null)} style={{ marginLeft: 12, color: "#fff", background: "none", border: "none", fontWeight: 700, cursor: "pointer" }}>✕</button>
+          <button onClick={() => setStartError(null)} style={{ marginLeft: 12, color: "rgb(var(--surface))", background: "none", border: "none", fontWeight: 700, cursor: "pointer" }}>✕</button>
         </div>
       )}
 
@@ -1640,7 +1640,7 @@ export default function DashboardClient({
             flex:       1,
             padding:    "48px 32px",
             minHeight:  "100vh",
-            background: "#f7f5f2",
+            background: "rgb(var(--paper))",
             transition: "margin-left 0.28s cubic-bezier(0.22,1,0.36,1)",
           }}
         >

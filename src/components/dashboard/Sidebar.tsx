@@ -164,16 +164,16 @@ const NAV_ITEMS: Array<{ id: DashboardTab; label: string; icon: (active: boolean
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
         <path
           d="M3 9.5L12 3l9 6.5V20a1 1 0 01-1 1H15v-5h-6v5H4a1 1 0 01-1-1V9.5z"
-          fill={active ? "#1c1c1e" : "none"}
-          stroke={active ? "#1c1c1e" : "#8e8e93"}
+          fill={active ? "rgb(var(--ink-1))" : "none"}
+          stroke={active ? "rgb(var(--ink-1))" : "rgb(var(--ink-2))"}
           strokeWidth="1.6"
           strokeLinejoin="round"
         />
-        <rect className="sb-door-light" x="9" y="16" width="6" height="5" fill="#FFB347" />
+        <rect className="sb-door-light" x="9" y="16" width="6" height="5" fill="rgb(var(--warning))" />
         <rect
           className="sb-door"
           x="9" y="16" width="6" height="5"
-          fill={active ? "#ffffff" : "#8e8e93"}
+          fill={active ? "rgb(var(--surface))" : "rgb(var(--ink-2))"}
           opacity={active ? 0.18 : 0.72}
         />
       </svg>
@@ -186,15 +186,15 @@ const NAV_ITEMS: Array<{ id: DashboardTab; label: string; icon: (active: boolean
         <g className="sb-plane">
           <path
             d="M22 2L11 13"
-            stroke={active ? "#1c1c1e" : "#8e8e93"}
+            stroke={active ? "rgb(var(--ink-1))" : "rgb(var(--ink-2))"}
             strokeWidth="1.6"
             strokeLinecap="round"
             strokeLinejoin="round"
           />
           <path
             d="M22 2L15 22L11 13L2 9L22 2z"
-            fill={active ? "#1c1c1e" : "none"}
-            stroke={active ? "#1c1c1e" : "#8e8e93"}
+            fill={active ? "rgb(var(--ink-1))" : "none"}
+            stroke={active ? "rgb(var(--ink-1))" : "rgb(var(--ink-2))"}
             strokeWidth="1.6"
             strokeLinejoin="round"
           />
@@ -210,8 +210,8 @@ const NAV_ITEMS: Array<{ id: DashboardTab; label: string; icon: (active: boolean
           {/* 4-pointed star / sparkle */}
           <path
             d="M12 2l2.4 7.6L22 12l-7.6 2.4L12 22l-2.4-7.6L2 12l7.6-2.4L12 2z"
-            fill={active ? "#1c1c1e" : "none"}
-            stroke={active ? "#1c1c1e" : "#8e8e93"}
+            fill={active ? "rgb(var(--ink-1))" : "none"}
+            stroke={active ? "rgb(var(--ink-1))" : "rgb(var(--ink-2))"}
             strokeWidth="1.6"
             strokeLinejoin="round"
           />
@@ -224,13 +224,13 @@ const NAV_ITEMS: Array<{ id: DashboardTab; label: string; icon: (active: boolean
     icon: (active) => (
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
         <rect x="4" y="3" width="16" height="18" rx="2"
-          stroke={active ? "#1c1c1e" : "#8e8e93"} strokeWidth="1.6" />
+          stroke={active ? "rgb(var(--ink-1))" : "rgb(var(--ink-2))"} strokeWidth="1.6" />
         <line className="sb-line1" x1="8" y1="8" x2="16" y2="8"
-          stroke={active ? "#1c1c1e" : "#8e8e93"} strokeWidth="1.6" strokeLinecap="round" />
+          stroke={active ? "rgb(var(--ink-1))" : "rgb(var(--ink-2))"} strokeWidth="1.6" strokeLinecap="round" />
         <line className="sb-line2" x1="8" y1="12" x2="16" y2="12"
-          stroke={active ? "#1c1c1e" : "#8e8e93"} strokeWidth="1.6" strokeLinecap="round" />
+          stroke={active ? "rgb(var(--ink-1))" : "rgb(var(--ink-2))"} strokeWidth="1.6" strokeLinecap="round" />
         <line className="sb-line3" x1="8" y1="16" x2="12" y2="16"
-          stroke={active ? "#1c1c1e" : "#8e8e93"} strokeWidth="1.6" strokeLinecap="round" />
+          stroke={active ? "rgb(var(--ink-1))" : "rgb(var(--ink-2))"} strokeWidth="1.6" strokeLinecap="round" />
       </svg>
     ),
   },
@@ -240,12 +240,12 @@ const NAV_ITEMS: Array<{ id: DashboardTab; label: string; icon: (active: boolean
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
         <path
           d="M12 22C6.477 22 2 17.523 2 12S6.477 2 12 2s10 4.477 10 10-4.477 10-10 10z"
-          stroke={active ? "#1c1c1e" : "#8e8e93"} strokeWidth="1.6"
+          stroke={active ? "rgb(var(--ink-1))" : "rgb(var(--ink-2))"} strokeWidth="1.6"
         />
         <path
           className="sb-exclaim"
           d="M12 8v4M12 16h.01"
-          stroke={active ? "#1c1c1e" : "#8e8e93"}
+          stroke={active ? "rgb(var(--ink-1))" : "rgb(var(--ink-2))"}
           strokeWidth="2"
           strokeLinecap="round"
         />
@@ -259,8 +259,8 @@ const NAV_ITEMS: Array<{ id: DashboardTab; label: string; icon: (active: boolean
         <path
           className="sb-bolt"
           d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"
-          fill={active ? "#1c1c1e" : "none"}
-          stroke={active ? "#1c1c1e" : "#8e8e93"}
+          fill={active ? "rgb(var(--ink-1))" : "none"}
+          stroke={active ? "rgb(var(--ink-1))" : "rgb(var(--ink-2))"}
           strokeWidth="1.6"
           strokeLinejoin="round"
         />
@@ -272,11 +272,11 @@ const NAV_ITEMS: Array<{ id: DashboardTab; label: string; icon: (active: boolean
     icon: (active) => (
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
         <rect className="sb-bar1" x="3" y="12" width="4" height="9" rx="1"
-          fill={active ? "#1c1c1e" : "none"} stroke={active ? "#1c1c1e" : "#8e8e93"} strokeWidth="1.6" />
+          fill={active ? "rgb(var(--ink-1))" : "none"} stroke={active ? "rgb(var(--ink-1))" : "rgb(var(--ink-2))"} strokeWidth="1.6" />
         <rect className="sb-bar2" x="10" y="7" width="4" height="14" rx="1"
-          fill={active ? "#1c1c1e" : "none"} stroke={active ? "#1c1c1e" : "#8e8e93"} strokeWidth="1.6" />
+          fill={active ? "rgb(var(--ink-1))" : "none"} stroke={active ? "rgb(var(--ink-1))" : "rgb(var(--ink-2))"} strokeWidth="1.6" />
         <rect className="sb-bar3" x="17" y="3" width="4" height="18" rx="1"
-          fill={active ? "#1c1c1e" : "none"} stroke={active ? "#1c1c1e" : "#8e8e93"} strokeWidth="1.6" />
+          fill={active ? "rgb(var(--ink-1))" : "none"} stroke={active ? "rgb(var(--ink-1))" : "rgb(var(--ink-2))"} strokeWidth="1.6" />
       </svg>
     ),
   },
@@ -286,10 +286,10 @@ const NAV_ITEMS: Array<{ id: DashboardTab; label: string; icon: (active: boolean
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
         <g className="sb-gear-group">
           <circle cx="12" cy="12" r="3"
-            stroke={active ? "#1c1c1e" : "#8e8e93"} strokeWidth="1.6" />
+            stroke={active ? "rgb(var(--ink-1))" : "rgb(var(--ink-2))"} strokeWidth="1.6" />
           <path
             d="M12 2v2M12 20v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M2 12h2M20 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"
-            stroke={active ? "#1c1c1e" : "#8e8e93"} strokeWidth="1.6" strokeLinecap="round"
+            stroke={active ? "rgb(var(--ink-1))" : "rgb(var(--ink-2))"} strokeWidth="1.6" strokeLinecap="round"
           />
         </g>
       </svg>
@@ -312,7 +312,7 @@ export default function Sidebar({
   };
 
   const callsPct       = Math.min((callsUsed / callLimit) * 100, 100);
-  const barColor       = callsPct >= 70 ? "#ff9f0a" : "#34c759";
+  const barColor       = callsPct >= 70 ? "rgb(var(--warning))" : "rgb(var(--positive))";
   const isNotPro       = subscriptionStatus !== "active";
   const checkoutHref   = `/api/stripe/create-checkout?plan=${role === "setter" ? "setter" : "closer"}`;
 
@@ -321,10 +321,10 @@ export default function Sidebar({
       style={{
         width: collapsed ? 56 : 220,
         flexShrink: 0,
-        background: "rgba(247,245,242,0.85)",
+        background: "rgb(var(--paper) / 0.85)",
         backdropFilter: "blur(20px)",
         WebkitBackdropFilter: "blur(20px)",
-        borderRight: "1px solid rgba(0,0,0,0.06)",
+        borderRight: "1px solid rgb(var(--line))",
         display: "flex",
         flexDirection: "column",
         padding: collapsed ? "48px 8px 20px" : "48px 12px 20px",
@@ -344,22 +344,22 @@ export default function Sidebar({
       <div style={{ display: "flex", alignItems: "center", justifyContent: collapsed ? "center" : "space-between", marginBottom: 28, paddingLeft: collapsed ? 0 : 8 }}>
         {!collapsed && (
           <div>
-            <div style={{ fontSize: 15, fontWeight: 700, color: "#1c1c1e", letterSpacing: "-0.02em" }}>Wingman</div>
-            <div style={{ fontSize: 11, color: "#8e8e93", fontWeight: 500, marginTop: 2 }}>● Standby</div>
+            <div style={{ fontSize: 15, fontWeight: 700, color: "rgb(var(--ink-1))", letterSpacing: "-0.02em" }}>Wingman</div>
+            <div style={{ fontSize: 11, color: "rgb(var(--ink-2))", fontWeight: 500, marginTop: 2 }}>● Standby</div>
           </div>
         )}
         <button
           onClick={onToggleCollapse}
           style={{
-            background: "rgba(0,0,0,0.04)", border: "none", borderRadius: 7,
+            background: "rgb(var(--surface-sunken))", border: "none", borderRadius: 7,
             width: 28, height: 28, display: "flex", alignItems: "center", justifyContent: "center",
             cursor: "pointer", flexShrink: 0, transition: "background 0.15s",
           }}
         >
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
             {collapsed
-              ? <path d="M9 18l6-6-6-6" stroke="#8e8e93" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-              : <path d="M15 18l-6-6 6-6" stroke="#8e8e93" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              ? <path d="M9 18l6-6-6-6" stroke="rgb(var(--ink-2))" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              : <path d="M15 18l-6-6 6-6" stroke="rgb(var(--ink-2))" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
             }
           </svg>
         </button>
@@ -377,7 +377,7 @@ export default function Sidebar({
               onClick={() => onTabClick(item.id)}
               title={collapsed ? item.label : ""}
               style={{
-                background: isActive ? "rgba(0,0,0,0.06)" : "transparent",
+                background: isActive ? "rgb(var(--surface-sunken))" : "transparent",
                 border: "none",
                 borderRadius: 9,
                 display: "flex",
@@ -395,19 +395,19 @@ export default function Sidebar({
               <div style={{ width: 20, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, position: "relative" }}>
                 {item.icon(isActive)}
                 {badge > 0 && !isActive && (
-                  <div style={{ position: "absolute", top: -4, right: -4, width: 14, height: 14, borderRadius: "50%", background: "#ff3b30", display: "flex", alignItems: "center", justifyContent: "center", border: "2px solid #f7f5f2" }}>
-                    <span style={{ fontSize: 8, fontWeight: 700, color: "#fff", lineHeight: 1 }}>{badge}</span>
+                  <div style={{ position: "absolute", top: -4, right: -4, width: 14, height: 14, borderRadius: "50%", background: "rgb(var(--critical))", display: "flex", alignItems: "center", justifyContent: "center", border: "2px solid rgb(var(--paper))" }}>
+                    <span style={{ fontSize: 8, fontWeight: 700, color: "rgb(var(--surface))", lineHeight: 1 }}>{badge}</span>
                   </div>
                 )}
               </div>
               {!collapsed && (
-                <span style={{ fontSize: 13, fontWeight: isActive ? 600 : 400, color: isActive ? "#1c1c1e" : "#8e8e93", letterSpacing: "-0.01em", whiteSpace: "nowrap" }}>
+                <span style={{ fontSize: 13, fontWeight: isActive ? 600 : 400, color: isActive ? "rgb(var(--ink-1))" : "rgb(var(--ink-2))", letterSpacing: "-0.01em", whiteSpace: "nowrap" }}>
                   {item.label}
                 </span>
               )}
               {!collapsed && badge > 0 && !isActive && (
-                <div style={{ marginLeft: "auto", background: "#ff3b30", borderRadius: 10, minWidth: 18, height: 18, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 5px", flexShrink: 0 }}>
-                  <span style={{ fontSize: 10, fontWeight: 700, color: "#fff" }}>{badge} new</span>
+                <div style={{ marginLeft: "auto", background: "rgb(var(--critical))", borderRadius: 10, minWidth: 18, height: 18, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 5px", flexShrink: 0 }}>
+                  <span style={{ fontSize: 10, fontWeight: 700, color: "rgb(var(--surface))" }}>{badge} new</span>
                 </div>
               )}
             </button>
@@ -417,19 +417,19 @@ export default function Sidebar({
 
       {/* Footer */}
       {!collapsed && (
-        <div style={{ borderTop: "1px solid rgba(0,0,0,0.06)", paddingTop: 14, paddingLeft: 8 }}>
+        <div style={{ borderTop: "1px solid rgb(var(--line))", paddingTop: 14, paddingLeft: 8 }}>
           {/* Calls-used indicator — only for non-pro users */}
           {isNotPro && (
             <div style={{ marginBottom: 12 }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 5 }}>
-                <span style={{ fontSize: 11, color: "#8e8e93", fontWeight: 500 }}>
+                <span style={{ fontSize: 11, color: "rgb(var(--ink-2))", fontWeight: 500 }}>
                   {callsUsed} of {callLimit} calls used
                 </span>
-                <span style={{ fontSize: 10, color: callsPct >= 70 ? "#ff9f0a" : "#aeaeb2", fontWeight: 600 }}>
+                <span style={{ fontSize: 10, color: callsPct >= 70 ? "rgb(var(--warning))" : "rgb(var(--ink-3))", fontWeight: 600 }}>
                   {callLimit - callsUsed} left
                 </span>
               </div>
-              <div style={{ height: 4, borderRadius: 2, background: "rgba(0,0,0,0.07)", overflow: "hidden" }}>
+              <div style={{ height: 4, borderRadius: 2, background: "rgb(var(--surface-sunken))", overflow: "hidden" }}>
                 <div style={{
                   height: "100%",
                   width: `${callsPct}%`,
@@ -441,19 +441,19 @@ export default function Sidebar({
               {/* Coaching messages used */}
               <div style={{ marginBottom: 10, marginTop: 10 }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 5 }}>
-                  <span style={{ fontSize: 11, color: "#8e8e93", fontWeight: 500 }}>
+                  <span style={{ fontSize: 11, color: "rgb(var(--ink-2))", fontWeight: 500 }}>
                     {chatMessagesToday} of 20 coaching messages used
                   </span>
-                  <span style={{ fontSize: 10, color: chatMessagesToday >= 14 ? "#ff9f0a" : "#aeaeb2", fontWeight: 600 }}>
+                  <span style={{ fontSize: 10, color: chatMessagesToday >= 14 ? "rgb(var(--warning))" : "rgb(var(--ink-3))", fontWeight: 600 }}>
                     {20 - chatMessagesToday} left
                   </span>
                 </div>
-                <div style={{ height: 4, borderRadius: 2, background: "rgba(0,0,0,0.07)", overflow: "hidden" }}>
+                <div style={{ height: 4, borderRadius: 2, background: "rgb(var(--surface-sunken))", overflow: "hidden" }}>
                   <div style={{
                     height: "100%",
                     width: `${Math.min((chatMessagesToday / 20) * 100, 100)}%`,
                     borderRadius: 2,
-                    background: chatMessagesToday >= 18 ? "#ff3b30" : chatMessagesToday >= 14 ? "#ff9f0a" : "#007aff",
+                    background: chatMessagesToday >= 18 ? "rgb(var(--critical))" : chatMessagesToday >= 14 ? "rgb(var(--warning))" : "rgb(var(--signal))",
                     transition: "width 0.4s ease",
                   }} />
                 </div>
@@ -465,8 +465,8 @@ export default function Sidebar({
                   display: "block",
                   marginTop: 8,
                   padding: "7px 0",
-                  background: "#1c1c1e",
-                  color: "#fff",
+                  background: "rgb(var(--ink-1))",
+                  color: "rgb(var(--surface))",
                   borderRadius: 8,
                   fontSize: 12,
                   fontWeight: 600,
@@ -480,24 +480,24 @@ export default function Sidebar({
             </div>
           )}
 
-          <div style={{ fontSize: 11, color: "#aeaeb2", fontWeight: 500 }}>
+          <div style={{ fontSize: 11, color: "rgb(var(--ink-3))", fontWeight: 500 }}>
             {role === "closer" ? "Closer" : "Setter"} · {salesStyle || ""}
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 3, marginTop: 10, marginBottom: 2 }}>
             {["⌃", "⇧", "W"].map((k) => (
               <span key={k} style={{
                 display: "inline-flex", alignItems: "center", justifyContent: "center",
-                background: "rgba(0,0,0,0.04)", border: "1px solid rgba(0,0,0,0.10)",
-                borderRadius: 4, fontSize: 9, fontWeight: 600, color: "#8e8e93",
+                background: "rgb(var(--surface-sunken))", border: "1px solid rgb(var(--line-strong))",
+                borderRadius: 4, fontSize: 9, fontWeight: 600, color: "rgb(var(--ink-2))",
                 width: 17, height: 15, fontFamily: "inherit",
-                boxShadow: "0 1px 0 rgba(0,0,0,0.08)",
+                boxShadow: "0 1px 0 rgb(var(--line-strong))",
               }}>{k}</span>
             ))}
-            <span style={{ fontSize: 10, color: "#aeaeb2", marginLeft: 3 }}>Deploy Wingman</span>
+            <span style={{ fontSize: 10, color: "rgb(var(--ink-3))", marginLeft: 3 }}>Deploy Wingman</span>
           </div>
           <button
             onClick={handleSignOut}
-            style={{ marginTop: 8, background: "none", border: "none", color: "#aeaeb2", fontSize: 11, cursor: "pointer", fontFamily: "inherit", padding: 0 }}
+            style={{ marginTop: 8, background: "none", border: "none", color: "rgb(var(--ink-3))", fontSize: 11, cursor: "pointer", fontFamily: "inherit", padding: 0 }}
           >
             Sign out →
           </button>

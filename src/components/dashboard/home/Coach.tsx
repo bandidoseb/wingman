@@ -249,7 +249,10 @@ export default function Coach({
           // prompt-kit hardcodes `text-primary` here, and our bridge maps --primary
           // to signal blue — so typed text would come out BLUE. Override to ink.
           // min-h-0 + rows=1 keeps it to a single line until the text wraps.
-          className="flex-1 min-h-0! py-1 text-ink-1 placeholder:text-ink-3"
+          // dark:bg-transparent: shadcn's Textarea ships `dark:bg-input/30`, which
+          // paints a lighter box INSIDE our composer in dark mode. The composer is
+          // the surface; the field itself must stay see-through.
+          className="flex-1 min-h-0! py-1 text-ink-1 placeholder:text-ink-3 bg-transparent dark:bg-transparent"
           placeholder={atLimit ? "Daily limit reached — resets at midnight" : "Ask Wingman about your calls…"}
           disabled={atLimit}
         />
