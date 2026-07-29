@@ -3,17 +3,15 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import type { Profile, Call, VaultObjection, VaultSignal, CallStageLabel } from "@/types";
+import type { Profile, Call, VaultObjection, CallStageLabel } from "@/types";
 import { NO_DEBRIEF_GRACE_MS } from "@/lib/wingman/outcome-stats";
 import Sidebar from "@/components/dashboard/Sidebar";
 import HomeTab from "@/components/dashboard/HomeTab";
 import FlightLogTab from "@/components/dashboard/FlightLogTab";
 import ObjectionVaultTab from "@/components/dashboard/ObjectionVaultTab";
-import SignalVaultTab from "@/components/dashboard/SignalVaultTab";
 import IntelTab from "@/components/dashboard/IntelTab";
 import SettingsTab from "@/components/dashboard/SettingsTab";
 import PersonalizeTab from "@/components/dashboard/PersonalizeTab";
-import FlightPlanTab from "@/components/dashboard/FlightPlanTab";
 import PaywallModal from "@/components/ui/PaywallModal";
 import { FREE_CALL_LIMIT } from "@/lib/constants";
 import { getDefaultStage } from "@/lib/wingman/poll-intervals";
@@ -26,13 +24,15 @@ import { useCoachSession } from "@/components/dashboard/home/Coach";
 import { useWingmanPoller } from "@/hooks/useWingmanPoller";
 import { useRecallTranscript } from "@/hooks/useRecallTranscript";
 
-export type DashboardTab = "home" | "flight-plan" | "library" | "objections" | "signals" | "intel" | "settings" | "personalize";
+// "flight-plan" and "signals" were removed 2026-07-29 (Sebastian: Sales DNA supersedes
+// Flight Plan; Signal Vault retired). Removing them from this union is what makes the
+// compiler find every leftover reference.
+export type DashboardTab = "home" | "library" | "objections" | "intel" | "settings" | "personalize";
 
 interface Props {
   profile: Profile;
   initialCalls: Call[];
   initialObjections: VaultObjection[];
-  initialSignals: VaultSignal[];
   userId: string;
 }
 
@@ -89,7 +89,6 @@ export default function DashboardClient({
   profile,
   initialCalls,
   initialObjections,
-  initialSignals,
   userId,
 }: Props) {
   const router = useRouter();
@@ -115,7 +114,6 @@ export default function DashboardClient({
   const [collapsed, setSidebarCollapsed] = useState(false);
   const [badges, setBadges] = useState({
     objections: initialObjections.filter((o) => o.is_new).length,
-    signals:    initialSignals.filter((s) => s.is_new).length,
   });
   const [pendingCall, setPendingCall] = useState<Call | null>(null);
   // Deep-link target: a callId to open in Flight Log (from the HUD "View call →"
@@ -1563,7 +1561,7 @@ export default function DashboardClient({
   // ── Navigation helpers ─────────────────────────────────────────────────────
   const handleTabClick = useCallback((id: DashboardTab) => {
     setTab(id);
-    if (id === "objections" || id === "signals") {
+    if (id === "objections") {
       setBadges((b) => ({ ...b, [id]: 0 }));
     }
   }, []);
@@ -1662,7 +1660,6 @@ export default function DashboardClient({
               coachUsed={coachUsed}
             />
           )}
-          {tab === "flight-plan" && <FlightPlanTab />}
           {tab === "library" && (
             <FlightLogTab
               calls={initialCalls}
@@ -1679,14 +1676,6 @@ export default function DashboardClient({
             <ObjectionVaultTab
               initialObjections={initialObjections}
               userId={userId}
-            />
-          )}
-          {tab === "signals" && (
-            <SignalVaultTab
-              initialSignals={initialSignals}
-              role={profile.role || "closer"}
-              userId={userId}
-              displayMode={profile.signal_display_mode || "short"}
             />
           )}
           {tab === "intel"    && <IntelTab calls={initialCalls} />}

@@ -8,7 +8,7 @@ interface SidebarProps {
   onTabClick: (id: DashboardTab) => void;
   collapsed: boolean;
   onToggleCollapse: () => void;
-  badges: { objections: number; signals: number };
+  badges: { objections: number };
   role: string;
   salesStyle: string;
   subscriptionStatus: string;
@@ -74,24 +74,6 @@ const SIDEBAR_STYLES = `
     100% { transform: scale(1);   opacity: 1;   }
   }
 
-  /* ── Signal Vault: bolt jolts like an electric shock ── */
-  .sb-bolt {
-    transform-box: view-box;
-    transform-origin: 12px 12px;
-  }
-  button[data-tab="signals"]:hover .sb-bolt {
-    animation: sbBoltJolt 0.44s ease-in-out;
-  }
-  @keyframes sbBoltJolt {
-    0%   { transform: translate(0,    0)    rotate(0deg);  }
-    16%  { transform: translate(-2px, -1px) rotate(-9deg); }
-    33%  { transform: translate( 2px,  1px) rotate( 9deg); }
-    50%  { transform: translate(-1px, -1px) rotate(-5deg); }
-    67%  { transform: translate( 1px,  1px) rotate( 5deg); }
-    83%  { transform: translate(-0.5px, 0)  rotate(-2deg); }
-    100% { transform: translate(0,    0)    rotate(0deg);  }
-  }
-
   /* ── Intel: three bars pop up one by one from the bottom ── */
   .sb-bar1, .sb-bar2, .sb-bar3 {
     transform-box: fill-box;
@@ -128,21 +110,6 @@ const SIDEBAR_STYLES = `
     to { transform: rotate(180deg); }
   }
 
-  /* ── Flight Plan: paper plane shoots forward then returns ── */
-  .sb-plane {
-    transform-box: view-box;
-    transform-origin: 12px 12px;
-  }
-  button[data-tab="flight-plan"]:hover .sb-plane {
-    animation: sbPlaneFly 0.5s cubic-bezier(0.22,1,0.36,1) forwards;
-  }
-  @keyframes sbPlaneFly {
-    0%   { transform: translate(0, 0); opacity: 1; }
-    40%  { transform: translate(4px, -4px); opacity: 0.4; }
-    60%  { transform: translate(-2px, 2px); opacity: 0.4; }
-    100% { transform: translate(0, 0); opacity: 1; }
-  }
-
   /* ── Personalize: sparkle star scales in ── */
   .sb-sparkle {
     transform-box: view-box;
@@ -176,29 +143,6 @@ const NAV_ITEMS: Array<{ id: DashboardTab; label: string; icon: (active: boolean
           fill={active ? "rgb(var(--surface))" : "rgb(var(--ink-2))"}
           opacity={active ? 0.18 : 0.72}
         />
-      </svg>
-    ),
-  },
-  {
-    id: "flight-plan", label: "Flight Plan",
-    icon: (active) => (
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-        <g className="sb-plane">
-          <path
-            d="M22 2L11 13"
-            stroke={active ? "rgb(var(--ink-1))" : "rgb(var(--ink-2))"}
-            strokeWidth="1.6"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <path
-            d="M22 2L15 22L11 13L2 9L22 2z"
-            fill={active ? "rgb(var(--ink-1))" : "none"}
-            stroke={active ? "rgb(var(--ink-1))" : "rgb(var(--ink-2))"}
-            strokeWidth="1.6"
-            strokeLinejoin="round"
-          />
-        </g>
       </svg>
     ),
   },
@@ -253,21 +197,6 @@ const NAV_ITEMS: Array<{ id: DashboardTab; label: string; icon: (active: boolean
     ),
   },
   {
-    id: "signals", label: "Signal Vault",
-    icon: (active) => (
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-        <path
-          className="sb-bolt"
-          d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"
-          fill={active ? "rgb(var(--ink-1))" : "none"}
-          stroke={active ? "rgb(var(--ink-1))" : "rgb(var(--ink-2))"}
-          strokeWidth="1.6"
-          strokeLinejoin="round"
-        />
-      </svg>
-    ),
-  },
-  {
     id: "intel", label: "Intel",
     icon: (active) => (
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
@@ -308,7 +237,6 @@ export default function Sidebar({
 
   const badgesMap: Record<string, number> = {
     objections: badges.objections,
-    signals: badges.signals,
   };
 
   const callsPct       = Math.min((callsUsed / callLimit) * 100, 100);

@@ -50,7 +50,54 @@ Warm neutrals — grey nudged toward the accent so it reads as *chosen*, not def
 | `--line-strong` | `#D6D1C6` | Input borders, stronger dividers |
 
 ### 3b. Neutrals — Dark (dashboard dark mode)
-`--paper` #171613 · `--surface` #201F1B · `--surface-sunken` #100F0D · `--ink-1` #F3F0E9 · `--ink-2` #ADA99F · `--ink-3` #726E64 · `--line` #302E28 · `--line-strong` #403D35. Both themes are *designed*, not inverted.
+`--paper` #171613 · `--surface` #201F1B · `--surface-sunken` **#2C2B25** · `--ink-1` #F3F0E9 · `--ink-2` #ADA99F · `--ink-3` **#8A867C** · `--line` #302E28 · `--line-strong` #403D35. Both themes are *designed*, not inverted.
+
+> **Corrected 2026-07-29.** `--surface-sunken` was #100F0D and `--ink-3` was #726E64. The first was *darker than the page background* — backwards for dark mode (see §3f) — which made every input, tab track, hover fill and keycap read as a black hole. Sebastian: *"On the Sales DNA page… it's a completely different dark black color."* The second then failed contrast against the corrected surface. **Fixing the token fixed every screen at once — no per-screen patching.**
+
+### 3f. Dark mode rules (researched + measured 2026-07-29)
+
+The rule Wingman got wrong once. Read this before touching any dark value.
+
+**1. Elevation is expressed as LIGHTNESS, and it does not flip.** Higher = lighter in *both* themes. Material 3 states elevation tonally ("always a lighter surface on top of a darker surface"); Apple HIG says base colors are darker so background interfaces recede while **elevated colors are lighter** so foreground interfaces advance.
+
+What *does* flip is whether you can go **down**. In light mode there is headroom below `--paper` (#FAF8F4), so a recessed surface goes darker. In dark mode `--paper` is already near the floor — going down just approaches black, which kills the depth cue. **So in dark mode a "recessed" surface goes UP instead.** The dark ladder is:
+
+```
+--paper  <  --surface  <  --surface-sunken
+#171613     #201F1B      #2C2B25
+```
+
+`--surface-sunken` does not mean "darker". It means **the sub-surface one step apart from `--surface`** — fields, tab tracks, chips, keycaps, hover fills — and the theme decides the direction. (Name is a light-mode holdover; kept because renaming churns 24 call sites for zero behaviour change.)
+
+**2. Match the step size across themes** so neither feels flatter:
+
+| Step | Light | Dark |
+|---|---|---|
+| `--surface` vs `--paper` | 1.061:1 | 1.097:1 |
+| `--surface-sunken` vs `--surface` | 1.158:1 | **1.162:1** |
+
+Dark deliberately runs slightly wider — at low luminance a given ratio is harder to see.
+
+**3. Never pure black.** #000 under light text is sustained maximum contrast (eye strain), causes halation on OLED, and leaves no room to recede. The near-black band is **#0A0A0A–#161616**; our `--paper` #171613 sits just inside it. ✅ validated, unchanged.
+
+**4. A field is LIGHTER than the card it sits in** — this is Sebastian's actual question, and it follows from rule 1. Its border uses `--line-strong`, never `--line`: `--line` sits only 1.05:1 from `--surface-sunken` in dark and the edge vanishes.
+
+**5. Contrast, measured on the real tokens** (WCAG AA: 4.5:1 body, 3:1 large/secondary):
+
+| Token | on `--paper` | on `--surface` | on `--surface-sunken` | |
+|---|---|---|---|---|
+| `--ink-1` | 15.9 | 14.5 | 12.5 | AA ✅ |
+| `--ink-2` | 7.7 | 7.0 | 6.1 | AA ✅ |
+| `--ink-3` | 5.0 | 4.5 | 3.9 | AA-large only |
+| `--signal` | 6.9 | 6.3 | 5.4 | AA ✅ |
+
+**`--ink-3` is a de-emphasis token — placeholder, meta, disabled. Never body copy, in either theme.** It is AA-large-only by design in both.
+
+**6. Accents are already correctly lightened.** Worst case on any dark surface: `--signal` 5.4:1, `--positive` 6.0:1, `--warning` 6.1:1, `--critical` 4.9:1 — all clear AA. Saturated accents vibrate on dark grounds; ours are lightened *and* slightly desaturated. ✅ no change needed.
+
+**7. Tokens that must NOT flip.** Two so far, each documented in `globals.css`: `--scrim` (always black — a scrim must dim in both themes, and `--ink-1` flips to near-white) and `--knob` (always near-white — a switch thumb stays light in dark mode, as macOS/iOS/Material all do). No neutral token stays put across the flip, so these are their own tokens.
+
+**8. Composition trap.** Because the direction flips, a track/thumb pattern built as `track: --surface-sunken` + `thumb: --surface` reads raised in light and **recessed in dark**. Use the inverted-fill pattern (`--ink-1` fill, `--surface` text) for selected states instead — `--ink-1` flips, so it reads correctly in both. The Settings Appearance and AI Performance controls both do this.
 
 ### 3c. Accent — "Signal blue" (confident, calm, aviation)
 | | Light | Dark |

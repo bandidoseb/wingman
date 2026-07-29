@@ -13,9 +13,13 @@ interface Props {
   userId: string;
 }
 
+// --line-strong, not --line: globals.css reserves --line-strong for input borders,
+// and in dark mode --line sits only 1.05:1 from --surface-sunken, so a field's edge
+// disappears. --line-strong holds it at 1.31:1. Matches the Home Coach composer,
+// which is the reference this page is being judged against.
 const inputStyle: React.CSSProperties = {
   background: "rgb(var(--surface-sunken))",
-  border: "1.5px solid rgb(var(--line))",
+  border: "1.5px solid rgb(var(--line-strong))",
   borderRadius: 10,
   padding: "11px 14px",
   color: "rgb(var(--ink-1))",
@@ -403,7 +407,7 @@ function SalesDnaCapture({ profile }: { profile: Profile }) {
         </div>
         {crawlError && <div style={{ fontSize: 12, color: "rgb(var(--critical))", marginBottom: 12 }}>⚠ {crawlError}</div>}
         {overview && (
-          <div style={{ background: "rgb(var(--surface-sunken))", border: "1px solid rgb(var(--line))", borderRadius: 10, padding: "12px 14px", marginBottom: 20 }}>
+          <div style={{ background: "rgb(var(--surface-sunken))", border: "1px solid rgb(var(--line-strong))", borderRadius: 10, padding: "12px 14px", marginBottom: 20 }}>
             <div style={{ fontSize: 10.5, color: "rgb(var(--ink-3))", fontWeight: 600, letterSpacing: "0.05em", textTransform: "uppercase", marginBottom: 6 }}>
               What Wingman found on your page · reference only
             </div>

@@ -30,6 +30,8 @@
   --color-line: rgb(var(--line));
   --color-line-strong: rgb(var(--line-strong));
 
+  --color-knob: rgb(var(--knob));
+
   --color-signal: rgb(var(--signal));
   --color-signal-hover: rgb(var(--signal-hover));
   --color-signal-weak: rgb(var(--signal-weak));
@@ -299,6 +301,14 @@
        in dark mode, which would wash the page out instead of dimming it. */
     --scrim: 0 0 0;
 
+    /* Switch/slider knob. Same "must not flip" category as --scrim, opposite
+       direction: a knob is the raised element on its track and reads near-white in
+       BOTH themes (macOS, iOS and Material all keep a light thumb in dark mode).
+       No neutral token stays light across the flip — --surface goes dark, --ink-1
+       goes light — so this is its own token. Defined only here on purpose: .dark
+       does not override it, so both themes inherit the one value. */
+    --knob: 252 251 248;            /* #FCFBF8  warm near-white */
+
     /* --- Radii (§5) ------------------------------------------------------ */
     --r-sm: 6px;
     --r-md: 10px;    /* buttons, inputs */
@@ -318,16 +328,55 @@
     --dur-3: 260ms;
   }
 
-  /* --- Neutrals + state — DARK (§3b). Designed, NOT inverted. ------------ */
+  /* --- Neutrals + state — DARK (§3b). Designed, NOT inverted. ------------ *
+   *
+   * ⚠️ ELEVATION FLIPS DIRECTION IN DARK MODE. Read §3f of the Design Language
+   * before changing any value below.
+   *
+   * In LIGHT mode a recessed surface goes DARKER than its parent, so the ladder
+   * runs   --surface-sunken < --paper < --surface.
+   * In DARK mode that inverts: elevation is expressed as LIGHTNESS (Material 3
+   * tonal elevation, Apple HIG "elevated colors are lighter"), and there is no
+   * headroom below --paper anyway — going down just approaches black, which
+   * kills depth cues. So the dark ladder runs
+   *
+   *     --paper  <  --surface  <  --surface-sunken
+   *
+   * `--surface-sunken` therefore does NOT mean "darker". It means "the
+   * sub-surface one step apart from --surface" — fields, tab tracks, chips,
+   * keycaps, hover fills — and the theme decides which way that step goes.
+   * (The name is a light-mode holdover. Kept because renaming it churns 24 call
+   * sites across 8 files for zero behaviour change.)
+   *
+   * The step size is tuned to MATCH light mode, so both themes feel the same:
+   *   light  sunken↔surface = 1.158:1
+   *   dark   sunken↔surface = 1.162:1
+   */
   .dark {
-    --paper: 23 22 19;              /* #171613 */
-    --surface: 32 31 27;            /* #201F1B */
-    --surface-sunken: 16 15 13;     /* #100F0D */
-    --ink-1: 243 240 233;           /* #F3F0E9 */
-    --ink-2: 173 169 159;           /* #ADA99F */
-    --ink-3: 114 110 100;           /* #726E64 */
-    --line: 48 46 40;               /* #302E28 */
-    --line-strong: 64 61 53;        /* #403D35 */
+    --paper: 23 22 19;              /* #171613  validated: sits in the #0A0A0A–#161616
+                                       near-black band. Never pure #000 — max contrast
+                                       against light text causes eye strain + OLED
+                                       halation, and leaves no room to recede. */
+    --surface: 32 31 27;            /* #201F1B  cards, panels — one step UP from paper */
+    --surface-sunken: 44 43 37;     /* #2C2B25  one step UP from surface (see above).
+                                       Was #100F0D — BELOW paper — which is why every
+                                       input, tab track and hover fill read as a black
+                                       hole. Fixed 2026-07-29. */
+    --ink-1: 243 240 233;           /* #F3F0E9  14.5–16.8:1 on every dark surface */
+    --ink-2: 173 169 159;           /* #ADA99F  6.0–8.2:1 — AA on every dark surface */
+    --ink-3: 138 134 124;           /* #8A867C  muted / placeholder / meta.
+                                       Was #726E64, which measured 2.79–3.56:1 —
+                                       below the 3:1 AA-large floor once the sunken
+                                       surface moved up. Now 3.91–4.98:1, and still
+                                       a clear step below --ink-2 (1.55:1 apart) so
+                                       the muted/secondary hierarchy survives.
+                                       NEVER use --ink-3 for body copy in either
+                                       theme — it is a de-emphasis token only. */
+    --line: 48 46 40;               /* #302E28  hairlines on --paper / --surface */
+    --line-strong: 64 61 53;        /* #403D35  INPUT BORDERS + stronger dividers.
+                                       Inputs must use this, not --line: --line is
+                                       lighter than --surface-sunken by only 1.05:1
+                                       and washes out against a field. */
 
     --signal: 126 155 255;          /* #7E9BFF */
     --signal-hover: 148 171 255;    /* #94ABFF */

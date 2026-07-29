@@ -168,3 +168,120 @@ Sebastian's call 2026-07-28, made with the tradeoff stated: this **removes worki
 - Typecheck gate stays green
 - No push without explicit approval
 - Plain English in every rep-facing string (§6) — no `cant_diy`, no NEPQ jargon
+
+---
+---
+
+# SESSION 2026-07-29 (cont.) — DARK MODE: research → fix
+
+*Research done first, per `tasks/plan-dark-mode.md` §4. Every number below is measured, not guessed
+(`node` contrast math on the real token values — WCAG 2.1 relative luminance).*
+
+## The research answers (→ become Design Language §3f)
+
+1. **Elevation direction.** Confirmed: in dark themes, **lighter = higher**, always. Material 3 expresses
+   elevation as *tonal* lightness ("always a lighter surface on top of a darker surface"), not just shadow.
+   Apple HIG says the same — base colors are darker so background interfaces recede; **elevated colors are
+   lighter** so foreground interfaces advance. A working dark theme needs **4 levels**: page ground → card →
+   sub-surface (fields, tracks, chips, hover) → overlay.
+2. **Why not pure black.** #000 with light text is sustained maximum contrast — eye strain, plus halation on
+   OLED, plus it removes all headroom to go *darker* for recesses. Recommended near-black band is
+   **#0A0A0A–#161616**. Ours is `--paper` **#171613 — validated, no change.**
+3. **Fields.** A dark-mode field is **lighter than the surface it sits on**, not darker. This is the direct
+   answer to Sebastian's question, and it's the whole bug.
+4. **Contrast (measured on our real tokens).** `--ink-1` 14.5–16.8:1 ✅ · `--ink-2` 6.0–8.2:1 ✅ ·
+   **`--ink-3` 2.8–3.6:1 ❌** — fails AA-large on the new lightest surface. Muted greys collapsing in dark is
+   the classic failure and we have it.
+5. **Desaturation.** Dark `--signal` #7E9BFF measures 6.3–7.3:1 on all dark surfaces ✅, and the state colors
+   (positive/warning/critical) all clear 5.6:1 ✅. **Already correct — no change.**
+
+## What the research found that the brief did NOT know
+
+**`src/components/ui/Card.tsx` is hardcoded `dark:bg-[#1c1c1e]`** — an iOS system gray. Measured hue:
+
+| | hex | R−B | reads as |
+|---|---|---|---|
+| legacy `Card` in dark | `#1C1C1E` | **−2** | **COOL / bluish** |
+| `--surface` (Home, Coach) | `#201F1B` | **+5** | **WARM / brownish** |
+
+That is Sebastian's *"it's like a bluish gray, and then on the homepage it's like a brownish gray"* —
+**literally measurable, and he spotted it with his eyes.** Seven tabs import this Card (Flight Log, Sales DNA,
+Intel, Settings, Flight Plan, Objection Vault, Signal Vault). It is a second, independent cause of the
+complaint and the single highest-leverage line in the codebase right now.
+
+Same file family: `SectionLabel` is hardcoded `dark:text-[#636366]` → **2.37–2.75:1 = illegible** in dark.
+
+## The fix — 3 files, all token-level
+
+| # | File | Change | Why |
+|---|---|---|---|
+| 1 | `src/app/globals.css` | dark `--surface-sunken` `#100F0D` → **`#2C2B25`** (moves from *below* `--paper` to *above* `--surface`) | The one token. Separation vs `--surface` becomes **1.162:1** — matching light mode's 1.158:1 exactly, so both themes feel identical. Fixes every field, tab track, hover fill, keycap and progress track at once. |
+| 2 | `src/app/globals.css` | dark `--ink-3` `#726E64` → **`#8A867C`** | Research Q4. Lifts min contrast 2.79 → **3.91:1**, still a clear step below `--ink-2` (1.55:1 apart) so hierarchy survives. |
+| 3 | `src/components/ui/Card.tsx` | `bg-white dark:bg-[#1c1c1e] border-black/6 dark:border-white/8` → `bg-surface border-line` | Kills the cool-gray card on 7 tabs. |
+| 4 | `src/components/ui/SectionLabel.tsx` | `text-[#aeaeb2] dark:text-[#636366]` → `text-ink-3` | Illegible label → legible, and drops 2 literals. |
+
+**Deliberately NOT doing:**
+- **No 4th "overlay" token.** Grep found zero popover consumers; the one modal (Flight Log) already separates
+  via `--scrim` + `--e-lg` + border. Add the token when a real overlay-over-card exists, not before.
+- **Not touching `Sidebar.tsx`.** Its `--surface-sunken` elements sit on `--paper`; after fix #1 they go from
+  a 1.058:1 step (invisible) to 1.275:1 (a clearly readable raised pill) — an improvement, and light mode is
+  untouched. Bigger deltas are *correct* at low luminance, not a bug.
+- **Not touching light mode at all.** Home is the reference; if the fix changes Home, the fix is wrong.
+
+## Verification (not screenshots-only — the brief warns they go stale)
+
+- Read **computed styles** in the browser for the Sales DNA input vs the Home Coach composer and prove they
+  now sit at the same step above their own parent.
+- Home light + Home dark eyeballed against the reference.
+- `npx tsc` (web + electron) · `npx vitest run` (218) · `node scripts/token-lint.mjs` (baseline must go **down**).
+- ⚠️ Dev server must be STOPPED before any `npm run build`.
+
+## Then, if approved
+
+**SettingsTab (75 literals — biggest remaining) + the light/dark toggle UI**, so Sebastian stops editing
+`localStorage` by hand.
+
+⚠️ **OPEN QUESTION FOR SEBASTIAN — blocks 125 literals of work:** Flight Plan / Objection Vault / Signal Vault.
+He said 2026-07-29 he's probably killing them. Migrating a page that's about to be deleted is pure waste.
+
+---
+
+## ✅ SESSION RESULT (2026-07-29 cont.)
+
+**Colour debt 286 → 111.** Zero literals now in: Card, SectionLabel, Toggle, **SettingsTab**.
+Remaining 111: IntelTab 53 · ObjectionVaultTab 34 · PaywallModal 15 · OnboardingClient 8 · WIcon 1.
+
+**Shipped**
+1. **Dark elevation fixed at the token.** `--surface-sunken` #100F0D → **#2C2B25** (below `--paper` → above
+   `--surface`). Ladder is now monotonic: page #171613 → card #201F1B → field #2C2B25. Measured step vs
+   `--surface` = **1.162:1**, matching light's 1.158:1.
+2. **The finding the brief didn't have:** `ui/Card.tsx` was hardcoded to an iOS gray measuring **R−B = −2
+   (cool)** against `--surface` at **R−B = +5 (warm)** — Sebastian's *"bluish gray vs brownish gray"*, on
+   **7 tabs at once**. Now tokens.
+3. `--ink-3` #726E64 → **#8A867C** (min contrast 2.79 → 3.91:1). `SectionLabel`'s dark gray measured
+   **2.37:1** — invisible — now `--ink-3`.
+4. **New `--knob` token** for switch thumbs (near-white in both themes, same "must not flip" class as
+   `--scrim`). Toggle rebuilt as a real `<button role="switch">` with an accessible label.
+5. **Flight Plan + Signal Vault deleted** (Sebastian: Sales DNA supersedes Flight Plan). Removed components,
+   sidebar entries, orphaned hover animations, tab-union members, badge wiring, and the now-dead
+   `vault_signals` query in `page.tsx` (one less Supabase round-trip per dashboard load). **Objection Vault
+   kept.**
+6. **SettingsTab on tokens + the Appearance control** (System / Light / Dark) — Sebastian no longer edits
+   `localStorage` by hand.
+
+**Verified by measurement, not screenshots** (browser pane returned stale frames again — cost two false
+alarms; DOM measurement is the authority): Home Coach composer unchanged at #201F1B on #171613 (1.097) ·
+Sales DNA input now #2C2B25 on a #201F1B card, monotonic ladder true · every light token byte-identical to
+before · theme switch flips class + `color-scheme` + tokens + storage + pressed state.
+
+**Gates:** typecheck (web + electron) · **218/218 vitest** · production build · token-lint 286→111 · dev
+server compiles clean.
+
+### ⚠️ FLAGGED — needs its own session, do NOT bolt onto a UI change
+Deleting the Flight Plan **page** did not remove the Flight Plan **plumbing**. `api/wingman/session`
+still reads the `flight_plans` table at every call start and snapshots it into `calls.flight_plan_snapshot`,
+which still feeds **the live card prompt** (`poll/route.ts` → `buildFlightPlanContext`) and **post-call
+framework grading** (`post-call/route.ts` → `formatFlightPlanForEval`). So that data is now **frozen** —
+live cards keep reading whatever is in the table, with no UI to change it. `api/flight-plan/route.ts` was
+left in place on purpose (it is the only remaining write path). **Decide separately:** point that plumbing
+at Sales DNA, or retire it. It is live-call code → plan-reviewer + `wingman-reviewer` required.
