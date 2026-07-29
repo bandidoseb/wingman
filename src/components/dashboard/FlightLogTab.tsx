@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import Card from "@/components/ui/Card";
 import SectionLabel from "@/components/ui/SectionLabel";
 import OutcomePill, { outcomeTone } from "@/components/ui/wm/OutcomePill";
+import OutcomeControl from "@/components/ui/wm/OutcomeControl";
+import CopyButton from "@/components/ui/wm/CopyButton";
 import type { Call, TranscriptLine } from "@/types";
 import { confirmedOutcome, NO_DEBRIEF_GRACE_MS } from "@/lib/wingman/outcome-stats";
 
@@ -652,19 +654,11 @@ export default function FlightLogTab({ calls, initialCall, onInitialCallConsumed
             </div>
           </div>
           {effectiveOutcome(call) && !editingOutcomes[call.id] ? (
-            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-              <OutcomePill outcome={effectiveOutcome(call)!} />
-              {!localOutcomes[call.id] && call.outcome_source === "auto" && (
-                <span title="Auto-detected by Wingman — confirm or change it"
-                  style={{ fontSize: 9.5, fontWeight: 700, letterSpacing: "0.05em", color: "rgb(var(--ink-2))", background: "rgb(var(--surface-sunken))", borderRadius: 5, padding: "2px 5px", textTransform: "uppercase" }}>
-                  auto
-                </span>
-              )}
-              <button onClick={() => setEditingOutcomes((prev) => ({ ...prev, [call.id]: true }))}
-                style={{ fontSize: 10, color: "rgb(var(--signal))", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", padding: "2px 6px" }}>
-                {!localOutcomes[call.id] && call.outcome_source === "auto" ? "Confirm" : "Edit"}
-              </button>
-            </div>
+            <OutcomeControl
+              outcome={effectiveOutcome(call)!}
+              isAuto={!localOutcomes[call.id] && call.outcome_source === "auto"}
+              onEdit={() => setEditingOutcomes((prev) => ({ ...prev, [call.id]: true }))}
+            />
           ) : (
             <OutcomePicker callId={call.id} onSaved={handleOutcomeSaved} />
           )}
@@ -783,7 +777,21 @@ export default function FlightLogTab({ calls, initialCall, onInitialCallConsumed
 
         {activeDetailTab === "transcript" && (
           <Card>
-            <SectionLabel>Transcript</SectionLabel>
+            {/* SectionLabel carries its own bottom margin, so the row zeroes it out
+                and owns the spacing — otherwise the copy button sits 14px high. */}
+            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, marginBottom: 14 }}>
+              <SectionLabel className="mb-0">Transcript</SectionLabel>
+              {transcript.length > 0 && (
+                <CopyButton
+                  getText={() =>
+                    [...transcript]
+                      .sort((a, b) => a.sequence_order - b.sequence_order)
+                      .map((l) => `${l.speaker}: ${l.text}`)
+                      .join("\n")
+                  }
+                />
+              )}
+            </div>
             {transcriptLoading ? (
               <div style={{ fontSize: 13, color: "rgb(var(--ink-2))" }}>Loading transcript…</div>
             ) : transcript.length === 0 ? (
@@ -966,27 +974,13 @@ export default function FlightLogTab({ calls, initialCall, onInitialCallConsumed
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                   {effectiveOutcome(call) && !editingOutcomes[call.id] && (
-                    <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
-                      <span style={{ fontSize: 10, color: "rgb(var(--ink-2))", fontWeight: 600, letterSpacing: "0.06em" }}>OUTCOME</span>
-                      <OutcomePill outcome={effectiveOutcome(call)!} />
-                      {!localOutcomes[call.id] && call.outcome_source === "auto" && (
-                        <span title="Auto-detected by Wingman — confirm or change it"
-                          style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.05em", color: "rgb(var(--ink-2))", background: "rgb(var(--surface-sunken))", borderRadius: 5, padding: "2px 5px", textTransform: "uppercase" }}>
-                          auto
-                        </span>
-                      )}
-                      {hoveredCallId === call.id && (
-                        <button
-                          onClick={(e) => { e.stopPropagation(); setEditingOutcomes((prev) => ({ ...prev, [call.id]: true })); }}
-                          className="hover:bg-blue-100 rounded-sm transition-colors"
-                          style={{ fontSize: 10, color: "rgb(var(--signal))", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", padding: "2px 6px" }}
-                        >
-                          {!localOutcomes[call.id] && call.outcome_source === "auto" ? "Confirm" : "Edit"}
-                        </button>
-                      )}
-                    </div>
+                    <OutcomeControl
+                      outcome={effectiveOutcome(call)!}
+                      isAuto={!localOutcomes[call.id] && call.outcome_source === "auto"}
+                      onEdit={() => setEditingOutcomes((prev) => ({ ...prev, [call.id]: true }))}
+                    />
                   )}
-                  <span className="hover:bg-blue-100 rounded-sm transition-colors" style={{ fontSize: 11.5, color: "rgb(var(--signal))", fontWeight: 600, whiteSpace: "nowrap", padding: "2px 6px", borderRadius: 6 }}>View →</span>
+                  <span className="text-signal font-semibold text-[11.5px] whitespace-nowrap px-1.5 py-0.5 rounded-control">View →</span>
                 </div>
               </div>
               {call.summary && <div style={{ fontSize: 12, color: "rgb(var(--ink-2))", lineHeight: 1.4 }}>{call.summary}</div>}

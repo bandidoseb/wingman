@@ -247,7 +247,12 @@ export default function Sidebar({
   return (
     <div
       style={{
-        width: collapsed ? 56 : 220,
+        // 80, not 56: on macOS the Electron window's traffic lights are drawn INSIDE
+        // this rail (electron/main.ts sets titleBarStyle "hiddenInset" with
+        // trafficLightPosition x:18). The three buttons need ~70px from that origin,
+        // so a 56px rail let them spill past the sidebar's right border — which is
+        // the line that appeared to cut through them when collapsed.
+        width: collapsed ? 80 : 220,
         flexShrink: 0,
         background: "rgb(var(--paper) / 0.85)",
         backdropFilter: "blur(20px)",

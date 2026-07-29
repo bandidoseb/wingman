@@ -33,21 +33,48 @@ export function outcomeTone(outcome: string): string {
   return TONE[outcome] ?? "bg-ink-3";
 }
 
+/**
+ * The "Wingman guessed this" mark. An inline SVG, not an emoji: it inherits
+ * `currentColor` (so it flips with the pill's text) and renders identically on
+ * every machine, which an emoji does not.
+ */
+function AutoSparkle() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      className="h-[11px] w-[11px] shrink-0 -ml-0.5"
+      fill="currentColor"
+      aria-hidden="true"
+    >
+      <path d="M12 2.5l1.9 5.6 5.6 1.9-5.6 1.9L12 17.5l-1.9-5.6L4.5 10l5.6-1.9L12 2.5z" />
+    </svg>
+  );
+}
+
 export default function OutcomePill({
   outcome,
   className,
   dimmed = false,
+  auto = false,
   ...props
 }: React.ComponentProps<"span"> & {
   outcome: string;
   /** Auto-detected and not yet confirmed — reads as provisional. */
   dimmed?: boolean;
+  /**
+   * Show the sparkle mark. This replaces the separate uppercase "AUTO" chip that
+   * used to sit beside the pill — Sebastian, 2026-07-29: the row read as busy with
+   * an "OUTCOME" label, a pill, an "AUTO" chip and a "Confirm" button all doing one
+   * job. Dimmed + sparkle says "Wingman's guess" in one element; solid says
+   * "you confirmed it".
+   */
+  auto?: boolean;
 }) {
   return (
     <span
       data-slot="outcome-pill"
       className={cn(
-        "inline-flex items-center h-6 px-2.5 rounded-pill text-[11px] font-semibold whitespace-nowrap",
+        "inline-flex items-center gap-1 h-6 px-2.5 rounded-pill text-[11px] font-semibold whitespace-nowrap",
         "text-paper",
         outcomeTone(outcome),
         dimmed && "opacity-60",
@@ -55,6 +82,7 @@ export default function OutcomePill({
       )}
       {...props}
     >
+      {auto && <AutoSparkle />}
       {outcome}
     </span>
   );
