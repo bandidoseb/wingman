@@ -51,6 +51,17 @@ export type CoachSession = {
   setSuggestion: React.Dispatch<React.SetStateAction<{ call_id: string; name: string } | null>>;
   open: boolean;
   setOpen: React.Dispatch<React.SetStateAction<boolean>>;
+  /**
+   * True from the moment a close starts until the exit animation finishes.
+   *
+   * `open` flips instantly, but the panel takes 260ms to fade out. Anything that
+   * changes LAYOUT must keep treating the Coach as open for that whole window —
+   * otherwise the column snaps back to its closed height, Home content pops in,
+   * and the composer visibly jumps while the panel is still on screen.
+   * Layout should key off `open || closing`, never `open` alone.
+   */
+  closing: boolean;
+  setClosing: React.Dispatch<React.SetStateAction<boolean>>;
 };
 
 /**
@@ -67,17 +78,25 @@ export function useCoachSession(): CoachSession {
   const [sentCount, setSentCount] = useState(0);
   const [suggestion, setSuggestion] = useState<{ call_id: string; name: string } | null>(null);
   const [open, setOpen] = useState(false);
-  return { messages, setMessages, sentCount, setSentCount, suggestion, setSuggestion, open, setOpen };
+  const [closing, setClosing] = useState(false);
+  return {
+    messages, setMessages, sentCount, setSentCount,
+    suggestion, setSuggestion, open, setOpen, closing, setClosing,
+  };
 }
 
 export default function Coach({
   calls,
-  usedToday,
+  used,
   onOpenCall,
   session,
 }: {
   calls: Call[];
-  usedToday: number;
+  /**
+   * Coaching messages used today. Computed ONCE in DashboardClient and shared
+   * with the sidebar, so the two can never show different numbers.
+   */
+  used: number;
   /** Hand off to Flight Log. Returns false if the id isn't in the loaded list. */
   onOpenCall: (callId: string) => boolean;
   session: CoachSession;
@@ -85,6 +104,22 @@ export default function Coach({
   const { messages, setMessages, sentCount, setSentCount, suggestion, setSuggestion } = session;
   const open = session.open;
   const onOpenChange = session.setOpen;
+  const { closing, setClosing } = session;
+
+  /*
+    Hold the "open" LAYOUT until the exit animation has actually finished.
+    Without this, closing flips every layout switch at t=0 while the panel is
+    still visibly fading out over 260ms — the column snaps to its closed height,
+    Home content pops back in underneath, and the composer jumps. `wasOpen`
+    stops this firing on first mount, when open is already false.
+  */
+  const wasOpen = useRef(false);
+  useEffect(() => {
+    if (open) { wasOpen.current = true; setClosing(false); }
+    else if (wasOpen.current) { setClosing(true); }
+  }, [open, setClosing]);
+
+  const layoutOpen = open || closing;
 
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -92,19 +127,6 @@ export default function Coach({
   // Ref (not state) so a double-submit in the same tick can't slip a second request through.
   const inFlight = useRef(false);
 
-  /*
-    `usedToday` is derived from `profile`, which DashboardClient re-fetches via
-    router.refresh() (on debrief landing, HUD outcome saved, etc.). HomeTab is NOT
-    remounted by that, so a naive `usedToday + sentCount` DOUBLE-COUNTS: the server
-    has already folded our sends into chat_messages_today, and sentCount still holds
-    them too. Rep sends 4, finishes a call, refresh lands → counter jumps 4/20 → 8/20
-    and they're cut off at 10 real messages, disagreeing with the sidebar.
-
-    Freeze the baseline at mount and take the max, so the count is monotonic and
-    converges on the server's truth instead of drifting above it.
-  */
-  const baseline = useRef(usedToday);
-  const used = Math.max(usedToday, baseline.current + sentCount);
   const atLimit = used >= CHAT_DAILY_CAP;
 
   // Esc returns to Home. Only bound while open so it can't swallow Esc elsewhere.
@@ -160,8 +182,9 @@ export default function Coach({
         // Lock the client to match. `usedToday` is a page-load snapshot, so a rep
         // who used Mission Intel first arrives with a stale low count — without
         // this they keep pressing send and keep collecting identical replies.
-        // Keyed off the frozen baseline so `used` lands exactly on the cap.
-        setSentCount(CHAT_DAILY_CAP - baseline.current);
+        // The shared `used` is max(serverCount, baseline + sentCount) and the
+        // baseline is never negative, so CAP here always forces atLimit true.
+        setSentCount(CHAT_DAILY_CAP);
         return;
       }
 
@@ -260,14 +283,14 @@ export default function Coach({
   return (
     <div
       className={
-        open
+        layoutOpen
           ? "flex-1 flex flex-col min-h-0"
           // z-10: the Sales DNA banner has z-indexed children in the root stacking
           // context and would otherwise paint over the bar as it scrolls past.
-          : "sticky bottom-0 z-10 pt-6 pb-2 bg-linear-to-t from-paper via-paper to-transparent"
+          : "sticky bottom-0 z-10 bg-linear-to-t from-paper via-paper to-transparent"
       }
     >
-      <AnimatePresence initial={false}>
+      <AnimatePresence initial={false} onExitComplete={() => setClosing(false)}>
         {open && (
           <motion.div
             key="coach-panel"
@@ -371,7 +394,10 @@ export default function Coach({
         )}
       </AnimatePresence>
 
-      <div>{composer}</div>
+      {/* Padding is IDENTICAL in both states on purpose. Any difference here
+          shifts the composer the instant the state flips — the "jump" Sebastian
+          saw on close. It also doubles as the gradient fade zone when closed. */}
+      <div className="pt-4 pb-2">{composer}</div>
     </div>
   );
 }

@@ -29,3 +29,24 @@ export function chatMessagesUsedToday(
   const lastReset = profile.chat_reset_date ?? utcToday;
   return lastReset === utcToday ? (profile.chat_messages_today ?? 0) : 0;
 }
+
+/**
+ * What every surface should DISPLAY as "used today".
+ *
+ * `serverCount` only moves when the page re-fetches the profile, so on its own
+ * the sidebar sits stale until a reload while the chat box counts live — they
+ * visibly disagree. `sentThisSession` covers the gap.
+ *
+ * Taking the MAX rather than adding is the important part: once a refresh lands,
+ * the server has already folded this session's sends into its own count, so
+ * adding would double-count and cut the rep off at half their real quota.
+ * `baseline` is the server count captured when the session started, so the sum
+ * side stays anchored to where we began rather than drifting upward.
+ */
+export function coachMessagesUsed(
+  baseline: number,
+  serverCount: number,
+  sentThisSession: number
+): number {
+  return Math.max(serverCount, baseline + sentThisSession);
+}

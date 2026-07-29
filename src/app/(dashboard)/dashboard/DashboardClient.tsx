@@ -21,7 +21,7 @@ import { parseSSEBuffer } from "@/lib/wingman/sse-parse";
 import { HOT_PARTIAL_MS, SETTLE_WAIT_MS } from "@/lib/wingman/live-tail";
 import { scoreReadiness, BELIEF_DISPLAY } from "@/lib/wingman/close-readiness.mjs";
 import { logDevEvent } from "@/lib/wingman/devlog-client";
-import { chatMessagesUsedToday } from "@/lib/wingman/chat-quota";
+import { chatMessagesUsedToday, coachMessagesUsed } from "@/lib/wingman/chat-quota";
 import { useCoachSession } from "@/components/dashboard/home/Coach";
 import { useWingmanPoller } from "@/hooks/useWingmanPoller";
 import { useRecallTranscript } from "@/hooks/useRecallTranscript";
@@ -102,6 +102,16 @@ export default function DashboardClient({
   // every tab change — including the Coach's own "Open X in Flight Log →"
   // handoff, which would silently destroy the thread the rep was building.
   const coachSession = useCoachSession();
+
+  // ONE number for the whole dashboard. The sidebar used to read the server
+  // count straight off `profile`, which only moves on a page load — so it sat
+  // stale ("1 of 20") while the chat box counted live ("3/20"). Both now read this.
+  const coachBaseline = useRef(chatMessagesUsedToday(profile));
+  const coachUsed = coachMessagesUsed(
+    coachBaseline.current,
+    chatMessagesUsedToday(profile),
+    coachSession.sentCount
+  );
   const [collapsed, setSidebarCollapsed] = useState(false);
   const [badges, setBadges] = useState({
     objections: initialObjections.filter((o) => o.is_new).length,
@@ -1615,7 +1625,7 @@ export default function DashboardClient({
           userId={userId}
           callsUsed={profile.calls_used ?? 0}
           callLimit={FREE_CALL_LIMIT}
-          chatMessagesToday={chatMessagesUsedToday(profile)}
+          chatMessagesToday={coachUsed}
         />
 
         <div
@@ -1649,6 +1659,7 @@ export default function DashboardClient({
               stillLooking={stillLooking}
               onCancelSearch={handleCancelSearch}
               coachSession={coachSession}
+              coachUsed={coachUsed}
             />
           )}
           {tab === "flight-plan" && <FlightPlanTab />}

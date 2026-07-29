@@ -5,7 +5,6 @@ import { CardPattern, generateRandomString } from "@/components/ui/evervault-car
 import type { Profile, Call } from "@/types";
 import { getGreeting } from "@/lib/utils";
 import { getSalesDnaStatus } from "@/lib/wingman/sales-dna-status";
-import { chatMessagesUsedToday } from "@/lib/wingman/chat-quota";
 import Card from "@/components/ui/wm/Card";
 import OutcomeConfirm from "@/components/dashboard/home/OutcomeConfirm";
 import Coach, { type CoachSession } from "@/components/dashboard/home/Coach";
@@ -27,6 +26,8 @@ interface Props {
   onCancelSearch?: () => void;
   /** Owned by DashboardClient so the thread survives a tab switch. */
   coachSession: CoachSession;
+  /** Coaching messages used today — computed once upstream, shared with the sidebar. */
+  coachUsed: number;
 }
 
 /** #47: one fixed-size slot so the control never resizes between states. */
@@ -35,7 +36,7 @@ const CONTROL = "h-10 w-[200px] shrink-0 inline-flex items-center justify-center
 export default function HomeTab({
   profile, calls, onDebrief, isActive, isPendingOutcome = false, savedMessage,
   onDeploy, onEndCall, onPersonalize, deployPhase = "idle", stillLooking = false, onCancelSearch,
-  coachSession,
+  coachSession, coachUsed,
 }: Props) {
   const { greeting } = getGreeting();
   const mouseX = useMotionValue(0);
@@ -48,6 +49,10 @@ export default function HomeTab({
   // DashboardClient so a tab switch doesn't wipe the conversation.
   const coachOpen = coachSession.open;
   const setCoachOpen = coachSession.setOpen;
+  // Layout must stay in "open" mode until the panel's exit animation finishes,
+  // otherwise the column resizes and Home content pops back in while the panel
+  // is still fading — which reads as the composer jumping. See CoachSession.closing.
+  const coachLayoutOpen = coachSession.open || coachSession.closing;
 
   /*
     Anything call-related pulls Home back into view. The takeover hides the live
@@ -117,7 +122,6 @@ export default function HomeTab({
     return true;
   };
 
-  const usedToday = chatMessagesUsedToday(profile);
 
   const showStatusStrip = isActive || deployPhase !== "idle";
 
@@ -133,11 +137,11 @@ export default function HomeTab({
       (composer stays at y=746, page doesn't scroll at all).
       Home keeps `min-h` so tall Home content can still grow the page normally.
     */
-    <div className={`max-w-[640px] mx-auto flex flex-col ${coachOpen ? "h-[calc(100vh-96px)]" : "min-h-[calc(100vh-96px)]"}`}>
+    <div className={`max-w-[640px] mx-auto flex flex-col ${coachLayoutOpen ? "h-[calc(100vh-96px)]" : "min-h-[calc(100vh-96px)]"}`}>
       {/* Hidden entirely while the Coach is open — that IS the takeover. When
           closed, the Coach bar is sticky but stays in flow, so nothing is
           unreachable at full scroll; content just fades under it on the way down. */}
-      <div className={coachOpen ? "hidden" : "flex-1 pb-2"}>
+      <div className={coachLayoutOpen ? "hidden" : "flex-1 pb-2"}>
         {/* ── Header: greeting left, Deploy right ─────────────────────────── */}
         <div className="flex items-start justify-between gap-6 mb-6">
           <h1 className="text-h1 text-ink-1">{greeting}.</h1>
@@ -339,7 +343,7 @@ export default function HomeTab({
       {/* ── Coach bar, pinned bottom ─────────────────────────────────────── */}
       <Coach
         calls={callsWithConfirmed}
-        usedToday={usedToday}
+        used={coachUsed}
         onOpenCall={openCall}
         session={coachSession}
       />

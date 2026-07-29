@@ -11,7 +11,7 @@
  * locks users out early or lets them believe they have messages they don't.
  */
 import { describe, it, expect } from "vitest";
-import { chatMessagesUsedToday, CHAT_DAILY_CAP } from "../../src/lib/wingman/chat-quota";
+import { chatMessagesUsedToday, coachMessagesUsed, CHAT_DAILY_CAP } from "../../src/lib/wingman/chat-quota";
 
 const utcToday = () => new Date().toISOString().slice(0, 10);
 
@@ -47,5 +47,34 @@ describe("chatMessagesUsedToday", () => {
 
   it("exposes the cap the server enforces", () => {
     expect(CHAT_DAILY_CAP).toBe(20);
+  });
+});
+
+describe("coachMessagesUsed", () => {
+  it("counts this session's sends before the server has caught up", () => {
+    // Sidebar used to read serverCount alone and sat stale until a page reload.
+    expect(coachMessagesUsed(1, 1, 2)).toBe(3);
+  });
+
+  it("does NOT double-count once a refresh folds sends into the server count", () => {
+    // The bug this guards: baseline 1 + 2 sent = 3, and the refreshed server
+    // count is also 3. Adding would say 5 and halve the rep's real quota.
+    expect(coachMessagesUsed(1, 3, 2)).toBe(3);
+  });
+
+  it("follows the server upward when another surface spends messages", () => {
+    // Mission Intel in Flight Log also burns quota; the server is the truth.
+    expect(coachMessagesUsed(1, 9, 0)).toBe(9);
+  });
+
+  it("never goes backwards when the server count lags", () => {
+    expect(coachMessagesUsed(4, 0, 1)).toBe(5);
+  });
+
+  it("forcing sentCount to the cap always reaches the limit", () => {
+    // How the client locks itself after a server 429, for any baseline.
+    for (const baseline of [0, 1, 7, 19, 20]) {
+      expect(coachMessagesUsed(baseline, 0, CHAT_DAILY_CAP)).toBeGreaterThanOrEqual(CHAT_DAILY_CAP);
+    }
   });
 });
