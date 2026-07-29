@@ -554,6 +554,27 @@ textarea:focus {
 .typing-dot:nth-child(2) { animation-delay: 0.2s; }
 .typing-dot:nth-child(3) { animation-delay: 0.4s; }
 
+/* prompt-kit's TypingLoader renders `animate-[typing_1s_infinite]` but the
+   registry doesn't ship the keyframes — without this the "thinking" dots are a
+   STATIC image for the 5–20s a non-streaming Sonnet reply takes, which reads as
+   a hang. Matches the motion of our own .typing-dot. */
+@keyframes typing {
+  0%, 60%, 100% { opacity: 0.4; transform: translateY(0); }
+  30%           { opacity: 1;   transform: translateY(-4px); }
+}
+
+/* Hide scrollbars on an element AND its descendants. Needed because
+   use-stick-to-bottom's real scroller is a nested div, and `scrollbar-width`
+   is not inherited, so scoping to the root alone silently does nothing. */
+.no-scrollbar,
+.no-scrollbar * {
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar,
+.no-scrollbar *::-webkit-scrollbar {
+  display: none;
+}
+
 /* Respect reduced motion (§5) */
 @media (prefers-reduced-motion: reduce) {
   *,

@@ -8,7 +8,7 @@ import { getSalesDnaStatus } from "@/lib/wingman/sales-dna-status";
 import { chatMessagesUsedToday } from "@/lib/wingman/chat-quota";
 import Card from "@/components/ui/wm/Card";
 import OutcomeConfirm from "@/components/dashboard/home/OutcomeConfirm";
-import CoachBar from "@/components/dashboard/home/CoachBar";
+import Coach, { type CoachSession } from "@/components/dashboard/home/Coach";
 
 interface Props {
   profile: Profile;
@@ -25,6 +25,8 @@ interface Props {
   deployPhase?: "idle" | "searching" | "starting";
   stillLooking?: boolean;   // 15s into searching → nudge copy
   onCancelSearch?: () => void;
+  /** Owned by DashboardClient so the thread survives a tab switch. */
+  coachSession: CoachSession;
 }
 
 /** #47: one fixed-size slot so the control never resizes between states. */
@@ -33,6 +35,7 @@ const CONTROL = "h-10 w-[200px] shrink-0 inline-flex items-center justify-center
 export default function HomeTab({
   profile, calls, onDebrief, isActive, isPendingOutcome = false, savedMessage,
   onDeploy, onEndCall, onPersonalize, deployPhase = "idle", stillLooking = false, onCancelSearch,
+  coachSession,
 }: Props) {
   const { greeting } = getGreeting();
   const mouseX = useMotionValue(0);
@@ -40,6 +43,23 @@ export default function HomeTab({
   const [randomString, setRandomString] = useState("");
   const [cardHovered, setCardHovered] = useState(false);
   const [dnaDismissed, setDnaDismissed] = useState(false);
+  // Granola pattern: engaging the Coach hands it the whole content column rather
+  // than piling messages onto Home. Esc / ✕ hands it back. State lives in
+  // DashboardClient so a tab switch doesn't wipe the conversation.
+  const coachOpen = coachSession.open;
+  const setCoachOpen = coachSession.setOpen;
+
+  /*
+    Anything call-related pulls Home back into view. The takeover hides the live
+    status strip, the ONLY web-side End Call button, "Processing call…" and the
+    outcome prompt — so a rep who left the Coach open and then deployed (hotkey or
+    auto-detect) would be staring at a chat with no live indicator and no way to
+    end the call, with no cue that anything was behind it.
+  */
+  const callBusy = isActive || deployPhase !== "idle" || isPendingOutcome;
+  useEffect(() => {
+    if (callBusy) setCoachOpen(false);
+  }, [callBusy, setCoachOpen]);
 
   // Outcomes confirmed in this session. We deliberately do NOT router.refresh()
   // after a save: on the dashboard that re-runs the full 20-calls-with-transcripts
@@ -102,12 +122,22 @@ export default function HomeTab({
   const showStatusStrip = isActive || deployPhase !== "idle";
 
   return (
-    <div className="max-w-[640px] mx-auto flex flex-col min-h-[calc(100vh-96px)]">
-      {/* The Coach bar is sticky but stays in flow, so nothing is unreachable at
-          full scroll — content just fades under it on the way down (the Granola
-          behaviour). This is breathing room so the last card doesn't sit flush
-          against the input. */}
-      <div className="flex-1 pb-2">
+    /*
+      h- vs min-h is load-bearing, not a style tweak.
+      `min-h` leaves the column's height AUTO with a floor, so a `flex-1` child's
+      content still contributes to the container's size — `min-h-0` does not bound
+      it and StickToBottom's `height:100%` scroller resolves to auto and grows.
+      Measured at 40 messages: body scrollHeight 2070 in a 794px viewport, with the
+      composer at y=2022 — the input walks off-screen and the rep has to scroll the
+      whole page to type. A DEFINITE height makes the chat scroll internally
+      (composer stays at y=746, page doesn't scroll at all).
+      Home keeps `min-h` so tall Home content can still grow the page normally.
+    */
+    <div className={`max-w-[640px] mx-auto flex flex-col ${coachOpen ? "h-[calc(100vh-96px)]" : "min-h-[calc(100vh-96px)]"}`}>
+      {/* Hidden entirely while the Coach is open — that IS the takeover. When
+          closed, the Coach bar is sticky but stays in flow, so nothing is
+          unreachable at full scroll; content just fades under it on the way down. */}
+      <div className={coachOpen ? "hidden" : "flex-1 pb-2"}>
         {/* ── Header: greeting left, Deploy right ─────────────────────────── */}
         <div className="flex items-start justify-between gap-6 mb-6">
           <h1 className="text-h1 text-ink-1">{greeting}.</h1>
@@ -307,10 +337,11 @@ export default function HomeTab({
       </div>
 
       {/* ── Coach bar, pinned bottom ─────────────────────────────────────── */}
-      <CoachBar
+      <Coach
         calls={callsWithConfirmed}
         usedToday={usedToday}
         onOpenCall={openCall}
+        session={coachSession}
       />
     </div>
   );

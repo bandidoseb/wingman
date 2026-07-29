@@ -22,6 +22,7 @@ import { HOT_PARTIAL_MS, SETTLE_WAIT_MS } from "@/lib/wingman/live-tail";
 import { scoreReadiness, BELIEF_DISPLAY } from "@/lib/wingman/close-readiness.mjs";
 import { logDevEvent } from "@/lib/wingman/devlog-client";
 import { chatMessagesUsedToday } from "@/lib/wingman/chat-quota";
+import { useCoachSession } from "@/components/dashboard/home/Coach";
 import { useWingmanPoller } from "@/hooks/useWingmanPoller";
 import { useRecallTranscript } from "@/hooks/useRecallTranscript";
 
@@ -96,6 +97,11 @@ export default function DashboardClient({
 
   // ── Tab / UI state ─────────────────────────────────────────────────────────
   const [tab, setTab] = useState<DashboardTab>("home");
+
+  // Coach conversation. Lives HERE, not in HomeTab, because HomeTab unmounts on
+  // every tab change — including the Coach's own "Open X in Flight Log →"
+  // handoff, which would silently destroy the thread the rep was building.
+  const coachSession = useCoachSession();
   const [collapsed, setSidebarCollapsed] = useState(false);
   const [badges, setBadges] = useState({
     objections: initialObjections.filter((o) => o.is_new).length,
@@ -1636,6 +1642,7 @@ export default function DashboardClient({
               deployPhase={deployPhase}
               stillLooking={stillLooking}
               onCancelSearch={handleCancelSearch}
+              coachSession={coachSession}
             />
           )}
           {tab === "flight-plan" && <FlightPlanTab />}
