@@ -14,11 +14,11 @@ interface Props {
 }
 
 const inputStyle: React.CSSProperties = {
-  background: "#f2f2f7",
-  border: "1.5px solid rgba(0,0,0,0.07)",
+  background: "rgb(var(--surface-sunken))",
+  border: "1.5px solid rgb(var(--line))",
   borderRadius: 10,
   padding: "11px 14px",
-  color: "#1c1c1e",
+  color: "rgb(var(--ink-1))",
   fontSize: 13,
   fontFamily: "inherit",
   outline: "none",
@@ -33,8 +33,8 @@ function SaveButton({ saving, saved, onClick }: { saving: boolean; saved: boolea
       style={{
         marginTop: 14,
         padding: "10px 20px",
-        background: saved ? "#34c759" : "#1c1c1e",
-        color: "#fff",
+        background: saved ? "rgb(var(--positive))" : "rgb(var(--ink-1))",
+        color: "rgb(var(--surface))",
         border: "none",
         borderRadius: 10,
         fontSize: 13,
@@ -98,7 +98,7 @@ function OfferSection({ userId }: { userId: string }) {
     setTimeout(() => setSaved(false), 3000);
   };
 
-  if (!loaded) return <Card style={{ marginBottom: 12 }}><div style={{ fontSize: 13, color: "#8e8e93" }}>Loading…</div></Card>;
+  if (!loaded) return <Card style={{ marginBottom: 12 }}><div style={{ fontSize: 13, color: "rgb(var(--ink-2))" }}>Loading…</div></Card>;
 
   const mainOffer   = offers.find((o) => o.is_main) ?? offers[0];
   const otherOffers = offers.filter((o) => !o.is_main);
@@ -108,7 +108,7 @@ function OfferSection({ userId }: { userId: string }) {
       <SectionLabel>Your Offer</SectionLabel>
 
       {/* Main offer */}
-      <div style={{ fontSize: 11, color: "#8e8e93", fontWeight: 500, marginBottom: 6 }}>Main offer</div>
+      <div style={{ fontSize: 11, color: "rgb(var(--ink-2))", fontWeight: 500, marginBottom: 6 }}>Main offer</div>
       <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
         <input
           value={mainOffer?.name ?? ""}
@@ -117,7 +117,7 @@ function OfferSection({ userId }: { userId: string }) {
           style={{ ...inputStyle, flex: 1 }}
         />
         <div style={{ position: "relative", width: 110, flexShrink: 0 }}>
-          <span style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", fontSize: 13, color: "#aeaeb2", pointerEvents: "none" }}>$</span>
+          <span style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", fontSize: 13, color: "rgb(var(--ink-3))", pointerEvents: "none" }}>$</span>
           <input
             value={mainOffer?.price ?? ""}
             onChange={(e) => updateOffer(0, "price", e.target.value)}
@@ -130,7 +130,7 @@ function OfferSection({ userId }: { userId: string }) {
       {/* Downsells */}
       {otherOffers.length > 0 && (
         <>
-          <div style={{ fontSize: 11, color: "#8e8e93", fontWeight: 500, marginBottom: 6 }}>Downsells & other offers</div>
+          <div style={{ fontSize: 11, color: "rgb(var(--ink-2))", fontWeight: 500, marginBottom: 6 }}>Downsells & other offers</div>
           <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 8 }}>
             {otherOffers.map((o, i) => {
               const realIdx = offers.indexOf(o);
@@ -143,7 +143,7 @@ function OfferSection({ userId }: { userId: string }) {
                     style={{ ...inputStyle, flex: 1 }}
                   />
                   <div style={{ position: "relative", width: 110, flexShrink: 0 }}>
-                    <span style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", fontSize: 13, color: "#aeaeb2", pointerEvents: "none" }}>$</span>
+                    <span style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", fontSize: 13, color: "rgb(var(--ink-3))", pointerEvents: "none" }}>$</span>
                     <input
                       value={o.price}
                       onChange={(e) => updateOffer(realIdx, "price", e.target.value)}
@@ -151,7 +151,7 @@ function OfferSection({ userId }: { userId: string }) {
                       style={{ ...inputStyle, paddingLeft: 24 }}
                     />
                   </div>
-                  <button onClick={() => removeOffer(realIdx)} style={{ background: "none", border: "none", color: "#aeaeb2", fontSize: 18, cursor: "pointer", padding: "0 2px", flexShrink: 0, lineHeight: 1 }}>×</button>
+                  <button onClick={() => removeOffer(realIdx)} style={{ background: "none", border: "none", color: "rgb(var(--ink-3))", fontSize: 18, cursor: "pointer", padding: "0 2px", flexShrink: 0, lineHeight: 1 }}>×</button>
                 </div>
               );
             })}
@@ -160,7 +160,7 @@ function OfferSection({ userId }: { userId: string }) {
       )}
 
       {offers.length < 5 && (
-        <button onClick={addOffer} style={{ background: "none", border: "none", color: "#8e8e93", fontSize: 13, cursor: "pointer", fontFamily: "inherit", padding: 0, marginBottom: 4, display: "flex", alignItems: "center", gap: 5 }}>
+        <button onClick={addOffer} style={{ background: "none", border: "none", color: "rgb(var(--ink-2))", fontSize: 13, cursor: "pointer", fontFamily: "inherit", padding: 0, marginBottom: 4, display: "flex", alignItems: "center", gap: 5 }}>
           <span style={{ fontSize: 16, lineHeight: 1 }}>+</span> Add another offer
         </button>
       )}
@@ -173,7 +173,7 @@ function OfferSection({ userId }: { userId: string }) {
 // ── Sales DNA Capture (the moat) ───────────────────────────────────────────────
 function BrainDumpNote() {
   return (
-    <div style={{ fontSize: 12, color: "#8e8e93", marginBottom: 16, lineHeight: 1.55 }}>
+    <div style={{ fontSize: 12, color: "rgb(var(--ink-2))", marginBottom: 16, lineHeight: 1.55 }}>
       The more you dump here, the smarter your Wingman gets — don&apos;t hold back, Wingman will make sense of it.
     </div>
   );
@@ -187,10 +187,10 @@ function DnaField({ label, star, sub, example, value, onChange, quickAnswer }: {
 }) {
   return (
     <div style={{ marginBottom: 18 }}>
-      <div style={{ fontSize: 12.5, color: "#1c1c1e", fontWeight: 600, marginBottom: sub ? 3 : 6, lineHeight: 1.45 }}>
-        {label}{star && <span style={{ color: "#ff9500", marginLeft: 5 }}>★</span>}
+      <div style={{ fontSize: 12.5, color: "rgb(var(--ink-1))", fontWeight: 600, marginBottom: sub ? 3 : 6, lineHeight: 1.45 }}>
+        {label}{star && <span style={{ color: "rgb(var(--warning))", marginLeft: 5 }}>★</span>}
       </div>
-      {sub && <div style={{ fontSize: 11.5, color: "#8e8e93", marginBottom: 7, lineHeight: 1.5 }}>{sub}</div>}
+      {sub && <div style={{ fontSize: 11.5, color: "rgb(var(--ink-2))", marginBottom: 7, lineHeight: 1.5 }}>{sub}</div>}
       <textarea
         value={value}
         onChange={(e) => onChange(e.target.value)}
@@ -203,9 +203,9 @@ function DnaField({ label, star, sub, example, value, onChange, quickAnswer }: {
           onClick={() => onChange(quickAnswer.value)}
           style={{
             marginTop: 6, padding: "5px 12px", borderRadius: 20,
-            border: value === quickAnswer.value ? "1.5px solid #1c1c1e" : "1.5px solid rgba(0,0,0,0.12)",
-            background: value === quickAnswer.value ? "#1c1c1e" : "transparent",
-            color: value === quickAnswer.value ? "#fff" : "#8e8e93",
+            border: value === quickAnswer.value ? "1.5px solid rgb(var(--ink-1))" : "1.5px solid rgb(var(--line-strong))",
+            background: value === quickAnswer.value ? "rgb(var(--ink-1))" : "transparent",
+            color: value === quickAnswer.value ? "rgb(var(--surface))" : "rgb(var(--ink-2))",
             fontSize: 11.5, fontWeight: 500, fontFamily: "inherit", cursor: "pointer",
             transition: "all 0.15s ease",
           }}
@@ -365,7 +365,7 @@ function SalesDnaCapture({ profile }: { profile: Profile }) {
   };
 
   const errorLine = error
-    ? <div style={{ fontSize: 12, color: "#c0392b", marginTop: 10 }}>⚠ {error}</div>
+    ? <div style={{ fontSize: 12, color: "rgb(var(--critical))", marginTop: 10 }}>⚠ {error}</div>
     : null;
 
   return (
@@ -376,7 +376,7 @@ function SalesDnaCapture({ profile }: { profile: Profile }) {
         <BrainDumpNote />
 
         {/* Offer URL → overview (reference only) */}
-        <div style={{ fontSize: 11.5, color: "#8e8e93", marginBottom: 7, lineHeight: 1.5 }}>
+        <div style={{ fontSize: 11.5, color: "rgb(var(--ink-2))", marginBottom: 7, lineHeight: 1.5 }}>
           Got an offer page? Paste it and Wingman will pull a quick overview to jog your memory. It&apos;s just a reference — only what you write below reaches your live Wingman.
         </div>
         <div style={{ display: "flex", gap: 8, marginBottom: crawlError ? 8 : (overview ? 12 : 20) }}>
@@ -390,8 +390,8 @@ function SalesDnaCapture({ profile }: { profile: Profile }) {
             onClick={handleAnalyze}
             disabled={crawling || !url.trim()}
             style={{
-              background: crawling || !url.trim() ? "#e5e5ea" : "#1c1c1e",
-              color: crawling || !url.trim() ? "#8e8e93" : "#fff",
+              background: crawling || !url.trim() ? "rgb(var(--line))" : "rgb(var(--ink-1))",
+              color: crawling || !url.trim() ? "rgb(var(--ink-2))" : "rgb(var(--surface))",
               border: "none", borderRadius: 10, padding: "0 16px",
               fontSize: 13, fontWeight: 600, fontFamily: "inherit",
               cursor: crawling || !url.trim() ? "not-allowed" : "pointer",
@@ -401,13 +401,13 @@ function SalesDnaCapture({ profile }: { profile: Profile }) {
             {crawling ? "Reading…" : "Analyze ↑"}
           </button>
         </div>
-        {crawlError && <div style={{ fontSize: 12, color: "#c0392b", marginBottom: 12 }}>⚠ {crawlError}</div>}
+        {crawlError && <div style={{ fontSize: 12, color: "rgb(var(--critical))", marginBottom: 12 }}>⚠ {crawlError}</div>}
         {overview && (
-          <div style={{ background: "#f7f7fb", border: "1px solid rgba(0,0,0,0.06)", borderRadius: 10, padding: "12px 14px", marginBottom: 20 }}>
-            <div style={{ fontSize: 10.5, color: "#aeaeb2", fontWeight: 600, letterSpacing: "0.05em", textTransform: "uppercase", marginBottom: 6 }}>
+          <div style={{ background: "rgb(var(--surface-sunken))", border: "1px solid rgb(var(--line))", borderRadius: 10, padding: "12px 14px", marginBottom: 20 }}>
+            <div style={{ fontSize: 10.5, color: "rgb(var(--ink-3))", fontWeight: 600, letterSpacing: "0.05em", textTransform: "uppercase", marginBottom: 6 }}>
               What Wingman found on your page · reference only
             </div>
-            <div style={{ fontSize: 12.5, color: "#3a3a3c", lineHeight: 1.6, whiteSpace: "pre-wrap" }}>{overview}</div>
+            <div style={{ fontSize: 12.5, color: "rgb(var(--ink-2))", lineHeight: 1.6, whiteSpace: "pre-wrap" }}>{overview}</div>
           </div>
         )}
 
@@ -427,10 +427,10 @@ function SalesDnaCapture({ profile }: { profile: Profile }) {
 
         {/* Syntax toggle */}
         <div style={{ marginBottom: 20 }}>
-          <div style={{ fontSize: 12.5, color: "#1c1c1e", fontWeight: 600, marginBottom: 3, lineHeight: 1.45 }}>
+          <div style={{ fontSize: 12.5, color: "rgb(var(--ink-1))", fontWeight: 600, marginBottom: 3, lineHeight: 1.45 }}>
             On a call, do you open on their problems or their goals first?
           </div>
-          <div style={{ fontSize: 11.5, color: "#8e8e93", marginBottom: 9, lineHeight: 1.5 }}>
+          <div style={{ fontSize: 11.5, color: "rgb(var(--ink-2))", marginBottom: 9, lineHeight: 1.5 }}>
             Some reps start with what&apos;s going wrong; others start with the dream. Both work — we just match how you run it.
           </div>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
@@ -440,9 +440,9 @@ function SalesDnaCapture({ profile }: { profile: Profile }) {
                 <button key={opt.value} onClick={() => set("syntax", opt.value)}
                   style={{
                     padding: "7px 14px", borderRadius: 20,
-                    border: active ? "1.5px solid #1c1c1e" : "1.5px solid rgba(0,0,0,0.12)",
-                    background: active ? "#1c1c1e" : "transparent",
-                    color: active ? "#fff" : "#3a3a3c",
+                    border: active ? "1.5px solid rgb(var(--ink-1))" : "1.5px solid rgb(var(--line-strong))",
+                    background: active ? "rgb(var(--ink-1))" : "transparent",
+                    color: active ? "rgb(var(--surface))" : "rgb(var(--ink-2))",
                     fontSize: 12, fontWeight: 500, fontFamily: "inherit", cursor: "pointer",
                     transition: "all 0.15s ease",
                   }}>
@@ -455,8 +455,8 @@ function SalesDnaCapture({ profile }: { profile: Profile }) {
           {/* Fallback chip — post-call self-updates an "unsure" rep, but if they're on this
               page in the brief window before it catches up, let them confirm the tendency. */}
           {syntaxHint && dna.syntax === "unsure" && (
-            <div style={{ marginTop: 10, background: "#f2f7ff", border: "1px solid rgba(0,90,255,0.15)", borderRadius: 10, padding: "10px 12px" }}>
-              <div style={{ fontSize: 12, color: "#1c1c1e", lineHeight: 1.5, marginBottom: 8 }}>
+            <div style={{ marginTop: 10, background: "rgb(var(--signal-weak))", border: "1px solid rgb(var(--signal) / 0.25)", borderRadius: 10, padding: "10px 12px" }}>
+              <div style={{ fontSize: 12, color: "rgb(var(--ink-1))", lineHeight: 1.5, marginBottom: 8 }}>
                 Based on your last {syntaxHint.sample} calls, you tended to open on{" "}
                 <strong>{syntaxHint.detected === "problems" ? "their problems" : "their goals"}</strong> first
                 {" "}({syntaxHint.detected === "problems" ? syntaxHint.problems : syntaxHint.goals}/{syntaxHint.sample}). Set that as your default?
@@ -465,7 +465,7 @@ function SalesDnaCapture({ profile }: { profile: Profile }) {
                 onClick={() => { set("syntax", syntaxHint.detected); }}
                 style={{
                   padding: "6px 14px", borderRadius: 20, border: "none",
-                  background: "#1c1c1e", color: "#fff", fontSize: 12, fontWeight: 600,
+                  background: "rgb(var(--ink-1))", color: "rgb(var(--surface))", fontSize: 12, fontWeight: 600,
                   fontFamily: "inherit", cursor: "pointer",
                 }}
               >
@@ -479,7 +479,7 @@ function SalesDnaCapture({ profile }: { profile: Profile }) {
               you" before a change is actually saved (reviewer 🟣). Shows once the post-call
               self-update has landed and matches the rep's real call pattern. */}
           {syntaxHint && profile.sales_dna?.syntax === syntaxHint.detected && (
-            <div style={{ marginTop: 10, fontSize: 11.5, color: "#8e8e93", lineHeight: 1.5 }}>
+            <div style={{ marginTop: 10, fontSize: 11.5, color: "rgb(var(--ink-2))", lineHeight: 1.5 }}>
               📊 Based on your last {syntaxHint.sample} calls, Wingman noticed you open on{" "}
               {syntaxHint.detected === "problems" ? "their problems" : "their goals"} first — so this is set for you. Change it anytime.
             </div>
@@ -502,8 +502,8 @@ export default function PersonalizeTab({ profile, userId }: Props) {
   return (
     <div style={{ maxWidth: 580, margin: "0 auto" }}>
       <div style={{ marginBottom: 24 }}>
-        <div style={{ fontSize: 26, fontWeight: 700, color: "#1c1c1e", letterSpacing: "-0.03em" }}>Sales DNA.</div>
-        <div style={{ fontSize: 14, color: "#8e8e93", marginTop: 3 }}>The more Wingman knows your offer and how you sell, the sharper every card gets.</div>
+        <div style={{ fontSize: 26, fontWeight: 700, color: "rgb(var(--ink-1))", letterSpacing: "-0.03em" }}>Sales DNA.</div>
+        <div style={{ fontSize: 14, color: "rgb(var(--ink-2))", marginTop: 3 }}>The more Wingman knows your offer and how you sell, the sharper every card gets.</div>
       </div>
 
       <OfferSection userId={userId} />

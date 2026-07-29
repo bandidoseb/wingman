@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import type { Call } from "@/types";
-import Pill from "@/components/ui/wm/Pill";
+import OutcomePill, { outcomeTone } from "@/components/ui/wm/OutcomePill";
+import { cn } from "@/lib/utils";
 
 /**
  * Inline outcome confirm — the Granola "AI guessed a folder, ✓ or ✗" pattern.
@@ -23,14 +24,6 @@ import Pill from "@/components/ui/wm/Pill";
  */
 
 const OUTCOMES = ["Closed", "Follow Up", "DQ", "No Show", "Lost"] as const;
-
-const TONE: Record<string, "positive" | "warning" | "critical" | "signal" | "neutral"> = {
-  Closed: "positive",
-  "Follow Up": "signal",
-  Lost: "critical",
-  "No Show": "warning",
-  DQ: "neutral",
-};
 
 export default function OutcomeConfirm({
   call,
@@ -86,7 +79,14 @@ export default function OutcomeConfirm({
             key={o}
             onClick={() => save(o)}
             disabled={saving}
-            className="h-6 px-2 rounded-pill text-[11px] font-semibold bg-surface-sunken text-ink-2 border border-line hover:bg-signal-weak hover:text-signal hover:border-signal/30 transition-colors duration-2 ease-wm disabled:opacity-50"
+            // Filled, in the outcome's own colour — the option looks exactly like
+            // the chip it produces. Dimmed until hovered so five saturated pills
+            // don't shout at once.
+            className={cn(
+              "h-6 px-2.5 rounded-pill text-[11px] font-semibold text-paper",
+              outcomeTone(o),
+              "opacity-55 hover:opacity-100 transition-opacity duration-2 ease-wm disabled:opacity-30"
+            )}
           >
             {o}
           </button>
@@ -115,17 +115,15 @@ export default function OutcomeConfirm({
     );
   }
 
-  const tone = TONE[call.outcome] ?? "neutral";
-
   // Human already confirmed (or a legacy row) — nothing to do.
   if (call.outcome_source !== "auto") {
-    return <Pill tone={tone}>{call.outcome}</Pill>;
+    return <OutcomePill outcome={call.outcome} />;
   }
 
   // AI-detected and unconfirmed — this is the ✓ / ✗ moment.
   return (
     <div className="flex items-center gap-1.5">
-      <Pill tone={tone} className="opacity-70">{call.outcome}</Pill>
+      <OutcomePill outcome={call.outcome} dimmed />
       <span
         className="text-[9px] font-bold uppercase tracking-wider text-ink-3"
         title="Wingman detected this. Confirm it so it counts toward your stats."
