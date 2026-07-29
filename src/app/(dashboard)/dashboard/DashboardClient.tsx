@@ -1619,6 +1619,12 @@ export default function DashboardClient({
         />
 
         <div
+          // Clicking the empty area beside the Coach panel drops back to Home,
+          // the way clicking beside Granola's chat does. Guarded on currentTarget
+          // so it only fires for the bare margin, never for content clicks.
+          onClick={(e) => {
+            if (coachSession.open && e.target === e.currentTarget) coachSession.setOpen(false);
+          }}
           style={{
             marginLeft: sidebarWidth,
             flex:       1,
