@@ -3,6 +3,23 @@
 import { createClient } from "@/lib/supabase/client";
 import type { DashboardTab } from "@/app/(dashboard)/dashboard/DashboardClient";
 
+/**
+ * Sidebar widths — the ONE definition. DashboardClient offsets the page body by
+ * exactly these, so they must never be written down twice.
+ *
+ * They were, and it was a real bug: this rail went to 80 while DashboardClient
+ * still said 56, so the two animated toward endpoints 24px apart and the content
+ * finished sitting under the rail. That is the "jumpy" collapse animation.
+ *
+ * COLLAPSED is sized around the macOS traffic lights, which are drawn INSIDE this
+ * rail (electron/main.ts, titleBarStyle "hiddenInset"). The button group is 52px
+ * wide — three 12px buttons at 20px centre-to-centre — so the even side margin is
+ * (96 − 52) / 2 = 22, and `trafficLightPosition.x` in main.ts must equal that 22.
+ * Change one, change the other.
+ */
+export const SIDEBAR_WIDTH_COLLAPSED = 96;
+export const SIDEBAR_WIDTH_EXPANDED = 220;
+
 interface SidebarProps {
   tab: DashboardTab;
   onTabClick: (id: DashboardTab) => void;
@@ -247,12 +264,7 @@ export default function Sidebar({
   return (
     <div
       style={{
-        // 80, not 56: on macOS the Electron window's traffic lights are drawn INSIDE
-        // this rail (electron/main.ts sets titleBarStyle "hiddenInset" with
-        // trafficLightPosition x:18). The three buttons need ~70px from that origin,
-        // so a 56px rail let them spill past the sidebar's right border — which is
-        // the line that appeared to cut through them when collapsed.
-        width: collapsed ? 80 : 220,
+        width: collapsed ? SIDEBAR_WIDTH_COLLAPSED : SIDEBAR_WIDTH_EXPANDED,
         flexShrink: 0,
         background: "rgb(var(--paper) / 0.85)",
         backdropFilter: "blur(20px)",

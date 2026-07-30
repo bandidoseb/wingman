@@ -39,10 +39,9 @@ export default function IntelTab({ calls: _calls }: { calls?: Call[] }) {
           </span>
 
           <div className="text-h3 text-ink-1 mb-1.5">Coming soon</div>
-          <p className="text-small text-ink-2 leading-relaxed max-w-[380px]">
-            Wingman is collecting your calls now. Once there&apos;s enough to find real
-            patterns, this page will show where deals actually slip — the stage you
-            lose them at, and what changes when you win.
+          <p className="text-small text-ink-2 leading-relaxed max-w-[400px]">
+            Insights across all your sales calls. See where deals slip, what objections
+            you get, and pinpoint exactly where you can improve.
           </p>
         </div>
       </Card>

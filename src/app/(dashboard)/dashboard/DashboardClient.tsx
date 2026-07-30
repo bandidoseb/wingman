@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import type { Profile, Call, VaultObjection, CallStageLabel } from "@/types";
 import { NO_DEBRIEF_GRACE_MS } from "@/lib/wingman/outcome-stats";
-import Sidebar from "@/components/dashboard/Sidebar";
+import Sidebar, { SIDEBAR_WIDTH_COLLAPSED, SIDEBAR_WIDTH_EXPANDED } from "@/components/dashboard/Sidebar";
 import HomeTab from "@/components/dashboard/HomeTab";
 import FlightLogTab from "@/components/dashboard/FlightLogTab";
 import ObjectionVaultTab from "@/components/dashboard/ObjectionVaultTab";
@@ -1577,7 +1577,8 @@ export default function DashboardClient({
 
   const clearPendingCall = useCallback(() => setPendingCall(null), []);
 
-  const sidebarWidth = collapsed ? 56 : 220;
+  // Imported, never re-typed — see the note on these constants in Sidebar.tsx.
+  const sidebarWidth = collapsed ? SIDEBAR_WIDTH_COLLAPSED : SIDEBAR_WIDTH_EXPANDED;
 
   return (
     <div
