@@ -1,0 +1,7 @@
+{
+  "_total": 58,
+  "src/app/(dashboard)/onboarding/OnboardingClient.tsx": 8,
+  "src/components/dashboard/ObjectionVaultTab.tsx": 34,
+  "src/components/ui/PaywallModal.tsx": 15,
+  "src/components/ui/WIcon.tsx": 1
+}

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { searchCoachingKnowledge } from "@/lib/wingman/knowledge-search";
+import type { ChatDiveReady } from "@/lib/wingman/dive-suggestion";
 
 const DAILY_CAP  = 20;
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -135,12 +136,22 @@ type CallRow = {
   call_transcript: Array<{ speaker: string; text: string; sequence_order: number }>;
 };
 
+/**
+ * `notFound` separates "that call does not exist / isn't yours" from "the query
+ * failed". Both used to come back as plain `null`, so a wrong or deleted id was
+ * retried like a transient outage: 3 round trips plus 1s of `setTimeout` holding
+ * the request open, then the rep is told to say "try again" — which re-runs the
+ * whole thing plus another Sonnet call and another quota decrement, forever.
+ * A missing row can never appear on retry, so it exits on the first attempt.
+ */
+type FetchCallResult = { row: CallRow | null; notFound: boolean };
+
 async function fetchCallWithRetry(
   supabase: Awaited<ReturnType<typeof createClient>>,
   callId: string,
   userId: string,
   maxRetries = 2
-): Promise<CallRow | null> {
+): Promise<FetchCallResult> {
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     if (attempt > 0) await new Promise((r) => setTimeout(r, 500));
     try {
@@ -160,16 +171,22 @@ async function fetchCallWithRetry(
         .eq("user_id", userId)
         .single();
 
+      // PGRST116 = .single() matched zero rows. Not an outage — the row genuinely
+      // isn't there (bad id from the model, or deleted). Retrying cannot help.
+      if (error?.code === "PGRST116") {
+        console.warn(`[ai/chat] dive call ${callId} not found for user — not retrying`);
+        return { row: null, notFound: true };
+      }
       if (error) throw error;
-      if (data) return data as CallRow;
+      if (data) return { row: data as CallRow, notFound: false };
     } catch (err) {
       if (attempt === maxRetries) {
         console.error(`[ai/chat] fetchCallWithRetry failed after ${maxRetries + 1} attempts:`, err);
-        return null;
+        return { row: null, notFound: false };
       }
     }
   }
-  return null;
+  return { row: null, notFound: false };
 }
 
 // ── Core system prompt (static — same for every user, every call) ─────────────
@@ -251,7 +268,15 @@ export async function POST(req: NextRequest) {
 
     if (usedToday >= DAILY_CAP) {
       return NextResponse.json(
-        { error: `Daily limit reached (${DAILY_CAP} messages/day). Resets at midnight.`, limitReached: true },
+        {
+          error: `Daily limit reached (${DAILY_CAP} messages/day). Resets at midnight.`,
+          limitReached: true,
+          // The REAL number, so the client pins to it instead of guessing the cap.
+          // It used to set its own counter to CAP here, which with a non-zero
+          // baseline rendered "23 of 20 used" and "-3 left" in the sidebar.
+          messagesUsedToday: usedToday,
+          quotaDay: today,
+        },
         { status: 429 }
       );
     }
@@ -380,22 +405,42 @@ export async function POST(req: NextRequest) {
     // ── Detect DIVE_NOW marker (global mode, Step 3) ──────────────────────────
     // Claude appends DIVE_NOW after the user accepts the deep dive.
     // We strip it, fetch the full transcript, and return diveReady to the client.
-    let diveReady: { openerReply: string; callData: CallRow } | null = null;
+    // `callId` is what the client needs to actually OPEN the call. It is deliberately
+    // NOT read off callData: that row is selected without an id (see fetchCallWithRetry)
+    // and is echoed straight back to us as `call` on later turns, so adding a field to
+    // it would change a payload for no gain. validPendingCallId is already UUID-checked.
+    let diveReady: (ChatDiveReady & { callData: CallRow }) | null = null;
+
+    // TRANSIENT dive failure. The rep is told to say "try again", which can only work
+    // if the client HOLDS ON to the call suggestion — clearing it makes the retry
+    // permanently impossible. Deliberately NOT set for "no transcript": that one can
+    // never succeed on retry, so the client should drop the suggestion instead of
+    // looping a full row+transcript re-read and a Sonnet call on every attempt.
+    let diveFailed = false;
 
     if (mode === "global" && /\n?DIVE_NOW[.!]?\s*$/i.test(reply)) {
       // Strip the marker from the visible reply
       reply = reply.replace(/\n?DIVE_NOW[.!]?\s*$/i, "").trim();
 
       if (!validPendingCallId) {
-        // Claude said DIVE_NOW but client didn't send a valid pendingCallId
-        console.warn("[ai/chat] DIVE_NOW fired but no valid pendingCallId — soft error");
-        reply = "Having trouble loading that call right now — just say 'try again' and we'll get it.";
+        // The client only sends pendingCallId when it HAS a suggestion, so reaching
+        // here means it has none. "Try again" would be a promise we can't keep: the
+        // retry sends no id either, lands here again, and burns a Sonnet call and a
+        // quota decrement every time, with no way out but New chat or a reload
+        // (CALL_MATCH can't re-fire outside Step 2). So ask which call instead —
+        // that re-enters Step 1 and lets the model legitimately re-offer one.
+        console.warn("[ai/chat] DIVE_NOW fired but no valid pendingCallId — re-entering Step 1");
+        reply = "Lost track of which call that was — which one do you mean?";
       } else {
-        const callData = await fetchCallWithRetry(supabase, validPendingCallId, user.id);
+        const { row: callData, notFound } = await fetchCallWithRetry(supabase, validPendingCallId, user.id);
 
-        if (!callData) {
-          // All retries failed — tell user to retry; client keeps pendingCallSuggestion
+        if (notFound) {
+          // Permanent: the row isn't there. Retrying re-reads nothing, forever.
+          reply = "I can't find that call anymore — it may have been deleted. Which call do you want to look at?";
+        } else if (!callData) {
+          // Genuine query failure — transient, so the retry is honest.
           reply = "Having trouble loading that transcript right now — just say 'try again' and I'll give it another shot.";
+          diveFailed = true;
         } else if (!callData.call_transcript?.length) {
           reply = "That call doesn't have a transcript available yet.";
         } else {
@@ -403,21 +448,35 @@ export async function POST(req: NextRequest) {
             month: "short", day: "numeric",
           });
           const openerReply = `Read it. Your call with ${callData.prospect_name ?? "that prospect"} on ${date} — ${callData.duration ?? "unknown duration"}, ${callData.outcome ?? "no outcome logged"}. What do you want to look at?`;
-          diveReady = { openerReply, callData };
+          diveReady = { openerReply, callData, callId: validPendingCallId };
         }
       }
     }
 
     // ── Increment daily counter ────────────────────────────────────────────────
+    // NOTE: read-modify-write, not atomic. Two tabs sending at the same instant can
+    // read the same `usedToday` and one increment is lost. Acceptable for a soft
+    // per-day courtesy cap; it would not be for anything billable per unit.
+    const messagesUsedToday = usedToday + 1;
     await supabase
       .from("profiles")
-      .update({ chat_messages_today: usedToday + 1, chat_reset_date: today })
+      .update({ chat_messages_today: messagesUsedToday, chat_reset_date: today })
       .eq("id", user.id);
 
     return NextResponse.json({
       reply,
+      // The server's own count, so the client never has to infer it. Without this
+      // a reply lost to a timeout or a closed tab left the server one ahead of the
+      // client forever — the surprise-429-with-headroom-showing bug.
+      messagesUsedToday,
+      // ...and the day that count belongs to. The client must NOT use its own clock
+      // here: a reply sent at 23:59:58 and received at 00:00:02 would look like a new
+      // day, re-anchoring the fresh day's baseline to yesterday's total and silently
+      // eating most of the rep's quota until a reload. Clock skew does the same.
+      quotaDay: today,
       ...(callSuggestion ? { callSuggestion } : {}),
       ...(diveReady      ? { diveReady }      : {}),
+      ...(diveFailed     ? { diveFailed }     : {}),
     });
 
   } catch (err) {

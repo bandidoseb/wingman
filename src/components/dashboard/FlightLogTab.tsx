@@ -1,12 +1,16 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Card from "@/components/ui/Card";
 import SectionLabel from "@/components/ui/SectionLabel";
-import OutcomeBadge from "@/components/ui/OutcomeBadge";
+import OutcomePill, { outcomeTone } from "@/components/ui/wm/OutcomePill";
+import OutcomeControl from "@/components/ui/wm/OutcomeControl";
+import CopyButton from "@/components/ui/wm/CopyButton";
 import type { Call, TranscriptLine } from "@/types";
 import { confirmedOutcome, NO_DEBRIEF_GRACE_MS } from "@/lib/wingman/outcome-stats";
+import { useCoachContext } from "@/components/dashboard/coach/CoachProvider";
+import { buildSingleCallPayload } from "@/lib/wingman/coach-payload";
 
 const PILLAR_DISPLAY: Array<{ key: string; label: string; description: string }> = [
   { key: "core_problem",         label: "Core Problem",      description: "Rep dug into the real pain" },
@@ -28,15 +32,16 @@ interface Props {
   userId: string;
   isActive?: boolean;
   isPendingOutcome?: boolean;
+  /**
+   * Report a server-side coaching-message count back to the shared quota state.
+   * This tab's two chat surfaces spend the SAME daily allowance as the Home Coach.
+   */
+  onQuotaReported?: (count: number, day?: string) => void;
 }
 
 // Outcome options shown in the inline picker
-const OUTCOMES = [
-  { label: "Closed",     color: "#34c759", text: "#fff" },
-  { label: "Follow Up",  color: "#007aff", text: "#fff" },
-  { label: "DQ",         color: "#8e8e93", text: "#fff" },
-  { label: "No Show",    color: "#ff9500", text: "#fff" },
-] as const;
+// Colours live in OutcomePill so the picker and the resulting chip can never drift.
+const OUTCOMES = ["Closed", "Follow Up", "DQ", "No Show", "Lost"] as const;
 
 function OutcomePicker({
   callId,
@@ -94,24 +99,18 @@ function OutcomePicker({
 
   return (
     <div onClick={(e) => e.stopPropagation()}>
-      <div style={{ fontSize: 10, color: "#8e8e93", fontWeight: 600, marginTop: 8, marginBottom: 5, letterSpacing: "0.06em" }}>
+      <div style={{ fontSize: 10, color: "rgb(var(--ink-2))", fontWeight: 600, marginTop: 8, marginBottom: 5, letterSpacing: "0.06em" }}>
         LOG OUTCOME
       </div>
       <div style={{ display: "flex", gap: 5, flexWrap: "wrap", alignItems: "center" }}>
         {OUTCOMES.map((o) => (
           <button
-            key={o.label}
-            onClick={(e) => pick(e, o.label)}
+            key={o}
+            onClick={(e) => pick(e, o)}
             disabled={saving !== null}
-            style={{
-              ...ghostPill,
-              border: `1.5px solid ${o.color}`,
-              background: saving === o.label ? o.color : "transparent",
-              color: saving === o.label ? o.text : o.color,
-              opacity: saving && saving !== o.label ? 0.4 : 1,
-            }}
+            className={`${outcomeTone(o)} text-paper rounded-pill px-2.5 h-6 text-[11px] font-semibold transition-opacity duration-2 ease-wm ${saving === o ? "opacity-100" : saving ? "opacity-30" : "opacity-55 hover:opacity-100"}`}
           >
-            {saving === o.label ? "Saving…" : o.label}
+            {saving === o ? "Saving…" : o}
           </button>
         ))}
 
@@ -120,7 +119,7 @@ function OutcomePicker({
           <button
             onClick={(e) => { e.stopPropagation(); setOtherMode(true); }}
             disabled={saving !== null}
-            style={{ ...ghostPill, border: "1.5px solid #8e8e93", color: "#8e8e93", opacity: saving ? 0.4 : 1 }}
+            className={`bg-ink-3 text-paper rounded-pill px-2.5 h-6 text-[11px] font-semibold transition-opacity duration-2 ease-wm ${saving ? "opacity-30" : "opacity-55 hover:opacity-100"}`}
           >
             Other
           </button>
@@ -140,17 +139,18 @@ function OutcomePicker({
                 fontSize: 10.5,
                 padding: "3px 8px",
                 borderRadius: 5,
-                border: "1.5px solid #8e8e93",
+                border: "1px solid rgb(var(--line-strong))",
+                background: "rgb(var(--surface))",
                 outline: "none",
                 fontFamily: "inherit",
-                color: "#1c1c1e",
+                color: "rgb(var(--ink-1))",
                 width: 140,
               }}
             />
             <button
               onClick={pickOther}
               disabled={saving !== null || !otherText.trim()}
-              style={{ ...ghostPill, border: "1.5px solid #007aff", color: "#007aff", opacity: !otherText.trim() ? 0.4 : 1 }}
+              className={`bg-signal text-paper rounded-pill px-2.5 h-6 text-[11px] font-semibold transition-opacity duration-2 ease-wm ${!otherText.trim() ? "opacity-30" : "opacity-100"}`}
             >
               {saving === "Other" ? "Saving…" : "Save"}
             </button>
@@ -189,22 +189,42 @@ function awaitingDebrief(call: Call | null | undefined): boolean {
   return Date.now() - started < DEBRIEF_WINDOW_MS;
 }
 
-export default function FlightLogTab({ calls, initialCall, onInitialCallConsumed, initialCallId, onInitialCallIdConsumed, userId, isActive = false, isPendingOutcome = false }: Props) {
+export default function FlightLogTab({ calls: callsProp, initialCall, onInitialCallConsumed, initialCallId, onInitialCallIdConsumed, userId, isActive = false, isPendingOutcome = false, onQuotaReported }: Props) {
   const router = useRouter();
+  const {
+    setSessionOutcome, applySessionOutcomes,
+    transcripts, setTranscript, noDebriefIds, markNoDebrief,
+  } = useCoachContext();
+  // Overlay this session's confirmations ONCE, here, so every consumer below —
+  // the list, the header count, the detail view and the coach payload — reads the
+  // same rows. Previously each did its own `localOutcomes[id] ?? …` lookup.
+  const calls = useMemo(() => applySessionOutcomes(callsProp), [callsProp, applySessionOutcomes]);
   const [selectedCall, setSelectedCall] = useState<Call | null>(initialCall);
+  // The overlay has to reach the fallback row too — see the note where it is used.
+  const selectedCallOverlaid = useMemo(
+    () => (selectedCall ? applySessionOutcomes([selectedCall])[0] : null),
+    [selectedCall, applySessionOutcomes]
+  );
   const [activeDetailTab, setActiveDetailTab] = useState<"debrief" | "transcript">("debrief");
-  // Tracks outcomes set inline (without a full page reload)
-  const [localOutcomes, setLocalOutcomes] = useState<Record<string, string>>({});
+
+  // Opening a call (or going back to the list) replaces the page body but leaves the
+  // window scrolled where it was — click a call from far down the list and the detail
+  // view opens somewhere in its middle. Keyed on the id so it fires for open, back,
+  // AND the HUD "View call →" deep-link, which sets selectedCall without a click.
+  useEffect(() => {
+    window.scrollTo({ top: 0 });
+  }, [selectedCall?.id]);
   const [editingOutcomes, setEditingOutcomes] = useState<Record<string, boolean>>({});
   const [hoveredCallId, setHoveredCallId] = useState<string | null>(null);
 
   const handleOutcomeSaved = (callId: string, outcome: string) => {
-    setLocalOutcomes((prev) => ({ ...prev, [callId]: outcome }));
+    setSessionOutcome(callId, outcome);
     setEditingOutcomes((prev) => ({ ...prev, [callId]: false }));
   };
 
-  // Helper: effective outcome for a call (local override wins)
-  const effectiveOutcome = (call: Call) => localOutcomes[call.id] ?? call.outcome;
+  // `calls` already carries this session's confirmations (applySessionOutcomes runs
+  // on the prop below), so the old `localOutcomes[id] ?? …` reads are now just reads.
+  const effectiveOutcome = (call: Call) => call.outcome;
   type GlobalMessage = { role: "user" | "assistant"; text: string; timestamp?: number };
 
   const [chatMessages, setChatMessages] = useState<Array<{ role: "user" | "assistant"; text: string }>>([]);
@@ -265,16 +285,12 @@ export default function FlightLogTab({ calls, initialCall, onInitialCallConsumed
   // tail of the call. A provisional entry is refetched once the call's summary lands
   // (the debrief only exists after the transcript is fully written) — whether the
   // rep kept the call open (detail poll refresh) or closed and reopened it later.
-  const [transcriptCache, setTranscriptCache] = useState<Record<string, { rows: TranscriptLine[]; provisional: boolean }>>({});
   const [transcriptLoadingId, setTranscriptLoadingId] = useState<string | null>(null);
-  // Calls the server has confirmed will never get a debrief (no transcript captured).
-  // Server-confirmed, so it beats awaitingDebrief's time-based guess immediately.
-  const [noDebriefIds, setNoDebriefIds] = useState<Set<string>>(() => new Set());
   useEffect(() => {
     const id = selectedCall?.id;
     if (!id) return;
     const fresh = calls.find((c) => c.id === id) ?? selectedCall;
-    const entry = transcriptCache[id];
+    const entry = transcripts[id];
     // Skip when cached — unless the entry is provisional and the debrief has since
     // landed, which means the full transcript is now available.
     if (entry && !(entry.provisional && fresh?.summary)) return;
@@ -286,10 +302,7 @@ export default function FlightLogTab({ calls, initialCall, onInitialCallConsumed
         if (!res.ok) return;  // keep "No transcript available." — never a stuck spinner
         const body = (await res.json()) as { transcript?: TranscriptLine[] };
         if (!cancelled) {
-          setTranscriptCache((prev) => ({
-            ...prev,
-            [id]: { rows: body.transcript ?? [], provisional: awaitingDebrief(fresh) },
-          }));
+          setTranscript(id, { rows: body.transcript ?? [], provisional: awaitingDebrief(fresh) });
         }
       } catch {
         // Network hiccup → fall through to the empty state; reopening retries.
@@ -298,9 +311,9 @@ export default function FlightLogTab({ calls, initialCall, onInitialCallConsumed
       }
     })();
     return () => { cancelled = true; };
-    // transcriptCache in deps is what re-arms the provisional refetch; the write
+    // `transcripts` in deps is what re-arms the provisional refetch; the write
     // inside is loop-safe because the guard above skips every settled entry.
-  }, [selectedCall, calls, transcriptCache]);
+  }, [selectedCall, calls, transcripts, setTranscript]);
 
   // While an open call has no debrief yet, poll for it so the skeleton fills in
   // even when the parent isn't already polling (e.g. a deep-link opened later).
@@ -347,7 +360,7 @@ export default function FlightLogTab({ calls, initialCall, onInitialCallConsumed
           // Zero rows, and long enough after the call that no save is still landing →
           // swap the skeleton for the honest note instead of spinning to the 6-min cap.
           clearInterval(iv);
-          setNoDebriefIds((prev) => (prev.has(id) ? prev : new Set(prev).add(id)));
+          markNoDebrief(id);
         }
       } catch {
         // Poll tick lost to a network blip — the next tick retries.
@@ -490,6 +503,13 @@ export default function FlightLogTab({ calls, initialCall, onInitialCallConsumed
       const res  = await fetchPromise;
       const data = await res.json();
 
+      // These two surfaces burn the SAME daily quota as the Home Coach but never
+      // reported it, so the sidebar showed full headroom while the server counted
+      // down — the rep hit a surprise 429. PR 4 deletes both; until then, report.
+      if (typeof data.messagesUsedToday === "number") {
+        onQuotaReported?.(data.messagesUsedToday, typeof data.quotaDay === "string" ? data.quotaDay : undefined);
+      }
+
       if (data.limitReached) {
         setGlobalMessages((prev) => [...prev, { role: "assistant", text: "You've hit today's coaching limit. Come back tomorrow — or upgrade to Pro for unlimited sessions.", timestamp: Date.now() }]);
         setGlobalLoading(false);
@@ -576,24 +596,11 @@ export default function FlightLogTab({ calls, initialCall, onInitialCallConsumed
     // query) — but the single_call coach builds its TRANSCRIPT block from this
     // payload. Graft the on-open fetch back in, or Wingman silently coaches from
     // the summary alone.
-    const cached = transcriptCache[call.id];
-    const rows = cached?.rows ?? call.call_transcript ?? [];
-    const callWithTranscript: Call = { ...call, call_transcript: rows };
-
-    // Tell the coach what we actually KNOW, because an empty array is ambiguous now
-    // that list rows don't carry transcripts. "empty" is a proven absence — a settled
-    // (non-provisional) fetch that returned zero rows. A provisional entry was fetched
-    // while the call was still being written, so its emptiness proves nothing yet.
-    // noDebriefIds is SERVER-confirmed zero rows past the grace window — strictly
-    // stronger proof than a settled cache entry, and the only proof available on this
-    // exact path: a no-transcript call never gets a summary, so its cache entry stays
-    // provisional forever. Without it the UI would show "no transcript was captured"
-    // while the coach said "it may still be saving — try reopening", on the primary
-    // scenario this whole feature exists for.
-    const transcriptStatus: "present" | "empty" | "unknown" =
-      rows.length ? "present"
-      : (cached && !cached.provisional) || noDebriefIds.has(call.id) ? "empty"
-      : "unknown";
+    // ONE builder, shared with the Coach bar from PR 4 — two callers producing two
+    // slightly different payloads for the same call is a guaranteed prompt-cache miss
+    // AND two different truths about that call.
+    const { call: callWithTranscript, transcriptStatus } =
+      buildSingleCallPayload(call, transcripts[call.id], noDebriefIds);
 
     // Kick off API immediately — hold typing indicator 2s so it looks like Wingman is reading
     const fetchPromise = fetch("/api/ai/chat", {
@@ -608,6 +615,14 @@ export default function FlightLogTab({ calls, initialCall, onInitialCallConsumed
     try {
       const res = await fetchPromise;
       const data = await res.json();
+
+      // These two surfaces burn the SAME daily quota as the Home Coach but never
+      // reported it, so the sidebar showed full headroom while the server counted
+      // down — the rep hit a surprise 429. PR 4 deletes both; until then, report.
+      if (typeof data.messagesUsedToday === "number") {
+        onQuotaReported?.(data.messagesUsedToday, typeof data.quotaDay === "string" ? data.quotaDay : undefined);
+      }
+
       if (data.limitReached) {
         setChatMessages((prev) => [...prev, { role: "assistant", text: "You've hit today's coaching limit. Come back tomorrow — or upgrade to Pro for unlimited sessions.", timestamp: Date.now() }]);
       } else {
@@ -634,11 +649,17 @@ export default function FlightLogTab({ calls, initialCall, onInitialCallConsumed
     // post-call job lands (router.refresh updates `calls`). `selectedCall` is only
     // the identity anchor + fallback for a deep-linked row not yet loaded. Reading
     // the frozen snapshot here would leave the skeleton stuck forever (SEV-5).
-    const call = calls.find((c) => c.id === selectedCall.id) ?? selectedCall;
+    // `selectedCallOverlaid`, not raw `selectedCall`: on the HUD deep-link path this
+    // fallback is a SYNTHETIC row (outcome: null) for a call not yet in `calls`, so a
+    // confirmation made right here would be applied to the shared map and then read
+    // straight past — the picker would re-render as "LOG OUTCOME" as if the click
+    // never happened, and the rep would click again. The old code was immune because
+    // it read `localOutcomes[id] ?? call.outcome` at every site.
+    const call = calls.find((c) => c.id === selectedCall.id) ?? selectedCallOverlaid!;
     const stages = call.call_stages || [];
     // Cache first (the on-open fetch), then any transcript already on the row
     // (e.g. a snapshot passed via initialCall) as a fallback.
-    const transcript = transcriptCache[call.id]?.rows ?? call.call_transcript ?? [];
+    const transcript = transcripts[call.id]?.rows ?? call.call_transcript ?? [];
     const transcriptLoading = transcriptLoadingId === call.id && transcript.length === 0;
     // Debrief still in flight → Granola-style skeleton that fills in. An OLD call with
     // no summary never got one (no transcript / failed job) and gets a plain note
@@ -649,70 +670,62 @@ export default function FlightLogTab({ calls, initialCall, onInitialCallConsumed
     return (
       <div style={{ maxWidth: 640, margin: "0 auto" }}>
         <button onClick={() => { setSelectedCall(null); setChatMessages([]); setActiveDetailTab("debrief"); }}
-          style={{ background: "none", border: "none", color: "#8e8e93", fontSize: 13, fontFamily: "inherit", fontWeight: 500, marginBottom: 20, padding: 0, display: "flex", alignItems: "center", gap: 5, cursor: "pointer" }}>
+          style={{ background: "none", border: "none", color: "rgb(var(--ink-2))", fontSize: 13, fontFamily: "inherit", fontWeight: 500, marginBottom: 20, padding: 0, display: "flex", alignItems: "center", gap: 5, cursor: "pointer" }}>
           ← All Calls
         </button>
 
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20 }}>
           <div>
-            <div style={{ fontSize: 22, fontWeight: 700, color: "#1c1c1e", letterSpacing: "-0.02em" }}>{call.prospect_name}</div>
-            <div style={{ fontSize: 13, color: "#8e8e93", marginTop: 3 }}>
+            <div style={{ fontSize: 22, fontWeight: 700, color: "rgb(var(--ink-1))", letterSpacing: "-0.02em" }}>{call.prospect_name}</div>
+            <div style={{ fontSize: 13, color: "rgb(var(--ink-2))", marginTop: 3 }}>
               {new Date(call.call_date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })} · {call.duration}
             </div>
           </div>
           {effectiveOutcome(call) && !editingOutcomes[call.id] ? (
-            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-              <OutcomeBadge outcome={effectiveOutcome(call)!} />
-              {!localOutcomes[call.id] && call.outcome_source === "auto" && (
-                <span title="Auto-detected by Wingman — confirm or change it"
-                  style={{ fontSize: 9.5, fontWeight: 700, letterSpacing: "0.05em", color: "#8e8e93", background: "#f2f2f7", borderRadius: 5, padding: "2px 5px", textTransform: "uppercase" }}>
-                  auto
-                </span>
-              )}
-              <button onClick={() => setEditingOutcomes((prev) => ({ ...prev, [call.id]: true }))}
-                style={{ fontSize: 10, color: "#007aff", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", padding: "2px 6px" }}>
-                {!localOutcomes[call.id] && call.outcome_source === "auto" ? "Confirm" : "Edit"}
-              </button>
-            </div>
+            <OutcomeControl
+              outcome={effectiveOutcome(call)!}
+              isAuto={call.outcome_source === "auto"}
+              onEdit={() => setEditingOutcomes((prev) => ({ ...prev, [call.id]: true }))}
+            />
           ) : (
             <OutcomePicker callId={call.id} onSaved={handleOutcomeSaved} />
           )}
         </div>
 
         {call.summary && (
-          <div style={{ background: "#fff", borderRadius: 14, padding: "16px 18px", marginBottom: 20, boxShadow: "0 1px 4px rgba(0,0,0,0.06)", border: "1px solid rgba(0,0,0,0.06)" }}>
-            <div style={{ fontSize: 11, fontWeight: 600, color: "#8e8e93", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.06em" }}>AI Debrief</div>
-            <div style={{ fontSize: 13.5, color: "#1c1c1e", lineHeight: 1.6 }}>{call.summary}</div>
+          <div style={{ background: "rgb(var(--surface))", borderRadius: 14, padding: "16px 18px", marginBottom: 20, boxShadow: "var(--e-sm)", border: "1px solid rgb(var(--line))" }}>
+            <div style={{ fontSize: 11, fontWeight: 600, color: "rgb(var(--ink-2))", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.06em" }}>AI Debrief</div>
+            <div style={{ fontSize: 13.5, color: "rgb(var(--ink-1))", lineHeight: 1.6 }}>{call.summary}</div>
           </div>
         )}
 
         {/* Loading skeleton — the debrief hasn't landed yet. Fills in via the
             self-refresh poll above; each section appears as its data arrives. */}
         {debriefPending && (
-          <div style={{ background: "#fff", borderRadius: 14, padding: "16px 18px", marginBottom: 20, boxShadow: "0 1px 4px rgba(0,0,0,0.06)", border: "1px solid rgba(0,0,0,0.06)" }}>
+          <div style={{ background: "rgb(var(--surface))", borderRadius: 14, padding: "16px 18px", marginBottom: 20, boxShadow: "var(--e-sm)", border: "1px solid rgb(var(--line))" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
-              <div style={{ width: 7, height: 7, borderRadius: "50%", background: "#aeaeb2", animation: "livePulse 2s ease-in-out infinite", flexShrink: 0 }} />
-              <div style={{ fontSize: 11, fontWeight: 600, color: "#8e8e93", textTransform: "uppercase", letterSpacing: "0.06em" }}>Generating debrief…</div>
+              <div style={{ width: 7, height: 7, borderRadius: "50%", background: "rgb(var(--ink-3))", animation: "livePulse 2s ease-in-out infinite", flexShrink: 0 }} />
+              <div style={{ fontSize: 11, fontWeight: 600, color: "rgb(var(--ink-2))", textTransform: "uppercase", letterSpacing: "0.06em" }}>Generating debrief…</div>
             </div>
             {[100, 92, 78].map((w, i) => (
-              <div key={i} style={{ height: 11, width: `${w}%`, borderRadius: 5, background: "#e5e5ea", marginBottom: i < 2 ? 9 : 0, animation: "livePulse 2s ease-in-out infinite" }} />
+              <div key={i} style={{ height: 11, width: `${w}%`, borderRadius: 5, background: "rgb(var(--line))", marginBottom: i < 2 ? 9 : 0, animation: "livePulse 2s ease-in-out infinite" }} />
             ))}
           </div>
         )}
 
         {/* No debrief was ever generated for this call (no transcript captured). */}
         {debriefMissing && (
-          <div style={{ background: "#fff", borderRadius: 14, padding: "16px 18px", marginBottom: 20, boxShadow: "0 1px 4px rgba(0,0,0,0.06)", border: "1px solid rgba(0,0,0,0.06)" }}>
-            <div style={{ fontSize: 11, fontWeight: 600, color: "#8e8e93", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.06em" }}>AI Debrief</div>
-            <div style={{ fontSize: 13, color: "#8e8e93", lineHeight: 1.5 }}>No debrief for this call — no transcript was captured.</div>
+          <div style={{ background: "rgb(var(--surface))", borderRadius: 14, padding: "16px 18px", marginBottom: 20, boxShadow: "var(--e-sm)", border: "1px solid rgb(var(--line))" }}>
+            <div style={{ fontSize: 11, fontWeight: 600, color: "rgb(var(--ink-2))", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.06em" }}>AI Debrief</div>
+            <div style={{ fontSize: 13, color: "rgb(var(--ink-2))", lineHeight: 1.5 }}>No debrief for this call — no transcript was captured.</div>
           </div>
         )}
 
         {/* Detail tabs */}
-        <div style={{ display: "flex", gap: 4, marginBottom: 16, background: "#e5e5ea", borderRadius: 10, padding: 4 }}>
+        <div style={{ display: "flex", gap: 4, marginBottom: 16, background: "rgb(var(--line))", borderRadius: 10, padding: 4 }}>
           {[{ id: "debrief", label: "Debrief" }, { id: "transcript", label: "Transcript" }].map((t) => (
             <button key={t.id} onClick={() => setActiveDetailTab(t.id as "debrief" | "transcript")}
-              style={{ flex: 1, padding: "7px 0", borderRadius: 7, border: "none", fontFamily: "inherit", fontSize: 12, fontWeight: 600, cursor: "pointer", background: activeDetailTab === t.id ? "#fff" : "transparent", color: activeDetailTab === t.id ? "#1c1c1e" : "#8e8e93", boxShadow: activeDetailTab === t.id ? "0 1px 4px rgba(0,0,0,0.08)" : "none", transition: "all 0.18s" }}>
+              style={{ flex: 1, padding: "7px 0", borderRadius: 7, border: "none", fontFamily: "inherit", fontSize: 12, fontWeight: 600, cursor: "pointer", background: activeDetailTab === t.id ? "rgb(var(--surface))" : "transparent", color: activeDetailTab === t.id ? "rgb(var(--ink-1))" : "rgb(var(--ink-2))", boxShadow: activeDetailTab === t.id ? "var(--e-sm)" : "none", transition: "all 0.18s" }}>
               {t.label}
             </button>
           ))}
@@ -729,23 +742,23 @@ export default function FlightLogTab({ calls, initialCall, onInitialCallConsumed
                 const lostStage = s.status === "lost";
                 return (
                   <div key={s.id} style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                    <div style={{ width: 22, height: 22, borderRadius: "50%", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, background: done ? "#34c759" : skip ? "#e5e5ea" : early ? "#fff3cd" : lostStage ? "#fff0f0" : "#e5e5ea", color: done ? "#fff" : skip ? "#8e8e93" : early ? "#856404" : lostStage ? "#ff3b30" : "#8e8e93", border: done ? "none" : `1.5px solid ${skip ? "#e5e5ea" : early ? "#ffc107" : lostStage ? "#ff3b30" : "#e5e5ea"}` }}>
+                    <div style={{ width: 22, height: 22, borderRadius: "50%", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, background: done ? "rgb(var(--positive))" : skip ? "rgb(var(--line))" : early ? "rgb(var(--warning-weak))" : lostStage ? "rgb(var(--critical-weak))" : "rgb(var(--line))", color: done ? "rgb(var(--surface))" : skip ? "rgb(var(--ink-2))" : early ? "rgb(var(--warning))" : lostStage ? "rgb(var(--critical))" : "rgb(var(--ink-2))", border: done ? "none" : `1.5px solid ${skip ? "rgb(var(--line))" : early ? "rgb(var(--warning))" : lostStage ? "rgb(var(--critical))" : "rgb(var(--line))"}` }}>
                       {done ? "✓" : skip ? "—" : early ? "!" : lostStage ? "✗" : "○"}
                     </div>
                     <div style={{ flex: 1 }}>
-                      <span style={{ fontSize: 13, fontWeight: 600, color: "#1c1c1e" }}>{s.name}</span>
-                      <span style={{ fontSize: 12, color: "#8e8e93", marginLeft: 8 }}>{s.note}</span>
+                      <span style={{ fontSize: 13, fontWeight: 600, color: "rgb(var(--ink-1))" }}>{s.name}</span>
+                      <span style={{ fontSize: 12, color: "rgb(var(--ink-2))", marginLeft: 8 }}>{s.note}</span>
                     </div>
                   </div>
                 );
               })}
             </div>
             {call.missed_topics && call.missed_topics.length > 0 && (
-              <div style={{ marginTop: 18, paddingTop: 16, borderTop: "1px solid rgba(0,0,0,0.06)" }}>
+              <div style={{ marginTop: 18, paddingTop: 16, borderTop: "1px solid rgb(var(--line))" }}>
                 <SectionLabel>Topics Missed Before Pitch</SectionLabel>
                 <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                   {call.missed_topics.map((m) => (
-                    <div key={m} style={{ fontSize: 11.5, color: "#ff3b30", background: "#fff0f0", borderRadius: 6, padding: "4px 10px", fontWeight: 500 }}>{m}</div>
+                    <div key={m} style={{ fontSize: 11.5, color: "rgb(var(--critical))", background: "rgb(var(--critical-weak))", borderRadius: 6, padding: "4px 10px", fontWeight: 500 }}>{m}</div>
                   ))}
                 </div>
               </div>
@@ -759,8 +772,8 @@ export default function FlightLogTab({ calls, initialCall, onInitialCallConsumed
           return (
             <Card style={{ marginTop: 12 }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
-                <SectionLabel className="!mb-0">Framework Coverage</SectionLabel>
-                <div style={{ fontSize: 11.5, fontWeight: 600, color: coveredCount >= 6 ? "#34c759" : coveredCount >= 4 ? "#ff9500" : "#ff3b30" }}>
+                <SectionLabel className="mb-0!">Framework Coverage</SectionLabel>
+                <div style={{ fontSize: 11.5, fontWeight: 600, color: coveredCount >= 6 ? "rgb(var(--positive))" : coveredCount >= 4 ? "rgb(var(--warning))" : "rgb(var(--critical))" }}>
                   {coveredCount}/{PILLAR_DISPLAY.length}
                 </div>
               </div>
@@ -771,15 +784,15 @@ export default function FlightLogTab({ calls, initialCall, onInitialCallConsumed
                   const evidence = result?.evidence ?? null;
                   return (
                     <div key={key} style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
-                      <div style={{ width: 20, height: 20, borderRadius: "50%", flexShrink: 0, marginTop: 1, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 700, background: covered ? "#34c759" : "#e5e5ea", color: covered ? "#fff" : "#aeaeb2" }}>
+                      <div style={{ width: 20, height: 20, borderRadius: "50%", flexShrink: 0, marginTop: 1, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 700, background: covered ? "rgb(var(--positive))" : "rgb(var(--line))", color: covered ? "rgb(var(--surface))" : "rgb(var(--ink-3))" }}>
                         {covered ? "✓" : "—"}
                       </div>
                       <div style={{ flex: 1 }}>
-                        <div style={{ fontSize: 13, fontWeight: 600, color: covered ? "#1c1c1e" : "#aeaeb2" }}>{label}</div>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: covered ? "rgb(var(--ink-1))" : "rgb(var(--ink-3))" }}>{label}</div>
                         {covered && evidence ? (
-                          <div style={{ fontSize: 11.5, color: "#8e8e93", marginTop: 2, lineHeight: 1.45, fontStyle: "italic" }}>"{evidence}"</div>
+                          <div style={{ fontSize: 11.5, color: "rgb(var(--ink-2))", marginTop: 2, lineHeight: 1.45, fontStyle: "italic" }}>"{evidence}"</div>
                         ) : !covered ? (
-                          <div style={{ fontSize: 11.5, color: "#c7c7cc", marginTop: 2 }}>{description}</div>
+                          <div style={{ fontSize: 11.5, color: "rgb(var(--line-strong))", marginTop: 2 }}>{description}</div>
                         ) : null}
                       </div>
                     </div>
@@ -792,17 +805,31 @@ export default function FlightLogTab({ calls, initialCall, onInitialCallConsumed
 
         {activeDetailTab === "transcript" && (
           <Card>
-            <SectionLabel>Transcript</SectionLabel>
+            {/* SectionLabel carries its own bottom margin, so the row zeroes it out
+                and owns the spacing — otherwise the copy button sits 14px high. */}
+            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, marginBottom: 14 }}>
+              <SectionLabel className="mb-0">Transcript</SectionLabel>
+              {transcript.length > 0 && (
+                <CopyButton
+                  getText={() =>
+                    [...transcript]
+                      .sort((a, b) => a.sequence_order - b.sequence_order)
+                      .map((l) => `${l.speaker}: ${l.text}`)
+                      .join("\n")
+                  }
+                />
+              )}
+            </div>
             {transcriptLoading ? (
-              <div style={{ fontSize: 13, color: "#8e8e93" }}>Loading transcript…</div>
+              <div style={{ fontSize: 13, color: "rgb(var(--ink-2))" }}>Loading transcript…</div>
             ) : transcript.length === 0 ? (
-              <div style={{ fontSize: 13, color: "#8e8e93" }}>No transcript available.</div>
+              <div style={{ fontSize: 13, color: "rgb(var(--ink-2))" }}>No transcript available.</div>
             ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
                 {[...transcript].sort((a, b) => a.sequence_order - b.sequence_order).map((line) => (
                   <div key={line.id} style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
-                    <div style={{ fontSize: 11, fontWeight: 600, color: line.speaker === "You" ? "#1c1c1e" : "#8e8e93", flexShrink: 0, marginTop: 2, minWidth: 60, textAlign: "right" }}>{line.speaker}</div>
-                    <div style={{ fontSize: 13, color: "#1c1c1e", lineHeight: 1.5, background: line.speaker === "You" ? "#e5e5ea" : "transparent", borderRadius: 8, padding: line.speaker === "You" ? "6px 10px" : "0", flex: 1 }}>{line.text}</div>
+                    <div style={{ fontSize: 11, fontWeight: 600, color: line.speaker === "You" ? "rgb(var(--ink-1))" : "rgb(var(--ink-2))", flexShrink: 0, marginTop: 2, minWidth: 60, textAlign: "right" }}>{line.speaker}</div>
+                    <div style={{ fontSize: 13, color: "rgb(var(--ink-1))", lineHeight: 1.5, background: line.speaker === "You" ? "rgb(var(--line))" : "transparent", borderRadius: 8, padding: line.speaker === "You" ? "6px 10px" : "0", flex: 1 }}>{line.text}</div>
                   </div>
                 ))}
               </div>
@@ -813,13 +840,13 @@ export default function FlightLogTab({ calls, initialCall, onInitialCallConsumed
         {/* Ask Wingman about this call */}
         <Card style={{ marginTop: 12 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
-            <div style={{ width: 7, height: 7, borderRadius: "50%", background: "#34c759", boxShadow: "0 0 6px rgba(52,199,89,0.5)", flexShrink: 0 }} />
-            <div style={{ fontSize: 11, fontWeight: 600, color: "#8e8e93", textTransform: "uppercase", letterSpacing: "0.06em" }}>Ask Wingman — About This Call</div>
+            <div style={{ width: 7, height: 7, borderRadius: "50%", background: "rgb(var(--positive))", boxShadow: "0 0 6px rgb(var(--positive) / 0.5)", flexShrink: 0 }} />
+            <div style={{ fontSize: 11, fontWeight: 600, color: "rgb(var(--ink-2))", textTransform: "uppercase", letterSpacing: "0.06em" }}>Ask Wingman — About This Call</div>
           </div>
           {chatMessages.length === 0 && (
             <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 12 }}>
               {["What did I do well?", "What was my biggest missed opportunity?", "What's the one thing to fix on my next call?"].map((q) => (
-                <button key={q} onClick={() => sendCallMessage(q, call)} style={{ fontSize: 11.5, color: "#1c1c1e", background: "#e5e5ea", border: "none", borderRadius: 7, padding: "6px 11px", fontFamily: "inherit", fontWeight: 500, cursor: "pointer" }}>{q}</button>
+                <button key={q} onClick={() => sendCallMessage(q, call)} style={{ fontSize: 11.5, color: "rgb(var(--ink-1))", background: "rgb(var(--line))", border: "none", borderRadius: 7, padding: "6px 11px", fontFamily: "inherit", fontWeight: 500, cursor: "pointer" }}>{q}</button>
               ))}
             </div>
           )}
@@ -828,11 +855,11 @@ export default function FlightLogTab({ calls, initialCall, onInitialCallConsumed
               {chatMessages.map((m, i) =>
                 m.role === "assistant"
                   ? m.text.split("\n\n").filter(Boolean).map((chunk, ci) => (
-                      <div key={`${i}-${ci}`} style={{ alignSelf: "flex-start", maxWidth: "88%", background: "#e5e5ea", color: "#1c1c1e", borderRadius: "12px 12px 12px 3px", padding: "9px 13px", fontSize: 13, lineHeight: 1.5 }}>{chunk}</div>
+                      <div key={`${i}-${ci}`} style={{ alignSelf: "flex-start", maxWidth: "88%", background: "rgb(var(--line))", color: "rgb(var(--ink-1))", borderRadius: "12px 12px 12px 3px", padding: "9px 13px", fontSize: 13, lineHeight: 1.5 }}>{chunk}</div>
                     ))
-                  : <div key={i} style={{ alignSelf: "flex-end", maxWidth: "88%", background: "#1c1c1e", color: "#fff", borderRadius: "12px 12px 3px 12px", padding: "9px 13px", fontSize: 13, lineHeight: 1.5 }}>{m.text}</div>
+                  : <div key={i} style={{ alignSelf: "flex-end", maxWidth: "88%", background: "rgb(var(--ink-1))", color: "rgb(var(--surface))", borderRadius: "12px 12px 3px 12px", padding: "9px 13px", fontSize: 13, lineHeight: 1.5 }}>{m.text}</div>
               )}
-              {chatLoading && !userIsTyping && <div style={{ alignSelf: "flex-start", background: "#e5e5ea", borderRadius: "12px 12px 12px 3px", padding: "11px 14px", display: "flex", gap: 5, alignItems: "center" }}><span className="typing-dot" /><span className="typing-dot" /><span className="typing-dot" /></div>}
+              {chatLoading && !userIsTyping && <div style={{ alignSelf: "flex-start", background: "rgb(var(--line))", borderRadius: "12px 12px 12px 3px", padding: "11px 14px", display: "flex", gap: 5, alignItems: "center" }}><span className="typing-dot" /><span className="typing-dot" /><span className="typing-dot" /></div>}
               <div ref={chatEndRef} />
             </div>
           )}
@@ -851,9 +878,9 @@ export default function FlightLogTab({ calls, initialCall, onInitialCallConsumed
               }}
               onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendCallMessage(chatInput, call); } }}
               placeholder="Ask anything about this call…"
-              style={{ flex: 1, background: "#e5e5ea", border: "none", borderRadius: 9, padding: "11px 14px", color: "#1c1c1e", fontSize: 13, fontFamily: "inherit", outline: "none", resize: "none", overflow: "auto", lineHeight: 1.4, boxSizing: "border-box" }}
+              style={{ flex: 1, background: "rgb(var(--line))", border: "none", borderRadius: 9, padding: "11px 14px", color: "rgb(var(--ink-1))", fontSize: 13, fontFamily: "inherit", outline: "none", resize: "none", overflow: "auto", lineHeight: 1.4, boxSizing: "border-box" }}
             />
-            <button onClick={() => sendCallMessage(chatInput, call)} style={{ padding: "11px 18px", background: "#1c1c1e", borderRadius: 9, color: "#fff", fontSize: 12, fontFamily: "inherit", fontWeight: 600, border: "none", cursor: "pointer", alignSelf: "flex-end" }}>Ask</button>
+            <button onClick={() => sendCallMessage(chatInput, call)} style={{ padding: "11px 18px", background: "rgb(var(--ink-1))", borderRadius: 9, color: "rgb(var(--surface))", fontSize: 12, fontFamily: "inherit", fontWeight: 600, border: "none", cursor: "pointer", alignSelf: "flex-end" }}>Ask</button>
           </div>
         </Card>
       </div>
@@ -863,44 +890,44 @@ export default function FlightLogTab({ calls, initialCall, onInitialCallConsumed
   // Call list view. Close-rate counts only CONFIRMED outcomes — an AI auto-mark
   // (outcome_source='auto') is excluded until the rep confirms it, and a local
   // pick made this session counts immediately (it's a manual confirmation).
-  const listOutcome = (c: Call): string | null => localOutcomes[c.id] ?? confirmedOutcome(c);
+  const listOutcome = (c: Call): string | null => confirmedOutcome(c);
   const wins = calls.filter((c) => listOutcome(c) === "Closed").length;
   const qualifying = calls.filter((c) => listOutcome(c) !== "DQ").length;
 
   return (
     <div style={{ maxWidth: 600, margin: "0 auto" }}>
       <div style={{ marginBottom: 24 }}>
-        <div style={{ fontSize: 22, fontWeight: 700, color: "#1c1c1e", letterSpacing: "-0.02em" }}>Flight Log</div>
-        <div style={{ fontSize: 14, color: "#8e8e93", marginTop: 3 }}>Every call. Every transcript. All yours.</div>
+        <div style={{ fontSize: 22, fontWeight: 700, color: "rgb(var(--ink-1))", letterSpacing: "-0.02em" }}>Flight Log</div>
+        <div style={{ fontSize: 14, color: "rgb(var(--ink-2))", marginTop: 3 }}>Every call. Every transcript. All yours.</div>
       </div>
 
       {/* Mission Intel — entry point, opens modal */}
       <Card style={{ marginBottom: 14 }}>
         <div style={{ marginBottom: 10 }}>
-          <SectionLabel className="!mb-0">Mission Intel — Ask Your Wingman</SectionLabel>
+          <SectionLabel className="mb-0!">Mission Intel — Ask Your Wingman</SectionLabel>
         </div>
 
         {/* Quick-send buttons — always visible */}
         <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 12 }}>
           {["Where do I lose most deals?", "What's my top objection?", "What works on wins?"].map((q) => (
-            <button key={q} onClick={() => { setModalOpen(true); sendGlobalMessage(q); }} style={{ fontSize: 11.5, color: "#1c1c1e", background: "#e5e5ea", border: "none", borderRadius: 7, padding: "6px 11px", fontFamily: "inherit", fontWeight: 500, cursor: "pointer" }}>{q}</button>
+            <button key={q} onClick={() => { setModalOpen(true); sendGlobalMessage(q); }} style={{ fontSize: 11.5, color: "rgb(var(--ink-1))", background: "rgb(var(--line))", border: "none", borderRadius: 7, padding: "6px 11px", fontFamily: "inherit", fontWeight: 500, cursor: "pointer" }}>{q}</button>
           ))}
         </div>
 
         {/* Chat thread entry point */}
         <button
           onClick={() => setModalOpen(true)}
-          style={{ display: "flex", alignItems: "center", gap: 12, width: "100%", background: "#f5f5f7", border: "none", borderRadius: 12, padding: "10px 12px", cursor: "pointer", textAlign: "left" }}
+          style={{ display: "flex", alignItems: "center", gap: 12, width: "100%", background: "rgb(var(--surface-sunken))", border: "none", borderRadius: 12, padding: "10px 12px", cursor: "pointer", textAlign: "left" }}
         >
           {/* Avatar */}
-          <div style={{ width: 40, height: 40, borderRadius: "50%", background: "#1c1c1e", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, position: "relative" }}>
-            <span style={{ color: "#fff", fontSize: 15, fontWeight: 700, fontFamily: "inherit" }}>W</span>
-            <div style={{ position: "absolute", bottom: 1, right: 1, width: 9, height: 9, borderRadius: "50%", background: "#34c759", border: "1.5px solid #f5f5f7" }} />
+          <div style={{ width: 40, height: 40, borderRadius: "50%", background: "rgb(var(--ink-1))", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, position: "relative" }}>
+            <span style={{ color: "rgb(var(--surface))", fontSize: 15, fontWeight: 700, fontFamily: "inherit" }}>W</span>
+            <div style={{ position: "absolute", bottom: 1, right: 1, width: 9, height: 9, borderRadius: "50%", background: "rgb(var(--positive))", border: "1.5px solid rgb(var(--surface-sunken))" }} />
           </div>
           {/* Name + preview */}
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 13.5, fontWeight: 700, color: "#1c1c1e", marginBottom: 2, fontFamily: "inherit" }}>Wingman</div>
-            <div style={{ fontSize: 12.5, color: "#8e8e93", overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis", fontFamily: "inherit" }}>
+            <div style={{ fontSize: 13.5, fontWeight: 700, color: "rgb(var(--ink-1))", marginBottom: 2, fontFamily: "inherit" }}>Wingman</div>
+            <div style={{ fontSize: 12.5, color: "rgb(var(--ink-2))", overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis", fontFamily: "inherit" }}>
               {globalMessages.length > 0
                 ? (() => {
                     const last = [...globalMessages].reverse().find(m => m.role === "assistant");
@@ -911,7 +938,7 @@ export default function FlightLogTab({ calls, initialCall, onInitialCallConsumed
             </div>
           </div>
           {/* CTA */}
-          <span style={{ fontSize: 12, color: "#007aff", fontWeight: 600, whiteSpace: "nowrap", flexShrink: 0, fontFamily: "inherit" }}>
+          <span style={{ fontSize: 12, color: "rgb(var(--signal))", fontWeight: 600, whiteSpace: "nowrap", flexShrink: 0, fontFamily: "inherit" }}>
             {globalMessages.length > 0 ? "Continue →" : "Open →"}
           </span>
         </button>
@@ -920,44 +947,44 @@ export default function FlightLogTab({ calls, initialCall, onInitialCallConsumed
       {/* Call list */}
       <Card>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-          <SectionLabel className="!mb-0">All Calls — {calls.length}</SectionLabel>
-          <div style={{ fontSize: 11.5, color: "#8e8e93", fontWeight: 500 }}>{wins}/{qualifying} closed</div>
+          <SectionLabel className="mb-0!">All Calls — {calls.length}</SectionLabel>
+          <div style={{ fontSize: 11.5, color: "rgb(var(--ink-2))", fontWeight: 500 }}>{wins}/{qualifying} closed</div>
         </div>
         {/* Live call skeleton — green dot, actively recording */}
         {isActive && (
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 8px", margin: "0 -8px", borderBottom: calls.length > 0 ? "1px solid rgba(0,0,0,0.06)" : "none", marginBottom: calls.length > 0 ? 14 : 0 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 8px", margin: "0 -8px", borderBottom: calls.length > 0 ? "1px solid rgb(var(--line))" : "none", marginBottom: calls.length > 0 ? 14 : 0 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 12, flex: 1 }}>
-              <div style={{ width: 34, height: 34, borderRadius: "50%", background: "#e5f7eb", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#34c759", animation: "livePulse 2s ease-in-out infinite" }} />
+              <div style={{ width: 34, height: 34, borderRadius: "50%", background: "rgb(var(--positive-weak))", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                <div style={{ width: 8, height: 8, borderRadius: "50%", background: "rgb(var(--positive))", animation: "livePulse 2s ease-in-out infinite" }} />
               </div>
               <div>
-                <div style={{ fontSize: 13.5, fontWeight: 600, color: "#1c1c1e" }}>Live Call in Progress…</div>
-                <div style={{ fontSize: 11.5, color: "#34c759", marginTop: 2, fontWeight: 500 }}>Recording now</div>
+                <div style={{ fontSize: 13.5, fontWeight: 600, color: "rgb(var(--ink-1))" }}>Live Call in Progress…</div>
+                <div style={{ fontSize: 11.5, color: "rgb(var(--positive))", marginTop: 2, fontWeight: 500 }}>Recording now</div>
               </div>
             </div>
-            <div style={{ width: 56, height: 22, borderRadius: 6, background: "#e5e5ea", animation: "livePulse 2s ease-in-out infinite" }} />
+            <div style={{ width: 56, height: 22, borderRadius: 6, background: "rgb(var(--line))", animation: "livePulse 2s ease-in-out infinite" }} />
           </div>
         )}
         {/* Processing skeleton — call ended, waiting for disposition */}
         {!isActive && isPendingOutcome && (
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 8px", margin: "0 -8px", borderBottom: calls.length > 0 ? "1px solid rgba(0,0,0,0.06)" : "none", marginBottom: calls.length > 0 ? 14 : 0 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 8px", margin: "0 -8px", borderBottom: calls.length > 0 ? "1px solid rgb(var(--line))" : "none", marginBottom: calls.length > 0 ? 14 : 0 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 12, flex: 1 }}>
-              <div style={{ width: 34, height: 34, borderRadius: "50%", background: "#f2f2f7", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#aeaeb2", animation: "livePulse 2s ease-in-out infinite" }} />
+              <div style={{ width: 34, height: 34, borderRadius: "50%", background: "rgb(var(--surface-sunken))", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                <div style={{ width: 8, height: 8, borderRadius: "50%", background: "rgb(var(--ink-3))", animation: "livePulse 2s ease-in-out infinite" }} />
               </div>
               <div>
-                <div style={{ fontSize: 13.5, fontWeight: 600, color: "#1c1c1e" }}>Processing call…</div>
-                <div style={{ fontSize: 11.5, color: "#8e8e93", marginTop: 2 }}>Waiting for outcome</div>
+                <div style={{ fontSize: 13.5, fontWeight: 600, color: "rgb(var(--ink-1))" }}>Processing call…</div>
+                <div style={{ fontSize: 11.5, color: "rgb(var(--ink-2))", marginTop: 2 }}>Waiting for outcome</div>
               </div>
             </div>
-            <div style={{ width: 56, height: 22, borderRadius: 6, background: "#e5e5ea", animation: "livePulse 2s ease-in-out infinite" }} />
+            <div style={{ width: 56, height: 22, borderRadius: 6, background: "rgb(var(--line))", animation: "livePulse 2s ease-in-out infinite" }} />
           </div>
         )}
         {!isActive && calls.length === 0 ? (
           <div style={{ textAlign: "center", padding: "40px 0" }}>
             <div style={{ fontSize: 32, marginBottom: 12 }}>🎙️</div>
-            <div style={{ fontSize: 15, fontWeight: 600, color: "#1c1c1e", marginBottom: 6 }}>No calls yet</div>
-            <div style={{ fontSize: 13, color: "#8e8e93" }}>Your calls will appear here after your first session with Wingman.</div>
+            <div style={{ fontSize: 15, fontWeight: 600, color: "rgb(var(--ink-1))", marginBottom: 6 }}>No calls yet</div>
+            <div style={{ fontSize: 13, color: "rgb(var(--ink-2))" }}>Your calls will appear here after your first session with Wingman.</div>
           </div>
         ) : calls.length > 0 ? (
           calls.map((call, i) => (
@@ -965,40 +992,26 @@ export default function FlightLogTab({ calls, initialCall, onInitialCallConsumed
               onClick={() => { setSelectedCall(call); setChatMessages([]); setChatInput(""); setActiveDetailTab("debrief"); }}
               onMouseEnter={() => setHoveredCallId(call.id)}
               onMouseLeave={() => setHoveredCallId(null)}
-              style={{ paddingBottom: i < calls.length - 1 ? 14 : 0, marginBottom: i < calls.length - 1 ? 14 : 0, borderBottom: i < calls.length - 1 ? "1px solid rgba(0,0,0,0.06)" : "none", cursor: "pointer", borderRadius: 8, padding: "10px 8px", margin: "0 -8px", background: hoveredCallId === call.id ? "#f5f5f7" : "transparent", transition: "background 0.15s" }}>
+              style={{ paddingBottom: i < calls.length - 1 ? 14 : 0, marginBottom: i < calls.length - 1 ? 14 : 0, borderBottom: i < calls.length - 1 ? "1px solid rgb(var(--line))" : "none", cursor: "pointer", borderRadius: 8, padding: "10px 8px", margin: "0 -8px", background: hoveredCallId === call.id ? "rgb(var(--surface-sunken))" : "transparent", transition: "background 0.15s" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 5 }}>
                 <div>
-                  <div style={{ fontSize: 13.5, fontWeight: 600, color: "#1c1c1e" }}>{call.prospect_name}</div>
-                  <div style={{ fontSize: 11.5, color: "#8e8e93", marginTop: 2 }}>
+                  <div style={{ fontSize: 13.5, fontWeight: 600, color: "rgb(var(--ink-1))" }}>{call.prospect_name}</div>
+                  <div style={{ fontSize: 11.5, color: "rgb(var(--ink-2))", marginTop: 2 }}>
                     {new Date(call.call_date).toLocaleDateString("en-US", { month: "short", day: "numeric" })} · {call.duration}
                   </div>
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                   {effectiveOutcome(call) && !editingOutcomes[call.id] && (
-                    <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
-                      <span style={{ fontSize: 10, color: "#8e8e93", fontWeight: 600, letterSpacing: "0.06em" }}>OUTCOME</span>
-                      <OutcomeBadge outcome={effectiveOutcome(call)!} />
-                      {!localOutcomes[call.id] && call.outcome_source === "auto" && (
-                        <span title="Auto-detected by Wingman — confirm or change it"
-                          style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.05em", color: "#8e8e93", background: "#f2f2f7", borderRadius: 5, padding: "2px 5px", textTransform: "uppercase" }}>
-                          auto
-                        </span>
-                      )}
-                      {hoveredCallId === call.id && (
-                        <button
-                          onClick={(e) => { e.stopPropagation(); setEditingOutcomes((prev) => ({ ...prev, [call.id]: true })); }}
-                          className="hover:bg-blue-100 rounded transition-colors"
-                          style={{ fontSize: 10, color: "#007aff", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", padding: "2px 6px" }}
-                        >
-                          {!localOutcomes[call.id] && call.outcome_source === "auto" ? "Confirm" : "Edit"}
-                        </button>
-                      )}
-                    </div>
+                    <OutcomeControl
+                      outcome={effectiveOutcome(call)!}
+                      isAuto={call.outcome_source === "auto"}
+                      onEdit={() => setEditingOutcomes((prev) => ({ ...prev, [call.id]: true }))}
+                    />
                   )}
-                  <span className="hover:bg-blue-100 rounded transition-colors" style={{ fontSize: 11.5, color: "#007aff", fontWeight: 600, whiteSpace: "nowrap", padding: "2px 6px", borderRadius: 6 }}>View →</span>
+                  <span className="text-signal font-semibold text-[11.5px] whitespace-nowrap px-1.5 py-0.5 rounded-control">View →</span>
                 </div>
               </div>
-              {call.summary && <div style={{ fontSize: 12, color: "#8e8e93", lineHeight: 1.4 }}>{call.summary}</div>}
+              {call.summary && <div style={{ fontSize: 12, color: "rgb(var(--ink-2))", lineHeight: 1.4 }}>{call.summary}</div>}
               {(!effectiveOutcome(call) || editingOutcomes[call.id]) && (
                 <OutcomePicker callId={call.id} onSaved={handleOutcomeSaved} />
               )}
@@ -1011,19 +1024,19 @@ export default function FlightLogTab({ calls, initialCall, onInitialCallConsumed
       {modalOpen && (
         <div
           onClick={() => { setModalOpen(false); setPendingCallSuggestion(null); setActiveSingleCall(null); singleCallHistoryRef.current = []; }}
-          style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(0,0,0,0.45)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}
+          style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgb(var(--scrim) / 0.45)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            style={{ background: "#fff", borderRadius: 18, width: 520, maxWidth: "100%", height: "82vh", display: "flex", flexDirection: "column", boxShadow: "0 24px 64px rgba(0,0,0,0.18)", overflow: "hidden" }}
+            style={{ background: "rgb(var(--surface))", borderRadius: 18, width: 520, maxWidth: "100%", height: "82vh", display: "flex", flexDirection: "column", boxShadow: "var(--e-lg)", overflow: "hidden" }}
           >
             {/* Header */}
-            <div style={{ padding: "16px 20px", borderBottom: "1px solid rgba(0,0,0,0.07)", display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0 }}>
+            <div style={{ padding: "16px 20px", borderBottom: "1px solid rgb(var(--line))", display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <div style={{ width: 7, height: 7, borderRadius: "50%", background: "#34c759", boxShadow: "0 0 6px rgba(52,199,89,0.5)", flexShrink: 0 }} />
-                <div style={{ fontSize: 13, fontWeight: 700, color: "#1c1c1e", letterSpacing: "-0.01em" }}>Mission Intel — Ask Your Wingman</div>
+                <div style={{ width: 7, height: 7, borderRadius: "50%", background: "rgb(var(--positive))", boxShadow: "0 0 6px rgb(var(--positive) / 0.5)", flexShrink: 0 }} />
+                <div style={{ fontSize: 13, fontWeight: 700, color: "rgb(var(--ink-1))", letterSpacing: "-0.01em" }}>Mission Intel — Ask Your Wingman</div>
               </div>
-              <button onClick={() => { setModalOpen(false); setPendingCallSuggestion(null); setActiveSingleCall(null); singleCallHistoryRef.current = []; }} style={{ background: "#e5e5ea", border: "none", borderRadius: "50%", width: 28, height: 28, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", fontSize: 13, color: "#8e8e93", fontFamily: "inherit", flexShrink: 0 }}>✕</button>
+              <button onClick={() => { setModalOpen(false); setPendingCallSuggestion(null); setActiveSingleCall(null); singleCallHistoryRef.current = []; }} style={{ background: "rgb(var(--line))", border: "none", borderRadius: "50%", width: 28, height: 28, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", fontSize: 13, color: "rgb(var(--ink-2))", fontFamily: "inherit", flexShrink: 0 }}>✕</button>
             </div>
 
             {/* Messages */}
@@ -1032,12 +1045,12 @@ export default function FlightLogTab({ calls, initialCall, onInitialCallConsumed
               <div style={{ flex: 1 }} />
               {globalMessages.length === 0 && (
                 <div style={{ textAlign: "center", padding: "32px 0" }}>
-                  <div style={{ fontSize: 13, color: "#8e8e93", lineHeight: 1.6, marginBottom: 16 }}>
+                  <div style={{ fontSize: 13, color: "rgb(var(--ink-2))", lineHeight: 1.6, marginBottom: 16 }}>
                     Ask Wingman anything about your calls — patterns, wins, what to fix next.
                   </div>
                   <div style={{ display: "flex", flexWrap: "wrap", gap: 6, justifyContent: "center" }}>
                     {["Where do I lose most deals?", "What's my top objection?", "What works on wins?"].map((q) => (
-                      <button key={q} onClick={() => sendGlobalMessage(q)} style={{ fontSize: 11.5, color: "#1c1c1e", background: "#e5e5ea", border: "none", borderRadius: 7, padding: "6px 11px", fontFamily: "inherit", fontWeight: 500, cursor: "pointer" }}>{q}</button>
+                      <button key={q} onClick={() => sendGlobalMessage(q)} style={{ fontSize: 11.5, color: "rgb(var(--ink-1))", background: "rgb(var(--line))", border: "none", borderRadius: 7, padding: "6px 11px", fontFamily: "inherit", fontWeight: 500, cursor: "pointer" }}>{q}</button>
                     ))}
                   </div>
                 </div>
@@ -1049,7 +1062,7 @@ export default function FlightLogTab({ calls, initialCall, onInitialCallConsumed
                 const showTs = m.timestamp && (i === 0 || (prevTs && m.timestamp - prevTs >= 10 * 60 * 1000));
                 if (showTs) {
                   items.push(
-                    <div key={`ts-${i}`} style={{ textAlign: "center", fontSize: 11, color: "#8e8e93", margin: "2px 0", fontFamily: "inherit" }}>
+                    <div key={`ts-${i}`} style={{ textAlign: "center", fontSize: 11, color: "rgb(var(--ink-2))", margin: "2px 0", fontFamily: "inherit" }}>
                       {formatTimestamp(m.timestamp!)}
                     </div>
                   );
@@ -1057,25 +1070,25 @@ export default function FlightLogTab({ calls, initialCall, onInitialCallConsumed
                 if (m.role === "assistant") {
                   items.push(
                     <div key={i} style={{ display: "flex", gap: 8, alignItems: "flex-end" }}>
-                      <div style={{ width: 28, height: 28, borderRadius: "50%", background: "#1c1c1e", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                        <span style={{ color: "#fff", fontSize: 12, fontWeight: 700, fontFamily: "inherit" }}>W</span>
+                      <div style={{ width: 28, height: 28, borderRadius: "50%", background: "rgb(var(--ink-1))", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                        <span style={{ color: "rgb(var(--surface))", fontSize: 12, fontWeight: 700, fontFamily: "inherit" }}>W</span>
                       </div>
                       <div style={{ display: "flex", flexDirection: "column", gap: 4, alignItems: "flex-start", maxWidth: "calc(85% - 36px)" }}>
                         {m.text.split("\n\n").filter(Boolean).map((chunk, ci) => (
-                          <div key={ci} style={{ background: "#e5e5ea", color: "#1c1c1e", borderRadius: "12px 12px 12px 3px", padding: "9px 13px", fontSize: 13, lineHeight: 1.5 }}>{chunk}</div>
+                          <div key={ci} style={{ background: "rgb(var(--line))", color: "rgb(var(--ink-1))", borderRadius: "12px 12px 12px 3px", padding: "9px 13px", fontSize: 13, lineHeight: 1.5 }}>{chunk}</div>
                         ))}
                       </div>
                     </div>
                   );
                 } else {
                   items.push(
-                    <div key={i} style={{ alignSelf: "flex-end", maxWidth: "85%", background: "#1c1c1e", color: "#fff", borderRadius: "12px 12px 3px 12px", padding: "9px 13px", fontSize: 13, lineHeight: 1.5 }}>{m.text}</div>
+                    <div key={i} style={{ alignSelf: "flex-end", maxWidth: "85%", background: "rgb(var(--ink-1))", color: "rgb(var(--surface))", borderRadius: "12px 12px 3px 12px", padding: "9px 13px", fontSize: 13, lineHeight: 1.5 }}>{m.text}</div>
                   );
                 }
                 return items;
               })}
               {globalLoading && !userIsTyping && (
-                <div style={{ alignSelf: "flex-start", background: "#e5e5ea", borderRadius: "12px 12px 12px 3px", padding: "11px 14px", display: "flex", gap: 5, alignItems: "center" }}>
+                <div style={{ alignSelf: "flex-start", background: "rgb(var(--line))", borderRadius: "12px 12px 12px 3px", padding: "11px 14px", display: "flex", gap: 5, alignItems: "center" }}>
                   <span className="typing-dot" /><span className="typing-dot" /><span className="typing-dot" />
                 </div>
               )}
@@ -1083,7 +1096,7 @@ export default function FlightLogTab({ calls, initialCall, onInitialCallConsumed
             </div>
 
             {/* Input */}
-            <div style={{ padding: "14px 20px", borderTop: "1px solid rgba(0,0,0,0.07)", display: "flex", gap: 8, flexShrink: 0 }}>
+            <div style={{ padding: "14px 20px", borderTop: "1px solid rgb(var(--line))", display: "flex", gap: 8, flexShrink: 0 }}>
               <textarea
                 ref={modalInputRef}
                 value={globalInput}
@@ -1098,9 +1111,9 @@ export default function FlightLogTab({ calls, initialCall, onInitialCallConsumed
                 }}
                 onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendGlobalMessage(globalInput); } }}
                 placeholder="Ask anything about your calls…"
-                style={{ flex: 1, background: "#e5e5ea", border: "none", borderRadius: 9, padding: "11px 14px", color: "#1c1c1e", fontSize: 13, fontFamily: "inherit", outline: "none", resize: "none", overflow: "auto", lineHeight: 1.4, boxSizing: "border-box" }}
+                style={{ flex: 1, background: "rgb(var(--line))", border: "none", borderRadius: 9, padding: "11px 14px", color: "rgb(var(--ink-1))", fontSize: 13, fontFamily: "inherit", outline: "none", resize: "none", overflow: "auto", lineHeight: 1.4, boxSizing: "border-box" }}
               />
-              <button onClick={() => sendGlobalMessage(globalInput)} style={{ padding: "11px 18px", background: "#1c1c1e", borderRadius: 9, color: "#fff", fontSize: 12, fontFamily: "inherit", fontWeight: 600, border: "none", cursor: "pointer", alignSelf: "flex-end" }}>Ask</button>
+              <button onClick={() => sendGlobalMessage(globalInput)} style={{ padding: "11px 18px", background: "rgb(var(--ink-1))", borderRadius: 9, color: "rgb(var(--surface))", fontSize: 12, fontFamily: "inherit", fontWeight: 600, border: "none", cursor: "pointer", alignSelf: "flex-end" }}>Ask</button>
             </div>
           </div>
         </div>

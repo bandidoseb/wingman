@@ -131,7 +131,7 @@ function FlightRecorderTab() {
       <div className="rounded-lg border border-dashed border-border bg-card p-8 text-center">
         <p className="text-sm font-medium text-foreground">Local dev only</p>
         <p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">
-          The Flight Recorder captures local calls. Run the app locally with <code className="rounded bg-muted px-1 py-0.5">WINGMAN_DEVLOG=1</code>, do a call, then reload this page.
+          The Flight Recorder captures local calls. Run the app locally with <code className="rounded-sm bg-muted px-1 py-0.5">WINGMAN_DEVLOG=1</code>, do a call, then reload this page.
         </p>
       </div>
     );

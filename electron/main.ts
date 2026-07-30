@@ -429,7 +429,13 @@ function createMainWindow(): void {
     minHeight:       600,
     titleBarStyle:   "hiddenInset",
     vibrancy:        "sidebar",
-    trafficLightPosition: { x: 18, y: 22 },
+    // Centred in the COLLAPSED sidebar rail. Keep in lockstep with
+    // SIDEBAR_WIDTH_COLLAPSED in src/components/dashboard/Sidebar.tsx: the macOS
+    // button group is 52px wide (three 12px buttons, 20px centre-to-centre), so
+    // x = (96 − 52) / 2 = 22 and the lights sit 22px clear of BOTH the window edge
+    // and the sidebar's right border. At 14 the border crowded the green button.
+    // The gap BELOW is owned by that file's top padding.
+    trafficLightPosition: { x: 22, y: 20 },
     backgroundColor: "#f5f5f7",
     show:            false,
     webPreferences: {

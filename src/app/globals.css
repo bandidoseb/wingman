@@ -1,19 +1,498 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import 'tailwindcss';
 
-:root {
-  --font-sans: -apple-system, "SF Pro Display", BlinkMacSystemFont, system-ui, sans-serif;
+@custom-variant dark (&:is(.dark *));
+
+/*
+  `inline` is LOAD-BEARING — do not drop it.
+
+  Every --color-* below points at a runtime token (`rgb(var(--paper))`) whose value
+  is swapped by the `.dark` block further down. With a plain `@theme`, Tailwind
+  emits `--color-paper: rgb(var(--paper))` on :root, CSS resolves it there once
+  against the LIGHT tokens, and every element inherits that frozen light value —
+  so dark mode silently does nothing unless `.dark` happens to sit on <html>.
+  Measured before this was added: `.dark` on <html> → rgb(23,22,19) ✓, but `.dark`
+  on any wrapper element → rgb(250,248,244) ✗.
+
+  `inline` substitutes the reference straight into the utility instead
+  (`background-color: rgb(var(--paper))`), so it resolves at the element and works
+  at any nesting depth. This is what shadcn's own v4 setup does.
+*/
+@theme inline {
+  --color-paper: rgb(var(--paper));
+
+  --color-surface: rgb(var(--surface));
+  --color-surface-sunken: rgb(var(--surface-sunken));
+
+  --color-ink-1: rgb(var(--ink-1));
+  --color-ink-2: rgb(var(--ink-2));
+  --color-ink-3: rgb(var(--ink-3));
+
+  --color-line: rgb(var(--line));
+  --color-line-strong: rgb(var(--line-strong));
+
+  --color-knob: rgb(var(--knob));
+
+  --color-signal: rgb(var(--signal));
+  --color-signal-hover: rgb(var(--signal-hover));
+  --color-signal-weak: rgb(var(--signal-weak));
+  --color-signal-on: rgb(var(--signal-on));
+
+  --color-positive: rgb(var(--positive));
+  --color-positive-weak: rgb(var(--positive-weak));
+
+  --color-warning: rgb(var(--warning));
+  --color-warning-weak: rgb(var(--warning-weak));
+
+  --color-critical: rgb(var(--critical));
+  --color-critical-weak: rgb(var(--critical-weak));
+
+  --color-score-0: rgb(var(--score-0));
+  --color-score-1: rgb(var(--score-1));
+  --color-score-2: rgb(var(--score-2));
+  --color-score-3: rgb(var(--score-3));
+
+  --color-background: rgb(var(--background));
+  --color-foreground: rgb(var(--foreground));
+
+  --color-card: rgb(var(--card));
+  --color-card-foreground: rgb(var(--card-foreground));
+
+  --color-popover: rgb(var(--popover));
+  --color-popover-foreground: rgb(var(--popover-foreground));
+
+  --color-primary: rgb(var(--primary));
+  --color-primary-foreground: rgb(var(--primary-foreground));
+
+  --color-secondary: rgb(var(--secondary));
+  --color-secondary-foreground: rgb(var(--secondary-foreground));
+
+  --color-muted: rgb(var(--muted));
+  --color-muted-foreground: rgb(var(--muted-foreground));
+
+  --color-accent: rgb(var(--accent));
+  --color-accent-foreground: rgb(var(--accent-foreground));
+
+  --color-destructive: rgb(var(--destructive));
+  --color-destructive-foreground: rgb(var(--destructive-foreground));
+
+  --color-border: rgb(var(--border));
+  --color-input: rgb(var(--input));
+  --color-ring: rgb(var(--ring));
+
+  --color-sidebar: rgb(var(--sidebar));
+  --color-sidebar-foreground: rgb(var(--sidebar-foreground));
+  --color-sidebar-primary: rgb(var(--sidebar-primary));
+  --color-sidebar-primary-foreground: rgb(var(--sidebar-primary-foreground));
+  --color-sidebar-accent: rgb(var(--sidebar-accent));
+  --color-sidebar-accent-foreground: rgb(var(--sidebar-accent-foreground));
+  --color-sidebar-border: rgb(var(--sidebar-border));
+  --color-sidebar-ring: rgb(var(--sidebar-ring));
+
+  --font-sans: var(--font-sans);
+  --font-mono: var(--font-mono);
+
+  --text-display: 32px;
+  --text-display--line-height: 1.15;
+  --text-display--letter-spacing: -0.022em;
+  --text-display--font-weight: 700;
+  --text-h1: 24px;
+  --text-h1--line-height: 1.2;
+  --text-h1--letter-spacing: -0.02em;
+  --text-h1--font-weight: 650;
+  --text-h2: 20px;
+  --text-h2--line-height: 1.25;
+  --text-h2--letter-spacing: -0.015em;
+  --text-h2--font-weight: 600;
+  --text-h3: 17px;
+  --text-h3--line-height: 1.35;
+  --text-h3--letter-spacing: -0.01em;
+  --text-h3--font-weight: 600;
+  --text-body: 15px;
+  --text-body--line-height: 1.55;
+  --text-body--letter-spacing: -0.006em;
+  --text-small: 13px;
+  --text-small--line-height: 1.45;
+  --text-label: 11px;
+  --text-label--line-height: 1.2;
+  --text-label--letter-spacing: 0.09em;
+  --text-label--font-weight: 600;
+
+  --radius-tight: var(--r-sm);
+  --radius-control: var(--r-md);
+  --radius-card: var(--r-lg);
+  --radius-panel: var(--r-xl);
+  --radius-pill: var(--r-full);
+
+  --shadow-raised: var(--e-sm);
+  --shadow-float: var(--e-md);
+  --shadow-overlay: var(--e-lg);
+
+  --ease-wm: var(--ease);
+
+  --transition-duration-1: var(--dur-1);
+  --transition-duration-2: var(--dur-2);
+  --transition-duration-3: var(--dur-3);
+
+  --animate-fade-up: fadeUp 0.28s cubic-bezier(0.22, 1, 0.36, 1) both;
+  --animate-accordion-down: accordionDown 0.22s cubic-bezier(0.22, 1, 0.36, 1)
+    both;
+  --animate-glow-blue: glowBlue 2.4s ease-in-out infinite;
+  --animate-glow-red: glowRed 1.6s ease-in-out infinite;
+  --animate-blink: blink 1.2s infinite;
+  --animate-typing-bounce: typingBounce 1.2s infinite ease-in-out;
+
+  @keyframes fadeUp {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  @keyframes accordionDown {
+    from {
+      opacity: 0;
+      transform: translateY(-6px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  @keyframes glowBlue {
+    0%,
+    100% {
+      box-shadow:
+        0 2px 24px rgba(0, 122, 255, 0.2),
+        0 0 0 1.5px rgba(0, 122, 255, 0.25);
+    }
+    50% {
+      box-shadow:
+        0 2px 36px rgba(0, 122, 255, 0.38),
+        0 0 0 1.5px rgba(0, 122, 255, 0.45);
+    }
+  }
+  @keyframes glowRed {
+    0%,
+    100% {
+      box-shadow:
+        0 2px 24px rgba(192, 57, 43, 0.25),
+        0 0 0 1.5px rgba(192, 57, 43, 0.32);
+    }
+    50% {
+      box-shadow:
+        0 2px 36px rgba(192, 57, 43, 0.45),
+        0 0 0 1.5px rgba(192, 57, 43, 0.55);
+    }
+  }
+  @keyframes blink {
+    0%,
+    100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0;
+    }
+  }
+  @keyframes typingBounce {
+    0%,
+    60%,
+    100% {
+      transform: translateY(0);
+      opacity: 0.4;
+    }
+    30% {
+      transform: translateY(-5px);
+      opacity: 1;
+    }
+  }
 }
 
-* {
-  box-sizing: border-box;
+/*
+  Tailwind v4 changed the default border color to `currentcolor`. The upgrade
+  codemod dropped in a compat shim pointing at `--color-gray-200`; we don't want
+  Tailwind's grey, we want our hairline token — and we already had a `* {}` rule
+  saying exactly that, so the shim was a second, conflicting declaration of the
+  same thing. Consolidated here, on the codemod's fuller selector list (which
+  correctly covers pseudo-elements, as v3's preflight did).
+*/
+@layer base {
+  *,
+  ::after,
+  ::before,
+  ::backdrop,
+  ::file-selector-button {
+    border-color: rgb(var(--border));
+  }
 }
 
-body {
-  font-family: var(--font-sans);
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+/* ============================================================================
+   WINGMAN DESIGN TOKENS — the single source of truth for color/type/space/motion
+   ----------------------------------------------------------------------------
+   Spec: Wingman Brain/00 - Product/Wingman Design Language.md
+   Rule (§5b): ONE token file, everything reads from it. NO hardcoded hex,
+   one-off spacing, or stray fonts anywhere else. Enforced by scripts/token-lint.mjs.
+
+   COLOR FORMAT: tokens are space-separated RGB CHANNELS, not hex.
+     - In Tailwind:  bg-surface, text-ink-2, border-line  (opacity works: text-ink-1/70)
+     - In raw CSS:   color: rgb(var(--ink-1));   <- note the rgb() wrapper
+   The channel split is a leftover from Tailwind v3, where `<alpha-value>` was the
+   only way to get opacity modifiers. On v4 (current) opacity goes through
+   color-mix(), so hex would work too — but the channels are kept because they cost
+   nothing and flattening them would touch every token and every raw-CSS use at once.
+
+   Tailwind config now lives in the `@theme inline` block ABOVE, not in a JS file.
+   `tailwind.config.ts` was deleted in the v4 migration; v4 auto-detects content.
+
+   NAMING NOTE: the spec calls the accent "signal blue" and names it `--accent`.
+   Here it is `--signal`, because shadcn reserves `--accent` for its neutral
+   hover background. Two different jobs, so two different names — aliasing them
+   would turn every shadcn hover state solid blue. Spec §3c title ("Signal blue")
+   is honored; only the variable name differs.
+   ========================================================================== */
+
+@layer base {
+  :root {
+    /* --- Typography (§4) ------------------------------------------------- */
+    --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif;
+    /* Spec §4 stack + the non-Apple fallbacks Tailwind's default carried. The web
+       dashboard is reachable from Windows even though the desktop app is Mac-only. */
+    --font-mono: ui-monospace, "SF Mono", "SFMono-Regular", Menlo, Consolas,
+      "Liberation Mono", "Courier New", monospace;
+
+    /* --- Neutrals — LIGHT (§3a) ------------------------------------------ */
+    --paper: 250 248 244;           /* #FAF8F4  app background (warm white) */
+    --surface: 255 255 255;         /* #FFFFFF  cards, raised surfaces */
+    --surface-sunken: 241 238 232;  /* #F1EEE8  insets, tab tracks, hover fills */
+    --ink-1: 27 26 23;              /* #1B1A17  primary text (warm near-black) */
+    --ink-2: 85 82 75;              /* #55524B  secondary text */
+    --ink-3: 139 135 126;           /* #8B877E  muted / placeholder */
+    --line: 230 226 217;            /* #E6E2D9  hairline borders */
+    --line-strong: 214 209 198;     /* #D6D1C6  input borders, stronger dividers */
+
+    /* --- Accent — "signal blue" (§3c) ------------------------------------ */
+    --signal: 53 87 199;            /* #3557C7 */
+    --signal-hover: 42 71 163;      /* #2A47A3 */
+    --signal-weak: 236 239 250;     /* #ECEFFA  tint background */
+    --signal-on: 255 255 255;       /* text ON a signal-filled surface */
+
+    /* --- State (§3d) — outcome only, never decoration -------------------- */
+    --positive: 62 142 90;          /* #3E8E5A  closed / won */
+    --positive-weak: 231 241 234;   /* #E7F1EA */
+    --warning: 183 127 39;          /* #B77F27  caution / mid */
+    --warning-weak: 246 238 221;    /* #F6EEDD */
+    --critical: 194 67 56;          /* #C24338  lost / danger */
+    --critical-weak: 247 231 228;   /* #F7E7E4 */
+
+    /* --- Sunset gradient (§3e) — DATA-VIZ ONLY --------------------------- *
+     * Scoring surfaces only: post-call belief/framework blocks colored by
+     * real score, and the close-readiness hue. NOT the accent, NOT state pills.
+     * Four anchor stops of the continuous red→amber→green scale; they double as
+     * the 4-step close-readiness ladder (§7).                                */
+    --score-0: 194 67 56;           /* #C24338  Not Ready */
+    --score-1: 217 138 61;          /* #D98A3D  Continue Discovery */
+    --score-2: 127 168 78;          /* #7FA84E  Almost Ready */
+    --score-3: 62 142 90;           /* #3E8E5A  Ready to Pitch */
+
+    /* Modal/overlay scrim. Deliberately NOT derived from --ink-1: a scrim must
+       darken whatever is behind it in BOTH themes, and --ink-1 flips to near-white
+       in dark mode, which would wash the page out instead of dimming it. */
+    --scrim: 0 0 0;
+
+    /* Switch/slider knob. Same "must not flip" category as --scrim, opposite
+       direction: a knob is the raised element on its track and reads near-white in
+       BOTH themes (macOS, iOS and Material all keep a light thumb in dark mode).
+       No neutral token stays light across the flip — --surface goes dark, --ink-1
+       goes light — so this is its own token. Defined only here on purpose: .dark
+       does not override it, so both themes inherit the one value. */
+    --knob: 252 251 248;            /* #FCFBF8  warm near-white */
+
+    /* --- Radii (§5) ------------------------------------------------------ */
+    --r-sm: 6px;
+    --r-md: 10px;    /* buttons, inputs */
+    --r-lg: 14px;    /* cards */
+    --r-xl: 20px;
+    --r-full: 999px; /* pills */
+
+    /* --- Elevation (§5) — soft + diffuse, three steps --------------------- */
+    --e-sm: 0 1px 2px rgba(28, 26, 21, 0.05);
+    --e-md: 0 2px 10px rgba(28, 26, 21, 0.07);
+    --e-lg: 0 12px 40px rgba(28, 26, 21, 0.1);
+
+    /* --- Motion (§5) — ONE easing curve. Fade, don't slide. -------------- */
+    --ease: cubic-bezier(0.2, 0.6, 0.2, 1);
+    --dur-1: 120ms;
+    --dur-2: 180ms;
+    --dur-3: 260ms;
+  }
+
+  /* --- Neutrals + state — DARK (§3b). Designed, NOT inverted. ------------ *
+   *
+   * ⚠️ ELEVATION FLIPS DIRECTION IN DARK MODE. Read §3f of the Design Language
+   * before changing any value below.
+   *
+   * In LIGHT mode a recessed surface goes DARKER than its parent, so the ladder
+   * runs   --surface-sunken < --paper < --surface.
+   * In DARK mode that inverts: elevation is expressed as LIGHTNESS (Material 3
+   * tonal elevation, Apple HIG "elevated colors are lighter"), and there is no
+   * headroom below --paper anyway — going down just approaches black, which
+   * kills depth cues. So the dark ladder runs
+   *
+   *     --paper  <  --surface  <  --surface-sunken
+   *
+   * `--surface-sunken` therefore does NOT mean "darker". It means "the
+   * sub-surface one step apart from --surface" — fields, tab tracks, chips,
+   * keycaps, hover fills — and the theme decides which way that step goes.
+   * (The name is a light-mode holdover. Kept because renaming it churns 24 call
+   * sites across 8 files for zero behaviour change.)
+   *
+   * The step size is tuned to MATCH light mode, so both themes feel the same:
+   *   light  sunken↔surface = 1.158:1
+   *   dark   sunken↔surface = 1.162:1
+   */
+  .dark {
+    --paper: 23 22 19;              /* #171613  validated: sits in the #0A0A0A–#161616
+                                       near-black band. Never pure #000 — max contrast
+                                       against light text causes eye strain + OLED
+                                       halation, and leaves no room to recede. */
+    --surface: 32 31 27;            /* #201F1B  cards, panels — one step UP from paper */
+    --surface-sunken: 44 43 37;     /* #2C2B25  one step UP from surface (see above).
+                                       Was #100F0D — BELOW paper — which is why every
+                                       input, tab track and hover fill read as a black
+                                       hole. Fixed 2026-07-29. */
+    --ink-1: 243 240 233;           /* #F3F0E9  14.5–16.8:1 on every dark surface */
+    --ink-2: 173 169 159;           /* #ADA99F  6.0–8.2:1 — AA on every dark surface */
+    --ink-3: 138 134 124;           /* #8A867C  muted / placeholder / meta.
+                                       Was #726E64, which measured 2.79–3.56:1 —
+                                       below the 3:1 AA-large floor once the sunken
+                                       surface moved up. Now 3.91–4.98:1, and still
+                                       a clear step below --ink-2 (1.55:1 apart) so
+                                       the muted/secondary hierarchy survives.
+                                       NEVER use --ink-3 for body copy in either
+                                       theme — it is a de-emphasis token only. */
+    --line: 48 46 40;               /* #302E28  hairlines on --paper / --surface */
+    --line-strong: 64 61 53;        /* #403D35  INPUT BORDERS + stronger dividers.
+                                       Inputs must use this, not --line: --line is
+                                       lighter than --surface-sunken by only 1.05:1
+                                       and washes out against a field. */
+
+    --signal: 126 155 255;          /* #7E9BFF */
+    --signal-hover: 148 171 255;    /* #94ABFF */
+    --signal-weak: 35 41 74;        /* #23294A */
+    --signal-on: 23 22 19;          /* dark text on the lighter dark-mode blue */
+
+    --positive: 103 185 138;        /* #67B98A */
+    --warning: 212 162 80;          /* #D4A250 */
+    --critical: 224 122 111;        /* #E07A6F */
+
+    /* Dark "weak" backgrounds are DERIVED — the spec (§3d) lists dark hues but
+       not their tint backgrounds. Built to sit at the same visual weight against
+       --surface as the light weaks do, and to match --signal-weak's dark treatment. */
+    --positive-weak: 28 51 39;      /* #1C3327 */
+    --warning-weak: 56 44 22;       /* #382C16 */
+    --critical-weak: 59 33 29;      /* #3B211D */
+
+    /* Sunset stops lightened for legibility on dark ground (same 4 steps). */
+    --score-0: 224 122 111;         /* #E07A6F */
+    --score-1: 226 160 90;          /* #E2A05A */
+    --score-2: 154 194 104;         /* #9AC268 */
+    --score-3: 103 185 138;         /* #67B98A */
+
+    /* Dark leans on borders more than shadows (§5) — shadows go deeper, softer. */
+    --e-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+    --e-md: 0 2px 10px rgba(0, 0, 0, 0.5);
+    --e-lg: 0 12px 40px rgba(0, 0, 0, 0.6);
+  }
+
+  /* ==========================================================================
+     SHADCN BRIDGE (§5b) — map Wingman tokens onto shadcn's semantic names so
+     every shadcn/imported component wears the Wingman language automatically
+     instead of looking like a guest. Values are references, never literals:
+     change a token above and every shadcn component follows.
+     ========================================================================== */
+  :root,
+  .dark {
+    --background: var(--paper);
+    --foreground: var(--ink-1);
+    --card: var(--surface);
+    --card-foreground: var(--ink-1);
+    --popover: var(--surface);
+    --popover-foreground: var(--ink-1);
+
+    --primary: var(--signal);
+    --primary-foreground: var(--signal-on);
+    --secondary: var(--surface-sunken);
+    --secondary-foreground: var(--ink-1);
+    --muted: var(--surface-sunken);
+    --muted-foreground: var(--ink-2);
+
+    /* shadcn's --accent is its NEUTRAL hover fill, not our brand accent.
+       Our brand accent is --signal / --primary. Do not point this at --signal. */
+    --accent: var(--surface-sunken);
+    --accent-foreground: var(--ink-1);
+
+    --destructive: var(--critical);
+    --destructive-foreground: 255 255 255;
+
+    --border: var(--line);
+    --input: var(--line-strong);
+    --ring: var(--signal);
+
+    --chart-1: var(--score-0);
+    --chart-2: var(--score-1);
+    --chart-3: var(--score-2);
+    --chart-4: var(--score-3);
+    --chart-5: var(--signal);
+
+    --sidebar: var(--surface);
+    --sidebar-foreground: var(--ink-1);
+    --sidebar-primary: var(--signal);
+    --sidebar-primary-foreground: var(--signal-on);
+    --sidebar-accent: var(--surface-sunken);
+    --sidebar-accent-foreground: var(--ink-1);
+    --sidebar-border: var(--line);
+    --sidebar-ring: var(--signal);
+
+    /* shadcn radius scale. radix-nova components reference --radius-md/-lg
+       directly (they were previously undefined → those classes were no-ops). */
+    --radius: var(--r-md);
+    --radius-sm: var(--r-sm);
+    --radius-md: var(--r-md);
+    --radius-lg: var(--r-lg);
+    --radius-xl: var(--r-xl);
+  }
+}
+
+@layer utilities {
+  /* ============================================================================
+   BASE ELEMENTS
+   ========================================================================== */
+
+  * {
+    box-sizing: border-box;
+  }
+}
+
+@layer base {
+  /* border-color for `*` is declared once, up top, alongside the v4 shim it
+     replaced — not here. Two competing `*` rules is how you get a hairline that
+     changes colour depending on which one the bundler emits last. */
+  html {
+    font-family: var(--font-sans);
+  }
+  body {
+    background: rgb(var(--paper));
+    color: rgb(var(--ink-1));
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    /* NOTE: body font-size/line-height deliberately NOT set here. Doing so would
+       resize every string in the app that has no explicit size — across 8 screens
+       none of which have been reviewed yet. The type scale (§4) is adopted per
+       screen via the .t-* classes below, which is the "screen by screen" rule. */
+  }
 }
 
 /* Scrollbars */
@@ -25,17 +504,14 @@ body {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(0, 0, 0, 0.15);
+  background: rgb(var(--line-strong));
   border-radius: 2px;
-}
-.dark ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.15);
 }
 
 /* Input placeholders */
 input::placeholder,
 textarea::placeholder {
-  color: #aeaeb2;
+  color: rgb(var(--ink-3));
 }
 
 /* Focus rings */
@@ -44,7 +520,35 @@ textarea:focus {
   outline: none;
 }
 
-/* Animations */
+/* Keyboard focus state (§6).
+   NOTE: this deliberately does NOT reach raw <input>/<textarea> — the
+   `input:focus { outline: none }` rule above is specificity (0,1,1) and wins.
+   Fixing that here would put a blue outline on every input across 8 screens that
+   haven't been rebuilt yet, so it's handled per-component instead: wm/Input.tsx
+   carries its own focus ring. Revisit when the last form migrates. */
+:focus-visible {
+  outline: 2px solid rgb(var(--signal));
+  outline-offset: 2px;
+}
+
+/* ============================================================================
+   TYPE SCALE (§4) — use these instead of ad-hoc text-[Npx] classes
+   ========================================================================== */
+
+.t-display { font-size: 32px; font-weight: 700; letter-spacing: -0.022em; line-height: 1.15; }
+.t-h1      { font-size: 24px; font-weight: 650; letter-spacing: -0.02em;  line-height: 1.2; }
+.t-h2      { font-size: 20px; font-weight: 600; letter-spacing: -0.015em; line-height: 1.25; }
+.t-h3      { font-size: 17px; font-weight: 600; letter-spacing: -0.01em;  line-height: 1.35; }
+.t-body    { font-size: 15px; font-weight: 400; letter-spacing: -0.006em; line-height: 1.55; }
+.t-small   { font-size: 13px; font-weight: 400; line-height: 1.45; }
+.t-label   { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.09em; }
+.t-data    { font-family: var(--font-mono); font-weight: 500; font-variant-numeric: tabular-nums; }
+
+/* ============================================================================
+   ANIMATIONS — unchanged. Legacy curves below predate the design language;
+   they get reconciled to var(--ease) screen by screen, not in one sweep.
+   ========================================================================== */
+
 @keyframes fadeUp {
   from { opacity: 0; transform: translateY(8px); }
   to { opacity: 1; transform: translateY(0); }
@@ -96,7 +600,7 @@ textarea:focus {
   width: 7px;
   height: 7px;
   border-radius: 50%;
-  background: #aaa;
+  background: rgb(var(--ink-3));
   display: inline-block;
   animation: typingBounce 1.2s infinite ease-in-out;
 }
@@ -104,85 +608,35 @@ textarea:focus {
 .typing-dot:nth-child(2) { animation-delay: 0.2s; }
 .typing-dot:nth-child(3) { animation-delay: 0.4s; }
 
-@layer base {
-  :root {
-    --background: oklch(1 0 0);
-    --foreground: oklch(0.145 0 0);
-    --card: oklch(1 0 0);
-    --card-foreground: oklch(0.145 0 0);
-    --popover: oklch(1 0 0);
-    --popover-foreground: oklch(0.145 0 0);
-    --primary: oklch(0.205 0 0);
-    --primary-foreground: oklch(0.985 0 0);
-    --secondary: oklch(0.97 0 0);
-    --secondary-foreground: oklch(0.205 0 0);
-    --muted: oklch(0.97 0 0);
-    --muted-foreground: oklch(0.556 0 0);
-    --accent: oklch(0.97 0 0);
-    --accent-foreground: oklch(0.205 0 0);
-    --destructive: oklch(0.577 0.245 27.325);
-    --border: oklch(0.922 0 0);
-    --input: oklch(0.922 0 0);
-    --ring: oklch(0.708 0 0);
-    --chart-1: oklch(0.809 0.105 251.813);
-    --chart-2: oklch(0.623 0.214 259.815);
-    --chart-3: oklch(0.546 0.245 262.881);
-    --chart-4: oklch(0.488 0.243 264.376);
-    --chart-5: oklch(0.424 0.199 265.638);
-    --radius: 0.625rem;
-    --sidebar: oklch(0.985 0 0);
-    --sidebar-foreground: oklch(0.145 0 0);
-    --sidebar-primary: oklch(0.205 0 0);
-    --sidebar-primary-foreground: oklch(0.985 0 0);
-    --sidebar-accent: oklch(0.97 0 0);
-    --sidebar-accent-foreground: oklch(0.205 0 0);
-    --sidebar-border: oklch(0.922 0 0);
-    --sidebar-ring: oklch(0.708 0 0);
-  }
-  .dark {
-    --background: oklch(0.145 0 0);
-    --foreground: oklch(0.985 0 0);
-    --card: oklch(0.205 0 0);
-    --card-foreground: oklch(0.985 0 0);
-    --popover: oklch(0.205 0 0);
-    --popover-foreground: oklch(0.985 0 0);
-    --primary: oklch(0.922 0 0);
-    --primary-foreground: oklch(0.205 0 0);
-    --secondary: oklch(0.269 0 0);
-    --secondary-foreground: oklch(0.985 0 0);
-    --muted: oklch(0.269 0 0);
-    --muted-foreground: oklch(0.708 0 0);
-    --accent: oklch(0.269 0 0);
-    --accent-foreground: oklch(0.985 0 0);
-    --destructive: oklch(0.704 0.191 22.216);
-    --border: oklch(1 0 0 / 10%);
-    --input: oklch(1 0 0 / 15%);
-    --ring: oklch(0.556 0 0);
-    --chart-1: oklch(0.809 0.105 251.813);
-    --chart-2: oklch(0.623 0.214 259.815);
-    --chart-3: oklch(0.546 0.245 262.881);
-    --chart-4: oklch(0.488 0.243 264.376);
-    --chart-5: oklch(0.424 0.199 265.638);
-    --sidebar: oklch(0.205 0 0);
-    --sidebar-foreground: oklch(0.985 0 0);
-    --sidebar-primary: oklch(0.488 0.243 264.376);
-    --sidebar-primary-foreground: oklch(0.985 0 0);
-    --sidebar-accent: oklch(0.269 0 0);
-    --sidebar-accent-foreground: oklch(0.985 0 0);
-    --sidebar-border: oklch(1 0 0 / 10%);
-    --sidebar-ring: oklch(0.556 0 0);
-  }
-  .theme {
-    --font-sans: var(--font-sans);
-  }
-  * {
-    border-color: var(--border);
-  }
-  body {
-    background: var(--background);
-    color: var(--foreground);
-  }
-  html {
-    font-family: var(--font-sans);
+/* prompt-kit's TypingLoader renders `animate-[typing_1s_infinite]` but the
+   registry doesn't ship the keyframes — without this the "thinking" dots are a
+   STATIC image for the 5–20s a non-streaming Sonnet reply takes, which reads as
+   a hang. Matches the motion of our own .typing-dot. */
+@keyframes typing {
+  0%, 60%, 100% { opacity: 0.4; transform: translateY(0); }
+  30%           { opacity: 1;   transform: translateY(-4px); }
+}
+
+/* Hide scrollbars on an element AND its descendants. Needed because
+   use-stick-to-bottom's real scroller is a nested div, and `scrollbar-width`
+   is not inherited, so scoping to the root alone silently does nothing. */
+.no-scrollbar,
+.no-scrollbar * {
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar,
+.no-scrollbar *::-webkit-scrollbar {
+  display: none;
+}
+
+/* Respect reduced motion (§5) */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }

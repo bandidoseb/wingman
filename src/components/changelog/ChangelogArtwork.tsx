@@ -96,7 +96,7 @@ export function ChangelogArtwork({
 }) {
   return (
     <div
-      className="relative flex aspect-[16/10] w-full items-center justify-center overflow-hidden rounded-xl"
+      className="relative flex aspect-16/10 w-full items-center justify-center overflow-hidden rounded-xl"
       style={{ background: meshBackground(seed) }}
     >
       {/* film grain */}

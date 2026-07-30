@@ -18,8 +18,14 @@ Goal: 5–10 hand-picked closers ("**Test Pilots**") using Wingman free on real 
 - Migration 011 shipped (outcome_source confirmed present in prod). Migration 010 (card_style) intentionally NOT run — dial is inert.
 - ⚠️ STILL UNPROVEN ON A REAL CALL (→ Session 8 dogfood): HUD safety latch (needs a 2-hr call or 20-min silence), post-call pill morph on a real call end, AI outcome auto-detect quality, #52 cold-ladder dig fix.
 
-### Session 1b — Flight Log redesign 🗂️ (NEW, from v0.1.29 live test 2026-07-27)
-Sebastian's call: decide what the Flight Log SHOWS before fixing how it displays — fixing labels inside a section we're about to delete is wasted work.
+### Session 1b — DASHBOARD REBUILD 🗂️ (widened 2026-07-28 — was "Flight Log redesign")
+> **SCOPE CHANGE 2026-07-28.** Sebastian pulled **"Dashboard full rebuild" OUT of the Parking Lot into Track 1**. Claude flagged the cutline; Sebastian reaffirmed, with a method: Claude builds the missing foundation while Sebastian sweeps the dashboard and reports everything that sticks out. Full plan: `tasks/todo.md`. Sweep instrument: `tasks/dashboard-sweep.md`.
+>
+> **What justified widening it:** the rebuild is mostly *mechanical*, not aesthetic. Measured 2026-07-28 — the Design Language's own Rollout step 2 ("tokens into the app") was **never done**: `globals.css` has zero tokens, and the dashboard carries **577 hardcoded hex literals across 41 unique colors** (spec defines ~20), with only 5 shared primitives. That absence is *why* it reads "Frankensteined" — every tab invented its own palette. Session A lands the token layer + primitives + a `token-lint` CI gate; screens then rebuild one per PR.
+>
+> **Cutline discipline retained:** one screen per PR, every session ships, and `DashboardClient.tsx` data/polling logic is off-limits (PR #54's ~2000× cost regression lived there).
+
+Flight Log is still the FIRST screen rebuilt (Session B), and the original ruling stands — decide what the Flight Log SHOWS before fixing how it displays; fixing labels inside a section we're about to delete is wasted work.
 - **Redundancy:** "Topics Missed Before Pitch" is a third rendering of data already shown twice — its `press stage/confirm stage/pitch/close` chips are just the incomplete rows of STAGE BREAKDOWN, and `cant_diy/investment readiness/why you` are just the unchecked rows of FRAMEWORK COVERAGE. Candidate for deletion.
 - **Raw internal keys leaking to users:** `cant_diy`, `investment_readiness`, `why_you` appear BOTH in the AI debrief prose AND the missed-topics chips. Cause: `post-call/route.ts` defines the pillars to the model in snake_case (lines ~31-92), so it echoes them. Fix = prompt rule (never emit internal keys) + a display-side key→label mapper as a backstop. `PILLARS` in `FlightLogTab.tsx` already holds the human labels.
 - Granola-referenced visual pass. Design Language spec is the north star.
@@ -105,7 +111,7 @@ Prompt caching: ✅ ALREADY SHIPPED (summarizer/objection/dig/flow-synth all hav
 ## Track 2 — Public Paid Launch (~2 weeks after Track 1, while feedback rolls in)
 1. Website / landing page (1 session) — must state Apple Silicon requirement
 2. Stripe wiring — checkout + webhook + gating; routes already exist (1–2 sessions)
-3. Dashboard polish — timeboxed cleanup, NOT the full rebuild (1–2 sessions)
+3. ~~Dashboard polish — timeboxed cleanup, NOT the full rebuild~~ → **moved to Track 1 Session 1b as the full rebuild (2026-07-28)**
 4. Flip Test Pilots to paid at the pre-announced date
 
 ---
@@ -119,7 +125,7 @@ Prompt caching: ✅ ALREADY SHIPPED (summarizer/objection/dig/flow-synth all hav
 - Owner dashboard (full founder cockpit — only the cost view ships in Track 1)
 - Positioning wedge demo
 - iMessage funnel (Project Blue)
-- Dashboard full rebuild (Design Language #5)
+- ~~Dashboard full rebuild (Design Language #5)~~ → **PULLED INTO TRACK 1 Session 1b (Sebastian, 2026-07-28)**
 - Dig threading — the REST of the track (chunk-down flow, belief selection by natural transition, the `support`/`money-qualifier` non-sequitur fix #6). NOTE: **exhaustion detection was pulled OUT of here into Track 1 voice week** (pre-beta required). The remainder stays parked unless the harness shows it's ruining cards.
 - Close-readiness follow-ups
 - Kb-signal rename + dead-code removal (#37)

@@ -4,6 +4,8 @@ import { useState } from "react";
 import Card from "@/components/ui/Card";
 import SectionLabel from "@/components/ui/SectionLabel";
 import Toggle from "@/components/ui/Toggle";
+import { useTheme } from "@/hooks/useTheme";
+import type { ThemePref } from "@/lib/theme";
 import type { Profile, Call, AiModelPreference } from "@/types";
 import { createClient } from "@/lib/supabase/client";
 import { PLANS, TOPOFF_PACKAGES } from "@/lib/stripe";
@@ -20,6 +22,16 @@ const ROLE_LABELS: Record<string, string> = {
   setter: "Setter",
 };
 
+/**
+ * Theme choices. "system" is first because it is the default and the one most
+ * people want — the dashboard then follows the Mac's appearance live.
+ */
+const THEME_OPTIONS: ReadonlyArray<{ pref: ThemePref; icon: string; title: string }> = [
+  { pref: "system", icon: "🖥️", title: "System" },
+  { pref: "light",  icon: "☀️", title: "Light" },
+  { pref: "dark",   icon: "🌙", title: "Dark" },
+];
+
 const STYLE_LABELS: Record<string, string> = {
   direct: "Direct & assertive",
   empathetic: "Empathetic & consultative",
@@ -30,6 +42,9 @@ const STYLE_LABELS: Record<string, string> = {
 
 export default function SettingsTab({ profile, calls, onZoomNameSaved }: Props) {
   const supabase = createClient();
+  // pref = what the rep picked; resolved = what's actually on screen right now
+  // (they differ only while pref is "system").
+  const { pref: themePref, resolved: resolvedTheme, setPref: setThemePref } = useTheme();
 
   const [aiModel, setAiModel] = useState<AiModelPreference>(
     profile.ai_model_preference ?? "smart"
@@ -146,12 +161,12 @@ export default function SettingsTab({ profile, calls, onZoomNameSaved }: Props) 
   return (
     <div style={{ maxWidth: 580, margin: "0 auto" }}>
       <div style={{ marginBottom: 20 }}>
-        <div style={{ fontSize: 22, fontWeight: 700, color: "#1c1c1e", letterSpacing: "-0.02em" }}>Settings</div>
-        <div style={{ fontSize: 14, color: "#8e8e93", marginTop: 3 }}>Manage your profile, billing, and preferences</div>
+        <div style={{ fontSize: 22, fontWeight: 700, color: "rgb(var(--ink-1))", letterSpacing: "-0.02em" }}>Settings</div>
+        <div style={{ fontSize: 14, color: "rgb(var(--ink-2))", marginTop: 3 }}>Manage your profile, billing, and preferences</div>
       </div>
 
       {error && (
-        <div style={{ background: "#fff0f0", border: "1px solid #ffd5d5", borderRadius: 10, padding: "10px 14px", marginBottom: 12, fontSize: 13, color: "#ff3b30" }}>
+        <div style={{ background: "rgb(var(--critical-weak))", border: "1px solid rgb(var(--critical) / 0.25)", borderRadius: 10, padding: "10px 14px", marginBottom: 12, fontSize: 13, color: "rgb(var(--critical))" }}>
           {error}
         </div>
       )}
@@ -167,24 +182,24 @@ export default function SettingsTab({ profile, calls, onZoomNameSaved }: Props) 
             { label: "Sales Style", value: profile.sales_style ? (STYLE_LABELS[profile.sales_style] || profile.sales_style) : "—" },
             { label: "Avg Call Length", value: profile.call_length || "—" },
           ].map((row) => (
-            <div key={row.label} style={{ display: "flex", alignItems: "flex-start", gap: 12, paddingBottom: 10, borderBottom: "1px solid #f2f2f7" }}>
-              <div style={{ fontSize: 12, color: "#8e8e93", fontWeight: 600, width: 110, flexShrink: 0, paddingTop: 1 }}>{row.label}</div>
-              <div style={{ fontSize: 13, color: "#1c1c1e", fontWeight: 500, flex: 1 }}>{row.value}</div>
+            <div key={row.label} style={{ display: "flex", alignItems: "flex-start", gap: 12, paddingBottom: 10, borderBottom: "1px solid rgb(var(--line))" }}>
+              <div style={{ fontSize: 12, color: "rgb(var(--ink-2))", fontWeight: 600, width: 110, flexShrink: 0, paddingTop: 1 }}>{row.label}</div>
+              <div style={{ fontSize: 13, color: "rgb(var(--ink-1))", fontWeight: 500, flex: 1 }}>{row.value}</div>
             </div>
           ))}
           <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
-            <div style={{ fontSize: 12, color: "#8e8e93", fontWeight: 600, width: 110, flexShrink: 0, paddingTop: 1 }}>Member Since</div>
-            <div style={{ fontSize: 13, color: "#1c1c1e", fontWeight: 500 }}>
+            <div style={{ fontSize: 12, color: "rgb(var(--ink-2))", fontWeight: 600, width: 110, flexShrink: 0, paddingTop: 1 }}>Member Since</div>
+            <div style={{ fontSize: 13, color: "rgb(var(--ink-1))", fontWeight: 500 }}>
               {new Date(profile.created_at).toLocaleDateString("en-US", { month: "long", year: "numeric" })}
             </div>
           </div>
 
           {/* Zoom Display Name — required for keyword trigger exclusion */}
-          <div style={{ paddingTop: 14, borderTop: "1px solid #f2f2f7" }}>
+          <div style={{ paddingTop: 14, borderTop: "1px solid rgb(var(--line))" }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
-              <div style={{ fontSize: 12, color: "#8e8e93", fontWeight: 600 }}>Zoom Display Name</div>
+              <div style={{ fontSize: 12, color: "rgb(var(--ink-2))", fontWeight: 600 }}>Zoom Display Name</div>
               {!zoomDisplayName.trim() && (
-                <div style={{ fontSize: 10, fontWeight: 700, color: "#ff3b30", background: "#fff0f0", padding: "2px 7px", borderRadius: 5, letterSpacing: "0.03em" }}>
+                <div style={{ fontSize: 10, fontWeight: 700, color: "rgb(var(--critical))", background: "rgb(var(--critical-weak))", padding: "2px 7px", borderRadius: 5, letterSpacing: "0.03em" }}>
                   REQUIRED
                 </div>
               )}
@@ -199,16 +214,16 @@ export default function SettingsTab({ profile, calls, onZoomNameSaved }: Props) 
                 padding: "9px 12px",
                 fontSize: 13,
                 fontFamily: "inherit",
-                border: `1.5px solid ${!zoomDisplayName.trim() ? "#ff9f0a" : "#e5e5ea"}`,
+                border: `1.5px solid ${!zoomDisplayName.trim() ? "rgb(var(--warning))" : "rgb(var(--line-strong))"}`,
                 borderRadius: 9,
                 outline: "none",
-                background: "#fafafa",
-                color: "#1c1c1e",
+                background: "rgb(var(--surface-sunken))",
+                color: "rgb(var(--ink-1))",
                 boxSizing: "border-box",
                 transition: "border-color 0.2s",
               }}
             />
-            <div style={{ fontSize: 11, color: "#8e8e93", marginTop: 6, lineHeight: 1.5 }}>
+            <div style={{ fontSize: 11, color: "rgb(var(--ink-2))", marginTop: 6, lineHeight: 1.5 }}>
               Enter your name exactly as it appears on your Zoom profile — you can find it in the top right corner of the Zoom app.
               Wingman uses this to know which voice is yours so it only fires cards for your prospect, not you.
             </div>
@@ -219,8 +234,8 @@ export default function SettingsTab({ profile, calls, onZoomNameSaved }: Props) 
                 style={{
                   marginTop: 10,
                   padding: "8px 18px",
-                  background: "#1c1c1e",
-                  color: "#fff",
+                  background: "rgb(var(--ink-1))",
+                  color: "rgb(var(--surface))",
                   border: "none",
                   borderRadius: 8,
                   fontSize: 13,
@@ -235,10 +250,56 @@ export default function SettingsTab({ profile, calls, onZoomNameSaved }: Props) 
               </button>
             )}
             {saving === null && !zoomNameDirty && zoomDisplayName.trim() && (
-              <div style={{ fontSize: 11, color: "#34c759", marginTop: 6, fontWeight: 600 }}>✓ Saved</div>
+              <div style={{ fontSize: 11, color: "rgb(var(--positive))", marginTop: 6, fontWeight: 600 }}>✓ Saved</div>
             )}
           </div>
         </div>
+      </Card>
+
+      {/* Appearance */}
+      <Card style={{ marginBottom: 14 }}>
+        <SectionLabel>Appearance</SectionLabel>
+        <div style={{ fontSize: 13, color: "rgb(var(--ink-2))", marginBottom: 14 }}>
+          How the dashboard looks. Your in-call display always stays dark so it disappears
+          against your video — this setting doesn&apos;t change it.
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
+          {THEME_OPTIONS.map((opt) => {
+            const isSelected = themePref === opt.pref;
+            return (
+              <button
+                key={opt.pref}
+                onClick={() => setThemePref(opt.pref)}
+                aria-pressed={isSelected}
+                style={{
+                  // Same selected/unselected treatment as AI Performance below, on
+                  // purpose: --ink-1 flips with the theme, so the "filled" state reads
+                  // correctly in BOTH. A track/thumb segmented control would NOT — in
+                  // dark, --surface is darker than --surface-sunken, so the thumb would
+                  // read as recessed instead of raised.
+                  background: isSelected ? "rgb(var(--ink-1))" : "rgb(var(--surface-sunken))",
+                  border: isSelected ? "2px solid rgb(var(--ink-1))" : "2px solid rgb(var(--line-strong))",
+                  borderRadius: 12,
+                  padding: "12px 10px",
+                  cursor: "pointer",
+                  textAlign: "center",
+                  fontFamily: "inherit",
+                  transition: "all 0.18s",
+                }}
+              >
+                <div style={{ fontSize: 18, marginBottom: 6 }}>{opt.icon}</div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: isSelected ? "rgb(var(--surface))" : "rgb(var(--ink-1))" }}>
+                  {opt.title}
+                </div>
+              </button>
+            );
+          })}
+        </div>
+        {themePref === "system" && (
+          <div style={{ fontSize: 11, color: "rgb(var(--ink-3))", marginTop: 10 }}>
+            Following your Mac — currently {resolvedTheme}.
+          </div>
+        )}
       </Card>
 
       {/* Plan & Billing Card */}
@@ -248,10 +309,10 @@ export default function SettingsTab({ profile, calls, onZoomNameSaved }: Props) 
           <>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
               <div>
-                <div style={{ fontSize: 15, fontWeight: 700, color: "#1c1c1e" }}>{planInfo.name}</div>
-                <div style={{ fontSize: 13, color: "#8e8e93", marginTop: 2 }}>{"price" in planInfo ? planInfo.price : ""} · {profile.subscription_status === "active" ? "Active" : profile.subscription_status}</div>
+                <div style={{ fontSize: 15, fontWeight: 700, color: "rgb(var(--ink-1))" }}>{planInfo.name}</div>
+                <div style={{ fontSize: 13, color: "rgb(var(--ink-2))", marginTop: 2 }}>{"price" in planInfo ? planInfo.price : ""} · {profile.subscription_status === "active" ? "Active" : profile.subscription_status}</div>
               </div>
-              <div style={{ background: profile.subscription_status === "active" ? "#f0faf4" : "#fff8ee", color: profile.subscription_status === "active" ? "#34c759" : "#ff9f0a", fontSize: 11, fontWeight: 700, padding: "4px 10px", borderRadius: 6 }}>
+              <div style={{ background: profile.subscription_status === "active" ? "rgb(var(--positive-weak))" : "rgb(var(--warning-weak))", color: profile.subscription_status === "active" ? "rgb(var(--positive))" : "rgb(var(--warning))", fontSize: 11, fontWeight: 700, padding: "4px 10px", borderRadius: 6 }}>
                 {profile.subscription_status === "active" ? "Active" : "Inactive"}
               </div>
             </div>
@@ -259,13 +320,13 @@ export default function SettingsTab({ profile, calls, onZoomNameSaved }: Props) 
             {callLimit && (
               <div style={{ marginBottom: 14 }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-                  <div style={{ fontSize: 12, color: "#8e8e93", fontWeight: 600 }}>Calls This Month</div>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: callsThisMonth >= callLimit ? "#ff3b30" : "#1c1c1e" }}>
+                  <div style={{ fontSize: 12, color: "rgb(var(--ink-2))", fontWeight: 600 }}>Calls This Month</div>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: callsThisMonth >= callLimit ? "rgb(var(--critical))" : "rgb(var(--ink-1))" }}>
                     {callsThisMonth} / {callLimit}
                   </div>
                 </div>
-                <div style={{ height: 6, background: "#e5e5ea", borderRadius: 3 }}>
-                  <div style={{ height: "100%", width: `${Math.min(100, (callsThisMonth / callLimit) * 100)}%`, borderRadius: 3, background: callsThisMonth >= callLimit ? "#ff3b30" : callsThisMonth >= callLimit * 0.8 ? "#ff9f0a" : "#34c759", transition: "width 0.4s ease" }} />
+                <div style={{ height: 6, background: "rgb(var(--surface-sunken))", borderRadius: 3 }}>
+                  <div style={{ height: "100%", width: `${Math.min(100, (callsThisMonth / callLimit) * 100)}%`, borderRadius: 3, background: callsThisMonth >= callLimit ? "rgb(var(--critical))" : callsThisMonth >= callLimit * 0.8 ? "rgb(var(--warning))" : "rgb(var(--positive))", transition: "width 0.4s ease" }} />
                 </div>
               </div>
             )}
@@ -275,15 +336,15 @@ export default function SettingsTab({ profile, calls, onZoomNameSaved }: Props) 
               const packages = TOPOFF_PACKAGES[plan as "closer" | "setter"];
               const extraCalls = profile.extra_calls_remaining ?? 0;
               return (
-                <div style={{ marginBottom: 14, padding: "12px 14px", background: extraCalls > 0 ? "#f0faf4" : "#f9f9f9", borderRadius: 10, border: `1px solid ${extraCalls > 0 ? "#c6f0d6" : "#e5e5ea"}` }}>
+                <div style={{ marginBottom: 14, padding: "12px 14px", background: extraCalls > 0 ? "rgb(var(--positive-weak))" : "rgb(var(--surface-sunken))", borderRadius: 10, border: `1px solid ${extraCalls > 0 ? "rgb(var(--positive) / 0.25)" : "rgb(var(--line-strong))"}` }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: extraCalls > 0 ? 4 : 10 }}>
-                    <div style={{ fontSize: 12, fontWeight: 600, color: "#8e8e93" }}>Extra Calls (Rollover)</div>
-                    <div style={{ fontSize: 13, fontWeight: 700, color: extraCalls > 0 ? "#34c759" : "#8e8e93" }}>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: "rgb(var(--ink-2))" }}>Extra Calls (Rollover)</div>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: extraCalls > 0 ? "rgb(var(--positive))" : "rgb(var(--ink-2))" }}>
                       {extraCalls} remaining
                     </div>
                   </div>
                   {extraCalls > 0 && (
-                    <div style={{ fontSize: 11, color: "#8e8e93", marginBottom: 10 }}>
+                    <div style={{ fontSize: 11, color: "rgb(var(--ink-2))", marginBottom: 10 }}>
                       These carry over every month until fully used.
                     </div>
                   )}
@@ -297,19 +358,19 @@ export default function SettingsTab({ profile, calls, onZoomNameSaved }: Props) 
                         style={{
                           flex: 1,
                           padding: "9px 0",
-                          background: "#fff",
-                          border: "1px solid #e5e5ea",
+                          background: "rgb(var(--surface))",
+                          border: "1px solid rgb(var(--line-strong))",
                           borderRadius: 9,
                           fontSize: 12,
                           fontWeight: 600,
-                          color: "#1c1c1e",
+                          color: "rgb(var(--ink-1))",
                           cursor: "pointer",
                           fontFamily: "inherit",
                           transition: "border-color 0.15s, background 0.15s",
                         }}
                       >
                         +{pkg.calls} calls
-                        <div style={{ fontSize: 11, fontWeight: 400, color: "#8e8e93", marginTop: 2 }}>{pkg.price}</div>
+                        <div style={{ fontSize: 11, fontWeight: 400, color: "rgb(var(--ink-2))", marginTop: 2 }}>{pkg.price}</div>
                       </button>
                     ))}
                   </div>
@@ -320,17 +381,17 @@ export default function SettingsTab({ profile, calls, onZoomNameSaved }: Props) 
             <button
               onClick={handlePortal}
               disabled={portalLoading}
-              style={{ width: "100%", padding: "11px 0", background: "#1c1c1e", color: "#fff", border: "none", borderRadius: 10, fontSize: 14, fontWeight: 600, cursor: portalLoading ? "not-allowed" : "pointer", opacity: portalLoading ? 0.6 : 1, fontFamily: "inherit", transition: "opacity 0.2s" }}
+              style={{ width: "100%", padding: "11px 0", background: "rgb(var(--ink-1))", color: "rgb(var(--surface))", border: "none", borderRadius: 10, fontSize: 14, fontWeight: 600, cursor: portalLoading ? "not-allowed" : "pointer", opacity: portalLoading ? 0.6 : 1, fontFamily: "inherit", transition: "opacity 0.2s" }}
             >
               {portalLoading ? "Opening Portal…" : "Manage Billing"}
             </button>
           </>
         ) : (
           <div style={{ textAlign: "center", padding: "20px 0" }}>
-            <div style={{ fontSize: 14, color: "#8e8e93", marginBottom: 14 }}>No active subscription</div>
+            <div style={{ fontSize: 14, color: "rgb(var(--ink-2))", marginBottom: 14 }}>No active subscription</div>
             <button
               onClick={() => window.location.href = "/api/stripe/create-checkout?plan=" + (profile.role || "closer")}
-              style={{ padding: "10px 24px", background: "#007aff", color: "#fff", border: "none", borderRadius: 10, fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}
+              style={{ padding: "10px 24px", background: "rgb(var(--signal))", color: "rgb(var(--signal-on))", border: "none", borderRadius: 10, fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}
             >
               Subscribe Now
             </button>
@@ -343,13 +404,13 @@ export default function SettingsTab({ profile, calls, onZoomNameSaved }: Props) 
         <SectionLabel>Wingman Assist</SectionLabel>
         <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
           <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 13, fontWeight: 600, color: "#1c1c1e", marginBottom: 3 }}>Enable Wingman Assist</div>
-            <div style={{ fontSize: 12, color: "#8e8e93", lineHeight: 1.5 }}>
+            <div style={{ fontSize: 13, fontWeight: 600, color: "rgb(var(--ink-1))", marginBottom: 3 }}>Enable Wingman Assist</div>
+            <div style={{ fontSize: 12, color: "rgb(var(--ink-2))", lineHeight: 1.5 }}>
               AI-powered real-time coaching during calls. +$50/mo add-on.
-              {saving === "assist" && <span style={{ color: "#007aff", marginLeft: 8 }}>Saving…</span>}
+              {saving === "assist" && <span style={{ color: "rgb(var(--signal))", marginLeft: 8 }}>Saving…</span>}
             </div>
           </div>
-          <Toggle on={assistEnabled} onToggle={() => handleAssistToggle(!assistEnabled)} />
+          <Toggle on={assistEnabled} onToggle={() => handleAssistToggle(!assistEnabled)} label="Enable Wingman Assist" />
         </div>
       </Card>
 
@@ -365,16 +426,16 @@ export default function SettingsTab({ profile, calls, onZoomNameSaved }: Props) 
           ].map((item, idx, arr) => (
             <div
               key={item.key}
-              style={{ display: "flex", alignItems: "flex-start", gap: 12, paddingTop: idx === 0 ? 0 : 14, paddingBottom: idx < arr.length - 1 ? 14 : 0, borderBottom: idx < arr.length - 1 ? "1px solid #f2f2f7" : "none" }}
+              style={{ display: "flex", alignItems: "flex-start", gap: 12, paddingTop: idx === 0 ? 0 : 14, paddingBottom: idx < arr.length - 1 ? 14 : 0, borderBottom: idx < arr.length - 1 ? "1px solid rgb(var(--line))" : "none" }}
             >
               <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 13, fontWeight: 600, color: "#1c1c1e", marginBottom: 2 }}>{item.label}</div>
-                <div style={{ fontSize: 12, color: "#8e8e93", lineHeight: 1.5 }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: "rgb(var(--ink-1))", marginBottom: 2 }}>{item.label}</div>
+                <div style={{ fontSize: 12, color: "rgb(var(--ink-2))", lineHeight: 1.5 }}>
                   {item.desc}
-                  {saving === item.key && <span style={{ color: "#007aff", marginLeft: 6 }}>Saving…</span>}
+                  {saving === item.key && <span style={{ color: "rgb(var(--signal))", marginLeft: 6 }}>Saving…</span>}
                 </div>
               </div>
-              <Toggle on={alerts[item.key]} onToggle={() => handleAlertToggle(item.key, !alerts[item.key])} />
+              <Toggle on={alerts[item.key]} onToggle={() => handleAlertToggle(item.key, !alerts[item.key])} label={item.label} />
             </div>
           ))}
         </div>
@@ -383,9 +444,9 @@ export default function SettingsTab({ profile, calls, onZoomNameSaved }: Props) 
       {/* AI Performance */}
       <Card style={{ marginBottom: 14 }}>
         <SectionLabel>AI Performance</SectionLabel>
-        <div style={{ fontSize: 13, color: "#8e8e93", marginBottom: 14 }}>
+        <div style={{ fontSize: 13, color: "rgb(var(--ink-2))", marginBottom: 14 }}>
           Choose how Wingman thinks during your calls.
-          {saving === "ai_model" && <span style={{ color: "#007aff", marginLeft: 8 }}>Saving…</span>}
+          {saving === "ai_model" && <span style={{ color: "rgb(var(--signal))", marginLeft: 8 }}>Saving…</span>}
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
           {([
@@ -398,8 +459,8 @@ export default function SettingsTab({ profile, calls, onZoomNameSaved }: Props) 
                 key={opt.pref}
                 onClick={() => handleAiModelSelect(opt.pref)}
                 style={{
-                  background: isSelected ? "#1c1c1e" : "#f9f9f9",
-                  border: isSelected ? "2px solid #1c1c1e" : "2px solid #e5e5ea",
+                  background: isSelected ? "rgb(var(--ink-1))" : "rgb(var(--surface-sunken))",
+                  border: isSelected ? "2px solid rgb(var(--ink-1))" : "2px solid rgb(var(--line-strong))",
                   borderRadius: 12,
                   padding: "14px 14px",
                   cursor: "pointer",
@@ -410,15 +471,15 @@ export default function SettingsTab({ profile, calls, onZoomNameSaved }: Props) 
                 }}
               >
                 {opt.recommended && (
-                  <div style={{ position: "absolute", top: 8, right: 8, background: "#007aff", color: "#fff", fontSize: 9, fontWeight: 800, padding: "2px 6px", borderRadius: 4, letterSpacing: "0.04em" }}>
+                  <div style={{ position: "absolute", top: 8, right: 8, background: "rgb(var(--signal))", color: "rgb(var(--signal-on))", fontSize: 9, fontWeight: 800, padding: "2px 6px", borderRadius: 4, letterSpacing: "0.04em" }}>
                     REC
                   </div>
                 )}
                 <div style={{ fontSize: 18, marginBottom: 6 }}>{opt.icon}</div>
-                <div style={{ fontSize: 13, fontWeight: 700, color: isSelected ? "#fff" : "#1c1c1e", marginBottom: 4 }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: isSelected ? "rgb(var(--surface))" : "rgb(var(--ink-1))", marginBottom: 4 }}>
                   {opt.title}
                 </div>
-                <div style={{ fontSize: 11, color: isSelected ? "rgba(255,255,255,0.65)" : "#8e8e93", lineHeight: 1.4 }}>
+                <div style={{ fontSize: 11, color: isSelected ? "rgb(var(--surface) / 0.65)" : "rgb(var(--ink-2))", lineHeight: 1.4 }}>
                   {opt.desc}
                 </div>
               </button>
@@ -432,13 +493,13 @@ export default function SettingsTab({ profile, calls, onZoomNameSaved }: Props) 
         <SectionLabel>Account</SectionLabel>
         <button
           onClick={handleSignOut}
-          style={{ width: "100%", padding: "11px 0", background: "#fff0f0", color: "#ff3b30", border: "1px solid #ffd5d5", borderRadius: 10, fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", transition: "background 0.2s" }}
+          style={{ width: "100%", padding: "11px 0", background: "rgb(var(--critical-weak))", color: "rgb(var(--critical))", border: "1px solid rgb(var(--critical) / 0.25)", borderRadius: 10, fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", transition: "background 0.2s" }}
         >
           Sign Out
         </button>
       </Card>
 
-      <div style={{ textAlign: "center", fontSize: 11, color: "#c7c7cc", paddingBottom: 24 }}>
+      <div style={{ textAlign: "center", fontSize: 11, color: "rgb(var(--ink-3))", paddingBottom: 24 }}>
         Wingman v1.0 · Built for closers.
       </div>
     </div>

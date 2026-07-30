@@ -3,17 +3,16 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import type { Profile, Call, VaultObjection, VaultSignal, CallStageLabel } from "@/types";
+import type { Profile, Call, VaultObjection, CallStageLabel } from "@/types";
 import { NO_DEBRIEF_GRACE_MS } from "@/lib/wingman/outcome-stats";
-import Sidebar from "@/components/dashboard/Sidebar";
+import Sidebar, { SIDEBAR_WIDTH_COLLAPSED, SIDEBAR_WIDTH_EXPANDED } from "@/components/dashboard/Sidebar";
+import { CoachProvider } from "@/components/dashboard/coach/CoachProvider";
 import HomeTab from "@/components/dashboard/HomeTab";
 import FlightLogTab from "@/components/dashboard/FlightLogTab";
 import ObjectionVaultTab from "@/components/dashboard/ObjectionVaultTab";
-import SignalVaultTab from "@/components/dashboard/SignalVaultTab";
 import IntelTab from "@/components/dashboard/IntelTab";
 import SettingsTab from "@/components/dashboard/SettingsTab";
 import PersonalizeTab from "@/components/dashboard/PersonalizeTab";
-import FlightPlanTab from "@/components/dashboard/FlightPlanTab";
 import PaywallModal from "@/components/ui/PaywallModal";
 import { FREE_CALL_LIMIT } from "@/lib/constants";
 import { getDefaultStage } from "@/lib/wingman/poll-intervals";
@@ -21,16 +20,20 @@ import { parseSSEBuffer } from "@/lib/wingman/sse-parse";
 import { HOT_PARTIAL_MS, SETTLE_WAIT_MS } from "@/lib/wingman/live-tail";
 import { scoreReadiness, BELIEF_DISPLAY } from "@/lib/wingman/close-readiness.mjs";
 import { logDevEvent } from "@/lib/wingman/devlog-client";
+import { chatMessagesUsedToday, quotaUsed } from "@/lib/wingman/chat-quota";
+import { useCoachSession } from "@/components/dashboard/home/Coach";
 import { useWingmanPoller } from "@/hooks/useWingmanPoller";
 import { useRecallTranscript } from "@/hooks/useRecallTranscript";
 
-export type DashboardTab = "home" | "flight-plan" | "library" | "objections" | "signals" | "intel" | "settings" | "personalize";
+// "flight-plan" and "signals" were removed 2026-07-29 (Sebastian: Sales DNA supersedes
+// Flight Plan; Signal Vault retired). Removing them from this union is what makes the
+// compiler find every leftover reference.
+export type DashboardTab = "home" | "library" | "objections" | "intel" | "settings" | "personalize";
 
 interface Props {
   profile: Profile;
   initialCalls: Call[];
   initialObjections: VaultObjection[];
-  initialSignals: VaultSignal[];
   userId: string;
 }
 
@@ -87,7 +90,6 @@ export default function DashboardClient({
   profile,
   initialCalls,
   initialObjections,
-  initialSignals,
   userId,
 }: Props) {
   const router = useRouter();
@@ -95,10 +97,53 @@ export default function DashboardClient({
 
   // ── Tab / UI state ─────────────────────────────────────────────────────────
   const [tab, setTab] = useState<DashboardTab>("home");
+
+  // Coach conversation. Lives HERE, not in HomeTab, because HomeTab unmounts on
+  // every tab change — including the Coach's own "Open X in Flight Log →"
+  // handoff, which would silently destroy the thread the rep was building.
+  const coachSession = useCoachSession(chatMessagesUsedToday(profile));
+
+  // ONE number for the whole dashboard. The sidebar used to read the server count
+  // straight off `profile`, which only moves on a page load — so it sat stale
+  // ("1 of 20") while the chat box counted live ("3/20"). Both now read this.
+  const coachUsed = quotaUsed(coachSession.quota);
+
+  // Fold the refreshed profile count in whenever router.refresh() lands a new one.
+  // This is also the ONLY rollover signal available to a tab that sits open past
+  // midnight without anyone sending a message: `chatMessagesUsedToday` re-checks the
+  // UTC date on every call, so it drops to 0 on its own and `quotaReconcile` sees the
+  // day change and re-anchors. The previous `useRef` baseline could not — it was
+  // captured once, so an overnight tab stayed pinned at yesterday's count.
+  const profileChatCount = chatMessagesUsedToday(profile);
+  const reportServerCount = coachSession.reportServerCount;
+  useEffect(() => {
+    reportServerCount(profileChatCount);
+  }, [profileChatCount, reportServerCount]);
+
+  /*
+    Deliver the rollover. `chatMessagesUsedToday` re-checks the UTC date, but only
+    WHEN CALLED — i.e. during a render — and an idle dashboard renders zero times
+    overnight (every interval here is gated on a live call or a pending outcome).
+    Without this, a rep who hit 20/20 at 4pm and left the window open finds the
+    composer still disabled at 9am with a full day's quota available, and clicking it
+    doesn't help: typing only re-renders Coach, not this component.
+
+    Free on same-day ticks — `quotaReconcile` returns the identical object when there
+    is nothing new, so React bails out and no re-render happens. Exactly one render
+    fires, at midnight. The focus listener covers a laptop that was asleep.
+  */
+  useEffect(() => {
+    const tick = () => reportServerCount(chatMessagesUsedToday(profile));
+    const id = setInterval(tick, 60_000);
+    window.addEventListener("focus", tick);
+    return () => {
+      clearInterval(id);
+      window.removeEventListener("focus", tick);
+    };
+  }, [profile, reportServerCount]);
   const [collapsed, setSidebarCollapsed] = useState(false);
   const [badges, setBadges] = useState({
     objections: initialObjections.filter((o) => o.is_new).length,
-    signals:    initialSignals.filter((s) => s.is_new).length,
   });
   const [pendingCall, setPendingCall] = useState<Call | null>(null);
   // Deep-link target: a callId to open in Flight Log (from the HUD "View call →"
@@ -1546,7 +1591,11 @@ export default function DashboardClient({
   // ── Navigation helpers ─────────────────────────────────────────────────────
   const handleTabClick = useCallback((id: DashboardTab) => {
     setTab(id);
-    if (id === "objections" || id === "signals") {
+    // Switching tabs swaps the whole page body but React keeps the window's scroll
+    // offset, so a tab opened from halfway down the previous one starts mid-page.
+    // The dashboard has no inner scroll container — the window itself scrolls.
+    window.scrollTo({ top: 0 });
+    if (id === "objections") {
       setBadges((b) => ({ ...b, [id]: 0 }));
     }
   }, []);
@@ -1558,13 +1607,14 @@ export default function DashboardClient({
 
   const clearPendingCall = useCallback(() => setPendingCall(null), []);
 
-  const sidebarWidth = collapsed ? 56 : 220;
+  // Imported, never re-typed — see the note on these constants in Sidebar.tsx.
+  const sidebarWidth = collapsed ? SIDEBAR_WIDTH_COLLAPSED : SIDEBAR_WIDTH_EXPANDED;
 
   return (
     <div
       style={{
         minHeight:  "100vh",
-        background: "#f7f5f2",
+        background: "rgb(var(--paper))",
         fontFamily: "-apple-system, 'SF Pro Display', BlinkMacSystemFont, sans-serif",
       }}
     >
@@ -1575,7 +1625,7 @@ export default function DashboardClient({
         @keyframes accordionDown { from{opacity:0;transform:translateY(-6px)} to{opacity:1;transform:translateY(0)} }
         .accordion-body { animation: accordionDown 0.22s cubic-bezier(0.22,1,0.36,1) both }
         @keyframes typingBounce { 0%,60%,100%{transform:translateY(0);opacity:0.4} 30%{transform:translateY(-5px);opacity:1} }
-        .typing-dot { width:7px;height:7px;border-radius:50%;background:#aaa;display:inline-block;animation:typingBounce 1.2s infinite ease-in-out; }
+        .typing-dot { width:7px;height:7px;border-radius:50%;background:rgb(var(--ink-3));display:inline-block;animation:typingBounce 1.2s infinite ease-in-out; }
         .typing-dot:nth-child(1){animation-delay:0s}
         .typing-dot:nth-child(2){animation-delay:0.2s}
         .typing-dot:nth-child(3){animation-delay:0.4s}
@@ -1587,11 +1637,11 @@ export default function DashboardClient({
       {startError && (
         <div style={{
           position: "fixed", top: 0, left: 0, right: 0, zIndex: 1000,
-          background: "#ff3b30", color: "#fff", padding: "10px 20px",
+          background: "rgb(var(--critical))", color: "rgb(var(--surface))", padding: "10px 20px",
           fontSize: 13, fontWeight: 500, textAlign: "center",
         }}>
           {startError}
-          <button onClick={() => setStartError(null)} style={{ marginLeft: 12, color: "#fff", background: "none", border: "none", fontWeight: 700, cursor: "pointer" }}>✕</button>
+          <button onClick={() => setStartError(null)} style={{ marginLeft: 12, color: "rgb(var(--surface))", background: "none", border: "none", fontWeight: 700, cursor: "pointer" }}>✕</button>
         </div>
       )}
 
@@ -1608,19 +1658,30 @@ export default function DashboardClient({
           userId={userId}
           callsUsed={profile.calls_used ?? 0}
           callLimit={FREE_CALL_LIMIT}
-          chatMessagesToday={profile.chat_messages_today ?? 0}
+          chatMessagesToday={coachUsed}
         />
 
         <div
+          // Clicking the empty area beside the Coach panel drops back to Home,
+          // the way clicking beside Granola's chat does. Guarded on currentTarget
+          // so it only fires for the bare margin, never for content clicks.
+          onClick={(e) => {
+            if (coachSession.open && e.target === e.currentTarget) coachSession.setOpen(false);
+          }}
           style={{
             marginLeft: sidebarWidth,
             flex:       1,
             padding:    "48px 32px",
             minHeight:  "100vh",
-            background: "#f7f5f2",
+            background: "rgb(var(--paper))",
             transition: "margin-left 0.28s cubic-bezier(0.22,1,0.36,1)",
           }}
         >
+          {/* Holds the state the Coach bar needs but that dies with a tab: the fetched
+              transcript and this session's outcome confirmations. Sits BELOW
+              DashboardClient on purpose — its updates must not re-render the component
+              that owns the live-call handlers and the Live Hub pill state machine. */}
+          <CoachProvider>
           {tab === "home" && (
             <HomeTab
               profile={profile}
@@ -1635,9 +1696,10 @@ export default function DashboardClient({
               deployPhase={deployPhase}
               stillLooking={stillLooking}
               onCancelSearch={handleCancelSearch}
+              coachSession={coachSession}
+              coachUsed={coachUsed}
             />
           )}
-          {tab === "flight-plan" && <FlightPlanTab />}
           {tab === "library" && (
             <FlightLogTab
               calls={initialCalls}
@@ -1648,20 +1710,13 @@ export default function DashboardClient({
               userId={userId}
               isActive={isActive}
               isPendingOutcome={pendingOutcome}
+              onQuotaReported={reportServerCount}
             />
           )}
           {tab === "objections" && (
             <ObjectionVaultTab
               initialObjections={initialObjections}
               userId={userId}
-            />
-          )}
-          {tab === "signals" && (
-            <SignalVaultTab
-              initialSignals={initialSignals}
-              role={profile.role || "closer"}
-              userId={userId}
-              displayMode={profile.signal_display_mode || "short"}
             />
           )}
           {tab === "intel"    && <IntelTab calls={initialCalls} />}
@@ -1678,6 +1733,7 @@ export default function DashboardClient({
               userId={userId}
             />
           )}
+          </CoachProvider>
         </div>
       </div>
 
