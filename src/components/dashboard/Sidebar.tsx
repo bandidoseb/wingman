@@ -260,7 +260,11 @@ export default function Sidebar({
         borderRight: "1px solid rgb(var(--line))",
         display: "flex",
         flexDirection: "column",
-        padding: collapsed ? "48px 8px 20px" : "48px 12px 20px",
+        // Top padding clears the macOS traffic lights, which are drawn INSIDE this
+        // rail (electron/main.ts, trafficLightPosition y:20 + 12px buttons = they
+        // end at 32). 58 leaves a 26px gap below them — previously 48 left only 14,
+        // which read as cramped against the first control.
+        padding: collapsed ? "58px 8px 20px" : "58px 12px 20px",
         position: "fixed",
         top: 0,
         left: 0,

@@ -1561,6 +1561,10 @@ export default function DashboardClient({
   // ── Navigation helpers ─────────────────────────────────────────────────────
   const handleTabClick = useCallback((id: DashboardTab) => {
     setTab(id);
+    // Switching tabs swaps the whole page body but React keeps the window's scroll
+    // offset, so a tab opened from halfway down the previous one starts mid-page.
+    // The dashboard has no inner scroll container — the window itself scrolls.
+    window.scrollTo({ top: 0 });
     if (id === "objections") {
       setBadges((b) => ({ ...b, [id]: 0 }));
     }

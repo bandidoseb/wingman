@@ -186,6 +186,14 @@ export default function FlightLogTab({ calls, initialCall, onInitialCallConsumed
   const router = useRouter();
   const [selectedCall, setSelectedCall] = useState<Call | null>(initialCall);
   const [activeDetailTab, setActiveDetailTab] = useState<"debrief" | "transcript">("debrief");
+
+  // Opening a call (or going back to the list) replaces the page body but leaves the
+  // window scrolled where it was — click a call from far down the list and the detail
+  // view opens somewhere in its middle. Keyed on the id so it fires for open, back,
+  // AND the HUD "View call →" deep-link, which sets selectedCall without a click.
+  useEffect(() => {
+    window.scrollTo({ top: 0 });
+  }, [selectedCall?.id]);
   // Tracks outcomes set inline (without a full page reload)
   const [localOutcomes, setLocalOutcomes] = useState<Record<string, string>>({});
   const [editingOutcomes, setEditingOutcomes] = useState<Record<string, boolean>>({});

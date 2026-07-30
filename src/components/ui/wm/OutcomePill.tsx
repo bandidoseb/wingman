@@ -34,7 +34,7 @@ export function outcomeTone(outcome: string): string {
 }
 
 /**
- * The "Wingman guessed this" mark. An inline SVG, not an emoji: it inherits
+ * The "Wingman detected this" mark. An inline SVG, not an emoji: it inherits
  * `currentColor` (so it flips with the pill's text) and renders identically on
  * every machine, which an emoji does not.
  */
@@ -65,8 +65,9 @@ export default function OutcomePill({
    * Show the sparkle mark. This replaces the separate uppercase "AUTO" chip that
    * used to sit beside the pill — Sebastian, 2026-07-29: the row read as busy with
    * an "OUTCOME" label, a pill, an "AUTO" chip and a "Confirm" button all doing one
-   * job. Dimmed + sparkle says "Wingman's guess" in one element; solid says
-   * "you confirmed it".
+   * job. Dimmed + sparkle says "Wingman detected this" in one element; solid says
+   * "you confirmed it". Never word this as a "guess" anywhere the rep can read it —
+   * see the copy rule in OutcomeControl.
    */
   auto?: boolean;
 }) {

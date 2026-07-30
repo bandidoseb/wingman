@@ -17,8 +17,13 @@ import {
  * separate elements sitting in a row — an "OUTCOME" caption, the pill, an "AUTO"
  * chip, and a "Confirm"/"Edit" button. It read as busy. Now there is one element:
  *
- *   confirmed        → solid filled pill
- *   Wingman's guess  → same pill, dimmed, with a sparkle mark
+ *   confirmed  → solid filled pill
+ *   detected   → same pill, dimmed, with a sparkle mark
+ *
+ * COPY RULE: never call it a "guess". Sebastian, 2026-07-29 — it undersells the
+ * feature and makes the product sound unreliable. The outcome is *detected* from
+ * the transcript by the post-call job and is confidence-gated before it is ever
+ * shown. "Detected by Wingman" is both accurate and the right level of confidence.
  *
  * and the pill itself is the button. The caption became a tooltip, because "what
  * is this pill" is a question you ask once, not something that needs permanent
@@ -73,7 +78,7 @@ export default function OutcomeControl({
           </button>
         </TooltipTrigger>
         <TooltipContent>
-          {isAuto ? "Wingman's guess — click to confirm" : "Call outcome — click to change"}
+          {isAuto ? "Detected by Wingman — click to confirm" : "Call outcome — click to change"}
         </TooltipContent>
       </Tooltip>
     </TooltipProvider>
