@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "build:verify": "WINGMAN_BUILD_DIR=.next-verify next build",
     "start": "next start",
     "lint": "next lint",
     "token-lint": "node scripts/token-lint.mjs",

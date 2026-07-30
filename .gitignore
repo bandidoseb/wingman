@@ -12,6 +12,9 @@ node_modules/
 
 # Next.js build output
 .next/
+# Throwaway output for `npm run build:verify` — a build gate that must never
+# clobber a running dev server's .next.
+.next-verify/
 out/
 
 # Vercel

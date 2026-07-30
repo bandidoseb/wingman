@@ -1,6 +1,18 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // Build output directory. Defaults to .next — Railway and `npm run build` are
+  // unchanged.
+  //
+  // WHY THIS IS OVERRIDABLE: a production build REPLACES the chunks in .next. If
+  // Sebastian's `npm run electron:dev` is running against the same directory, his
+  // already-loaded dev server suddenly can't resolve its own modules and the app
+  // dies with "Cannot find module './XXXX.js'". This has now happened twice, both
+  // times because a build was run as a verification gate while his server was up.
+  // `npm run build:verify` sets this to a throwaway directory so a correctness
+  // check can never take his running app down.
+  distDir: process.env.WINGMAN_BUILD_DIR || ".next",
+
   experimental: {
     serverActions: {
       // Allow requests from localhost (Electron dev) and both production domains

@@ -118,3 +118,24 @@
 ### Queued future work belongs in Current Sprint.md, not just MEMORY's "Future Projects"
 **What happened:** Captured a future design session (dig-card threading) as a MEMORY.md "Future Projects" pointer. Sebastian pushed back: "I don't think Claude checks Future Projects when I start new sessions." Correct — the session-start protocol reliably reads `Current Sprint.md` / `Known Issues.md` / `Decisions Log.md` and reports from them; MEMORY.md is auto-loaded but Future Projects is a low-salience backwater that doesn't drive "what do we work on."
 **Rule:** For anything meant to shape a FUTURE session's work, add it to the `Current Sprint.md` QUEUED list (that's the file the start-of-session routine acts on), AND keep the MEMORY pointer as the durable cross-session index. Both — Current Sprint for reliable surfacing, MEMORY for permanence. A design note in `_Inbox/` alone is not enough; nothing routinely reads `_Inbox/`.
+
+---
+
+## Session: 2026-07-29 (dashboard rebuild, session 2)
+
+### NEVER run `npm run build` as a verification gate — it kills Sebastian's running dev server
+**What happened:** Ran `npm run build` at the end of several turns as a "final gate". A production build REPLACES the chunks in `.next`. Sebastian's `npm run electron:dev` was running against that same directory, so his already-loaded app suddenly couldn't resolve its own modules and died with `Cannot find module './5611.js'`. He saw a Runtime Error screen on a dashboard that was actually fine. **This lesson was already written down** (`feedback_dev_server_vs_build`) and I did it anyway — stopping MY OWN preview server is not enough, because his terminal has its own.
+**Rule:** Use **`npm run build:verify`** (added this session). It sets `WINGMAN_BUILD_DIR=.next-verify` via the `distDir` override in `next.config.ts`, so the build lands in a throwaway directory and `.next` is never touched. Plain `npm run build` is for Railway and for Sebastian, not for me. Proven with a sentinel file: `.next/sentinel.txt` survived a full `build:verify`.
+**Deeper rule:** "I stopped the dev server" only accounts for servers I know about. Prefer a change that makes the damage *impossible* over a habit that avoids it.
+
+### One number written in two files WILL desync — export it instead
+**What happened:** The sidebar rail width lived in `Sidebar.tsx` and the page body's matching offset lived in `DashboardClient.tsx`, as two hardcoded copies. I changed one (56 → 80) and not the other, so the collapse animation ran toward endpoints 24px apart and the content finished sitting under the rail. Sebastian reported it as "jumpy and not smooth" — a visual symptom of a duplicated constant.
+**Rule:** When two components must agree on a number (widths, offsets, durations, z-indexes), export it from one and import it in the other. If a third process needs it too — `electron/main.ts` needs `trafficLightPosition.x = (railWidth − 52) / 2` and cannot import from `src/` — write the arithmetic into a comment in BOTH files so the link is discoverable from either end.
+
+### `token-lint` scans comments, so "was #xxx" notes keep the debt counter high
+**What happened:** Documented a colour fix by quoting the old hex in a comment. The literal still counted, the file stayed in the baseline, and the ratchet went blind on it.
+**Rule:** Describe the old value in prose, never paste it. Same for `rgba(...)` in explanatory comments.
+
+### A synthetic `.click()` cannot test the clipboard
+**What happened:** Spent several rounds thinking the copy button was broken. Both `navigator.clipboard.writeText` and the `execCommand` fallback require a *trusted* user gesture; a scripted `.click()` from the browser tool is not one, so both paths failed and the button showed its error state.
+**Rule:** For clipboard, file pickers, fullscreen, autoplay — anything gated on user activation — drive it with the `computer` tool's real mouse click, and remember that tool takes SCREENSHOT-space coordinates, not viewport coordinates. Confirm by recording the state transition (`Copy → Copied → Copy`), not by reading the clipboard, which needs a separate permission.
