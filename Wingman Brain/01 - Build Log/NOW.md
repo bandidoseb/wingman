@@ -38,18 +38,17 @@ happens today and is invisible: **"Retrying (2 of 3)"**.
 
 ## Blocked on Sebastian
 
-- **Typeface call.** The app ships **Geist** (`src/app/layout.tsx` assigns it to `--font-sans`,
-  shadowing the token) but Design Language §4 says system sans / SF Pro. Left unchanged because
-  it restyles every screen. Pick one.
 - **Dark-mode sweep of every screen** — the instrument is `tasks/dashboard-sweep.md` and it is
   still **completely empty**. Nothing downstream of it can start.
-- **`.claude/settings.local.json` sets `"defaultMode": "bypassPermissions"`** and that file is
-  git-tracked, not ignored. Permission prompts are off and the setting is committed. Deliberate?
-  If yes, leave it. If not, it should move to a gitignored file.
 - **Objection Vault redesign** — rank by DAMAGE not frequency; buckets → instances; kill the red
   NEW badges (red means *lost*, never decoration — Design Language §3d).
-- **Open a PR for `chore/context-system-cleanup`?** 7 commits, the whole context overhaul.
-  `main` is ruleset-protected, so this has to go through a PR either way.
+
+**Settled 2026-07-30 — do not re-raise:**
+- **The typeface question is deferred to a dashboard session** (Sebastian: *"that's for a
+  different session. maybe one that involves the dashboard work"*). Geist stays for now. Don't
+  raise it again outside a session that is already touching the dashboard — see the Backlog.
+- **`"defaultMode": "bypassPermissions"` in `.claude/settings.local.json` is deliberate**
+  (Sebastian confirmed). Leave it. Not a finding, not a bug, not a security gap to re-report.
 
 ---
 
@@ -57,8 +56,8 @@ happens today and is invisible: **"Retrying (2 of 3)"**.
 
 Nothing mid-code. The SessionStart hook reports real branch/PR/release state — read it, not this.
 
-**The context-system cleanup** lives on `chore/context-system-cleanup` and is awaiting Sebastian's
-decision on opening a PR (CLAUDE.md rule #0). Full write-up: `2026-07-30.md` → Session 2.
+**The context-system cleanup shipped** — PR #59, merged 2026-07-30. Full write-up:
+`2026-07-30.md` → Session 2; how the system works: memory `reference-context-system`.
 
 ⚠️ **The enforcement hooks have never run in a genuinely cold session.** Every gate was tested by
 invoking it directly and each fired correctly, but the first real session start is the true test.
@@ -102,6 +101,12 @@ Test Pilot from using the 4 arrows?* If no → it stays here, however good it is
   and that URL must resolve before a single beta user signs up.
 - **Beta onboarding email** — download link is the public `wingman-releases` page. **No quarantine
   command** (notarized since 2026-07-01). Mention it auto-updates after first install.
+
+**Bundle into the next dashboard session** (deferred there by Sebastian, 2026-07-30)
+- **Typeface decision** — the app ships **Geist** (`src/app/layout.tsx` assigns it to
+  `--font-sans`, shadowing the token) while Design Language §4 says system sans / SF Pro. Whichever
+  wins restyles every screen, so it belongs with dashboard work, not on its own.
+- Dark-mode sweep · Objection Vault redesign · new icons.
 
 **Queued projects** (each its own fresh session — do not batch)
 - Core card **voice** rework → then un-pin the confrontation dial (built, gated, inert)
