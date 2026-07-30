@@ -5,6 +5,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { ArrowUp, X, SquarePen } from "lucide-react";
 import type { Call } from "@/types";
 import { CHAT_DAILY_CAP } from "@/lib/wingman/chat-quota";
+import { nextSuggestion, type ChatDiveReady } from "@/lib/wingman/dive-suggestion";
 import {
   PromptInput,
   PromptInputTextarea,
@@ -196,20 +197,54 @@ export default function Coach({
         return;
       }
 
-      // Ready to go deep on one call — Flight Log owns that experience.
-      if (data.diveReady?.callData?.id) {
-        const opened = onOpenCall(data.diveReady.callData.id);
-        setSuggestion(null);
+      /*
+        A dive is an ordinary 200 with an ordinary reply, so it takes the ordinary
+        path: show the reply, count the message, settle the suggestion. Then, and
+        only then, navigate.
+
+        It used to `return` early out of a branch keyed on `data.diveReady?.callData?.id`
+        — a field the route has never sent (its select has no `id`). That branch was
+        dead, which meant:
+          · "yes, dive into that call" silently did nothing on Home; and
+          · `setSuggestion(null)` lived INSIDE it, so the suggestion never cleared,
+            `pendingCallId` rode every later send, the model re-fired DIVE_NOW, and
+            each message re-read the full row + transcript and paid for another Sonnet
+            call and another quota decrement — invisibly, until reload.
+        The route now returns `diveReady.callId` (already UUID-validated) and a
+        `diveFailed` flag. Both halves of that bug are fixed here.
+      */
+      // Cast against the SHARED wire type, not an inline shape — see ChatDiveReady.
+      const dive = data.diveReady as ChatDiveReady | undefined;
+
+      setMessages((p) => [
+        ...p,
+        { role: "assistant", text: data.reply || "Couldn't get a response." },
+        /*
+          Deliberately NOT `dive.openerReply` here. That line is "Read it. Your call
+          with X … what do you want to look at?" — true in Flight Log, which switches
+          into single-call mode with the transcript loaded. Home has no single-call
+          mode (see the note at the top of this file): the follow-up would go out as
+          `mode:"global"` with only a 150-char summary per call, while the history
+          contains the model's own claim to have read the transcript. That is a setup
+          for confident fabrication about a call, which is worse than admitting the
+          limit. Hand off instead.
+        */
+        ...(dive?.callId
+          ? [{ role: "assistant" as const, text: "Opening it in your Flight Log — ask me there and I'll have the full transcript." }]
+          : []),
+      ]);
+      setSentCount((n) => n + 1);
+
+      // Suggestion lifecycle lives in `nextSuggestion` so it is unit-testable — the
+      // rule it encodes is the one whose failure burned quota on every message.
+      setSuggestion((prev) => nextSuggestion(prev, data));
+
+      if (dive?.callId) {
+        const opened = onOpenCall(dive.callId);
         if (!opened) {
           setMessages((p) => [...p, { role: "assistant", text: "Couldn't open that call from here — it's in your Flight Log." }]);
         }
-        return;
       }
-
-      if (data.callSuggestion?.call_id) setSuggestion(data.callSuggestion);
-
-      setMessages((p) => [...p, { role: "assistant", text: data.reply || "Couldn't get a response." }]);
-      setSentCount((n) => n + 1);
     } catch (err) {
       console.error("[Coach] /api/ai/chat failed", err);
       setMessages((p) => [...p, { role: "assistant", text: "Couldn't reach Wingman just then. Try again." }]);

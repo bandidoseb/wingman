@@ -210,6 +210,13 @@ Both chat UIs, plus the leftovers: `chatEndRef`/`globalEndRef`/`modalEndRef`/`mo
 effects (:362-378), modal ESC handler (:381-392), `formatTimestamp` (:157-163), `GlobalMessage`
 (:209), both `/api/ai/chat` fetches.
 
+**Same leak survives in FlightLogTab until this PR deletes it** (`wingman-reviewer`, PR 1).
+`setPendingCallSuggestion(null)` only runs inside the `diveReady` success branch (:506, :525),
+so on the "no transcript" reply the suggestion is retained forever and `pendingCallId` rides
+every later global send from the Mission Intel modal. Lower blast radius than Home's (the
+transcript is empty, so the re-read is cheap) and PR 4 deletes the whole surface — but if PR 4
+slips, fix it in place.
+
 **Port, don't delete:** `wingman_global_chat` localStorage, 24h TTL (:399-424). The Coach thread
 is in-memory only (Coach.tsx:36-39), so a naive merge regresses a shipped behaviour and orphans
 the key.
