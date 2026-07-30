@@ -584,8 +584,8 @@ Required keys (confirm these exist before debugging API issues):
 **Dev only** — never set on Railway
 - `WINGMAN_DEVLOG=1` + `NEXT_PUBLIC_WINGMAN_DEVLOG=1` — Flight Recorder. Also gated on `NODE_ENV !== "production"`, so it is a hard no-op in prod.
 
-**No longer required**
-- `GROQ_API_KEY` — `query-distill.ts` has zero importers since the Groq distiller was cut (2026-06-30). Nothing breaks if it's absent. *(This line previously said it was "required for Phase 3.5" and told you to verify it on Railway before merging — dead advice for a dead path.)*
+**No longer required on Railway — but KEEP it in `.env.local`**
+- `GROQ_API_KEY` — the app no longer uses it. The Groq distiller left the live objection path on 2026-06-30 (`kb-signal/route.ts`: "NO Groq") and `query-distill.ts` has no runtime caller. **But two local dev harnesses still read it:** `scripts/test-distill.mjs` **hard-fails** without it ("cannot run"), and `scripts/kb-ab-test.mjs` warns and degrades. So: safe to drop from Railway, do not delete from `.env.local`. *(This line previously said it was "required for Phase 3.5" — dead advice. Corrected again 2026-07-30 after a first pass wrongly claimed "nothing breaks if it's absent," which is false for the dev scripts.)*
 
 ---
 

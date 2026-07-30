@@ -306,3 +306,10 @@ REMOVED: server. Use **`npm run build:verify`**.
 REMOVED: - **Name what's unverified.** "Verified by arithmetic, needs an Electron run" beats silence.
 REMOVED: - If `/wrap` itself couldn't do a step (a missing file, a failing command), **say so in the log**
 REMOVED: rather than quietly skipping it.
+
+REMOVED: - `GROQ_API_KEY` ← required for Phase 3.5 query distillation (query-distill.ts). If missing, distillation silently degrades to the raw search path (feature inert, logs only). In .env.local + Railway since 2026-06-07 — verify on Railway before merging Phase 3.5.
+**Why:** dead advice for a dead path — the Groq distiller left the live objection path on
+2026-06-30 and `query-distill.ts` has no runtime caller. Replaced with an entry that says it can
+be dropped from Railway but must stay in `.env.local`, because `scripts/test-distill.mjs`
+hard-fails without it and `scripts/kb-ab-test.mjs` degrades. (A first pass at this replacement
+wrongly said "nothing breaks if it's absent"; the background Groq-cleanup session caught it.)
