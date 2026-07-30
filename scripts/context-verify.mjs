@@ -73,6 +73,10 @@ function isNoise(line) {
   if (/^[-=*_#|>\s:]+$/.test(t)) return true;      // rules, empty table borders
   if (/^\|[\s|:-]+\|$/.test(t)) return true;        // table separator rows
   if (/^```/.test(t)) return true;
+  // Metadata that is SUPPOSED to change every session. Treating a bumped date as
+  // a lost line would train everyone to ignore this script's output.
+  if (/^\**Last updated:?\**\s*:?\s*\d{4}-\d{2}-\d{2}/i.test(t)) return true;
+  if (/^<!--\s*GENERATED/i.test(t)) return true;
   return false;
 }
 

@@ -202,3 +202,31 @@ REMOVED: | # | Issue | Resolution | Date |
 **Why:** that section had existed since April holding 6 legacy rows and had never been added to.
 Its 6 rows were carried into `Known Issues Archive.md` under "Legacy archive rows (pre-2026-04-03)".
 The new archive uses the same 5-column shape as the open table so rows move without reformatting.
+
+---
+
+## Wingman Brain/CLAUDE.md — the two rules that caused the bloat (2026-07-30)
+
+This nested file is auto-loaded whenever Claude works inside the vault. Both rules below were
+*obeyed perfectly* for 34 sessions — that is exactly why `Current Sprint.md` reached 755 lines.
+They protected content but never named anywhere for it to go.
+
+REMOVED: - Never delete entries from any log file — append only
+**Why:** replaced by "**Never delete — relocate.**" plus a table naming the destination for each
+kind of content (NOW → dated log → Sprint Archive; resolved issues → Known Issues Archive;
+reversed decisions → stamped in place; shipped inbox notes → `_Inbox/_Shipped/`; executed plans →
+`tasks/_archive/`). The protection is unchanged; only the dead end was removed.
+
+REMOVED: 1. **Always append, never overwrite** log files
+**Why:** replaced by "**Append to logs; relocate when done. The live top of a file is for what is
+still true — history lives in its archive, never above it.**"
+
+REMOVED: 3. **Keep Known Issues.md current** after every session
+**Why:** extended, not dropped — now also says to move fully-resolved rows to the archive, and
+that a row stays open while ANY verification is outstanding.
+
+REMOVED: - Before starting any build session, read `00 - Product/Architecture.md` and `01 - Build Log/` to get current context
+**Why:** "read `01 - Build Log/`" pointed at a directory that now holds 41 dated logs plus four
+other files — as an instruction it meant "read everything," which is how session-start load
+reached ~85k tokens. Replaced by: "read `01 - Build Log/NOW.md` — what's true right now.
+Everything older is on-demand." `Architecture.md` is still there and still linked from CLAUDE.md.
