@@ -23,6 +23,8 @@
  *   node scripts/context-verify.mjs                 # verify against the default tag
  *   node scripts/context-verify.mjs --tag <name>    # verify against another snapshot
  *   node scripts/context-verify.mjs --list          # print every missing line, undeduped
+ *   node scripts/context-verify.mjs --emit          # print missing lines as ready-to-paste
+ *                                                   # "REMOVED:" entries, full text, no truncation
  */
 
 import { readFileSync, existsSync, readdirSync, statSync } from "node:fs";
@@ -37,12 +39,29 @@ const MEMORY_DIR =
 const argv = process.argv.slice(2);
 const TAG = argv.includes("--tag") ? argv[argv.indexOf("--tag") + 1] : "context-backup-2026-07-30";
 const LIST_ALL = argv.includes("--list");
+const EMIT = argv.includes("--emit");
 
 /** Context surfaces. Code is out of scope — this checks prose, not source. */
 const IS_CONTEXT = (p) =>
   (p.endsWith(".md") || p.endsWith(".mdx")) &&
   !p.startsWith("node_modules/") &&
   !p.includes("/node_modules/");
+
+/**
+ * Directories that must NEVER count as "the line still exists".
+ *
+ * `.claude/worktrees/` holds throwaway git worktrees — full copies of the repo at
+ * some earlier commit. During the 2026-07-30 cleanup a worktree created mid-session
+ * still held the PRE-EDIT CLAUDE.md, so every line this script was meant to catch
+ * as removed was found inside that stale copy and silently passed. A safety check
+ * that reads a snapshot of the past to prove the present is intact is worse than no
+ * check at all. Excluded, permanently.
+ */
+const EXCLUDED_DIRS = [".claude/worktrees", ".next", ".next-verify", "electron-dist", "dist"];
+const isExcluded = (abs) => {
+  const rel = relative(ROOT, abs).split(sep).join("/");
+  return EXCLUDED_DIRS.some((d) => rel === d || rel.startsWith(d + "/"));
+};
 
 /**
  * Structural noise. These carry no information, appear thousands of times, and
@@ -103,8 +122,9 @@ for (const f of tagFiles) {
 function walkMd(dir, out = []) {
   if (!existsSync(dir)) return out;
   for (const entry of readdirSync(dir)) {
-    if (entry === "node_modules" || entry === ".git" || entry === ".next") continue;
+    if (entry === "node_modules" || entry === ".git") continue;
     const full = join(dir, entry);
+    if (isExcluded(full)) continue;
     let st;
     try {
       st = statSync(full);
@@ -162,6 +182,21 @@ console.log("");
 
 if (!missing.length) {
   console.log(`✅ 0 lines missing. Every line of text from before the cleanup still exists.`);
+  process.exit(0);
+}
+
+// --emit: exact, untruncated text ready to paste into removed-on-purpose.md.
+if (EMIT) {
+  const grouped = new Map();
+  for (const m of missing) {
+    const key = m.files[0];
+    if (!grouped.has(key)) grouped.set(key, []);
+    grouped.get(key).push(m.line);
+  }
+  for (const [file, lines] of grouped) {
+    console.log(`\n## ${file} — ${lines.length} line(s)\n`);
+    for (const l of lines) console.log(`REMOVED: ${l}`);
+  }
   process.exit(0);
 }
 

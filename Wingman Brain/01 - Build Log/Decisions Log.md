@@ -2,11 +2,61 @@
 
 A running log of every major architectural or product decision made on Wingman. Append only — never delete. Each entry captures the decision, the date, the reasoning, and any alternatives that were rejected.
 
-Last updated: 2026-07-20
+Last updated: 2026-07-30
+
+> **Reversed decisions are never removed** — they stay in place with a
+> `> ⚠️ **SUPERSEDED <date> → <new truth>**` banner above them. A decision you can't find is a
+> decision that gets relitigated. `context/STATE.md` carries a one-line index of every entry here,
+> so this file no longer has to load at session start to stay discoverable.
 
 ---
 
 ## 2026
+
+### 2026-07-30 — Context system: NOW vs ARCHIVE, and status is generated, never typed
+**Decision:** Every context file is now exactly one of two kinds. **NOW files** are small, rewritten each session, and answer "what's true today" (`NOW.md`, `Known Issues.md`). **HISTORY files** are append-only, never read at session start, always searchable (`Sprint Archive.md`, `Known Issues Archive.md`, the dated logs, this file). Nothing is both. Separately: **status is never hand-typed** — version, branch, PR, and release state are generated into `context/STATE.md` by `scripts/context-gen.mjs` and injected live by a SessionStart hook. Four deterministic hooks enforce the shape; the size ratchet starts as a warning, not a block.
+**Why:** `Current Sprint.md` had reached 755 lines / ~29k tokens, of which 470 were finished work already recorded in the dated build logs — because every written rule in the vault said ADD and none named a destination. Worse, the hand-typed status was actively wrong: both `Current Sprint.md` and `MEMORY.md` asserted `feat/design-tokens` was "17 commits UNPUSHED" when it had merged as PR #58 and shipped, and `CLAUDE.md` gave release instructions that would have failed against the wrong repo. Session-start load went ~85k → ~21k tokens, but the reason was correctness, not size: a tool that lies with confidence costs more than a tool that is merely large.
+**Rejected:** deleting anything (everything moved; `npm run context:verify` proves no line was lost against the `context-backup-2026-07-30` tag, and `context/removed-on-purpose.md` records the only intentional edits). Also rejected: a strict size gate — `token-lint.mjs`'s own comment warns a hard gate "would have been disabled within a week."
+**Status:** Active.
+
+---
+
+### 2026-07-28 — Card doctrine: the test is "has the prospect revealed anything real?", never minutes-in
+**Decision:** (1) Wingman speaks only when it knows something the rep doesn't. (2) Something real revealed → dig it, anchored to the prospect's own words. (3) **Nothing real → Wingman admits it has nothing** and may NEVER invent a question from its own head; the quiet state is the literal string `"Nothing to work with yet."` (4) Never take-the-close on a cold ladder. (5) The ↓ contract is "what's the best question to ask right now?" — it covers opening questions AND chunk-downs, not just "go deeper." **Rename ↓ "Dig Deeper" → "Discover"**, user-facing labels ONLY — never `dig-prompt.mjs`, `DIG_SYSTEM_PROMPT`, the `"dig"` id, or any eval id. Final compass: ↑ Objection · ← Answer · → Close · ↓ Discover. **Exhaustion detection moves from the parking lot to PRE-BETA REQUIRED.**
+**Why:** the work is SUBTRACTION — two prompt instructions currently COMMAND a question unconditionally (`dig-prompt.mjs` ~78 and the `buildDigUserSegments` no-summary fallback) and must change together. Reps will mash ↓; no sense of exhaustion within a belief reads as interrogation, which is Product Rule #11 breaking in front of the first ten users.
+**Rejected:** "Still listening." as the quiet state — reads like a spinner, not an admission.
+**Status:** Active. Lands in voice week.
+
+---
+
+### 2026-07-28 — The launch cutline is law until beta ships
+**Decision:** Before building anything, ask: *does this block a Test Pilot from using the 4 arrows?* If no → Parking Lot, however good the idea is. `tasks/launch-plan.md` is the scope contract. Beta is FREE, called "Test Pilots," capped 5→10, time-boxed and reciprocal. Frozen for the duration: the confrontation dial, A/V notetaker, summarizer tuning, calendar detection, voice-AI onboarding, owner cockpit, positioning demo, iMessage.
+**Why:** Sebastian, in his own words — *"every time I sit down I find more things to build… it feels never-ending"* — 3–4 months in with ~15 queued projects. The constraint is the deliverable.
+**Status:** Active. In force until launch.
+
+---
+
+### 2026-07-28 — Wingman will build its own capture, post-launch, in shadow mode
+**Decision:** Recall.ai stays until a proven replacement exists. Building our own capture is the **first post-launch project**, run in **shadow mode**: it runs alongside Recall, the two are compared across ~20 real calls, and we flip only at proven parity.
+**Why:** measured cost is **~$1.25/recorded hour** (Recall $0.50 + transcription $0.15 + summarizer ~$0.51 + cards ~$0.05 + post-call ~$0.07) at 75–80% margin on a typical user. Own capture lands $0.15–0.30/hr — a 55–75% cut. But every competitor to Recall is BOT-based (a visible participant is a dealbreaker), and Recall's botless SDK is effectively unique in 2026, so switching blind risks the core product experience.
+**Rejected:** migrating before parity; any bot-based provider.
+**Status:** Active. ⚠️ Recall PAYG fine print: 2-hour per-recording limit + 500 h/month cap, both lifted on the Launch tier.
+
+---
+
+### 2026-07-30 — The Coach replies as one message; progress phases must be real or absent
+**Decision:** Staggered multi-bubble Coach replies are **dropped** — the reply arrives as one message. "Dive into that call" opens the call **and** scopes the chat. Any future chain-of-thought progress display must stream **real** phases from the route; inventing steps on timers is forbidden.
+**Why:** `/api/ai/chat` is not streamed, so a progress display added today could only be fabricated steps on a timer — that is Product Rule #11 (never make reps into robots) applied to our own UI. The honest version of PR 5 is "make the route stream its phases." The one real phase that happens today and is invisible: "Retrying (2 of 3)."
+**Status:** Active. CLAUDE.md previously listed staggered bubbles as shipped; corrected 2026-07-30.
+
+---
+
+### 2026-07-30 — In dark mode, elevation is LIGHTNESS and you cannot go down
+**Decision:** `--surface-sunken` is `#2C2B25`, one step ABOVE `--surface`, not below it. Dark-mode ladder: `#171613 → #201F1B → #2C2B25` (step 1.162:1, versus light's 1.158:1). Written up as Design Language §3f.
+**Why:** `--paper` is already at the floor in dark mode, so a "sunken" surface set below it (`#100F0D`) had nowhere to go and every input read as a black hole. One token was the entire bug.
+**Status:** Active.
+
+---
 
 ### 2026-07-20 — Tune the SUMMARIZER (belief ladder) before judging more card outputs; keep the 4 belief states but relabel ⚠️ "at-risk" → "objected"
 **Decision:** Sequencing: **fix the belief-ladder summarizer FIRST**, then resume grading the dig/objection outputs — the summary (`calls.live_summary`) is the foundation every live card reads, so judging card quality on an unrefined foundation is backwards. Scope of the summarizer session (self-contained brief: `tasks/plan-summarizer-tuning.md`), Sebastian-confirmed via a Cole-Gordon-lens audit: **(a) keep all four belief states** (✅ locked / 🟡 partial / ⬜ open / ⚠️) — they encode WHAT TO DO (⬜/🟡 → dig to build; ⚠️ → handle the objection), so don't collapse them; **(b) relabel ⚠️ "at-risk/objection" → "objected"/"contested"** — because an unlocked belief is itself a LATENT objection (⬜/🟡 are also "at risk"), so "at-risk" reads predictive when ⚠️ actually means "already fired"; **(c) raise the ✅ bar to EMOTIONAL ownership on Pain/Desire/Cost** (a logical concession ≠ locked); **(d) protect the ✅ = prospect-affirmed-in-their-own-words bar** (rep asserting ≠ locked — the load-bearing correctness). All gated by `test-belief-ladder.mjs` GREEN + plan-reviewer. Also decided: the objection card should FAVOR QUESTIONS over statements (NEPQ self-persuasion), and payment-terms belong in a Sales DNA configurator that conditionally suppresses the `financial-trade` lever for reps who don't offer plans.
@@ -369,6 +419,12 @@ Last updated: 2026-07-20
 ---
 
 ### 2026-04-02 — Claude Haiku for live signal cards, Claude Sonnet for post-call
+
+> ⚠️ **SUPERSEDED 2026-06-21 → live cards are Claude Sonnet 4.6, not Haiku.** Haiku had a
+> tonality tic that prompt work could not kill; Sonnet follows the rules natively (~0.4s slower,
+> judged worth it). The post-call half of this decision still stands. *(Stamped 2026-07-30 — this
+> entry read "Status: Active" for five weeks after it stopped being true.)*
+
 **Decision:** Use Claude Haiku for real-time signal card generation (target <800ms) and Claude Sonnet for post-call analysis (async, quality over speed).
 **Reasoning:** Haiku's token throughput and latency profile makes it the only Anthropic model that can meet the <1 second end-to-end target reliably. Sonnet is 3-5x slower but produces significantly higher quality analysis for complex tasks (grading a full call transcript, extracting nuanced patterns). Since post-call runs async, latency is irrelevant — quality wins.
 **Status:** Active
@@ -397,6 +453,14 @@ Last updated: 2026-07-20
 ---
 
 ### 2026-04-07 — Keyword signals bypass the 90-second cooldown
+
+> ⚠️ **SUPERSEDED 2026-06-03 → there are no keyword-triggered cards and no cooldown the rep can
+> feel.** The hotkey pivot removed autonomous firing entirely; every live card is summoned via the
+> compass. `keyword-triggers.ts` has zero importers, and `NON_ALERT_COOLDOWN_MS = 90_000` survives
+> only on the legacy poll path. *(Stamped 2026-07-30 — this entry read "Status: Active" while
+> describing a mechanism that no longer exists, and its wording was the upstream source of
+> CLAUDE.md's Core Product Rules #1–#4, which were also wrong.)*
+
 **Decision:** Keyword-triggered objection cards always fire immediately, interrupting any current card and ignoring the 90-second cooldown. Poll-based nudges still respect the cooldown.
 **Reasoning:** A prospect raising a live objection is always time-sensitive. Suppressing it because a card fired 60 seconds ago means a buying signal gets no response. Poll-based cards are lower urgency (the rep may already be handling it) — those still respect the cooldown.
 **Status:** Active.

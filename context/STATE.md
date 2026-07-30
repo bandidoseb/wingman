@@ -12,7 +12,7 @@ session by the SessionStart hook, because a committed file cannot know today's t
 
 - **App version:** `0.1.29` (package.json)
 - **Releases publish to:** `bandidoseb/wingman-releases` (PUBLIC, separate from the source repo)
-- **Branch at last generate:** `main` · 86cac8a chore(context): snapshot memory graph into repo before context cleanup
+- **Branch at last generate:** `main` · 919bf0b chore(context): phase 1 — safety net, build-log index, worktree removal
 
 ## Orphan modules — zero inbound imports
 
@@ -62,6 +62,7 @@ Root-cause write-ups live in `Known Issues Archive.md`. Several are load-bearing
 (#53 Chromium background-timer throttling, #58 `npm run build` killing the dev server,
 #60 `res.json()` typed `any`) — search the archive before re-diagnosing anything similar.
 
+- #1 — Signal card pipeline not yet live-tested on a real call
 - #60 — Coach "dive into that call" NEVER worked — and burned a Sonnet call + quota on EVERY la…
 - #59 — Coach quota: under-reported, could show "23 of 20", and locked an overnight tab at the…
 - #58 — npm run build as a verification gate kills a running dev server
@@ -90,14 +91,19 @@ Root-cause write-ups live in `Known Issues Archive.md`. Several are load-bearing
 - #12 — Transcript duplicates in dashboard and database
 - #13 — Post-call job fails with 502 on Anthropic overload
 - #10 — Transcript buffer discarded if call ends before poll timer fires
-- #1 — Signal card pipeline not yet live-tested on a real call
 - #5 — App is not Apple-notarized
 
-## Decisions (64) — index only
+## Decisions (70) — index only
 
 Full entries: `Wingman Brain/01 - Build Log/Decisions Log.md`. **Read it before**
 **re-opening any architecture question** — that is what it is for. ⚠️ = superseded.
 
+- 2026-07-30 — Context system: NOW vs ARCHIVE, and status is generated, never typed
+- 2026-07-28 — Card doctrine: the test is "has the prospect revealed anything real?", never minutes-in
+- 2026-07-28 — The launch cutline is law until beta ships
+- 2026-07-28 — Wingman will build its own capture, post-launch, in shadow mode
+- 2026-07-30 — The Coach replies as one message; progress phases must be real or absent
+- 2026-07-30 — In dark mode, elevation is LIGHTNESS and you cannot go down
 - 2026-07-20 — Tune the SUMMARIZER (belief ladder) before judging more card outputs; keep the 4 belie…
 - 2026-07-11 — Offer-Aware moat SHIPPED (Phase 1b): Sales DNA injected as an interpretive LENS, never…
 - 2026-07-11 — Do NOT split the ↓ Dig button (breadth vs depth); threading + natural-transition selec…
@@ -163,7 +169,7 @@ Full entries: `Wingman Brain/01 - Build Log/Decisions Log.md`. **Read it before*
 - 2026-04-09 — Obsidian brain tracked in GitHub repo
 - 2026-04-09 — /wrap skill for session end automation
 
-## Build logs (41) — index only
+## Build logs (42) — index only
 
 Full narrative per session: `Wingman Brain/01 - Build Log/YYYY-MM-DD.md`
 
@@ -193,6 +199,7 @@ Full narrative per session: `Wingman Brain/01 - Build Log/YYYY-MM-DD.md`
 - **2026-06-06** — Everything worked:
 - **2026-06-05** — #35 RESOLVED + live-tested by Sebastian ✅. The post-call "How'd it go?" card was unresponsive on the 2nd…
 - **2026-06-03** — Phase 0 — Transcript persistence decoupled from the Sonnet poll (PR #4, merged). New POST /api/wingman/t…
+- **2026-06-02** — Phase 0: Transcript Decouple
 - **2026-06-01** — 1. Deep research on state-of-the-art Claude Code workflows (3 parallel research agents, all sourced):
 - **2026-05-31** — Logged the hotkey-summoned signal card pivot in Decisions Log.md (2026-05-31) — full spec: Up Arrow defa…
 - **2026-05-30** — Conclusion: Stay on Claude Haiku 4.5 for now.

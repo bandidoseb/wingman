@@ -54,3 +54,151 @@ been lost before it started:
   `src/lib/wingman/objection-prompt.mjs:150` still cites by path, plus the Multi-Turn Objection
   Threading rev-2 invariants cited by `src/lib/wingman/live-tail.ts:18`, plus the unbuilt
   Core $149 / Pro $299 billing plan.
+
+---
+
+## CLAUDE.md — 91 stale lines replaced (2026-07-30)
+
+Every line below was **factually wrong** about the product as it exists today, and each was
+verified against the actual code before removal. They fall into eight groups:
+
+1. **Version** — said 0.1.22; `package.json` says 0.1.29.
+2. **"Current Build Status (as of March 2026)"** — four months stale. It claimed the Deploy
+   button was broken and the transcript → card pipeline had never been tested end-to-end. You
+   have since shipped v0.1.29 and measured ~$1.25/recorded hour on real calls. Replaced with a
+   current status section that carries a staleness warning and points at generated state.
+3. **Core Product Rules #1–#4** — described autonomous card firing with a 90-second cooldown.
+   Cards are hotkey-summoned via the compass; `useWingmanPoller.ts:500` records that the
+   autonomous trigger path was deleted. These were labelled "Never Violate," so leaving them
+   would have had a future session rebuild a retired product.
+4. **Definition of Done items 3, 4, 5, 11** — cited autonomous firing, a live stage bar, the
+   "How'd it go?" card, and the Playbook page. The stage bar is force-hidden at
+   `electron/hud/index.html:841`; the outcome card was retired in v0.1.29; the Playbook has
+   zero code.
+5. **The AI Architecture diagram** — showed `keyword-triggers.ts` → pgvector embed → Claude
+   Haiku. None of those three are in the live path; the first has zero importers.
+6. **Project Structure entries** — named `PlaybookTab` (doesn't exist), described the HUD as
+   polling the API (it makes zero network calls), and listed dead modules as live.
+7. **Release instructions** — said the build uploads as a draft to the source repo and that
+   auto-update was broken. It publishes live to `bandidoseb/wingman-releases` and auto-update
+   works. Following the old steps would have failed against the wrong repo.
+8. **`GROQ_API_KEY` "required"** — `query-distill.ts` has zero importers since 2026-06-30.
+
+The full original text of all of it remains readable at `git show context-backup-2026-07-30:CLAUDE.md`.
+The Playbook spec was **not** deleted — it is folded into a `<details>` block in CLAUDE.md.
+
+REMOVED: **Current version:** 0.1.22
+REMOVED: | AI — live | Claude **Sonnet** (objection + dig cards — streaming, NO KB) | Signal cards: **objection**/**dig** = Sonnet, NO KB · **close** = client-side readiness chip (no AI) · **answer** = NOT built yet. KB kept for the **Coach only**. *(Reconciled 2026-07-22 — the old "Haiku still on answer/dig/close" was stale; see line ~196.)* |
+REMOVED: │ ├── hud/index.html # Floating HUD overlay (signal cards, stage bar)
+REMOVED: │ │ │ ├── poll/ # HUD polls this for signal cards
+REMOVED: │ │ │ ├── kb-signal/ # RAG lookup → signal card generation
+REMOVED: │ │ ├── dashboard/ # FlightLogTab, HomeTab, IntelTab, ObjectionVaultTab, SettingsTab, Sidebar, PlaybookTab (SignalVaultTab retired)
+REMOVED: │ │ ├── wingman/ # LiveCallView, SignalCard, SignalLog, StageBar, LiveScorecard
+REMOVED: │ │ │ ├── knowledge-search.ts # Vector search against KB
+REMOVED: │ │ │ ├── knowledge-signal.ts # Assembles prompt + calls Claude Haiku
+REMOVED: │ │ │ ├── keyword-triggers.ts # Fast trigger classifier (fires before RAG)
+REMOVED: │ │ │ ├── system-prompt.ts # Claude system prompt assembly
+REMOVED: │ │ │ └── poll-intervals.ts # HUD polling config
+REMOVED: │ └── useWingmanPoller.ts # HUD polling hook
+REMOVED: ## Current Build Status (as of March 2026)
+REMOVED: ### ✅ Built / working (with confidence levels)
+REMOVED: - HUD shows up on screen ✅
+REMOVED: - Signal card UI renders on screen (~80% confident)
+REMOVED: - Supabase connected (~90% confident)
+REMOVED: - Post-call job + Sales DNA updating (~98% confident)
+REMOVED: - Flight Log screen ✅ — includes inline outcome picker, call chat, post-call debrief
+REMOVED: - Mission Intel modal ✅ — staggered multi-bubble chat, daily cap, KB-powered coaching
+REMOVED: - Objection Vault tab ✅ — only populated from real calls, no pre-seeded data
+REMOVED: - Onboarding flow (multi-step) ✅
+REMOVED: - Auth (login/signup) ✅
+REMOVED: - Post-call HUD outcome card ✅ — "How'd it go?" card fires after call ends, saves via Bearer token
+REMOVED: - Stripe routes exist (checkout, webhook, portal) — not fully wired/tested
+REMOVED: - Knowledge base: 37 videos, ~15 hours, 419 KB entries ingested ✅
+REMOVED: - Recall AI SDK initializes and detects Zoom meetings ✅ (confirmed working as of v0.1.19)
+REMOVED: - Recall AI upload token flow ✅ — API key lives on Railway, Electron fetches short-lived token via authenticated API route
+REMOVED: ### ❌ Broken / not connected
+REMOVED: - **Deploy Wingman button** — meeting detection confirmed working, full live transcript pipeline NOT yet end-to-end tested. #1 priority before beta.
+REMOVED: - End-to-end transcript → signal card pipeline has NOT been tested live
+REMOVED: - Stripe billing — not live
+REMOVED: - iMessage upsell trigger — not built yet
+REMOVED: ### 🔲 Not built yet
+REMOVED: - **Playbook page** — pre-call framework setup (replaces Signal Vault, see below)
+REMOVED: - Stripe billing fully wired
+REMOVED: - iMessage upsell trigger (Project Blue / Blooio)
+REMOVED: - Windows support (Mac only for now)
+REMOVED: ### 🗑️ Retired
+REMOVED: - **Signal Vault tab** — removed from sidebar. Replaced by: (1) Playbook page for pre-call framework setup, (2) post-call framework review inside individual Flight Log entries.
+REMOVED: 3. Signal cards pop up at the right moments (objections, key triggers) — rare, powerful, not spammy
+REMOVED: 4. Stage bar tracks them through the call stages
+REMOVED: 5. Call ends → "How'd it go?" HUD card fires → rep logs outcome instantly
+REMOVED: 8. User can chat with "Ask Wingman" (Mission Intel) about any call
+REMOVED: 11. Rep can set up their Playbook framework once → Wingman uses it silently every call
+REMOVED: 1. **One signal card at a time. Never queue.**
+REMOVED: 2. **90-second minimum cooldown between signal cards.**
+REMOVED: 3. **Almost nothing fires during Rapport stage.**
+REMOVED: 4. **Signal cards only fire when silence would cost money.** If it's not a clear yes — don't fire.
+REMOVED: ## AI Architecture (RAG Pipeline)
+REMOVED: > ✅ **SHIPPED 2026-06-29.** The **objection** card no longer uses this RAG/KB path — it's a context-driven **Sonnet** prompt (diagnose the weak Belief Ladder belief → uncertainty-first tie-down anchored to the prospect's own words → one spoken line, NO embed/KB) in `src/lib/wingman/objection-signal.ts`, wired in `kb-signal/route.ts` (the Groq distiller is kept only as the "no standing objection → nudge" gate). The KB stays for the **Wingman Coach** (Mission Intel) **ONLY**. *(Reconciled 2026-07-22 — the old "still-KB answer/dig/close slots" claim was STALE and WRONG: **dig** is now Sonnet streaming (no KB), **close** is the client-side readiness chip (no AI/KB, PR #50), and **answer** was never built. The `searchKnowledge`→`generateSignalCard` block in `kb-signal/route.ts` is **DEAD CODE** — no client path reaches it — slated for **Phase 5 dead-code removal (#37)**.)* The objection slot is Sonnet with no retrieval. Full narrative: `Wingman Brain/01 - Build Log/2026-06-29.md` + Decisions Log 2026-06-29.
+REMOVED: Recall.ai transcript stream
+REMOVED: Keyword trigger classifier (keyword-triggers.ts) — fast, cheap
+REMOVED: ↓ (only fires on meaningful moments)
+REMOVED: Embed trigger chunk → pgvector search → Sales KB (knowledge-search.ts)
+REMOVED: Prompt assembly: system prompt + Sales DNA + session memory + KB results + trigger chunk
+REMOVED: Claude Haiku → signal card → HUD (target: <1 second)
+REMOVED: Grade + debrief + one win + one fix + objections + Sales DNA delta
+REMOVED: *(Renamed from "Offer Brain" on 2026-05-31 — same system, more neutral/personal name. A full app + code-wide rename sweep is still pending; see `Wingman Brain/01 - Build Log/Current Sprint.md`. Old code identifiers like `rep-profile.ts` and DB columns may still say "offer_brain" until that sweep runs.)*
+REMOVED: ## The Playbook
+REMOVED: **What it is:** A pre-call framework setup page in the dashboard. Rep visits once, customizes their call checklist, and Wingman runs it silently in the background during every call.
+REMOVED: **What it is NOT:** A live HUD checklist. There is no checklist displayed during the call. Wingman uses the playbook framework internally to decide when to fire signal cards — the rep never sees it mid-call.
+REMOVED: - **CI** (`.github/workflows/ci.yml`) — typecheck (web + electron) + unit tests. Must pass.
+REMOVED: The `release.yml` Action (triggered by the `v*` tag) builds + signs + packages the `.dmg` — **but uploads it as a GitHub DRAFT.** A draft is invisible to downloads and to auto-update, so you must publish it:
+REMOVED: gh release edit vX.Y.Z --draft=false
+REMOVED: 🚨 **Auto-update does NOT currently work.** Every release was historically left as a draft, so installed apps never saw new versions — Sebastian has always downloaded `Wingman-X.Y.Z-arm64.dmg` from the Releases page manually. **Fixing the auto-updater is a queued priority session — the app cannot ship to beta users until it works.** Until then: publish the release, then download the `.dmg` manually.
+REMOVED: 2. Read `tasks/lessons.md` if it exists — these are mistakes made in past sessions, don't repeat them.
+REMOVED: 3. Read these three Wingman Brain files for current context:
+REMOVED: - `Wingman Brain/01 - Build Log/Current Sprint.md` — what was just done, what's next, what's blocking
+REMOVED: - `Wingman Brain/01 - Build Log/Known Issues.md` — current bugs and their priority
+REMOVED: - `Wingman Brain/01 - Build Log/Decisions Log.md` — decisions already made (don't relitigate these)
+REMOVED: 4. **Reconcile status against git/GitHub before trusting the prose.** The brain files are hand-written and lag reality — a branch gets merged or a release cut *after* the wrap is written, so the notes describe the world as it was *before* the last thing happened. Prose holds **decisions + intent**; git/GitHub holds **status**. Run this and report status from *its* output, never from the notes alone:
+REMOVED: cd "/Users/sebastianperez/Desktop/Wingman CC" && git branch --show-current && gh pr list --state merged --limit 5 && git tag --sort=-v:refname | head -3 && gh release view --json tagName,isDraft 2>/dev/null
+REMOVED: If a note says "branch not pushed / PR not merged / release not cut" but git says otherwise, git wins — say so out loud.
+REMOVED: 5. Based on Current Sprint.md **as reconciled in step 4**, tell Sebastian: "Here's where we left off and here's what I think we should work on today" — then ask if that's right before touching any code.
+REMOVED: 6. Confirm the single task before writing any code.
+REMOVED: 7. After completing the task, give exact test steps.
+REMOVED: 8. Update `Wingman Brain/01 - Build Log/Current Sprint.md` to reflect what was completed and what's next.
+REMOVED: - `NEXT_PUBLIC_SUPABASE_URL`
+REMOVED: - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+REMOVED: - `SUPABASE_SERVICE_ROLE_KEY`
+REMOVED: - `ANTHROPIC_API_KEY`
+REMOVED: - `OPENAI_API_KEY` ← embeddings for KB ingestion + the **Wingman Coach** search (live objection cards no longer embed, since 2026-06-21)
+REMOVED: - `GROQ_API_KEY` ← required for Phase 3.5 query distillation (query-distill.ts). If missing, distillation silently degrades to the raw search path (feature inert, logs only). In .env.local + Railway since 2026-06-07 — verify on Railway before merging Phase 3.5.
+REMOVED: - `RECALL_AI_API_KEY`
+REMOVED: - `STRIPE_SECRET_KEY`
+REMOVED: - `STRIPE_WEBHOOK_SECRET`
+REMOVED: - `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`
+REMOVED: - The HUD is a **separate Electron window** (`electron/hud/index.html`) that floats on top of other apps. It polls the Next.js API for signal cards.
+REMOVED: 1. **Always end every session with `/wrap`.** This is non-negotiable. The `/wrap` skill writes a new dated build log in the Obsidian brain (`Wingman Brain/01 - Build Log/YYYY-MM-DD.md`), updates Known Issues and Current Sprint, checks Railway deploy status, and commits everything. One file per session — 7 sessions = 7 separate files.
+
+---
+
+## Phase 3 — the structural split (2026-07-30)
+
+`Current Sprint.md` became three files. **All 755 lines of content moved verbatim** into
+`Sprint Archive.md` — only these structural scaffolding lines changed:
+
+REMOVED: # Current Sprint
+**Why:** the path `Current Sprint.md` now holds a short pointer titled "# Current Sprint → moved",
+which routes you to [[NOW]] (what's true today) and [[Sprint Archive]] (the full history). The
+history file carries the `# Sprint Archive` title instead.
+
+`Known Issues.md` split into open-only + an archive file. 29 fully-resolved rows moved **verbatim,
+with their complete Notes column**, into the new `Known Issues Archive.md`. Six rows that read
+◐ / "Needs testing" / "Partially resolved" (#50, #48, #38, #15, #14, #1) were deliberately left in
+the open file — each still carries an unmet verification. The old, never-used archive section's
+two header lines were replaced by the new file's own header:
+
+REMOVED: ## Resolved Issues (Archive)
+REMOVED: | # | Issue | Resolution | Date |
+**Why:** that section had existed since April holding 6 legacy rows and had never been added to.
+Its 6 rows were carried into `Known Issues Archive.md` under "Legacy archive rows (pre-2026-04-03)".
+The new archive uses the same 5-column shape as the open table so rows move without reformatting.

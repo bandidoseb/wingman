@@ -13,7 +13,10 @@ Wingman is a Mac desktop app (Electron + Next.js) that acts as a real-time AI co
 **Repo:** bandidoseb/wingman  
 **Local path:** `/Users/sebastianperez/Desktop/Wingman CC`  
 **Deployed via:** Railway (web/backend auto-deploys on git push). Desktop app needs a release cut.  
-**Current version:** 0.1.22
+**Releases repo:** `bandidoseb/wingman-releases` — PUBLIC, holds only signed installers. Source stays private.  
+**Current version:** 0.1.29 (shipped, signed, notarized, published live 2026-07-27 — auto-update confirmed working)
+
+⚠️ That version number goes stale between sessions. `package.json` is the truth — and `context/STATE.md` reads it for you. Never trust a hand-typed version.
 
 ---
 
@@ -44,7 +47,7 @@ Wingman is a Mac desktop app (Electron + Next.js) that acts as a real-time AI co
 | Web/dashboard | Next.js (App Router) | Dashboard UI, API routes, auth |
 | Live audio | Recall.ai | Joins the call, streams transcript |
 | Transcription | Deepgram (inside Recall.ai) | Speech to text |
-| AI — live | Claude **Sonnet** (objection + dig cards — streaming, NO KB) | Signal cards: **objection**/**dig** = Sonnet, NO KB · **close** = client-side readiness chip (no AI) · **answer** = NOT built yet. KB kept for the **Coach only**. *(Reconciled 2026-07-22 — the old "Haiku still on answer/dig/close" was stale; see line ~196.)* |
+| AI — live | Claude **Sonnet 4.6** (`claude-sonnet-4-6`) | Hotkey-summoned cards: **↑ objection** / **↓ dig** = Sonnet, streaming, NO KB · **→ close** = client-side readiness chip (no AI call) · **← answer** = NOT built. KB kept for the **Coach only**. See "The Compass" below. |
 | AI — post-call | Claude Sonnet | Call grading, debrief, Sales DNA update |
 | Database | Supabase | Users, calls, Sales DNA JSON, KB embeddings |
 | Vector search | pgvector (in Supabase) | KB retrieval — **Wingman Coach only** since 2026-06-21 (no longer live objection cards) |
@@ -63,7 +66,7 @@ Wingman is a Mac desktop app (Electron + Next.js) that acts as a real-time AI co
 │   ├── main.ts                # Main process — app lifecycle, tray, HUD window
 │   ├── preload.ts             # Bridge between Electron and web UI
 │   ├── recall.ts              # Recall.ai integration — live transcript stream
-│   ├── hud/index.html         # Floating HUD overlay (signal cards, stage bar)
+│   ├── hud/index.html         # Floating HUD overlay + Live Hub pill. NO network calls — pure IPC consumer
 │   └── tray-popover/index.html # Tray menu UI
 │
 ├── src/                       # Next.js web app (dashboard + API)
@@ -73,8 +76,8 @@ Wingman is a Mac desktop app (Electron + Next.js) that acts as a real-time AI co
 │   │   └── api/
 │   │       ├── wingman/
 │   │       │   ├── session/   # Start/end call session
-│   │       │   ├── poll/      # HUD polls this for signal cards
-│   │       │   ├── kb-signal/ # RAG lookup → signal card generation
+│   │       │   ├── poll/      # polled by the Next.js renderer (useWingmanPoller) — NOT by the HUD
+│   │       │   ├── kb-signal/ # hotkey-summoned card endpoint (legacy name — rename queued)
 │   │       │   ├── post-call/ # Post-call AI job (grade, debrief, Sales DNA)
 │   │       │   └── outcome/   # User marks call outcome (Closed/Lost/DQ/etc.)
 │   │       ├── ai/chat/       # "Ask Wingman" chatbot (per-call transcript chat)
@@ -87,24 +90,28 @@ Wingman is a Mac desktop app (Electron + Next.js) that acts as a real-time AI co
 │   │       └── user/          # User data
 │   │
 │   ├── components/
-│   │   ├── dashboard/         # FlightLogTab, HomeTab, IntelTab, ObjectionVaultTab, SettingsTab, Sidebar, PlaybookTab (SignalVaultTab retired)
-│   │   ├── wingman/           # LiveCallView, SignalCard, SignalLog, StageBar, LiveScorecard
+│   │   ├── dashboard/         # FlightLogTab, HomeTab, IntelTab, ObjectionVaultTab, PersonalizeTab, SettingsTab, Sidebar, coach/, home/
+│   │   ├── wingman/           # ⚠️ ALL DEAD — LiveCallView has zero importers, so SignalCard/SignalLog/StageBar/LiveScorecard die with it
 │   │   ├── onboarding/        # Multi-step onboarding flow components
 │   │   └── ui/                # Shared UI primitives
 │   │
 │   ├── lib/
 │   │   ├── wingman/
-│   │   │   ├── knowledge-search.ts   # Vector search against KB
-│   │   │   ├── knowledge-signal.ts   # Assembles prompt + calls Claude Haiku
-│   │   │   ├── keyword-triggers.ts   # Fast trigger classifier (fires before RAG)
-│   │   │   ├── system-prompt.ts      # Claude system prompt assembly
+│   │   │   ├── objection-signal.ts   # ↑ objection card — Sonnet 4.6, streaming, NO KB
+│   │   │   ├── dig-signal.ts         # ↓ dig/"Discover" card — Sonnet 4.6, streaming, NO KB
+│   │   │   ├── dig-prompt.mjs        # ↓ prompt (DIG_SYSTEM_PROMPT — never rename, eval ids depend on it)
+│   │   │   ├── close-readiness.mjs   # → close chip — pure client-side scoring, NO AI call
+│   │   │   ├── belief-ladder.ts      # live summarizer (Belief Ladder → calls.live_summary)
+│   │   │   ├── knowledge-search.ts   # vector search — LIVE, but only for the Coach (api/ai/chat)
 │   │   │   ├── rep-profile.ts        # Sales DNA loader
-│   │   │   └── poll-intervals.ts     # HUD polling config
+│   │   │   ├── knowledge-signal.ts   # ⚠️ DEAD — reached only from a guarded branch that never runs
+│   │   │   ├── keyword-triggers.ts   # ⚠️ DEAD — zero importers (was the autonomous trigger classifier)
+│   │   │   └── query-distill.ts      # ⚠️ DEAD — zero importers (Groq distiller, cut 2026-06-30)
 │   │   └── supabase/                 # Supabase client (client, server, middleware)
 │   │
 │   └── hooks/
 │       ├── useRecallTranscript.ts    # Hooks into Recall.ai transcript stream
-│       └── useWingmanPoller.ts       # HUD polling hook
+│       └── useWingmanPoller.ts       # renderer polling + triggers + summarizer + summarizeNow()
 │
 ├── knowledge-base/            # Standalone KB ingestion tool (Node.js)
 │   ├── ingest.js              # YouTube → transcript → KB entries → embeddings
@@ -121,38 +128,37 @@ Wingman is a Mac desktop app (Electron + Next.js) that acts as a real-time AI co
 
 ---
 
-## Current Build Status (as of March 2026)
+## Current Build Status
 
-### ✅ Built / working (with confidence levels)
-- HUD shows up on screen ✅
-- Signal card UI renders on screen (~80% confident)
-- Supabase connected (~90% confident)
-- Post-call job + Sales DNA updating (~98% confident)
-- Flight Log screen ✅ — includes inline outcome picker, call chat, post-call debrief
-- Mission Intel modal ✅ — staggered multi-bubble chat, daily cap, KB-powered coaching
-- Objection Vault tab ✅ — only populated from real calls, no pre-seeded data
-- Onboarding flow (multi-step) ✅
-- Auth (login/signup) ✅
-- Post-call HUD outcome card ✅ — "How'd it go?" card fires after call ends, saves via Bearer token
-- Stripe routes exist (checkout, webhook, portal) — not fully wired/tested
-- Knowledge base: 37 videos, ~15 hours, 419 KB entries ingested ✅
-- Recall AI SDK initializes and detects Zoom meetings ✅ (confirmed working as of v0.1.19)
-- Recall AI upload token flow ✅ — API key lives on Railway, Electron fetches short-lived token via authenticated API route
+⚠️ **This section goes stale fast.** Reconcile against git and `tasks/launch-plan.md` before trusting it — see "How to Start Every Session," step 4. `context/STATE.md` is generated and always current; this is the narrative.
 
-### ❌ Broken / not connected
-- **Deploy Wingman button** — meeting detection confirmed working, full live transcript pipeline NOT yet end-to-end tested. #1 priority before beta.
-- End-to-end transcript → signal card pipeline has NOT been tested live
-- Stripe billing — not live
-- iMessage upsell trigger — not built yet
+### ✅ Shipped and live (v0.1.29, published 2026-07-27)
+- **Full live pipeline works end-to-end** — Recall.ai → transcript → hotkey-summoned card → HUD. Tested on real calls. Measured cost ~$1.25/recorded hour, 75–80% margin.
+- Compass slots: **↑ objection** and **↓ dig** stream from Sonnet 4.6 · **→ close** is a client-side readiness chip · **← answer NOT built**.
+- Live summarizer (Belief Ladder) on a ~2-min background timer → `calls.live_summary`.
+- Live Hub pill — drag/persist, content-protection, waveform. Replaced the tray-only surface.
+- Post-call job → grade, debrief, 6 `call_stages`, objections, Sales DNA delta.
+- Post-call flow — call-end popups killed; the pill morphs Live → "generating debrief" → "View call" and deep-links into that Flight Log entry. Outcome auto-detected by the post-call job (confidence-gated, excluded from close-rate until confirmed).
+- Dashboard — Home + Coach, Sales DNA (Personalize), Flight Log, Objection Vault, Settings, dark mode. Intel is an intentional "Coming soon" placeholder.
+- Auth, multi-step onboarding, Objection Vault (only ever populated from real calls), owner dashboard, private `/changelog`.
+- Recall AI upload-token flow — API key lives on Railway, Electron fetches a short-lived token via an authenticated route (Invariant #1).
+- Knowledge base: 37 videos, ~15 hours, 419 KB entries ingested — now used by the **Coach only**.
+- **Auto-update works** — signed, notarized, publishes live to `bandidoseb/wingman-releases`. Confirmed by Sebastian on v0.1.29.
+- Flight Recorder (`dev-logs/*.jsonl`) — DEV-ONLY, gated on `NODE_ENV !== "production"`.
 
-### 🔲 Not built yet
-- **Playbook page** — pre-call framework setup (replaces Signal Vault, see below)
-- Stripe billing fully wired
-- iMessage upsell trigger (Project Blue / Blooio)
-- Windows support (Mac only for now)
+### ❌ Not built / not wired
+- **← Answer card** — the one empty compass slot; shows a "coming soon" pill.
+- **Stripe billing** — routes exist (checkout, webhook, portal), not live or tested.
+- **iMessage upsell trigger** (Project Blue / Blooio).
+- **Windows / Intel Mac** — blocked by the Recall SDK. Not planned.
 
-### 🗑️ Retired
-- **Signal Vault tab** — removed from sidebar. Replaced by: (1) Playbook page for pre-call framework setup, (2) post-call framework review inside individual Flight Log entries.
+### 🗑️ Retired — do NOT rebuild
+- **Autonomous card firing** — replaced by the compass. See "The Compass" below.
+- **Live stage bar** — `electron/hud/index.html:841` forces `#stageBar { display: none !important; }`. Stages are post-call only.
+- **HUD "How'd it go?" outcome card** — retired in v0.1.29; disposition lives in Flight Log. `api/wingman/hud-outcome/route.ts` is now an orphan.
+- **Signal Vault tab** and **Flight Plan tab** — deleted 2026-07-29. Sales DNA supersedes Flight Plan. ⚠️ `api/flight-plan/route.ts` has no UI caller, but the post-call job still reads `call.flight_plan_snapshot` — do not delete the column blind.
+- **Mission Intel staggered multi-bubble chat** — dropped 2026-07-30; the Coach replies as one message.
+- **The Playbook page** — never built. See below.
 
 ---
 
@@ -161,15 +167,17 @@ Wingman is a Mac desktop app (Electron + Next.js) that acts as a real-time AI co
 A user can:
 1. Open Wingman and click Deploy
 2. Wingman listens live on their sales call
-3. Signal cards pop up at the right moments (objections, key triggers) — rare, powerful, not spammy
-4. Stage bar tracks them through the call stages
-5. Call ends → "How'd it go?" HUD card fires → rep logs outcome instantly
-6. Post-call job fires automatically
+3. The rep **summons** a card with the compass (↑ then a direction) at the moment they need it — rare, powerful, never spammy
+4. The Live Hub pill shows Wingman is listening, and stays out of the way
+5. Call ends → the pill morphs to "generating debrief" → "View call", deep-linking into that Flight Log entry
+6. Post-call job fires automatically and auto-detects the outcome
 7. User goes to dashboard → sees Flight Log entry with transcript, debrief, grade, framework coverage
-8. User can chat with "Ask Wingman" (Mission Intel) about any call
+8. User can chat with "Ask Wingman" (the Coach) about any call
 9. Objections from the call appear in their Objection Vault
 10. Sales DNA updates silently in the background
-11. Rep can set up their Playbook framework once → Wingman uses it silently every call
+11. Rep sets up their **Sales DNA** once (Personalize tab) → Wingman uses it silently in every card
+
+*(Reconciled 2026-07-30 — items 3, 4, 5 and 11 previously described autonomous firing, a live stage bar, the "How'd it go?" card, and the Playbook page. All four were retired or never built.)*
 
 **That's the finish line. Everything else is V2.**
 
@@ -177,10 +185,10 @@ A user can:
 
 ## Core Product Rules (Never Violate)
 
-1. **One signal card at a time. Never queue.**
-2. **90-second minimum cooldown between signal cards.**
-3. **Almost nothing fires during Rapport stage.**
-4. **Signal cards only fire when silence would cost money.** If it's not a clear yes — don't fire.
+1. **Cards are HOTKEY-SUMMONED, never autonomous.** Wingman pops nothing up on its own. The rep presses ↑ to open the compass, then picks a direction. *(Reconciled 2026-07-30 — rules 1–4 previously described the retired autonomous-firing model: queueing, a 90-second cooldown, "almost nothing fires during Rapport." `useWingmanPoller.ts:500` states the trigger path was removed. A `NON_ALERT_COOLDOWN_MS = 90_000` constant survives on the legacy poll path and governs nothing the rep sees. Upstream source: `00 - Product/Bubble Discipline.md`.)*
+2. **One card at a time. Never queue.** A new summon replaces the current card; nothing stacks.
+3. **The test is "has the prospect revealed anything real?" — NEVER how many minutes in.** (Card doctrine, locked 2026-07-28.)
+4. **If nothing real has surfaced, Wingman admits it has nothing.** The quiet state is the literal string `"Nothing to work with yet."` It may **never** invent a question out of its own head to fill silence.
 5. **Signal cards use the prospect's exact words** (tie-down language).
 6. **Transcripts are retained (text only), user-deletable.** Kept after the post-call job — "Ask Wingman," the Flight Log transcript view, and (planned) follow-up-call prospect memory all rely on them. The rep can delete them per-call or account-wide (compliance — Issue #33). Never auto-deleted. *(Reconciled 2026-06-05 — the old "deleted immediately" line was stale and contradicted the live code, which keeps transcripts.)*
 7. **Never store audio or video.** Text only.
@@ -191,36 +199,66 @@ A user can:
 
 ---
 
-## AI Architecture (RAG Pipeline)
+## The Compass — how live cards are actually summoned
 
-> ✅ **SHIPPED 2026-06-29.** The **objection** card no longer uses this RAG/KB path — it's a context-driven **Sonnet** prompt (diagnose the weak Belief Ladder belief → uncertainty-first tie-down anchored to the prospect's own words → one spoken line, NO embed/KB) in `src/lib/wingman/objection-signal.ts`, wired in `kb-signal/route.ts` (the Groq distiller is kept only as the "no standing objection → nudge" gate). The KB stays for the **Wingman Coach** (Mission Intel) **ONLY**. *(Reconciled 2026-07-22 — the old "still-KB answer/dig/close slots" claim was STALE and WRONG: **dig** is now Sonnet streaming (no KB), **close** is the client-side readiness chip (no AI/KB, PR #50), and **answer** was never built. The `searchKnowledge`→`generateSignalCard` block in `kb-signal/route.ts` is **DEAD CODE** — no client path reaches it — slated for **Phase 5 dead-code removal (#37)**.)* The objection slot is Sonnet with no retrieval. Full narrative: `Wingman Brain/01 - Build Log/2026-06-29.md` + Decisions Log 2026-06-29.
+Wingman fires **nothing** on its own. The rep summons a card:
+
+- **Press ↑** → the compass menu opens over the HUD (auto-fades after 5s; `esc` dismisses).
+- **Then press a direction** to pick a slot.
+
+| Key | Slot (code id) | User-facing label | Status |
+|-----|----------------|-------------------|--------|
+| ↑ (double-tap Up) | `objection` | Handle objection | ✅ LIVE — Sonnet 4.6, streaming, no KB (`objection-signal.ts`) |
+| ↓ | `dig` | Dig deeper → being renamed **"Discover"** | ✅ LIVE — Sonnet 4.6, streaming, no KB (`dig-signal.ts`) |
+| → | `close` | Close | ✅ LIVE — client-side readiness chip, **no AI call** (`close-readiness.mjs`) |
+| ← | `answer` | Answer question | ❌ NOT BUILT — shows a "coming soon" pill |
+
+⚠️ The ↓ rename to **"Discover"** is **user-facing labels ONLY**. Never rename `dig-prompt.mjs`, `DIG_SYSTEM_PROMPT`, the `"dig"` direction id, or any eval id — the eval harness keys off them.
+
+Path: `electron/main.ts` (`openCompassMenu` / `registerPick` / `registerDirect` / double-tap-Up) → IPC `wingman:menu-pick` → `DashboardClient.tsx` → `POST /api/wingman/kb-signal` (streaming) → Pusher → renderer → IPC → HUD.
+
+---
+
+## AI Architecture
+
+*(Section was titled "RAG Pipeline." The live card path has had no retrieval step since 2026-06-21 — the KB now serves the Coach only.)*
 
 ```
-Recall.ai transcript stream
+Recall.ai desktop SDK → live transcript chunks (Deepgram inside Recall)
+         ↓  IPC
+DashboardClient (Next.js renderer) ── useRecallTranscript → useWingmanPoller
          ↓
-Keyword trigger classifier (keyword-triggers.ts) — fast, cheap
-         ↓ (only fires on meaningful moments)
-Embed trigger chunk → pgvector search → Sales KB (knowledge-search.ts)
+  ├─ every ~2 min: POST /api/wingman/summarize → Sonnet 4.6 → Belief Ladder → calls.live_summary
+  └─ NOTHING fires on its own. Waits for a compass press.
+         ↓  rep presses ↑ then a direction
+POST /api/wingman/kb-signal   (legacy route name — rename queued)
          ↓
-Prompt assembly: system prompt + Sales DNA + session memory + KB results + trigger chunk
-         ↓
-Claude Haiku → signal card → HUD (target: <1 second)
+  ↑ objection → objection-signal.ts → Claude Sonnet 4.6, STREAMING, NO KB
+  ↓ dig       → dig-signal.ts       → Claude Sonnet 4.6, STREAMING, NO KB
+  → close     → close-readiness.mjs → pure client-side scoring, NO AI CALL
+  ← answer    → NOT BUILT
+         ↓  Pusher → renderer → IPC
+HUD card streams in (electron/hud/index.html)
          ↓
 [Call ends]
          ↓
 Post-call job (Claude Sonnet) — async:
-  Grade + debrief + one win + one fix + objections + Sales DNA delta
+  Grade + debrief + one win + one fix + objections + 6 call_stages + Sales DNA delta
          ↓
 Sales DNA JSON updated in Supabase
 Flight Log entry created
 Raw transcript retained (text only, user-deletable — Ask Wingman + follow-up memory rely on it)
 ```
 
+**DEAD CODE — do not treat as live** (Phase-5 removal, Known Issue #37): `keyword-triggers.ts` · `query-distill.ts` · `knowledge-signal.ts` (reached only from a guarded branch in `kb-signal/route.ts` that no client path hits) · all of `src/components/wingman/` · `api/wingman/hud-outcome/route.ts`.
+
+⚠️ **`knowledge-search.ts` is NOT dead** — `api/ai/chat/route.ts` calls `searchCoachingKnowledge()` for the Wingman Coach. Do not delete it with the rest.
+
 ---
 
 ## Sales DNA
 
-*(Renamed from "Offer Brain" on 2026-05-31 — same system, more neutral/personal name. A full app + code-wide rename sweep is still pending; see `Wingman Brain/01 - Build Log/Current Sprint.md`. Old code identifiers like `rep-profile.ts` and DB columns may still say "offer_brain" until that sweep runs.)*
+*(Renamed from "Offer Brain" on 2026-05-31 — same system, more neutral/personal name. **There is no rename sweep to do.** `grep -rn "offer_brain\|offerBrain" src electron supabase` returns nothing: the term never existed in app code or the schema. `rep-profile.ts` is just a filename. Reconciled 2026-07-30 — this note previously described a pending sweep as outstanding work, and it was a phantom task.)*
 
 One JSON object per user stored in Supabase. Loads at call start. Updated after every call by post-call job.
 
@@ -249,11 +287,20 @@ The **Jeremy Miner (NEPQ) + Cole Gordon 8-stage methodology is the coaching *phi
 
 ---
 
-## The Playbook
+## The Playbook — SHELVED, do not build
 
-**What it is:** A pre-call framework setup page in the dashboard. Rep visits once, customizes their call checklist, and Wingman runs it silently in the background during every call.
+A pre-call framework setup page was specced in early 2026 and **never built**. There is zero code: `grep -rn "Playbook" src electron` returns nothing. It is not on the launch cutline in `tasks/launch-plan.md`.
 
-**What it is NOT:** A live HUD checklist. There is no checklist displayed during the call. Wingman uses the playbook framework internally to decide when to fire signal cards — the rep never sees it mid-call.
+The need it was meant to serve is now met by two shipped things: **Sales DNA** (the Personalize tab — the rep's offer and style, captured once) and **post-call framework coverage** inside each Flight Log entry.
+
+Do not build this without an explicit new decision from Sebastian. The cutline rule applies: *does this block a Test Pilot from using the 4 arrows?* It does not.
+
+<details>
+<summary>Original spec, kept for the record (never implemented)</summary>
+
+**What it was:** A pre-call framework setup page in the dashboard. Rep visits once, customizes their call checklist, and Wingman runs it silently in the background during every call.
+
+**What it was NOT:** A live HUD checklist. There is no checklist displayed during the call. Wingman uses the playbook framework internally to decide when to fire signal cards — the rep never sees it mid-call.
 
 **Three tiers of checklist items:**
 - 🔒 **Locked core** — Cannot be removed (e.g. pain, timeline, finances). Non-negotiable.
@@ -263,6 +310,8 @@ The **Jeremy Miner (NEPQ) + Cole Gordon 8-stage methodology is the coaching *phi
 **Post-call review:** After each call, the individual Flight Log entry shows which framework items Wingman detected as covered and which were missed. Coaching happens post-call, never during.
 
 **Philosophy:** The Playbook is silent infrastructure. Reps should never feel like they're following a script because of it.
+
+</details>
 
 ---
 
@@ -281,8 +330,10 @@ git push -u origin descriptive-branch-name
 gh pr create --fill
 ```
 On the PR, two GitHub Actions run automatically:
-- **CI** (`.github/workflows/ci.yml`) — typecheck (web + electron) + unit tests. Must pass.
+- **CI** (`.github/workflows/ci.yml`) — typecheck (web + electron) + unit tests + **`token-lint`** (fails on any NEW hardcoded color literal; ratchets down, never up — run `npm run token-lint -- --update` after migrating a screen). Must pass.
 - **Security Review** (`.github/workflows/security-review.yml`) — AI security scan, posts inline comments. Does not block; read its findings.
+
+⚠️ CI does **not** run a Next.js build, so a build-only failure reaches Railway unseen. Run `npm run build:verify` locally before merging anything structural. **Never plain `npm run build`** — it overwrites `.next` and kills Sebastian's running dev server.
 
 Once green and reviewed, merge the PR → **Railway auto-deploys `main`.**
 
@@ -302,11 +353,19 @@ git fetch origin main
 git tag -f vX.Y.Z origin/main
 git push origin vX.Y.Z
 ```
-The `release.yml` Action (triggered by the `v*` tag) builds + signs + packages the `.dmg` — **but uploads it as a GitHub DRAFT.** A draft is invisible to downloads and to auto-update, so you must publish it:
+The `release.yml` Action (triggered by the `v*` tag) builds + signs + **notarizes** + packages, then publishes **LIVE — not a draft — to the separate PUBLIC repo `bandidoseb/wingman-releases`.** The private source repo `bandidoseb/wingman` holds no current releases. This is set in `electron-builder.yml` (`publish.repo: wingman-releases`, `releaseType: release`) and uses the `WINGMAN_RELEASES_TOKEN` secret.
+
+✅ **Auto-update WORKS** — confirmed live by Sebastian on v0.1.29 (2026-07-27). Installed apps update themselves via `electron-updater` reading the public feed. A private repo's `releases.atom` 404s, which is exactly why releases moved to a public repo (Known Issue #45).
+
+There is **no** `gh release edit --draft=false` step any more. Running it against `bandidoseb/wingman` will fail, because the release isn't there.
+
+To confirm a release actually landed:
 ```bash
-gh release edit vX.Y.Z --draft=false
+gh release list --repo bandidoseb/wingman-releases --limit 5
 ```
-🚨 **Auto-update does NOT currently work.** Every release was historically left as a draft, so installed apps never saw new versions — Sebastian has always downloaded `Wingman-X.Y.Z-arm64.dmg` from the Releases page manually. **Fixing the auto-updater is a queued priority session — the app cannot ship to beta users until it works.** Until then: publish the release, then download the `.dmg` manually.
+Both a `.dmg` (first manual download) and a `.zip` must be attached — `electron-updater` can only apply a `.zip`, never a `.dmg`.
+
+*(Reconciled 2026-07-30 — this block previously said releases upload as drafts to the source repo and that auto-update was broken. Both were false, and following the old instructions would have failed against the wrong repo.)*
 
 > CI not firing on a fresh PR is a known GitHub hiccup — close + reopen the PR (`gh pr close N; gh pr reopen N`) to re-fire the `pull_request` event.
 
@@ -445,21 +504,27 @@ If the answer to any of those is "probably not" — it's not done yet.
 
 ## How to Start Every Session
 
+The SessionStart hook (`.claude/hooks/session-start.sh`) already injects live git/GitHub status into your context before you read anything. Trust **it** over any prose, including this file.
+
 1. Read this file (`CLAUDE.md`) in full.
-2. Read `tasks/lessons.md` if it exists — these are mistakes made in past sessions, don't repeat them.
-3. Read these three Wingman Brain files for current context:
-   - `Wingman Brain/01 - Build Log/Current Sprint.md` — what was just done, what's next, what's blocking
-   - `Wingman Brain/01 - Build Log/Known Issues.md` — current bugs and their priority
-   - `Wingman Brain/01 - Build Log/Decisions Log.md` — decisions already made (don't relitigate these)
-4. **Reconcile status against git/GitHub before trusting the prose.** The brain files are hand-written and lag reality — a branch gets merged or a release cut *after* the wrap is written, so the notes describe the world as it was *before* the last thing happened. Prose holds **decisions + intent**; git/GitHub holds **status**. Run this and report status from *its* output, never from the notes alone:
+2. Read `context/STATE.md` — **generated**, never hand-written. Version, orphan modules, and one-line indexes of every decision, issue, and build log.
+3. Read `Wingman Brain/01 - Build Log/NOW.md` — what's next, what's blocked, what's in flight, the backlog. This is the only hand-written state file, and it is size-capped.
+4. Read `tasks/lessons.md` — mistakes made in past sessions, don't repeat them.
+5. Read `tasks/launch-plan.md` — **the cutline**. Before proposing ANY work, ask: *does this block a Test Pilot from using the 4 arrows?* If no → Parking Lot, even when the idea is good.
+6. Read `Wingman Brain/01 - Build Log/Known Issues.md` for open bugs.
+7. **Anything older is on-demand, not at startup.** `STATE.md`'s indexes tell you what exists; go read the full file when a question touches it:
+   - `Decisions Log.md` — **read before re-opening any architecture question.** That is what it is for.
+   - `Sprint Archive.md` + `Wingman Brain/01 - Build Log/YYYY-MM-DD.md` — the full narrative of any past session.
+   - `Known Issues Archive.md` — root-cause write-ups. Search it before re-diagnosing anything.
+8. **If prose and git disagree, git wins — say so out loud.** Prose holds *decisions and intent*; git holds *status*. If the hook didn't run, reconcile manually:
    ```bash
-   cd "/Users/sebastianperez/Desktop/Wingman CC" && git branch --show-current && gh pr list --state merged --limit 5 && git tag --sort=-v:refname | head -3 && gh release view --json tagName,isDraft 2>/dev/null
+   cd "/Users/sebastianperez/Desktop/Wingman CC" && git branch --show-current && git status --short && git log --oneline -5 && gh pr list --state merged --limit 5 && gh release list --repo bandidoseb/wingman-releases --limit 3
    ```
-   If a note says "branch not pushed / PR not merged / release not cut" but git says otherwise, git wins — say so out loud.
-5. Based on Current Sprint.md **as reconciled in step 4**, tell Sebastian: "Here's where we left off and here's what I think we should work on today" — then ask if that's right before touching any code.
-6. Confirm the single task before writing any code.
-7. After completing the task, give exact test steps.
-8. Update `Wingman Brain/01 - Build Log/Current Sprint.md` to reflect what was completed and what's next.
+   ⚠️ Releases live in the **separate public repo** `bandidoseb/wingman-releases`. A bare `gh release view` reads the source repo and reports a version several releases stale — that exact bug sat in this file for a month.
+9. Tell Sebastian: "Here's where we left off and here's what I think we should work on today" — then ask if that's right before touching any code.
+10. Confirm the single task before writing any code.
+11. After completing the task, give exact test steps.
+12. End with `/wrap`, which updates `NOW.md`, the dated log, Known Issues, the changelog, and memory — and regenerates `STATE.md`.
 
 ---
 
@@ -498,23 +563,36 @@ If the answer to any of those is "probably not" — it's not done yet.
 ## Environment Variables (keys live in .env.local — never read aloud or log)
 
 Required keys (confirm these exist before debugging API issues):
-- `NEXT_PUBLIC_SUPABASE_URL`
-- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-- `SUPABASE_SERVICE_ROLE_KEY`
-- `ANTHROPIC_API_KEY`
-- `OPENAI_API_KEY` ← embeddings for KB ingestion + the **Wingman Coach** search (live objection cards no longer embed, since 2026-06-21)
-- `GROQ_API_KEY` ← required for Phase 3.5 query distillation (query-distill.ts). If missing, distillation silently degrades to the raw search path (feature inert, logs only). In .env.local + Railway since 2026-06-07 — verify on Railway before merging Phase 3.5.
-- `RECALL_AI_API_KEY`
-- `STRIPE_SECRET_KEY`
-- `STRIPE_WEBHOOK_SECRET`
-- `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`
+
+**Supabase**
+- `NEXT_PUBLIC_SUPABASE_URL` · `NEXT_PUBLIC_SUPABASE_ANON_KEY` · `SUPABASE_SERVICE_ROLE_KEY`
+
+**AI**
+- `ANTHROPIC_API_KEY` — every live card, the summarizer, the post-call job, the Coach
+- `OPENAI_API_KEY` — embeddings for KB ingestion + the **Wingman Coach** search only (live cards stopped embedding 2026-06-21)
+
+**Realtime — REQUIRED. Live cards fail silently without these.**
+- Server: `PUSHER_APP_ID` · `PUSHER_KEY` · `PUSHER_SECRET` · `PUSHER_CLUSTER`
+- Client: `NEXT_PUBLIC_PUSHER_KEY` · `NEXT_PUBLIC_PUSHER_CLUSTER`
+
+**Recall**
+- `RECALL_AI_API_KEY` — Railway ONLY, never in the Electron binary (Invariant #1)
+
+**Stripe** (routes exist, billing not live)
+- `STRIPE_SECRET_KEY` · `STRIPE_WEBHOOK_SECRET` · `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`
+
+**Dev only** — never set on Railway
+- `WINGMAN_DEVLOG=1` + `NEXT_PUBLIC_WINGMAN_DEVLOG=1` — Flight Recorder. Also gated on `NODE_ENV !== "production"`, so it is a hard no-op in prod.
+
+**No longer required**
+- `GROQ_API_KEY` — `query-distill.ts` has zero importers since the Groq distiller was cut (2026-06-30). Nothing breaks if it's absent. *(This line previously said it was "required for Phase 3.5" and told you to verify it on Railway before merging — dead advice for a dead path.)*
 
 ---
 
 ## Key Context for Debugging
 
 - The app is **Electron + Next.js together** — there are two processes: the Electron main process (`electron/main.ts`) and the Next.js web app (`src/`). Bugs can live in either.
-- The HUD is a **separate Electron window** (`electron/hud/index.html`) that floats on top of other apps. It polls the Next.js API for signal cards.
+- The HUD is a **separate Electron window** (`electron/hud/index.html`, ~2,700 lines) that floats on top of other apps. It makes **no network requests at all** — it renders whatever the main process pushes over IPC (`hud:update-signal`, `hud:update-signal-delta`, `hud:summon-state`, `hud:readiness`, `hud:flow-state`; see the `hud` namespace in `electron/preload.ts`). API calls happen in the Next.js renderer (`DashboardClient.tsx` → `useWingmanPoller`); results reach the HUD via Pusher → renderer → IPC → main → HUD. **If a card doesn't appear, the break is almost never in the HUD** — check Pusher keys and the renderer first.
 - The "Deploy Wingman" button in the tray popover triggers `electron/recall.ts` which connects to Recall.ai. Meeting detection confirmed working as of v0.1.19 — full transcript pipeline not yet end-to-end tested.
 - Railway hosts the Next.js app. The Electron app talks to the Railway URL in production.
 - Knowledge base ingestion runs **locally** from the `/knowledge-base` folder — it's a separate Node.js process, not part of the main app.
@@ -547,7 +625,7 @@ Rules:
 3. Confirm your understanding of the task before starting.
 
 ### Session End Protocol
-1. **Always end every session with `/wrap`.** This is non-negotiable. The `/wrap` skill writes a new dated build log in the Obsidian brain (`Wingman Brain/01 - Build Log/YYYY-MM-DD.md`), updates Known Issues and Current Sprint, checks Railway deploy status, and commits everything. One file per session — 7 sessions = 7 separate files.
+1. **Always end every session with `/wrap`.** This is non-negotiable. The `/wrap` skill writes a new dated build log in the Obsidian brain (`Wingman Brain/01 - Build Log/YYYY-MM-DD.md`), rewrites `NOW.md`, updates Known Issues, adds a changelog entry, refreshes memory, regenerates `context/STATE.md`, and commits everything. One file per session — 7 sessions = 7 separate files.
 2. Do not declare the session complete if any acceptance criteria remain unverified.
 3. Do not end without running `/wrap`. If Sebastian hasn't said "wrap it up" yet, remind him.
 
