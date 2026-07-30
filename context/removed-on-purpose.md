@@ -230,3 +230,79 @@ REMOVED: - Before starting any build session, read `00 - Product/Architecture.md
 other files — as an instruction it meant "read everything," which is how session-start load
 reached ~85k tokens. Replaced by: "read `01 - Build Log/NOW.md` — what's true right now.
 Everything older is on-demand." `Architecture.md` is still there and still linked from CLAUDE.md.
+
+---
+
+## .claude/skills/wrap/SKILL.md — rewritten for the new structure (2026-07-30)
+
+The wrap ritual is the load-bearing maintenance step in this whole system, so it was rewritten
+rather than patched. **Everything valuable was kept** — Step 0's "reconcile against git first,"
+the build-log guidance ("what broke and why", "the measurement", "what was NOT verified", "bugs
+Claude caused", "quote Sebastian verbatim"), the changelog schema, and Step 8's
+committed ≠ pushed ≠ merged ≠ deployed. It got **shorter**, deliberately: a longer ritual is a
+more-skipped ritual.
+
+What actually changed:
+
+- **Step 2 was the bug.** It said *"Replace the top block only; leave the history below it
+  intact"* — that instruction is why `Current Sprint.md` reached 755 lines. It now says rewrite
+  `NOW.md` in place, with finished work moving out to the dated log and Sprint Archive.
+- **Step 0's reconcile command read the wrong repo** for releases and reported a stale version.
+- **New Step 4** — log decisions the same session. Its absence is why the Decisions Log drifted
+  ten days and six decisions behind.
+- **New Step 7** — run `context:gen`, `context:lint`, `context:verify`. The mechanical parts of
+  the ritual are now a script rather than something a nearly-out-of-context Claude has to remember.
+- **Step 3** now says to move resolved rows to the archive, keeping the full Notes column.
+
+The complete original is at `git show context-backup-2026-07-30:.claude/skills/wrap/SKILL.md`.
+
+REMOVED: End-of-session wrap for Wingman. Reconciles the real state from git/GitHub, writes a dated
+REMOVED: build log in the Obsidian brain, updates Current Sprint + Known Issues, adds a plain-English
+REMOVED: changelog entry, refreshes memory, and commits it all. Run this at the end of EVERY session —
+REMOVED: CLAUDE.md's Session End Protocol makes it non-negotiable. Invoke when Sebastian says "wrap",
+REMOVED: "wrap it up", "/wrap", or is about to step away.
+REMOVED: ## Step 0 — RECONCILE FIRST. Never write prose you haven't checked against git.
+REMOVED: The brain files are hand-written and **lag reality**. Prose holds decisions and intent; **git and
+REMOVED: GitHub hold status.** Run this and report from *its* output:
+REMOVED: echo "ahead of origin/main: $(git log --oneline origin/main..HEAD | wc -l | tr -d ' ')" && \
+REMOVED: git tag --sort=-v:refname | head -3 && \
+REMOVED: gh release view --json tagName,isDraft 2>/dev/null
+REMOVED: If a note says "not pushed / not merged / not released" and git disagrees, **git wins — say so
+REMOVED: out loud in the log.** Two specific traps:
+REMOVED: - `git log origin/main..HEAD` counts commits ahead of **main**, not ahead of the remote branch.
+REMOVED: A branch can be partially pushed already. Check `git log origin/<branch>..HEAD` before claiming
+REMOVED: "N unpushed commits".
+REMOVED: - A PR for the branch may already exist. `gh pr list --head <branch> --state all` before opening
+REMOVED: a new one.
+REMOVED: **One file per session. Never append to yesterday's, never overwrite.** Use today's real date.
+REMOVED: Write for someone who wasn't here. For each thing shipped:
+REMOVED: - **What was NOT verified.** This is the highest-value line in the file. If something was checked
+REMOVED: by arithmetic and not by eye, say that.
+REMOVED: These are more useful to the next session than the features.
+REMOVED: End with a **🔴 Next session** block: the first concrete action, any blockers, and any decision
+REMOVED: waiting on Sebastian.
+REMOVED: ## Step 2 — `Wingman Brain/01 - Build Log/Current Sprint.md`
+REMOVED: Replace the **top block only**; leave the history below it intact. This is the file the
+REMOVED: session-start protocol actually acts on, so anything meant to shape the next session must land
+REMOVED: here — not only in memory. Lead with what's NEXT, not with what's done.
+REMOVED: ## Step 3 — `Wingman Brain/01 - Build Log/Known Issues.md`
+REMOVED: Update `Last updated:`. Add new issues at the top; mark fixed ones **✅ RESOLVED + date**.
+REMOVED: **Never delete a row** (vault rule). A bug worth an entry: anything that reached Sebastian, cost
+REMOVED: money, or would take a fresh session more than ten minutes to rediscover.
+REMOVED: ## Step 4 — Changelog entry: `src/data/changelog.json`
+REMOVED: "refactored". Describe what a rep would notice. `id` is `YYYY-MM-DD-slug` and must be unique.
+REMOVED: Skip this step only when the session shipped nothing user-visible.
+REMOVED: ## Step 5 — Memory
+REMOVED: Update `MEMORY.md`'s "Current State" bullet and any `project_*.md` the session changed. Memory is
+REMOVED: the durable cross-session index; Current Sprint is what gets read first. **Both, not either.**
+REMOVED: ## Step 6 — Commit
+REMOVED: Then state plainly: what is committed, what is **pushed**, what is **merged**, and what is
+REMOVED: **deployed**. Those are four different things and conflating them is how a session ends with
+REMOVED: everyone believing work is live when it is sitting on a laptop.
+REMOVED: ⚠️ **Pushing and merging need Sebastian's explicit approval** (CLAUDE.md rule #0). Recommend, and
+REMOVED: name the risk, but do not run them unasked.
+REMOVED: - **Never `npm run build`** as a check — it overwrites `.next` and kills Sebastian's running dev
+REMOVED: server. Use **`npm run build:verify`**.
+REMOVED: - **Name what's unverified.** "Verified by arithmetic, needs an Electron run" beats silence.
+REMOVED: - If `/wrap` itself couldn't do a step (a missing file, a failing command), **say so in the log**
+REMOVED: rather than quietly skipping it.

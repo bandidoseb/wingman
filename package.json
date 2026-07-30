@@ -12,7 +12,7 @@
     "context:gen": "node scripts/context-gen.mjs",
     "context:check": "node scripts/context-gen.mjs --check",
     "context:verify": "node scripts/context-verify.mjs",
-    "context:size": "node scripts/context-size.mjs",
+    "context:lint": "node scripts/context-lint.mjs",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "typecheck:electron": "tsc --noEmit -p tsconfig.electron.json",
     "test": "vitest run",

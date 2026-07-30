@@ -7,10 +7,10 @@ Last updated: 2026-07-30
 > a session lives in its dated log. **Five headings only** (a hook blocks a sixth), and the file
 > is size-capped, so it can never grow into another 755-line scroll.
 >
-> **Do not hand-type status here** — no "not pushed", "not merged", "nothing deployed". Those
+> **Do not hand-type status here** — no "not pushed", "not merged", "nothing deployed". Those <!-- context-lint-ok -->
 > rot within a day. Branch, PR, and release status is injected live by the SessionStart hook and
 > generated into `context/STATE.md`. That rule exists because on 2026-07-30 both this file's
-> predecessor and MEMORY.md insisted `feat/design-tokens` was "17 commits UNPUSHED" while it had
+> predecessor and MEMORY.md insisted `feat/design-tokens` was "17 commits UNPUSHED" while it had <!-- context-lint-ok -->
 > already merged as PR #58 and shipped.
 
 ---
