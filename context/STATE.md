@@ -12,7 +12,7 @@ session by the SessionStart hook, because a committed file cannot know today's t
 
 - **App version:** `0.1.29` (package.json)
 - **Releases publish to:** `bandidoseb/wingman-releases` (PUBLIC, separate from the source repo)
-- **Branch at last generate:** `chore/context-system-cleanup` · 220e9a1 chore: session wrap 2026-07-30 S2 — context system audited, corrected, and gated
+- **Branch at last generate:** `chore/record-decisions-2026-07-30` · f52cff3 Context system: audited, corrected, and gated (#59)
 
 ## Orphan modules — zero inbound imports
 
