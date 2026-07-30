@@ -10,7 +10,7 @@
  * The rule: "empty" is a PROVEN absence. Never assert it from ignorance.
  */
 import { describe, it, expect } from "vitest";
-import { buildSingleCallPayload, transcriptStatusFor } from "../../src/lib/wingman/coach-payload";
+import { buildSingleCallPayload, transcriptStatusFor, transcriptRowsFromDive } from "../../src/lib/wingman/coach-payload";
 import type { Call } from "../../src/types";
 
 const ID = "11111111-1111-4111-8111-111111111111";
@@ -73,5 +73,48 @@ describe("buildSingleCallPayload", () => {
     const original = call();
     buildSingleCallPayload(original, { rows: [ROW], provisional: false }, NONE);
     expect(original.call_transcript).toBeNull();
+  });
+});
+
+describe("transcriptRowsFromDive", () => {
+  const CALL = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
+
+  it("salvages the rows the server already read for a dive", () => {
+    const rows = transcriptRowsFromDive(CALL, {
+      call_transcript: [
+        { speaker: "You", text: "so what's the hold up", sequence_order: 2 },
+        { speaker: "Prospect", text: "i need to talk to my wife", sequence_order: 1 },
+      ],
+    });
+    expect(rows).toHaveLength(2);
+    expect(rows![0]).toEqual({
+      id: `${CALL}:2`, call_id: CALL, speaker: "You", text: "so what's the hold up", sequence_order: 2,
+    });
+    // Synthetic ids must be unique — they are React keys.
+    expect(new Set(rows!.map((r) => r.id)).size).toBe(2);
+  });
+
+  it("reports it as PRESENT once seeded, which is the whole point", () => {
+    const rows = transcriptRowsFromDive(CALL, {
+      call_transcript: [{ speaker: "You", text: "hi", sequence_order: 1 }],
+    })!;
+    // Provisional on purpose (Flight Log still refetches the real rows), and
+    // `present` regardless — otherwise the turn after "Read it." tells the rep
+    // Wingman can't pull the transcript up.
+    expect(transcriptStatusFor(CALL, { rows, provisional: true }, new Set(), rows)).toBe("present");
+  });
+
+  it("returns null rather than a PARTIAL list on a malformed payload", () => {
+    // A half-salvaged transcript is worse than none: rows.length > 0 reports as a
+    // proven "present" and the coach answers from an incomplete call.
+    expect(transcriptRowsFromDive(CALL, { call_transcript: [{ speaker: "You", text: "hi" }] })).toBeNull();
+    expect(transcriptRowsFromDive(CALL, { call_transcript: [{ speaker: 1, text: "hi", sequence_order: 1 }] })).toBeNull();
+    expect(transcriptRowsFromDive(CALL, { call_transcript: [null] })).toBeNull();
+  });
+
+  it("returns null for an absent or empty transcript", () => {
+    expect(transcriptRowsFromDive(CALL, null)).toBeNull();
+    expect(transcriptRowsFromDive(CALL, {})).toBeNull();
+    expect(transcriptRowsFromDive(CALL, { call_transcript: [] })).toBeNull();
   });
 });

@@ -91,6 +91,7 @@ Wingman is a Mac desktop app (Electron + Next.js) that acts as a real-time AI co
 │   │
 │   ├── components/
 │   │   ├── dashboard/         # FlightLogTab, HomeTab, IntelTab, ObjectionVaultTab, PersonalizeTab, SettingsTab, Sidebar, coach/, home/
+│   │   │   └── coach/         # CoachBar (the ONE coach entry point, wraps every tab) + CoachProvider + useChatQuota
 │   │   ├── wingman/           # ⚠️ ALL DEAD — LiveCallView has zero importers, so SignalCard/SignalLog/StageBar/LiveScorecard die with it
 │   │   ├── onboarding/        # Multi-step onboarding flow components
 │   │   └── ui/                # Shared UI primitives
@@ -139,7 +140,8 @@ Wingman is a Mac desktop app (Electron + Next.js) that acts as a real-time AI co
 - Live Hub pill — drag/persist, content-protection, waveform. Replaced the tray-only surface.
 - Post-call job → grade, debrief, 6 `call_stages`, objections, Sales DNA delta.
 - Post-call flow — call-end popups killed; the pill morphs Live → "generating debrief" → "View call" and deep-links into that Flight Log entry. Outcome auto-detected by the post-call job (confidence-gated, excluded from close-rate until confirmed).
-- Dashboard — Home + Coach, Sales DNA (Personalize), Flight Log, Objection Vault, Settings, dark mode. Intel is an intentional "Coming soon" placeholder.
+- Dashboard — Home, Sales DNA (Personalize), Flight Log, Objection Vault, Settings, dark mode. Intel is an intentional "Coming soon" placeholder.
+- **Unified Coach bar** — ONE `sticky bottom-0` chat bar on every tab (`components/dashboard/coach/CoachBar.tsx`), Granola-style takeover on send. It replaced three separate surfaces: Home's Coach, Flight Log's Mission Intel card + modal, and Flight Log's per-call "Ask Wingman" card. Scope is automatic — open a call in Flight Log and the bar asks about that call (`mode: "single_call"`); otherwise it asks across your last 20 (`mode: "global"`). Threads are kept per scope. **The bar is DISABLED during a live call** — `electron/main.ts` binds bare arrow keys as global shortcuts, and `globalShortcut` beats a focused textarea, so typing mid-call would fire compass slots onto the HUD.
 - Auth, multi-step onboarding, Objection Vault (only ever populated from real calls), owner dashboard, private `/changelog`.
 - Recall AI upload-token flow — API key lives on Railway, Electron fetches a short-lived token via an authenticated route (Invariant #1).
 - Knowledge base: 37 videos, ~15 hours, 419 KB entries ingested — now used by the **Coach only**.
@@ -158,6 +160,7 @@ Wingman is a Mac desktop app (Electron + Next.js) that acts as a real-time AI co
 - **HUD "How'd it go?" outcome card** — retired in v0.1.29; disposition lives in Flight Log. `api/wingman/hud-outcome/route.ts` is now an orphan.
 - **Signal Vault tab** and **Flight Plan tab** — deleted 2026-07-29. Sales DNA supersedes Flight Plan. ⚠️ `api/flight-plan/route.ts` has no UI caller, but the post-call job still reads `call.flight_plan_snapshot` — do not delete the column blind.
 - **Mission Intel staggered multi-bubble chat** — dropped 2026-07-30; the Coach replies as one message.
+- **Three separate chat surfaces** — Home's Coach, the Mission Intel card + modal, and the per-call "Ask Wingman" card were all deleted 2026-07-30 and replaced by the one Coach bar above. Do not re-add a per-screen chat box.
 - **The Playbook page** — never built. See below.
 
 ---

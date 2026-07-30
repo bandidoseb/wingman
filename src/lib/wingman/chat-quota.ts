@@ -73,8 +73,20 @@ export function quotaReconcile(
   day: string = utcDay()
 ): QuotaState {
   if (!Number.isFinite(serverCount) || serverCount < 0) return state;
-  // New day → yesterday's baseline and sends describe a quota that no longer exists.
-  if (day !== state.day) return initQuota(serverCount, day);
+  /*
+    Re-anchor only FORWARDS. Day keys are "YYYY-MM-DD", so a lexicographic compare is
+    a date compare.
+
+    A LATER day means yesterday's baseline and sends describe a quota that no longer
+    exists — re-anchor. An EARLIER day is never a real rollover: it is either clock
+    skew (the profile-refresh path reports the CLIENT's day, chat replies report the
+    SERVER's) or a reply that was in flight across midnight. The old `day !== state.day`
+    treated both directions the same, so a client clock a few seconds ahead of the
+    server flapped the anchor back and forth around midnight and wiped the new day's
+    sends each time.
+  */
+  if (day > state.day) return initQuota(serverCount, day);
+  if (day < state.day) return state;
   // Nothing to learn — return the SAME OBJECT so React bails out of the re-render.
   // This is what makes it free to poll this on a timer (see the rollover ticker in
   // DashboardClient): same-day ticks cost nothing, and only the midnight one renders.

@@ -4,13 +4,12 @@ import React, { useState, useEffect, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Card from "@/components/ui/Card";
 import SectionLabel from "@/components/ui/SectionLabel";
-import OutcomePill, { outcomeTone } from "@/components/ui/wm/OutcomePill";
+import { outcomeTone } from "@/components/ui/wm/OutcomePill";
 import OutcomeControl from "@/components/ui/wm/OutcomeControl";
 import CopyButton from "@/components/ui/wm/CopyButton";
 import type { Call, TranscriptLine } from "@/types";
 import { confirmedOutcome, NO_DEBRIEF_GRACE_MS } from "@/lib/wingman/outcome-stats";
-import { useCoachContext } from "@/components/dashboard/coach/CoachProvider";
-import { buildSingleCallPayload } from "@/lib/wingman/coach-payload";
+import { useCoachContext, useTranscriptMeta } from "@/components/dashboard/coach/CoachProvider";
 
 const PILLAR_DISPLAY: Array<{ key: string; label: string; description: string }> = [
   { key: "core_problem",         label: "Core Problem",      description: "Rep dug into the real pain" },
@@ -32,11 +31,6 @@ interface Props {
   userId: string;
   isActive?: boolean;
   isPendingOutcome?: boolean;
-  /**
-   * Report a server-side coaching-message count back to the shared quota state.
-   * This tab's two chat surfaces spend the SAME daily allowance as the Home Coach.
-   */
-  onQuotaReported?: (count: number, day?: string) => void;
 }
 
 // Outcome options shown in the inline picker
@@ -161,14 +155,6 @@ function OutcomePicker({
   );
 }
 
-function formatTimestamp(ts: number): string {
-  const d   = new Date(ts);
-  const now = new Date();
-  const time = d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true });
-  if (d.toDateString() === now.toDateString()) return `Today ${time}`;
-  return `${d.toLocaleDateString("en-US", { weekday: "long" })} ${time}`;
-}
-
 /**
  * True while a call could still legitimately be waiting on its post-call debrief.
  *
@@ -189,12 +175,16 @@ function awaitingDebrief(call: Call | null | undefined): boolean {
   return Date.now() - started < DEBRIEF_WINDOW_MS;
 }
 
-export default function FlightLogTab({ calls: callsProp, initialCall, onInitialCallConsumed, initialCallId, onInitialCallIdConsumed, userId, isActive = false, isPendingOutcome = false, onQuotaReported }: Props) {
+export default function FlightLogTab({ calls: callsProp, initialCall, onInitialCallConsumed, initialCallId, onInitialCallIdConsumed, userId, isActive = false, isPendingOutcome = false }: Props) {
   const router = useRouter();
   const {
     setSessionOutcome, applySessionOutcomes,
-    transcripts, setTranscript, noDebriefIds, markNoDebrief,
+    getTranscript, setTranscript, noDebriefIds, markNoDebrief,
+    setOpenCallId,
   } = useCoachContext();
+  // Separate context on purpose — this is the one subscription that must re-render
+  // when a transcript lands, and the Coach bar deliberately does not share it.
+  const transcriptMeta = useTranscriptMeta();
   // Overlay this session's confirmations ONCE, here, so every consumer below —
   // the list, the header count, the detail view and the coach payload — reads the
   // same rows. Previously each did its own `localOutcomes[id] ?? …` lookup.
@@ -225,34 +215,24 @@ export default function FlightLogTab({ calls: callsProp, initialCall, onInitialC
   // `calls` already carries this session's confirmations (applySessionOutcomes runs
   // on the prop below), so the old `localOutcomes[id] ?? …` reads are now just reads.
   const effectiveOutcome = (call: Call) => call.outcome;
-  type GlobalMessage = { role: "user" | "assistant"; text: string; timestamp?: number };
 
-  const [chatMessages, setChatMessages] = useState<Array<{ role: "user" | "assistant"; text: string }>>([]);
-  const [chatInput, setChatInput] = useState("");
-  const [chatLoading, setChatLoading] = useState(false);
-  const [globalMessages, setGlobalMessages] = useState<GlobalMessage[]>([]);
-  const [globalInput, setGlobalInput] = useState("");
-  const [globalLoading, setGlobalLoading] = useState(false);
-  const chatEndRef        = useRef<HTMLDivElement>(null);
-  const globalEndRef      = useRef<HTMLDivElement>(null);
-  const modalEndRef       = useRef<HTMLDivElement>(null);
-  const modalInputRef     = useRef<HTMLTextAreaElement>(null);
-  const callInputRef      = useRef<HTMLTextAreaElement>(null);
-  const globalInFlightRef   = useRef(false); // prevents double-sends during the 2s reading delay
-  const callInFlightRef     = useRef(false);
-  const [userIsTyping, setUserIsTyping] = useState(false);
-  const userTypingTimerRef  = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [modalOpen, setModalOpen] = useState(false);
+  /*
+    Tell the Coach bar which call is on screen — its `derived` scope.
 
-  // Deep dive state — set when Claude identifies a specific call, cleared on modal close
-  const [pendingCallSuggestion, setPendingCallSuggestion] = useState<{ call_id: string; name: string; date: string } | null>(null);
-  const [activeSingleCall, setActiveSingleCall]           = useState<object | null>(null);
-  const singleCallHistoryRef = useRef<Array<{ role: string; content: string }>>([]);
+    The CLEANUP is the load-bearing half. This tab unmounts on every tab change
+    (DashboardClient renders it conditionally), so without it the bar would keep
+    answering about a call that is no longer visible anywhere. It also fires when the
+    rep goes back to the list, and on the HUD deep-link path, because both change
+    `selectedCall`.
+  */
+  useEffect(() => {
+    setOpenCallId(selectedCall?.id ?? null);
+    return () => setOpenCallId(null);
+  }, [selectedCall?.id, setOpenCallId]);
 
   useEffect(() => {
     if (initialCall) {
       setSelectedCall(initialCall);
-      setChatMessages([]);
       setActiveDetailTab("debrief");
       onInitialCallConsumed();
     }
@@ -269,7 +249,6 @@ export default function FlightLogTab({ calls: callsProp, initialCall, onInitialC
       outcome_source: null, duration: null, summary: null, missed_topics: [],
       call_date: new Date().toISOString(), created_at: new Date().toISOString(),
     });
-    setChatMessages([]);
     setActiveDetailTab("debrief");
     onInitialCallIdConsumed?.();
   // Only react to a NEW deep-link id, not to every calls refresh.
@@ -290,10 +269,11 @@ export default function FlightLogTab({ calls: callsProp, initialCall, onInitialC
     const id = selectedCall?.id;
     if (!id) return;
     const fresh = calls.find((c) => c.id === id) ?? selectedCall;
-    const entry = transcripts[id];
+    // The META, not the rows — rows live in a ref and never re-run this effect.
+    const meta = transcriptMeta[id];
     // Skip when cached — unless the entry is provisional and the debrief has since
     // landed, which means the full transcript is now available.
-    if (entry && !(entry.provisional && fresh?.summary)) return;
+    if (meta && !(meta.provisional && fresh?.summary)) return;
     let cancelled = false;
     setTranscriptLoadingId(id);
     (async () => {
@@ -311,9 +291,10 @@ export default function FlightLogTab({ calls: callsProp, initialCall, onInitialC
       }
     })();
     return () => { cancelled = true; };
-    // `transcripts` in deps is what re-arms the provisional refetch; the write
-    // inside is loop-safe because the guard above skips every settled entry.
-  }, [selectedCall, calls, transcripts, setTranscript]);
+    // `transcriptMeta` in deps is what re-arms the provisional refetch; the write
+    // inside is loop-safe because the guard above skips every settled entry, AND
+    // `setTranscript` returns the same meta object when nothing observable changed.
+  }, [selectedCall, calls, transcriptMeta, setTranscript]);
 
   // While an open call has no debrief yet, poll for it so the skeleton fills in
   // even when the parent isn't already polling (e.g. a deep-link opened later).
@@ -371,279 +352,6 @@ export default function FlightLogTab({ calls: callsProp, initialCall, onInitialC
     return () => clearInterval(iv);
   }, [selectedCall, calls, router]);
 
-  useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
-  }, [chatMessages, chatLoading]);
-
-  useEffect(() => {
-    globalEndRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
-  }, [globalMessages, globalLoading]);
-
-  // Auto-focus modal input when it opens
-  useEffect(() => {
-    if (modalOpen) setTimeout(() => modalInputRef.current?.focus(), 50);
-  }, [modalOpen]);
-
-  // Scroll modal to bottom when messages update
-  useEffect(() => {
-    if (modalOpen) modalEndRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
-  }, [globalMessages, globalLoading, modalOpen]);
-
-  // ESC closes modal and clears deep dive state
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        setModalOpen(false);
-        setPendingCallSuggestion(null);
-        setActiveSingleCall(null);
-        singleCallHistoryRef.current = [];
-      }
-    };
-    if (modalOpen) document.addEventListener("keydown", handler);
-    return () => document.removeEventListener("keydown", handler);
-  }, [modalOpen]);
-
-  // Clean up debounce timer on unmount to prevent state updates on unmounted component
-  useEffect(() => {
-    return () => { if (userTypingTimerRef.current) clearTimeout(userTypingTimerRef.current); };
-  }, []);
-
-  // Restore global chat conversation from localStorage on mount (24-hour TTL)
-  useEffect(() => {
-    try {
-      const stored = localStorage.getItem("wingman_global_chat");
-      if (stored) {
-        const { messages, savedAt } = JSON.parse(stored);
-        const oneDayMs = 24 * 60 * 60 * 1000;
-        if (Date.now() - savedAt < oneDayMs && messages?.length > 0) {
-          setGlobalMessages(messages);
-        } else {
-          localStorage.removeItem("wingman_global_chat");
-        }
-      }
-    } catch { /* ignore corrupted data */ }
-  }, []);
-
-  // Save global chat conversation to localStorage whenever messages change
-  useEffect(() => {
-    if (globalMessages.length === 0) return;
-    try {
-      localStorage.setItem("wingman_global_chat", JSON.stringify({
-        messages: globalMessages,
-        savedAt: Date.now(),
-      }));
-    } catch { /* ignore if storage quota exceeded */ }
-  }, [globalMessages]);
-
-  const sendGlobalMessage = async (text: string) => {
-    if (!text.trim() || globalInFlightRef.current) return;
-    globalInFlightRef.current = true;
-    const newMessage: GlobalMessage = { role: "user", text, timestamp: Date.now() };
-    setGlobalMessages((prev) => [...prev, newMessage]);
-    setGlobalInput("");
-    if (modalInputRef.current) modalInputRef.current.style.height = "auto";
-    if (userTypingTimerRef.current) clearTimeout(userTypingTimerRef.current);
-    setUserIsTyping(false);
-
-    // ── Build request body based on current mode ─────────────────────────────
-    const isInSingleCallMode = activeSingleCall !== null;
-    let body: object;
-
-    if (isInSingleCallMode) {
-      // Body size guard — full transcript can be large
-      const callDataStr = JSON.stringify(activeSingleCall);
-      if (callDataStr.length > 800_000) {
-        setGlobalMessages((prev) => [...prev, { role: "assistant", text: "That transcript is too large to process. Try asking about a shorter call.", timestamp: Date.now() }]);
-        setGlobalLoading(false);
-        globalInFlightRef.current = false;
-        return;
-      }
-      const newTurn = { role: "user" as const, content: text };
-      singleCallHistoryRef.current = [...singleCallHistoryRef.current, newTurn];
-      body = {
-        mode:     "single_call",
-        messages: singleCallHistoryRef.current.slice(-10),
-        call:     activeSingleCall,
-      };
-    } else {
-      // Global mode — strip transcript data, include pendingCallId if set
-      const callSummaries = calls.map((c) => ({
-        id:             c.id,
-        prospect_name:  c.prospect_name,
-        outcome:        c.outcome,
-        outcome_source: c.outcome_source ?? null,
-        call_date:      c.call_date,
-        duration:       c.duration,
-        summary:        c.summary,
-        missed_topics:  c.missed_topics,
-      }));
-      const messages = [...globalMessages.slice(-9), newMessage].map((m) => ({
-        role:    m.role,
-        content: m.text,
-      }));
-      body = {
-        mode: "global",
-        messages,
-        callSummaries,
-        ...(pendingCallSuggestion ? { pendingCallId: pendingCallSuggestion.call_id } : {}),
-      };
-    }
-
-    // Kick off API immediately — hold typing indicator 2s so it looks like Wingman is reading
-    const fetchPromise = fetch("/api/ai/chat", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-
-    await new Promise<void>((resolve) => setTimeout(resolve, 2000));
-    setGlobalLoading(true);
-
-    try {
-      const res  = await fetchPromise;
-      const data = await res.json();
-
-      // These two surfaces burn the SAME daily quota as the Home Coach but never
-      // reported it, so the sidebar showed full headroom while the server counted
-      // down — the rep hit a surprise 429. PR 4 deletes both; until then, report.
-      if (typeof data.messagesUsedToday === "number") {
-        onQuotaReported?.(data.messagesUsedToday, typeof data.quotaDay === "string" ? data.quotaDay : undefined);
-      }
-
-      if (data.limitReached) {
-        setGlobalMessages((prev) => [...prev, { role: "assistant", text: "You've hit today's coaching limit. Come back tomorrow — or upgrade to Pro for unlimited sessions.", timestamp: Date.now() }]);
-        setGlobalLoading(false);
-        globalInFlightRef.current = false;
-        return;
-      }
-
-      const reply      = data.reply || "Couldn't get a response.";
-      const diveReady  = data.diveReady  ?? null;
-      const suggestion = data.callSuggestion ?? null;
-
-      // ── Store callSuggestion silently (no button shown) ───────────────────
-      if (suggestion) {
-        setPendingCallSuggestion(suggestion);
-      }
-
-      // ── Handle diveReady: transcript fetched, switch to single-call mode ──
-      if (diveReady) {
-        // Show Claude's "reading transcript" reply (staggered bubbles)
-        const chunks = reply.split("\n\n").filter(Boolean);
-        for (let i = 0; i < chunks.length; i++) {
-          if (i > 0) await new Promise<void>((r) => setTimeout(r, 3000));
-          setGlobalMessages((prev) => [...prev, { role: "assistant", text: chunks[i], timestamp: Date.now() }]);
-        }
-
-        // 2-second pause, then the personalized opener
-        await new Promise<void>((r) => setTimeout(r, 2000));
-        setGlobalMessages((prev) => [...prev, { role: "assistant", text: diveReady.openerReply, timestamp: Date.now() }]);
-
-        // Switch to single-call mode
-        setActiveSingleCall(diveReady.callData);
-        setPendingCallSuggestion(null);
-        singleCallHistoryRef.current = [{ role: "assistant", content: diveReady.openerReply }];
-
-        setGlobalLoading(false);
-        globalInFlightRef.current = false;
-        return;
-      }
-
-      // ── Normal staggered bubble display ───────────────────────────────────
-      const chunks = reply.split("\n\n").filter(Boolean);
-      if (chunks.length <= 1) {
-        setGlobalMessages((prev) => [...prev, { role: "assistant", text: reply, timestamp: Date.now() }]);
-      } else {
-        for (let i = 0; i < chunks.length; i++) {
-          if (i > 0) await new Promise<void>((resolve) => setTimeout(resolve, 3000));
-          setGlobalMessages((prev) => [...prev, { role: "assistant", text: chunks[i], timestamp: Date.now() }]);
-        }
-      }
-
-      // Track conversation history when in single-call mode
-      if (isInSingleCallMode) {
-        singleCallHistoryRef.current = [
-          ...singleCallHistoryRef.current,
-          { role: "assistant", content: reply },
-        ];
-      }
-
-    } catch {
-      setGlobalMessages((prev) => [...prev, { role: "assistant", text: "Connection error. Try again.", timestamp: Date.now() }]);
-    }
-    setGlobalLoading(false);
-    globalInFlightRef.current = false;
-  };
-
-  const sendCallMessage = async (text: string, call: Call) => {
-    if (!text.trim() || callInFlightRef.current) return;
-    callInFlightRef.current = true;
-    const newMessage = { role: "user" as const, text };
-    setChatMessages((prev) => [...prev, newMessage]);
-    setChatInput("");
-    if (callInputRef.current) callInputRef.current.style.height = "auto";
-    // Reset typing state immediately so it doesn't mask the indicator after send
-    if (userTypingTimerRef.current) clearTimeout(userTypingTimerRef.current);
-    setUserIsTyping(false);
-
-    // Last 9 existing turns + the new one → API receives up to 10 turns total
-    const messages = [...chatMessages.slice(-9), newMessage].map((m) => ({
-      role:    m.role,
-      content: m.text,
-    }));
-
-    // The list rows no longer carry call_transcript (dropped from the dashboard
-    // query) — but the single_call coach builds its TRANSCRIPT block from this
-    // payload. Graft the on-open fetch back in, or Wingman silently coaches from
-    // the summary alone.
-    // ONE builder, shared with the Coach bar from PR 4 — two callers producing two
-    // slightly different payloads for the same call is a guaranteed prompt-cache miss
-    // AND two different truths about that call.
-    const { call: callWithTranscript, transcriptStatus } =
-      buildSingleCallPayload(call, transcripts[call.id], noDebriefIds);
-
-    // Kick off API immediately — hold typing indicator 2s so it looks like Wingman is reading
-    const fetchPromise = fetch("/api/ai/chat", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ mode: "single_call", messages, call: callWithTranscript, transcriptStatus }),
-    });
-
-    await new Promise<void>(resolve => setTimeout(resolve, 2000));
-    setChatLoading(true);
-
-    try {
-      const res = await fetchPromise;
-      const data = await res.json();
-
-      // These two surfaces burn the SAME daily quota as the Home Coach but never
-      // reported it, so the sidebar showed full headroom while the server counted
-      // down — the rep hit a surprise 429. PR 4 deletes both; until then, report.
-      if (typeof data.messagesUsedToday === "number") {
-        onQuotaReported?.(data.messagesUsedToday, typeof data.quotaDay === "string" ? data.quotaDay : undefined);
-      }
-
-      if (data.limitReached) {
-        setChatMessages((prev) => [...prev, { role: "assistant", text: "You've hit today's coaching limit. Come back tomorrow — or upgrade to Pro for unlimited sessions.", timestamp: Date.now() }]);
-      } else {
-        const reply  = data.reply || "Couldn't get a response.";
-        const chunks = reply.split("\n\n").filter(Boolean);
-        if (chunks.length <= 1) {
-          setChatMessages((prev) => [...prev, { role: "assistant", text: reply }]);
-        } else {
-          for (let i = 0; i < chunks.length; i++) {
-            if (i > 0) await new Promise<void>(resolve => setTimeout(resolve, 3000));
-            setChatMessages((prev) => [...prev, { role: "assistant", text: chunks[i] }]);
-          }
-        }
-      }
-    } catch {
-      setChatMessages((prev) => [...prev, { role: "assistant", text: "Connection error. Try again.", timestamp: Date.now() }]);
-    }
-    setChatLoading(false);
-    callInFlightRef.current = false;
-  };
-
   if (selectedCall) {
     // Derive from the LIVE `calls` prop by id so an open entry fills in as the
     // post-call job lands (router.refresh updates `calls`). `selectedCall` is only
@@ -659,7 +367,10 @@ export default function FlightLogTab({ calls: callsProp, initialCall, onInitialC
     const stages = call.call_stages || [];
     // Cache first (the on-open fetch), then any transcript already on the row
     // (e.g. a snapshot passed via initialCall) as a fallback.
-    const transcript = transcripts[call.id]?.rows ?? call.call_transcript ?? [];
+    // Reading the ref during render is safe here BECAUSE every write to it is paired
+    // with a `transcriptMeta` state write in the same call — this component only
+    // renders in response to that meta, so it can never show rows without their meta.
+    const transcript = getTranscript(call.id)?.rows ?? call.call_transcript ?? [];
     const transcriptLoading = transcriptLoadingId === call.id && transcript.length === 0;
     // Debrief still in flight → Granola-style skeleton that fills in. An OLD call with
     // no summary never got one (no transcript / failed job) and gets a plain note
@@ -669,7 +380,7 @@ export default function FlightLogTab({ calls: callsProp, initialCall, onInitialC
 
     return (
       <div style={{ maxWidth: 640, margin: "0 auto" }}>
-        <button onClick={() => { setSelectedCall(null); setChatMessages([]); setActiveDetailTab("debrief"); }}
+        <button onClick={() => { setSelectedCall(null); setActiveDetailTab("debrief"); }}
           style={{ background: "none", border: "none", color: "rgb(var(--ink-2))", fontSize: 13, fontFamily: "inherit", fontWeight: 500, marginBottom: 20, padding: 0, display: "flex", alignItems: "center", gap: 5, cursor: "pointer" }}>
           ← All Calls
         </button>
@@ -837,52 +548,6 @@ export default function FlightLogTab({ calls: callsProp, initialCall, onInitialC
           </Card>
         )}
 
-        {/* Ask Wingman about this call */}
-        <Card style={{ marginTop: 12 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
-            <div style={{ width: 7, height: 7, borderRadius: "50%", background: "rgb(var(--positive))", boxShadow: "0 0 6px rgb(var(--positive) / 0.5)", flexShrink: 0 }} />
-            <div style={{ fontSize: 11, fontWeight: 600, color: "rgb(var(--ink-2))", textTransform: "uppercase", letterSpacing: "0.06em" }}>Ask Wingman — About This Call</div>
-          </div>
-          {chatMessages.length === 0 && (
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 12 }}>
-              {["What did I do well?", "What was my biggest missed opportunity?", "What's the one thing to fix on my next call?"].map((q) => (
-                <button key={q} onClick={() => sendCallMessage(q, call)} style={{ fontSize: 11.5, color: "rgb(var(--ink-1))", background: "rgb(var(--line))", border: "none", borderRadius: 7, padding: "6px 11px", fontFamily: "inherit", fontWeight: 500, cursor: "pointer" }}>{q}</button>
-              ))}
-            </div>
-          )}
-          {chatMessages.length > 0 && (
-            <div style={{ maxHeight: 300, overflowY: "auto", marginBottom: 12, display: "flex", flexDirection: "column", gap: 10 }}>
-              {chatMessages.map((m, i) =>
-                m.role === "assistant"
-                  ? m.text.split("\n\n").filter(Boolean).map((chunk, ci) => (
-                      <div key={`${i}-${ci}`} style={{ alignSelf: "flex-start", maxWidth: "88%", background: "rgb(var(--line))", color: "rgb(var(--ink-1))", borderRadius: "12px 12px 12px 3px", padding: "9px 13px", fontSize: 13, lineHeight: 1.5 }}>{chunk}</div>
-                    ))
-                  : <div key={i} style={{ alignSelf: "flex-end", maxWidth: "88%", background: "rgb(var(--ink-1))", color: "rgb(var(--surface))", borderRadius: "12px 12px 3px 12px", padding: "9px 13px", fontSize: 13, lineHeight: 1.5 }}>{m.text}</div>
-              )}
-              {chatLoading && !userIsTyping && <div style={{ alignSelf: "flex-start", background: "rgb(var(--line))", borderRadius: "12px 12px 12px 3px", padding: "11px 14px", display: "flex", gap: 5, alignItems: "center" }}><span className="typing-dot" /><span className="typing-dot" /><span className="typing-dot" /></div>}
-              <div ref={chatEndRef} />
-            </div>
-          )}
-          <div style={{ display: "flex", gap: 8 }}>
-            <textarea
-              ref={callInputRef}
-              value={chatInput}
-              rows={1}
-              onChange={(e) => {
-                setChatInput(e.target.value);
-                e.target.style.height = "auto";
-                e.target.style.height = Math.min(e.target.scrollHeight, 120) + "px";
-                setUserIsTyping(true);
-                if (userTypingTimerRef.current) clearTimeout(userTypingTimerRef.current);
-                userTypingTimerRef.current = setTimeout(() => setUserIsTyping(false), 1000);
-              }}
-              onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendCallMessage(chatInput, call); } }}
-              placeholder="Ask anything about this call…"
-              style={{ flex: 1, background: "rgb(var(--line))", border: "none", borderRadius: 9, padding: "11px 14px", color: "rgb(var(--ink-1))", fontSize: 13, fontFamily: "inherit", outline: "none", resize: "none", overflow: "auto", lineHeight: 1.4, boxSizing: "border-box" }}
-            />
-            <button onClick={() => sendCallMessage(chatInput, call)} style={{ padding: "11px 18px", background: "rgb(var(--ink-1))", borderRadius: 9, color: "rgb(var(--surface))", fontSize: 12, fontFamily: "inherit", fontWeight: 600, border: "none", cursor: "pointer", alignSelf: "flex-end" }}>Ask</button>
-          </div>
-        </Card>
       </div>
     );
   }
@@ -900,49 +565,6 @@ export default function FlightLogTab({ calls: callsProp, initialCall, onInitialC
         <div style={{ fontSize: 22, fontWeight: 700, color: "rgb(var(--ink-1))", letterSpacing: "-0.02em" }}>Flight Log</div>
         <div style={{ fontSize: 14, color: "rgb(var(--ink-2))", marginTop: 3 }}>Every call. Every transcript. All yours.</div>
       </div>
-
-      {/* Mission Intel — entry point, opens modal */}
-      <Card style={{ marginBottom: 14 }}>
-        <div style={{ marginBottom: 10 }}>
-          <SectionLabel className="mb-0!">Mission Intel — Ask Your Wingman</SectionLabel>
-        </div>
-
-        {/* Quick-send buttons — always visible */}
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 12 }}>
-          {["Where do I lose most deals?", "What's my top objection?", "What works on wins?"].map((q) => (
-            <button key={q} onClick={() => { setModalOpen(true); sendGlobalMessage(q); }} style={{ fontSize: 11.5, color: "rgb(var(--ink-1))", background: "rgb(var(--line))", border: "none", borderRadius: 7, padding: "6px 11px", fontFamily: "inherit", fontWeight: 500, cursor: "pointer" }}>{q}</button>
-          ))}
-        </div>
-
-        {/* Chat thread entry point */}
-        <button
-          onClick={() => setModalOpen(true)}
-          style={{ display: "flex", alignItems: "center", gap: 12, width: "100%", background: "rgb(var(--surface-sunken))", border: "none", borderRadius: 12, padding: "10px 12px", cursor: "pointer", textAlign: "left" }}
-        >
-          {/* Avatar */}
-          <div style={{ width: 40, height: 40, borderRadius: "50%", background: "rgb(var(--ink-1))", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, position: "relative" }}>
-            <span style={{ color: "rgb(var(--surface))", fontSize: 15, fontWeight: 700, fontFamily: "inherit" }}>W</span>
-            <div style={{ position: "absolute", bottom: 1, right: 1, width: 9, height: 9, borderRadius: "50%", background: "rgb(var(--positive))", border: "1.5px solid rgb(var(--surface-sunken))" }} />
-          </div>
-          {/* Name + preview */}
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 13.5, fontWeight: 700, color: "rgb(var(--ink-1))", marginBottom: 2, fontFamily: "inherit" }}>Wingman</div>
-            <div style={{ fontSize: 12.5, color: "rgb(var(--ink-2))", overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis", fontFamily: "inherit" }}>
-              {globalMessages.length > 0
-                ? (() => {
-                    const last = [...globalMessages].reverse().find(m => m.role === "assistant");
-                    return last ? last.text.slice(0, 60) + (last.text.length > 60 ? "…" : "") : "Tap to start chatting";
-                  })()
-                : "Tap to start chatting"
-              }
-            </div>
-          </div>
-          {/* CTA */}
-          <span style={{ fontSize: 12, color: "rgb(var(--signal))", fontWeight: 600, whiteSpace: "nowrap", flexShrink: 0, fontFamily: "inherit" }}>
-            {globalMessages.length > 0 ? "Continue →" : "Open →"}
-          </span>
-        </button>
-      </Card>
 
       {/* Call list */}
       <Card>
@@ -989,7 +611,7 @@ export default function FlightLogTab({ calls: callsProp, initialCall, onInitialC
         ) : calls.length > 0 ? (
           calls.map((call, i) => (
             <div key={call.id}
-              onClick={() => { setSelectedCall(call); setChatMessages([]); setChatInput(""); setActiveDetailTab("debrief"); }}
+              onClick={() => { setSelectedCall(call); setActiveDetailTab("debrief"); }}
               onMouseEnter={() => setHoveredCallId(call.id)}
               onMouseLeave={() => setHoveredCallId(null)}
               style={{ paddingBottom: i < calls.length - 1 ? 14 : 0, marginBottom: i < calls.length - 1 ? 14 : 0, borderBottom: i < calls.length - 1 ? "1px solid rgb(var(--line))" : "none", cursor: "pointer", borderRadius: 8, padding: "10px 8px", margin: "0 -8px", background: hoveredCallId === call.id ? "rgb(var(--surface-sunken))" : "transparent", transition: "background 0.15s" }}>
@@ -1020,104 +642,6 @@ export default function FlightLogTab({ calls: callsProp, initialCall, onInitialC
         ) : null}
       </Card>
 
-      {/* ── Mission Intel Chat Modal ─────────────────────────────────────────── */}
-      {modalOpen && (
-        <div
-          onClick={() => { setModalOpen(false); setPendingCallSuggestion(null); setActiveSingleCall(null); singleCallHistoryRef.current = []; }}
-          style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgb(var(--scrim) / 0.45)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            style={{ background: "rgb(var(--surface))", borderRadius: 18, width: 520, maxWidth: "100%", height: "82vh", display: "flex", flexDirection: "column", boxShadow: "var(--e-lg)", overflow: "hidden" }}
-          >
-            {/* Header */}
-            <div style={{ padding: "16px 20px", borderBottom: "1px solid rgb(var(--line))", display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <div style={{ width: 7, height: 7, borderRadius: "50%", background: "rgb(var(--positive))", boxShadow: "0 0 6px rgb(var(--positive) / 0.5)", flexShrink: 0 }} />
-                <div style={{ fontSize: 13, fontWeight: 700, color: "rgb(var(--ink-1))", letterSpacing: "-0.01em" }}>Mission Intel — Ask Your Wingman</div>
-              </div>
-              <button onClick={() => { setModalOpen(false); setPendingCallSuggestion(null); setActiveSingleCall(null); singleCallHistoryRef.current = []; }} style={{ background: "rgb(var(--line))", border: "none", borderRadius: "50%", width: 28, height: 28, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", fontSize: 13, color: "rgb(var(--ink-2))", fontFamily: "inherit", flexShrink: 0 }}>✕</button>
-            </div>
-
-            {/* Messages */}
-            <div style={{ flex: 1, overflowY: "auto", padding: "16px 20px", display: "flex", flexDirection: "column", gap: 10 }}>
-              {/* Spacer pushes messages to bottom when chat is short; collapses when full so scroll works */}
-              <div style={{ flex: 1 }} />
-              {globalMessages.length === 0 && (
-                <div style={{ textAlign: "center", padding: "32px 0" }}>
-                  <div style={{ fontSize: 13, color: "rgb(var(--ink-2))", lineHeight: 1.6, marginBottom: 16 }}>
-                    Ask Wingman anything about your calls — patterns, wins, what to fix next.
-                  </div>
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6, justifyContent: "center" }}>
-                    {["Where do I lose most deals?", "What's my top objection?", "What works on wins?"].map((q) => (
-                      <button key={q} onClick={() => sendGlobalMessage(q)} style={{ fontSize: 11.5, color: "rgb(var(--ink-1))", background: "rgb(var(--line))", border: "none", borderRadius: 7, padding: "6px 11px", fontFamily: "inherit", fontWeight: 500, cursor: "pointer" }}>{q}</button>
-                    ))}
-                  </div>
-                </div>
-              )}
-              {globalMessages.flatMap((m, i) => {
-                const items: React.ReactNode[] = [];
-                // Show timestamp if: first message, or 10+ min gap from previous
-                const prevTs = i > 0 ? globalMessages[i - 1].timestamp : undefined;
-                const showTs = m.timestamp && (i === 0 || (prevTs && m.timestamp - prevTs >= 10 * 60 * 1000));
-                if (showTs) {
-                  items.push(
-                    <div key={`ts-${i}`} style={{ textAlign: "center", fontSize: 11, color: "rgb(var(--ink-2))", margin: "2px 0", fontFamily: "inherit" }}>
-                      {formatTimestamp(m.timestamp!)}
-                    </div>
-                  );
-                }
-                if (m.role === "assistant") {
-                  items.push(
-                    <div key={i} style={{ display: "flex", gap: 8, alignItems: "flex-end" }}>
-                      <div style={{ width: 28, height: 28, borderRadius: "50%", background: "rgb(var(--ink-1))", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                        <span style={{ color: "rgb(var(--surface))", fontSize: 12, fontWeight: 700, fontFamily: "inherit" }}>W</span>
-                      </div>
-                      <div style={{ display: "flex", flexDirection: "column", gap: 4, alignItems: "flex-start", maxWidth: "calc(85% - 36px)" }}>
-                        {m.text.split("\n\n").filter(Boolean).map((chunk, ci) => (
-                          <div key={ci} style={{ background: "rgb(var(--line))", color: "rgb(var(--ink-1))", borderRadius: "12px 12px 12px 3px", padding: "9px 13px", fontSize: 13, lineHeight: 1.5 }}>{chunk}</div>
-                        ))}
-                      </div>
-                    </div>
-                  );
-                } else {
-                  items.push(
-                    <div key={i} style={{ alignSelf: "flex-end", maxWidth: "85%", background: "rgb(var(--ink-1))", color: "rgb(var(--surface))", borderRadius: "12px 12px 3px 12px", padding: "9px 13px", fontSize: 13, lineHeight: 1.5 }}>{m.text}</div>
-                  );
-                }
-                return items;
-              })}
-              {globalLoading && !userIsTyping && (
-                <div style={{ alignSelf: "flex-start", background: "rgb(var(--line))", borderRadius: "12px 12px 12px 3px", padding: "11px 14px", display: "flex", gap: 5, alignItems: "center" }}>
-                  <span className="typing-dot" /><span className="typing-dot" /><span className="typing-dot" />
-                </div>
-              )}
-              <div ref={modalEndRef} />
-            </div>
-
-            {/* Input */}
-            <div style={{ padding: "14px 20px", borderTop: "1px solid rgb(var(--line))", display: "flex", gap: 8, flexShrink: 0 }}>
-              <textarea
-                ref={modalInputRef}
-                value={globalInput}
-                rows={1}
-                onChange={(e) => {
-                  setGlobalInput(e.target.value);
-                  e.target.style.height = "auto";
-                  e.target.style.height = Math.min(e.target.scrollHeight, 120) + "px";
-                  setUserIsTyping(true);
-                  if (userTypingTimerRef.current) clearTimeout(userTypingTimerRef.current);
-                  userTypingTimerRef.current = setTimeout(() => setUserIsTyping(false), 1000);
-                }}
-                onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendGlobalMessage(globalInput); } }}
-                placeholder="Ask anything about your calls…"
-                style={{ flex: 1, background: "rgb(var(--line))", border: "none", borderRadius: 9, padding: "11px 14px", color: "rgb(var(--ink-1))", fontSize: 13, fontFamily: "inherit", outline: "none", resize: "none", overflow: "auto", lineHeight: 1.4, boxSizing: "border-box" }}
-              />
-              <button onClick={() => sendGlobalMessage(globalInput)} style={{ padding: "11px 18px", background: "rgb(var(--ink-1))", borderRadius: 9, color: "rgb(var(--surface))", fontSize: 12, fontFamily: "inherit", fontWeight: 600, border: "none", cursor: "pointer", alignSelf: "flex-end" }}>Ask</button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

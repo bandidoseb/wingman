@@ -159,4 +159,22 @@ describe("quotaReconcile — midnight rollover", () => {
     q = quotaReconcile(q, 0, DAY2);
     expect(quotaUsed(q)).toBe(0);
   });
+
+  it("re-anchors FORWARDS only — a backwards day is clock skew, not a rollover", () => {
+    /*
+      Two clocks report into this: chat replies carry the SERVER's day, the
+      profile-refresh ticker falls back to the CLIENT's. A client a few seconds ahead
+      crosses midnight first, so around midnight the days arrive out of order. Treating
+      any mismatch as a rollover made the anchor flap and wiped the new day's sends
+      on every backwards report.
+    */
+    let q = initQuota(0, DAY2);          // client already rolled over
+    q = quotaOnSent(q);
+    q = quotaOnSent(q);
+    expect(quotaUsed(q)).toBe(2);
+
+    q = quotaReconcile(q, 15, DAY1);     // a straggler from the old day
+    expect(q.day).toBe(DAY2);
+    expect(quotaUsed(q)).toBe(2);        // NOT 15, and the two sends survive
+  });
 });

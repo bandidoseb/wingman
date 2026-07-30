@@ -21,7 +21,8 @@ import { HOT_PARTIAL_MS, SETTLE_WAIT_MS } from "@/lib/wingman/live-tail";
 import { scoreReadiness, BELIEF_DISPLAY } from "@/lib/wingman/close-readiness.mjs";
 import { logDevEvent } from "@/lib/wingman/devlog-client";
 import { chatMessagesUsedToday, quotaUsed } from "@/lib/wingman/chat-quota";
-import { useCoachSession } from "@/components/dashboard/home/Coach";
+import { useChatQuota } from "@/components/dashboard/coach/useChatQuota";
+import CoachBar from "@/components/dashboard/coach/CoachBar";
 import { useWingmanPoller } from "@/hooks/useWingmanPoller";
 import { useRecallTranscript } from "@/hooks/useRecallTranscript";
 
@@ -98,15 +99,15 @@ export default function DashboardClient({
   // ── Tab / UI state ─────────────────────────────────────────────────────────
   const [tab, setTab] = useState<DashboardTab>("home");
 
-  // Coach conversation. Lives HERE, not in HomeTab, because HomeTab unmounts on
-  // every tab change — including the Coach's own "Open X in Flight Log →"
-  // handoff, which would silently destroy the thread the rep was building.
-  const coachSession = useCoachSession(chatMessagesUsedToday(profile));
+  // The Coach's daily quota. Lives HERE, not in the bar, because the sidebar renders
+  // the same number and the midnight rollover ticker below has to re-anchor it.
+  // The CONVERSATION no longer needs lifting: the bar wraps the tabs and never unmounts.
+  const chatQuota = useChatQuota(chatMessagesUsedToday(profile));
 
   // ONE number for the whole dashboard. The sidebar used to read the server count
   // straight off `profile`, which only moves on a page load — so it sat stale
   // ("1 of 20") while the chat box counted live ("3/20"). Both now read this.
-  const coachUsed = quotaUsed(coachSession.quota);
+  const coachUsed = quotaUsed(chatQuota.quota);
 
   // Fold the refreshed profile count in whenever router.refresh() lands a new one.
   // This is also the ONLY rollover signal available to a tab that sits open past
@@ -115,7 +116,7 @@ export default function DashboardClient({
   // day change and re-anchors. The previous `useRef` baseline could not — it was
   // captured once, so an overnight tab stayed pinned at yesterday's count.
   const profileChatCount = chatMessagesUsedToday(profile);
-  const reportServerCount = coachSession.reportServerCount;
+  const reportServerCount = chatQuota.reportServerCount;
   useEffect(() => {
     reportServerCount(profileChatCount);
   }, [profileChatCount, reportServerCount]);
@@ -1607,6 +1608,25 @@ export default function DashboardClient({
 
   const clearPendingCall = useCallback(() => setPendingCall(null), []);
 
+  /**
+   * Open a call in Flight Log by id — the Coach bar's dive hand-off.
+   * Returns false when the id isn't in the loaded 20, so the bar can say so out loud
+   * instead of scoping itself to a call it could never load.
+   */
+  const openCallById = useCallback((callId: string): boolean => {
+    const call = initialCalls.find((c) => c.id === callId);
+    if (!call) return false;
+    setPendingCall(call);
+    setTab("library");
+    return true;
+  }, [initialCalls]);
+
+  // The bar is disabled for both non-idle phases, with different copy for each —
+  // see the `callPhase` prop's note in CoachBar. "live" wins when both are somehow
+  // true, because that is the one with the arrow-key hazard behind it.
+  const callPhase: "idle" | "live" | "processing" =
+    isActive || deployPhase !== "idle" ? "live" : pendingOutcome ? "processing" : "idle";
+
   // Imported, never re-typed — see the note on these constants in Sidebar.tsx.
   const sidebarWidth = collapsed ? SIDEBAR_WIDTH_COLLAPSED : SIDEBAR_WIDTH_EXPANDED;
 
@@ -1662,12 +1682,6 @@ export default function DashboardClient({
         />
 
         <div
-          // Clicking the empty area beside the Coach panel drops back to Home,
-          // the way clicking beside Granola's chat does. Guarded on currentTarget
-          // so it only fires for the bare margin, never for content clicks.
-          onClick={(e) => {
-            if (coachSession.open && e.target === e.currentTarget) coachSession.setOpen(false);
-          }}
           style={{
             marginLeft: sidebarWidth,
             flex:       1,
@@ -1682,6 +1696,19 @@ export default function DashboardClient({
               DashboardClient on purpose — its updates must not re-render the component
               that owns the live-call handlers and the Live Hub pill state machine. */}
           <CoachProvider>
+          {/* ONE coach entry point on every tab. It WRAPS the tabs rather than sitting
+              beside them: `children` is an element created here, so it stays
+              referentially stable and the tab tree does not re-render on every
+              keystroke — and wrapping is what lets the takeover hide the tab content
+              without lifting any chat state into this component. */}
+          <CoachBar
+            calls={initialCalls}
+            used={coachUsed}
+            callPhase={callPhase}
+            onOpenCall={openCallById}
+            markSent={chatQuota.markSent}
+            onQuotaReported={reportServerCount}
+          >
           {tab === "home" && (
             <HomeTab
               profile={profile}
@@ -1696,8 +1723,6 @@ export default function DashboardClient({
               deployPhase={deployPhase}
               stillLooking={stillLooking}
               onCancelSearch={handleCancelSearch}
-              coachSession={coachSession}
-              coachUsed={coachUsed}
             />
           )}
           {tab === "library" && (
@@ -1710,7 +1735,6 @@ export default function DashboardClient({
               userId={userId}
               isActive={isActive}
               isPendingOutcome={pendingOutcome}
-              onQuotaReported={reportServerCount}
             />
           )}
           {tab === "objections" && (
@@ -1733,6 +1757,7 @@ export default function DashboardClient({
               userId={userId}
             />
           )}
+          </CoachBar>
           </CoachProvider>
         </div>
       </div>
