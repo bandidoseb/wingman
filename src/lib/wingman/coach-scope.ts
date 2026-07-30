@@ -73,6 +73,15 @@ export function onDerivedChange(s: ScopeState, next: string | null): ScopeState 
   return { override, derived: next, dismissedDerived };
 }
 
+/**
+ * Jump straight to a scope — a dive resolving, or the rep picking a saved
+ * conversation out of History. Both are explicit instructions, so both outrank
+ * whatever Flight Log happens to have open.
+ */
+export function selectScope(s: ScopeState, scope: string): ScopeState {
+  return scope === GLOBAL_SCOPE ? dismissScope(s) : onDive(s, scope);
+}
+
 /** A dive resolved. Only ever called with a call id that IS in the loaded list. */
 export function onDive(s: ScopeState, callId: string): ScopeState {
   // Clear any dismissal for this id, or an explicit dive could land on a scope the

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { ArrowUp, X, SquarePen, MessageSquare } from "lucide-react";
+import { ArrowUp, X, SquarePen, MessageSquare, History, ChevronDown } from "lucide-react";
 import type { Call } from "@/types";
 import { CHAT_DAILY_CAP } from "@/lib/wingman/chat-quota";
 import { nextSuggestion, type CallSuggestion, type ChatDiveReady } from "@/lib/wingman/dive-suggestion";
@@ -14,7 +14,27 @@ import {
   onDerivedChange,
   onDive,
   dismissScope,
+  selectScope,
 } from "@/lib/wingman/coach-scope";
+import {
+  EMPTY_STORE,
+  activeThread,
+  startThread,
+  appendMessages,
+  setThreadSuggestion,
+  clearActive,
+  selectThread,
+  historyList,
+  relativeAge,
+  pruneStore,
+  deserialize,
+  migrateLegacy,
+  STORAGE_KEY,
+  LEGACY_STORAGE_KEY,
+  type Msg,
+  type Thread,
+  type ThreadStore,
+} from "@/lib/wingman/coach-threads";
 import { useCoachContext } from "@/components/dashboard/coach/CoachProvider";
 import {
   PromptInput,
@@ -57,23 +77,23 @@ import { Loader } from "@/components/ui/loader";
  * type. A definite height makes the conversation scroll internally instead.
  */
 
-type Msg = { role: "user" | "assistant"; text: string; timestamp?: number };
-type Thread = { messages: Msg[]; suggestion: CallSuggestion | null };
-
-const EMPTY_THREAD: Thread = { messages: [], suggestion: null };
+/** Stable empty array — a fresh `[]` each render would invalidate every dep on it. */
+const EMPTY_MESSAGES: Msg[] = [];
 
 /**
- * Per-thread history cap. There is no LRU on the threads themselves: 20 calls × 20
- * messages is ~200 KB against an already-multi-MB dashboard payload, and evicting a
- * thread creates an undefined case (a reply landing in a thread that no longer
- * exists). Capping the messages inside each thread bounds the same memory with none
- * of that risk. The wire caps independently at 10 turns.
+ * Thread ids. `crypto.randomUUID` needs a SECURE CONTEXT, and it throws rather than
+ * returning undefined when it isn't in one — which would fail a send with no feedback
+ * at all. Every shipping path is secure (Electron → https Railway, dev → localhost),
+ * so the fallback is unreachable in practice and cheap enough to have anyway. Ids are
+ * local keys only: nothing persists them server-side or sends them anywhere.
  */
-const MAX_THREAD_MESSAGES = 40;
-
-/** Ported from Flight Log's Mission Intel, key and TTL unchanged — see `restore`. */
-const STORAGE_KEY = "wingman_global_chat";
-const STORAGE_TTL_MS = 24 * 60 * 60 * 1000;
+function newThreadId(): string {
+  try {
+    const id = globalThis.crypto?.randomUUID?.();
+    if (id) return id;
+  } catch { /* not a secure context — fall through */ }
+  return `t-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+}
 
 const GLOBAL_CHIPS = [
   "Where do I lose most deals?",
@@ -85,10 +105,6 @@ const CALL_CHIPS = [
   "What was my biggest missed opportunity?",
   "What's the one thing to fix on my next call?",
 ];
-
-function capMessages(msgs: Msg[]): Msg[] {
-  return msgs.length > MAX_THREAD_MESSAGES ? msgs.slice(-MAX_THREAD_MESSAGES) : msgs;
-}
 
 export default function CoachBar({
   calls,
@@ -162,33 +178,28 @@ export default function CoachBar({
   const scope = resolveScope(scopeState);
 
   // ── Threads ──────────────────────────────────────────────────────────────────
-  const [threads, setThreads] = useState<Record<string, Thread>>({});
+  const [store, setStore] = useState<ThreadStore>(EMPTY_STORE);
   const [input, setInput] = useState("");
   const [open, setOpen] = useState(false);
   const [closing, setClosing] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
   /**
-   * Which thread has a request in flight — NOT a boolean.
+   * Which THREAD has a request in flight — an id, not a boolean.
    *
-   * A reply must be written into the thread that ASKED, and the typing dots must
-   * render there too. Rendering them in whatever thread is visible would show a
-   * global conversation "thinking" about a question asked of a call.
+   * A reply must be written into the conversation that asked, and the typing dots
+   * must render there too. Rendering them in whatever thread is visible would show
+   * a global conversation "thinking" about a question asked of a call.
    */
-  const [pendingScope, setPendingScope] = useState<string | null>(null);
+  const [pendingThreadId, setPendingThreadId] = useState<string | null>(null);
   /**
    * Ref, not state, so a double-submit in the same tick can't slip a second request
    * through. ONE in flight per bar: a scope switch does not unlock the composer,
    * which also serialises the daily quota so two replies can't both decrement it.
    */
   const inFlightRef = useRef<string | null>(null);
-  /**
-   * Bumped whenever "New chat" resets a thread. A request captures the generation it
-   * was sent under and drops its writes if the thread was cleared while it was in
-   * flight — otherwise the reply lands in the fresh thread as an answer with no
-   * question above it.
-   */
-  const threadGenRef = useRef<Record<string, number>>({});
 
-  const thread = threads[scope] ?? EMPTY_THREAD;
+  const thread = activeThread(store, scope);
+  const messages = thread?.messages ?? EMPTY_MESSAGES;
   /**
    * ANY request in flight, not just the visible thread's.
    *
@@ -198,7 +209,7 @@ export default function CoachBar({
    * Nothing clears, nothing errors, Enter just does nothing. The dots stay scoped to
    * the asking thread (`thinking`); the LOCK is global.
    */
-  const sending = pendingScope !== null;
+  const sending = pendingThreadId !== null;
 
   /*
     Overlay this session's outcome confirmations ONCE, here, for both the global
@@ -291,56 +302,66 @@ export default function CoachBar({
     restore as a conversation the coach can no longer see the subject of.
   */
   /*
-    `lastPersisted` holds the exact array instance currently in storage, and it is
-    seeded with the one restore just put into state.
-
-    Without it the two effects fight on mount. Restore CANNOT be a lazy `useState`
-    initialiser — this is a client component, so that initialiser also runs during
-    SSR where `localStorage` is undefined — so it has to be an effect, and the save
-    effect below runs in the same commit with the pre-restore value. It would remove
-    the key it had just read (recoverable, but a tab closed inside that window loses
-    the thread), and then rewrite it with a fresh `savedAt`, so the 24h TTL would
-    reset on every dashboard load and a stale thread would never expire.
+    Restore CANNOT be a lazy `useState` initialiser — this is a client component, so
+    that initialiser also runs during SSR, where `localStorage` is undefined. It has
+    to be an effect, which means the SAVE effect below runs once in the same commit
+    with the pre-restore value. `hydratedRef` is what stops that first pass from
+    writing an empty store over the one it is about to read.
   */
-  const lastPersistedRef = useRef<Msg[] | null>(null);
-  const restoredRef = useRef(false);
+  /*
+    `hydrated` is STATE, not a ref, and that is load-bearing.
+
+    A ref is set synchronously, so it would already read `true` when the save effect
+    below runs for the first time — in the SAME commit, before React has applied the
+    restored store — and the save would write the still-empty store straight over the
+    conversations it had just read. As state, `setHydrated(true)` batches into the same
+    commit as `setStore(restored)`, so the save effect's first run already sees them.
+  */
+  const [hydrated, setHydrated] = useState(false);
+  /** The legacy key is only safe to delete AFTER its content has been re-saved. */
+  const legacyCleanupPendingRef = useRef(false);
   useEffect(() => {
-    if (restoredRef.current) return;
-    restoredRef.current = true;
+    let restored: ThreadStore | null = null;
     try {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      if (!stored) return;
-      const { messages, savedAt } = JSON.parse(stored);
-      if (Date.now() - savedAt < STORAGE_TTL_MS && Array.isArray(messages) && messages.length > 0) {
-        const restored = capMessages(messages);
-        lastPersistedRef.current = restored;
-        setThreads((prev) => ({ ...prev, [GLOBAL_SCOPE]: { messages: restored, suggestion: null } }));
-      } else {
-        localStorage.removeItem(STORAGE_KEY);
+      restored = deserialize(localStorage.getItem(STORAGE_KEY));
+      if (!restored) {
+        // First run after the upgrade: carry the old single global thread across so
+        // the rep doesn't lose the conversation they had open.
+        restored = migrateLegacy(localStorage.getItem(LEGACY_STORAGE_KEY), newThreadId(), Date.now());
       }
+      legacyCleanupPendingRef.current = true;
     } catch { /* corrupted or private mode — start fresh */ }
+    if (restored) setStore(pruneStore(restored, Date.now()));
+    setHydrated(true);
   }, []);
 
-  const globalMessages = threads[GLOBAL_SCOPE]?.messages;
   useEffect(() => {
-    // `undefined` = the thread has never been touched this session. An EMPTY array is
-    // different: it only happens after "New chat", which must clear storage too, or a
-    // reload resurrects the conversation the rep just cleared.
-    if (globalMessages === undefined) return;
-    if (globalMessages === lastPersistedRef.current) return;
-    lastPersistedRef.current = globalMessages;
+    if (!hydrated) return;
     try {
-      if (globalMessages.length === 0) localStorage.removeItem(STORAGE_KEY);
-      else localStorage.setItem(STORAGE_KEY, JSON.stringify({ messages: globalMessages, savedAt: Date.now() }));
+      if (Object.keys(store.threads).length === 0) localStorage.removeItem(STORAGE_KEY);
+      else localStorage.setItem(STORAGE_KEY, JSON.stringify(store));
+      /*
+        Drop the old key only now — AFTER the migrated content has been written under
+        the new one. Deleting it in the restore effect above left a window, however
+        small, where the rep's pre-upgrade conversation existed in neither place.
+      */
+      if (legacyCleanupPendingRef.current) {
+        legacyCleanupPendingRef.current = false;
+        localStorage.removeItem(LEGACY_STORAGE_KEY);
+      }
     } catch { /* quota exceeded / private mode — persistence is best-effort */ }
-  }, [globalMessages]);
+  }, [store, hydrated]);
+
+  // The History menu belongs to the panel — it must not be waiting, still open,
+  // the next time the rep opens it.
+  useEffect(() => {
+    if (!open) setHistoryOpen(false);
+  }, [open]);
 
   // ── Send ─────────────────────────────────────────────────────────────────────
-  const appendTo = useCallback((key: string, ...msgs: Msg[]) => {
-    setThreads((prev) => {
-      const cur = prev[key] ?? EMPTY_THREAD;
-      return { ...prev, [key]: { ...cur, messages: capMessages([...cur.messages, ...msgs]) } };
-    });
+  /** Append into the thread that ASKED — by id, so "New chat" can't misroute it. */
+  const appendTo = useCallback((threadId: string, ...msgs: Msg[]) => {
+    setStore((prev) => appendMessages(prev, threadId, msgs, Date.now()));
   }, []);
 
   /** `preset` is a quick-prompt chip; a normal send reads (and clears) the composer. */
@@ -348,31 +369,40 @@ export default function CoachBar({
     const text = (preset ?? input).trim();
     if (!text || inFlightRef.current || disabled) return;
 
-    // The key is captured HERE and used for every write below. The rep can switch
-    // scope while this is in flight; the answer still belongs to the thread that asked.
+    /*
+      Resolve the target THREAD once, here, and address every write below by its id.
+      A thread id is stable in a way a scope key is not: "New chat" starts a new
+      thread rather than emptying this one, so a reply that lands afterwards goes to
+      the conversation that asked for it — which is still on the History list — and
+      the rep's fresh thread is left alone. That is why there is no generation
+      counter any more; there is simply nowhere for a reply to be misfiled.
+    */
     const key = scope;
-    // Captured now; every write below is dropped if "New chat" bumps it meanwhile.
-    const gen = threadGenRef.current[key] ?? 0;
-    inFlightRef.current = key;
-    setPendingScope(key);
+    const existing = activeThread(store, key);
+    const threadId = existing?.id ?? newThreadId();
+    // Prune as we grow. Hydration prunes too, but a rep who never reloads would
+    // otherwise accumulate threads all session. The thread we just started is
+    // active, so it can never be the one pruned.
+    if (!existing) {
+      const now = Date.now();
+      setStore((prev) => pruneStore(startThread(prev, key, threadId, now), now));
+    }
+
+    inFlightRef.current = threadId;
+    setPendingThreadId(threadId);
     if (!preset) setInput("");
     setOpen(true);
 
-    const cur = threads[key] ?? EMPTY_THREAD;
+    const priorMessages = existing?.messages ?? EMPTY_MESSAGES;
     const userMsg: Msg = { role: "user", text, timestamp: Date.now() };
-    appendTo(key, userMsg);
-
-    /** Write into the thread that ASKED — and only if it is still that conversation. */
-    const write = (...msgs: Msg[]) => {
-      if ((threadGenRef.current[key] ?? 0) !== gen) return;
-      appendTo(key, ...msgs);
-    };
+    appendTo(threadId, userMsg);
+    const write = (...msgs: Msg[]) => appendTo(threadId, ...msgs);
 
     try {
       // Body construction lives INSIDE the try on purpose: `inFlightRef` is already
-      // set, so a throw out here would strand it and `pendingScope` forever —
+      // set, so a throw out here would strand it and `pendingThreadId` forever —
       // permanent dots and a dead composer, recoverable only by reloading.
-      const wire = [...cur.messages, userMsg].slice(-10).map((m) => ({ role: m.role, content: m.text }));
+      const wire = [...priorMessages, userMsg].slice(-10).map((m) => ({ role: m.role, content: m.text }));
       let body: object;
       if (key === GLOBAL_SCOPE) {
         body = {
@@ -390,7 +420,7 @@ export default function CoachBar({
           })),
           // Keeps the dive flow coherent: without it the route answers a "yes, dive in"
           // with a soft error and the rep is stuck in a retry loop.
-          ...(cur.suggestion ? { pendingCallId: cur.suggestion.call_id } : {}),
+          ...(existing?.suggestion ? { pendingCallId: existing.suggestion.call_id } : {}),
         };
       } else {
         // `scopedCall` is non-null here — `scopeMissing` is part of `disabled`.
@@ -459,12 +489,10 @@ export default function CoachBar({
         Sonnet call and another quota decrement. The lifecycle rule itself lives in
         `nextSuggestion` so it is unit-testable.
       */
-      if (key === GLOBAL_SCOPE && (threadGenRef.current[key] ?? 0) === gen) {
-        setThreads((prev) => {
-          const t = prev[key] ?? EMPTY_THREAD;
-          const next = nextSuggestion(t.suggestion, data);
-          return next === t.suggestion ? prev : { ...prev, [key]: { ...t, suggestion: next } };
-        });
+      if (key === GLOBAL_SCOPE) {
+        setStore((prev) =>
+          setThreadSuggestion(prev, threadId, nextSuggestion(prev.threads[threadId]?.suggestion ?? null, data))
+        );
       }
 
       /*
@@ -492,7 +520,22 @@ export default function CoachBar({
           if (rows) setTranscript(dive.callId, { rows, provisional: true });
 
           setScopeState((s) => onDive(s, dive.callId));
-          appendTo(dive.callId, { role: "assistant", text: dive.openerReply, timestamp: Date.now() });
+          /*
+            Seed the opener into that call's conversation, starting one if this is the
+            first time. ONE functional update so the create and the append can't
+            interleave with anything else — but the id and timestamp are generated
+            OUTSIDE it: React may double-invoke an updater in StrictMode, and an
+            updater that mints a fresh id each invocation is a trap waiting for the
+            next person to extend it.
+          */
+          const seedId = newThreadId();
+          const seedAt = Date.now();
+          setStore((prev) => {
+            const cur = activeThread(prev, dive.callId);
+            const id = cur?.id ?? seedId;
+            const withThread = cur ? prev : pruneStore(startThread(prev, dive.callId, id, seedAt), seedAt);
+            return appendMessages(withThread, id, [{ role: "assistant", text: dive.openerReply, timestamp: seedAt }], seedAt);
+          });
         } else {
           write({
             role: "assistant",
@@ -506,40 +549,82 @@ export default function CoachBar({
       write({ role: "assistant", text: "Couldn't reach Wingman just then. Try again.", timestamp: Date.now() });
     } finally {
       inFlightRef.current = null;
-      setPendingScope((cur) => (cur === key ? null : cur));
+      setPendingThreadId((cur) => (cur === threadId ? null : cur));
     }
   };
 
   /**
-   * Clear the conversation the rep is looking at — and STAY in this scope.
+   * "New chat" — start a fresh conversation in this scope, and KEEP the old one.
    *
-   * The scope deliberately does not change here (see `dismissScope`): dropping it
-   * would change which thread is visible, so New chat would have to clear the
-   * landing thread too — and "start over on this call" would silently wipe the
-   * global coaching history and its 24h localStorage entry. The chip's ✕ is the
-   * explicit, visible way out of a call scope.
+   * Not a delete: the previous thread moves to History, which is the whole point of
+   * individual chats. It also means a reply still in flight has somewhere to land,
+   * so there is no orphaned-answer case to guard against.
+   *
+   * The scope deliberately does not change (see `dismissScope`): dropping it would
+   * change which conversation is visible, and "start over on this call" would dump
+   * the rep into their global thread. The chip's ✕ is the way out of a call scope.
    */
   const newChat = () => {
-    // Bump first: a reply already in flight for this thread must not land in the
-    // fresh one as an answer with no question above it.
-    threadGenRef.current[scope] = (threadGenRef.current[scope] ?? 0) + 1;
-    setThreads((prev) => ({ ...prev, [scope]: EMPTY_THREAD }));
+    setStore((prev) => clearActive(prev, scope));
     setInput("");
+    setHistoryOpen(false);
+  };
+
+  /** Resume a saved conversation from History — switching scope to match it. */
+  const resumeThread = (t: Thread) => {
+    setStore((prev) => selectThread(prev, t.id));
+    setScopeState((s) => selectScope(s, t.scope));
+    setHistoryOpen(false);
+    setOpen(true);
   };
 
   // ── Render ───────────────────────────────────────────────────────────────────
-  const scopeLabel = scopedCall
-    ? `Your call with ${scopedCall.prospect_name ?? "an unknown prospect"}`
-    : scopeMissing ? "That call" : null;
+  /**
+   * Name a conversation by WHAT IT IS ABOUT, from data we already have.
+   *
+   * No AI-generated titles: that would be a second model call per thread, for a
+   * label, and it would occasionally be wrong about the rep's own call.
+   */
+  const labelForScope = useCallback(
+    (s: string) => {
+      if (s === GLOBAL_SCOPE) return "All calls";
+      const c = calls.find((x) => x.id === s);
+      return c ? `Your call with ${c.prospect_name ?? "an unknown prospect"}` : "A call no longer in your list";
+    },
+    [calls]
+  );
+
+  const scopeLabel = scope === GLOBAL_SCOPE ? null : labelForScope(scope);
+
+  /*
+    `sending` without `thinking` = a request is running for a conversation that is no
+    longer the visible one. The commonest way in is hitting "New chat" while waiting:
+    the dots belong to the old thread, so the rep is left looking at an empty panel
+    with a greyed-out send button and nothing explaining why, for up to 45 seconds.
+    The reply is not lost — it lands in the previous chat, which is why the copy says
+    where to find it.
+  */
+  const waitingElsewhere = sending && pendingThreadId !== thread?.id;
 
   const placeholder =
     disabledReason ??
-    (scopedCall ? `Ask about ${scopedCall.prospect_name ?? "this call"}…` : "Ask Wingman about your calls…");
+    (waitingElsewhere ? "Finishing your last message — it'll be in History" :
+     scopedCall ? `Ask about ${scopedCall.prospect_name ?? "this call"}…` : "Ask Wingman about your calls…");
 
   const chips = scope === GLOBAL_SCOPE ? GLOBAL_CHIPS : CALL_CHIPS;
-  const thinking = pendingScope === scope;
-  /** Preview line for the "Continue →" row — the last thing said, either side. */
-  const lastLine = thread.messages[thread.messages.length - 1]?.text ?? "";
+  const thinking = pendingThreadId !== null && pendingThreadId === thread?.id;
+
+  const history = useMemo(() => historyList(store), [store]);
+  // Display-only, and deliberately not state: History ages are coarse (`34m`, `1d`),
+  // so a ticking clock would buy nothing but a re-render a second.
+  const now = Date.now();
+  /**
+   * What the closed bar offers to reopen: the conversation in THIS scope if it has
+   * one, otherwise the most recent anywhere. Without the fallback, a rep whose only
+   * chats are on other screens sees no way back into History at all.
+   */
+  const resumeTarget = (messages.length > 0 ? thread : history[0]) ?? null;
+  const lastLine = resumeTarget?.messages[resumeTarget.messages.length - 1]?.text ?? "";
 
   /*
     ONE return, not two.
@@ -564,7 +649,7 @@ export default function CoachBar({
         2026-07-29), while refusing to reopen a real thread meant the only way back
         to your own messages was to send another one.
       */
-      onClick={() => { if (thread.messages.length > 0) setOpen(true); }}
+      onClick={() => { if (messages.length > 0) setOpen(true); }}
       maxHeight={140}
       className="bg-surface border border-line-strong rounded-panel px-3 py-2 shadow-raised transition-[box-shadow,border-color] duration-2 ease-wm focus-within:border-signal focus-within:shadow-float"
     >
@@ -654,7 +739,59 @@ export default function CoachBar({
               <div className="flex items-center justify-between gap-3 pb-2">
                 <h2 className="text-h3 text-ink-1">Wingman Coach</h2>
                 <div className="flex items-center gap-1">
-                  {thread.messages.length > 0 && (
+                  {/* History — every saved conversation, newest first. Anchored to
+                      this button so the menu can't drift from it. */}
+                  {history.length > 0 && (
+                    <div className="relative">
+                      <button
+                        onClick={() => setHistoryOpen((v) => !v)}
+                        title="Past conversations"
+                        aria-label="History"
+                        aria-expanded={historyOpen}
+                        className="h-8 px-2 rounded-pill inline-flex items-center gap-1 text-[11.5px] font-medium text-ink-3 hover:text-ink-1 hover:bg-surface-sunken transition-colors duration-2 ease-wm"
+                      >
+                        <History className="h-3.5 w-3.5" />
+                        History
+                        <ChevronDown className={`h-3 w-3 transition-transform duration-2 ease-wm ${historyOpen ? "rotate-180" : ""}`} />
+                      </button>
+
+                      {historyOpen && (
+                        <>
+                          {/* Full-screen catcher: clicking anywhere else closes the
+                              menu WITHOUT that click also hitting what's underneath. */}
+                          <div className="fixed inset-0 z-20" onClick={() => setHistoryOpen(false)} />
+                          <div className="absolute right-0 top-9 z-30 w-[300px] max-h-[320px] overflow-y-auto no-scrollbar rounded-card border border-line bg-surface shadow-float p-1">
+                            {history.map((t) => {
+                              const active = t.id === thread?.id;
+                              return (
+                                <button
+                                  key={t.id}
+                                  onClick={() => resumeThread(t)}
+                                  className={`w-full text-left rounded-control px-2.5 py-2 transition-colors duration-2 ease-wm ${active ? "bg-surface-sunken" : "hover:bg-surface-sunken"}`}
+                                >
+                                  <div className="flex items-baseline gap-2">
+                                    <span className="flex-1 truncate text-[12.5px] font-medium text-ink-1">
+                                      {labelForScope(t.scope)}
+                                    </span>
+                                    <span className="shrink-0 text-[11px] tabular-nums text-ink-3">
+                                      {relativeAge(t.updatedAt, now)}
+                                    </span>
+                                  </div>
+                                  {/* The first thing the rep ASKED — what actually
+                                      tells two chats about the same call apart. */}
+                                  <div className="truncate text-[11.5px] text-ink-3 mt-0.5">
+                                    {t.messages.find((m) => m.role === "user")?.text ?? "…"}
+                                  </div>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  )}
+
+                  {messages.length > 0 && (
                     <button
                       onClick={newChat}
                       title="New chat"
@@ -677,7 +814,7 @@ export default function CoachBar({
 
               <ChatContainerRoot className="flex-1 min-h-0 relative no-scrollbar bg-surface border border-line rounded-card">
                 <ChatContainerContent className="gap-3 p-4">
-                  {thread.messages.length === 0 && !thinking && (
+                  {messages.length === 0 && !thinking && (
                     <p className="text-body text-ink-3">
                       {scopedCall
                         ? "Ask anything about this call — what landed, what didn't, what to do next time."
@@ -685,7 +822,7 @@ export default function CoachBar({
                     </p>
                   )}
 
-                  {thread.messages.map((m, i) => (
+                  {messages.map((m, i) => (
                     <div
                       key={i}
                       className={
@@ -748,7 +885,7 @@ export default function CoachBar({
           {/* Quick prompts — only on an empty thread, and never while disabled (they
               are sends, and a send during a live call is the arrow-key hazard) or
               while another thread's request is still in flight. */}
-          {thread.messages.length === 0 && !disabled && !sending && (
+          {messages.length === 0 && !disabled && !sending && (
             <div className="flex flex-wrap gap-1.5 pb-2">
               {chips.map((q) => (
                 <button
@@ -768,13 +905,23 @@ export default function CoachBar({
               which costs a Sonnet call and a quota decrement to re-read something
               you already have (Sebastian, 2026-07-30). Shows the last reply so the
               row says WHICH conversation, the way Granola's chat entry does. */}
-          {!layoutOpen && thread.messages.length > 0 && (
+          {!layoutOpen && resumeTarget && (
             <button
-              onClick={() => setOpen(true)}
+              // `resumeThread`, not a bare `setOpen(true)`: when this row is the
+              // FALLBACK it points at another scope's conversation, and just opening
+              // the panel would show the current (empty) one instead of the chat the
+              // row previewed. It also has to say which conversation that is, or the
+              // scope appears to change on its own.
+              onClick={() => resumeThread(resumeTarget)}
               className="group/resume flex w-full items-center gap-2 rounded-control bg-surface-sunken border border-line px-2.5 py-1.5 mb-2 text-left hover:border-line-strong transition-colors duration-2 ease-wm"
             >
               <MessageSquare className="h-3.5 w-3.5 shrink-0 text-ink-3" />
-              <span className="flex-1 truncate text-[11.5px] text-ink-2">{lastLine}</span>
+              <span className="flex-1 truncate text-[11.5px] text-ink-2">
+                {resumeTarget.scope !== scope && (
+                  <span className="text-ink-3">{labelForScope(resumeTarget.scope)} · </span>
+                )}
+                {lastLine}
+              </span>
               <span className="shrink-0 text-[11px] font-semibold text-signal">Continue →</span>
             </button>
           )}
