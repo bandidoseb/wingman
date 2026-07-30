@@ -1,0 +1,67 @@
+diff --git a/CLAUDE.md b/CLAUDE.md
+index 90a2ba2..69e76c4 100644
+--- a/CLAUDE.md
++++ b/CLAUDE.md
+@@ -503,7 +503,7 @@ Required keys (confirm these exist before debugging API issues):
+ - `SUPABASE_SERVICE_ROLE_KEY`
+ - `ANTHROPIC_API_KEY`
+ - `OPENAI_API_KEY` ← embeddings for KB ingestion + the **Wingman Coach** search (live objection cards no longer embed, since 2026-06-21)
+-- `GROQ_API_KEY` ← required for Phase 3.5 query distillation (query-distill.ts). If missing, distillation silently degrades to the raw search path (feature inert, logs only). In .env.local + Railway since 2026-06-07 — verify on Railway before merging Phase 3.5.
++- ~~`GROQ_API_KEY`~~ ← **NOT required by the app any more** *(reconciled 2026-07-30)*. The Groq query distiller was removed from the live objection path on 2026-06-30 (`kb-signal/route.ts`: "NO Groq"), and the dead warm-up ping that still called Groq on every call start was removed 2026-07-30. `src/lib/wingman/query-distill.ts` now has no runtime caller — only its unit test — and is queued for Phase 5 dead-code removal (#37). **Keep the key in `.env.local`** — the local dev harnesses `scripts/test-distill.mjs` and `scripts/kb-ab-test.mjs` still read it. It is no longer needed on Railway.
+ - `RECALL_AI_API_KEY`
+ - `STRIPE_SECRET_KEY`
+ - `STRIPE_WEBHOOK_SECRET`
+diff --git a/src/lib/wingman/pipeline-warmup.ts b/src/lib/wingman/pipeline-warmup.ts
+index a60c799..cf29e45 100644
+--- a/src/lib/wingman/pipeline-warmup.ts
++++ b/src/lib/wingman/pipeline-warmup.ts
+@@ -20,13 +20,13 @@
+  * - Never throws: three independent pings via Promise.allSettled, each with
+  *   its own timeout and its own catch. Call sites still `void ...catch()`.
+  * - Never awaited on the request path — call start latency is unaffected.
+- * - Bounded cost: ~1 embed token + 1 Haiku token + 1 Groq token + one RPC
+- *   per call start (<$0.001). A session-create retry warms twice — accepted.
++ * - Bounded cost: ~1 embed token + 1 Haiku token + one RPC per call start
++ *   (<$0.001). A session-create retry warms twice — accepted.
+  *
+  * NOTE: prompt caching (cache_control) was evaluated and EXCLUDED here — the
+  * kb-signal system prompt (~430 tokens) is below Haiku's 2,048-token minimum
+- * cacheable block, so it cannot engage. Connection warm-up + the short
+- * distilled query are the load-bearing latency levers.
++ * cacheable block, so it cannot engage. Connection warm-up is the load-bearing
++ * latency lever.
+  *
+  * Railway runs a persistent Node server, so this work completes after the
+  * HTTP response is sent (same proven pattern as the post-call job kickoff).
+@@ -172,23 +172,6 @@ async function warmSonnetAndPrimeDigCache(salesDna: Record<string, string> | nul
+   return `sonnet-prime:ok(created=${usage.cache_creation_input_tokens ?? 0},read=${usage.cache_read_input_tokens ?? 0})`;
+ }
+ 
+-/** Groq 1-token ping — warms the distiller's connection. */
+-async function warmGroq(): Promise<string> {
+-  const apiKey = process.env.GROQ_API_KEY;
+-  if (!apiKey) return "groq:skipped(no-key)";
+-
+-  const resp = await fetchWithTimeout("https://api.groq.com/openai/v1/chat/completions", {
+-    method:  "POST",
+-    headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" },
+-    body: JSON.stringify({
+-      model:      "llama-3.1-8b-instant",
+-      max_tokens: 1,
+-      messages:   [{ role: "user", content: "warm" }],
+-    }),
+-  });
+-  return resp.ok ? "groq:ok" : `groq:${resp.status}`;
+-}
+-
+ /**
+  * @param salesDna — the rep's sanitized Sales DNA (from the session-create body).
+  *   Complete DNA upgrades the Sonnet ping into a dig-prefix cache prime; anything
+@@ -200,7 +183,6 @@ export async function warmUpPipeline(salesDna: Record<string, string> | null = n
+     warmEmbedAndKb(),
+     warmAnthropic("claude-haiku-4-5-20251001", "haiku"),  // answer/close slots
+     warmSonnetAndPrimeDigCache(salesDna),                  // objection + dig (Sonnet) — primes the DNA cache when briefed
+-    warmGroq(),
+   ]);
+ 
+   const summary = results

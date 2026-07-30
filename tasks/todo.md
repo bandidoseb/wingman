@@ -1,5 +1,14 @@
 # TODO — Dashboard Rebuild
 
+> ⚠️ **Looking for an engineering invariant that a source comment sent you here for?**
+> It is not in this file. `todo.md` is a reused filename — six shipped modules
+> (`objection-prompt.mjs:150` "see tasks/todo.md (SEV-A)", `live-tail.ts:18` "Invariants
+> (plan rev 2 — tasks/todo.md)", `kb-memory.ts` ×3, `kb-signal/route.ts`,
+> `pipeline-warmup.ts`) point at content that was overwritten when this filename was reused.
+> **That content is in [`_archive/../todo-archive-2026-07-09.md`](todo-archive-2026-07-09.md)** —
+> the SEV-A prompt-caching structure, the Multi-Turn Objection Threading rev-2 invariants, and
+> the KB scale/graduation ceilings. See `tasks/README.md`.
+
 *Plan written 2026-07-28. Supersedes the post-call flow todo (shipped in v0.1.29; narrative in `Wingman Brain/01 - Build Log/2026-07-24.md` + `2026-07-28.md`; its one open item — live-test on a real call — is tracked in `launch-plan.md` Session 8 dogfood).*
 
 **Scope decision:** Sebastian pulled "Dashboard full rebuild" OUT of the Parking Lot into Track 1 (2026-07-28) after I flagged the cutline. His call, reaffirmed. `tasks/launch-plan.md` updated to match.

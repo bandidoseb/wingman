@@ -1,5 +1,28 @@
 [
   {
+    "id": "2026-07-30-dashboard-dark-mode",
+    "date": "2026-07-30",
+    "category": "ui",
+    "title": "Dark mode that actually looks right — and a coach that stopped charging you twice",
+    "summary": "Dark mode had one colour pointing the wrong way, which made every text box look like a black hole. That is fixed everywhere at once. Separately, the \"dig into that call\" feature turned out to have never worked — and it was quietly using up your daily coaching messages every time you sent one.",
+    "changes": [
+      "Text boxes, tabs and buttons in dark mode no longer read as black holes",
+      "Cards across the app now match the homepage instead of using a colder, bluer grey",
+      "Settings has a Light / Dark / System switch",
+      "Flight Plan and Signal Vault are gone — Sales DNA covers what Flight Plan did",
+      "Intel is a placeholder for now, until it has enough calls to say something real",
+      "The outcome chip is one thing you click, instead of four bits of text competing for space",
+      "You can copy a full transcript with one button",
+      "Pages open at the top again instead of halfway down",
+      "Asking Wingman to dig into a specific call now actually opens it",
+      "Your daily coaching message count is finally accurate, and resets properly at midnight"
+    ],
+    "details": [
+      "The dark mode bug was a single colour token. In light mode a recessed surface like a text box goes darker than the card around it. In dark mode that inverts — there is no room left below the page background, so a recessed surface has to go lighter instead. Ours was still going darker, which put every input below the page colour and made it read as a hole. One value fixed every screen.",
+      "The \"dig into that call\" bug was worse than it looked. The app was waiting for a piece of information the server never sent, so the button silently did nothing. And because the code that cleared the request lived inside that dead path, every message you sent afterwards re-ran the whole thing — re-reading the entire call transcript and spending another coaching message — until you reloaded the page."
+    ]
+  },
+  {
     "id": "2026-07-28-post-call-honesty",
     "date": "2026-07-28",
     "category": "fix",
