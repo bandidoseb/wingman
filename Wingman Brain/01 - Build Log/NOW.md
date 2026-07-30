@@ -126,6 +126,12 @@ Test Pilot from using the 4 arrows?* If no → it stays here, however good it is
 - **Recall.ai Launch plan** — before signing, ask: (1) overage rate above 6,000 h, (2) the
   3,000 h starter option. Then update the rate in `margin-calculator.html`.
 
+**Decided 2026-07-30:** the dead Groq warm-up ping is **not** fixed on its own — it rides the
+**Phase 5 dead-code sweep (#37)**. The finished change is already written and saved as
+`tasks/_archive/groq-warmup-removal-2026-07-30.patch`; apply it during that sweep rather than
+rewriting it. It removes `warmGroq()` from `pipeline-warmup.ts`, which currently pings Groq on
+every call start to warm a code path nothing calls.
+
 **Dead — do not resurrect**
 - Pusher push migration (superseded by the hotkey pivot; Phase 5 rips out the leftover path)
 - "Offer Brain" → "Sales DNA" rename sweep — **phantom task.** The term never existed in app
