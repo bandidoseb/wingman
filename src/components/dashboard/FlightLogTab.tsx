@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Card from "@/components/ui/Card";
 import SectionLabel from "@/components/ui/SectionLabel";
@@ -9,6 +9,8 @@ import OutcomeControl from "@/components/ui/wm/OutcomeControl";
 import CopyButton from "@/components/ui/wm/CopyButton";
 import type { Call, TranscriptLine } from "@/types";
 import { confirmedOutcome, NO_DEBRIEF_GRACE_MS } from "@/lib/wingman/outcome-stats";
+import { useCoachContext } from "@/components/dashboard/coach/CoachProvider";
+import { buildSingleCallPayload } from "@/lib/wingman/coach-payload";
 
 const PILLAR_DISPLAY: Array<{ key: string; label: string; description: string }> = [
   { key: "core_problem",         label: "Core Problem",      description: "Rep dug into the real pain" },
@@ -187,9 +189,22 @@ function awaitingDebrief(call: Call | null | undefined): boolean {
   return Date.now() - started < DEBRIEF_WINDOW_MS;
 }
 
-export default function FlightLogTab({ calls, initialCall, onInitialCallConsumed, initialCallId, onInitialCallIdConsumed, userId, isActive = false, isPendingOutcome = false, onQuotaReported }: Props) {
+export default function FlightLogTab({ calls: callsProp, initialCall, onInitialCallConsumed, initialCallId, onInitialCallIdConsumed, userId, isActive = false, isPendingOutcome = false, onQuotaReported }: Props) {
   const router = useRouter();
+  const {
+    setSessionOutcome, applySessionOutcomes,
+    transcripts, setTranscript, noDebriefIds, markNoDebrief,
+  } = useCoachContext();
+  // Overlay this session's confirmations ONCE, here, so every consumer below —
+  // the list, the header count, the detail view and the coach payload — reads the
+  // same rows. Previously each did its own `localOutcomes[id] ?? …` lookup.
+  const calls = useMemo(() => applySessionOutcomes(callsProp), [callsProp, applySessionOutcomes]);
   const [selectedCall, setSelectedCall] = useState<Call | null>(initialCall);
+  // The overlay has to reach the fallback row too — see the note where it is used.
+  const selectedCallOverlaid = useMemo(
+    () => (selectedCall ? applySessionOutcomes([selectedCall])[0] : null),
+    [selectedCall, applySessionOutcomes]
+  );
   const [activeDetailTab, setActiveDetailTab] = useState<"debrief" | "transcript">("debrief");
 
   // Opening a call (or going back to the list) replaces the page body but leaves the
@@ -199,18 +214,17 @@ export default function FlightLogTab({ calls, initialCall, onInitialCallConsumed
   useEffect(() => {
     window.scrollTo({ top: 0 });
   }, [selectedCall?.id]);
-  // Tracks outcomes set inline (without a full page reload)
-  const [localOutcomes, setLocalOutcomes] = useState<Record<string, string>>({});
   const [editingOutcomes, setEditingOutcomes] = useState<Record<string, boolean>>({});
   const [hoveredCallId, setHoveredCallId] = useState<string | null>(null);
 
   const handleOutcomeSaved = (callId: string, outcome: string) => {
-    setLocalOutcomes((prev) => ({ ...prev, [callId]: outcome }));
+    setSessionOutcome(callId, outcome);
     setEditingOutcomes((prev) => ({ ...prev, [callId]: false }));
   };
 
-  // Helper: effective outcome for a call (local override wins)
-  const effectiveOutcome = (call: Call) => localOutcomes[call.id] ?? call.outcome;
+  // `calls` already carries this session's confirmations (applySessionOutcomes runs
+  // on the prop below), so the old `localOutcomes[id] ?? …` reads are now just reads.
+  const effectiveOutcome = (call: Call) => call.outcome;
   type GlobalMessage = { role: "user" | "assistant"; text: string; timestamp?: number };
 
   const [chatMessages, setChatMessages] = useState<Array<{ role: "user" | "assistant"; text: string }>>([]);
@@ -271,16 +285,12 @@ export default function FlightLogTab({ calls, initialCall, onInitialCallConsumed
   // tail of the call. A provisional entry is refetched once the call's summary lands
   // (the debrief only exists after the transcript is fully written) — whether the
   // rep kept the call open (detail poll refresh) or closed and reopened it later.
-  const [transcriptCache, setTranscriptCache] = useState<Record<string, { rows: TranscriptLine[]; provisional: boolean }>>({});
   const [transcriptLoadingId, setTranscriptLoadingId] = useState<string | null>(null);
-  // Calls the server has confirmed will never get a debrief (no transcript captured).
-  // Server-confirmed, so it beats awaitingDebrief's time-based guess immediately.
-  const [noDebriefIds, setNoDebriefIds] = useState<Set<string>>(() => new Set());
   useEffect(() => {
     const id = selectedCall?.id;
     if (!id) return;
     const fresh = calls.find((c) => c.id === id) ?? selectedCall;
-    const entry = transcriptCache[id];
+    const entry = transcripts[id];
     // Skip when cached — unless the entry is provisional and the debrief has since
     // landed, which means the full transcript is now available.
     if (entry && !(entry.provisional && fresh?.summary)) return;
@@ -292,10 +302,7 @@ export default function FlightLogTab({ calls, initialCall, onInitialCallConsumed
         if (!res.ok) return;  // keep "No transcript available." — never a stuck spinner
         const body = (await res.json()) as { transcript?: TranscriptLine[] };
         if (!cancelled) {
-          setTranscriptCache((prev) => ({
-            ...prev,
-            [id]: { rows: body.transcript ?? [], provisional: awaitingDebrief(fresh) },
-          }));
+          setTranscript(id, { rows: body.transcript ?? [], provisional: awaitingDebrief(fresh) });
         }
       } catch {
         // Network hiccup → fall through to the empty state; reopening retries.
@@ -304,9 +311,9 @@ export default function FlightLogTab({ calls, initialCall, onInitialCallConsumed
       }
     })();
     return () => { cancelled = true; };
-    // transcriptCache in deps is what re-arms the provisional refetch; the write
+    // `transcripts` in deps is what re-arms the provisional refetch; the write
     // inside is loop-safe because the guard above skips every settled entry.
-  }, [selectedCall, calls, transcriptCache]);
+  }, [selectedCall, calls, transcripts, setTranscript]);
 
   // While an open call has no debrief yet, poll for it so the skeleton fills in
   // even when the parent isn't already polling (e.g. a deep-link opened later).
@@ -353,7 +360,7 @@ export default function FlightLogTab({ calls, initialCall, onInitialCallConsumed
           // Zero rows, and long enough after the call that no save is still landing →
           // swap the skeleton for the honest note instead of spinning to the 6-min cap.
           clearInterval(iv);
-          setNoDebriefIds((prev) => (prev.has(id) ? prev : new Set(prev).add(id)));
+          markNoDebrief(id);
         }
       } catch {
         // Poll tick lost to a network blip — the next tick retries.
@@ -589,24 +596,11 @@ export default function FlightLogTab({ calls, initialCall, onInitialCallConsumed
     // query) — but the single_call coach builds its TRANSCRIPT block from this
     // payload. Graft the on-open fetch back in, or Wingman silently coaches from
     // the summary alone.
-    const cached = transcriptCache[call.id];
-    const rows = cached?.rows ?? call.call_transcript ?? [];
-    const callWithTranscript: Call = { ...call, call_transcript: rows };
-
-    // Tell the coach what we actually KNOW, because an empty array is ambiguous now
-    // that list rows don't carry transcripts. "empty" is a proven absence — a settled
-    // (non-provisional) fetch that returned zero rows. A provisional entry was fetched
-    // while the call was still being written, so its emptiness proves nothing yet.
-    // noDebriefIds is SERVER-confirmed zero rows past the grace window — strictly
-    // stronger proof than a settled cache entry, and the only proof available on this
-    // exact path: a no-transcript call never gets a summary, so its cache entry stays
-    // provisional forever. Without it the UI would show "no transcript was captured"
-    // while the coach said "it may still be saving — try reopening", on the primary
-    // scenario this whole feature exists for.
-    const transcriptStatus: "present" | "empty" | "unknown" =
-      rows.length ? "present"
-      : (cached && !cached.provisional) || noDebriefIds.has(call.id) ? "empty"
-      : "unknown";
+    // ONE builder, shared with the Coach bar from PR 4 — two callers producing two
+    // slightly different payloads for the same call is a guaranteed prompt-cache miss
+    // AND two different truths about that call.
+    const { call: callWithTranscript, transcriptStatus } =
+      buildSingleCallPayload(call, transcripts[call.id], noDebriefIds);
 
     // Kick off API immediately — hold typing indicator 2s so it looks like Wingman is reading
     const fetchPromise = fetch("/api/ai/chat", {
@@ -655,11 +649,17 @@ export default function FlightLogTab({ calls, initialCall, onInitialCallConsumed
     // post-call job lands (router.refresh updates `calls`). `selectedCall` is only
     // the identity anchor + fallback for a deep-linked row not yet loaded. Reading
     // the frozen snapshot here would leave the skeleton stuck forever (SEV-5).
-    const call = calls.find((c) => c.id === selectedCall.id) ?? selectedCall;
+    // `selectedCallOverlaid`, not raw `selectedCall`: on the HUD deep-link path this
+    // fallback is a SYNTHETIC row (outcome: null) for a call not yet in `calls`, so a
+    // confirmation made right here would be applied to the shared map and then read
+    // straight past — the picker would re-render as "LOG OUTCOME" as if the click
+    // never happened, and the rep would click again. The old code was immune because
+    // it read `localOutcomes[id] ?? call.outcome` at every site.
+    const call = calls.find((c) => c.id === selectedCall.id) ?? selectedCallOverlaid!;
     const stages = call.call_stages || [];
     // Cache first (the on-open fetch), then any transcript already on the row
     // (e.g. a snapshot passed via initialCall) as a fallback.
-    const transcript = transcriptCache[call.id]?.rows ?? call.call_transcript ?? [];
+    const transcript = transcripts[call.id]?.rows ?? call.call_transcript ?? [];
     const transcriptLoading = transcriptLoadingId === call.id && transcript.length === 0;
     // Debrief still in flight → Granola-style skeleton that fills in. An OLD call with
     // no summary never got one (no transcript / failed job) and gets a plain note
@@ -684,7 +684,7 @@ export default function FlightLogTab({ calls, initialCall, onInitialCallConsumed
           {effectiveOutcome(call) && !editingOutcomes[call.id] ? (
             <OutcomeControl
               outcome={effectiveOutcome(call)!}
-              isAuto={!localOutcomes[call.id] && call.outcome_source === "auto"}
+              isAuto={call.outcome_source === "auto"}
               onEdit={() => setEditingOutcomes((prev) => ({ ...prev, [call.id]: true }))}
             />
           ) : (
@@ -890,7 +890,7 @@ export default function FlightLogTab({ calls, initialCall, onInitialCallConsumed
   // Call list view. Close-rate counts only CONFIRMED outcomes — an AI auto-mark
   // (outcome_source='auto') is excluded until the rep confirms it, and a local
   // pick made this session counts immediately (it's a manual confirmation).
-  const listOutcome = (c: Call): string | null => localOutcomes[c.id] ?? confirmedOutcome(c);
+  const listOutcome = (c: Call): string | null => confirmedOutcome(c);
   const wins = calls.filter((c) => listOutcome(c) === "Closed").length;
   const qualifying = calls.filter((c) => listOutcome(c) !== "DQ").length;
 
@@ -1004,7 +1004,7 @@ export default function FlightLogTab({ calls, initialCall, onInitialCallConsumed
                   {effectiveOutcome(call) && !editingOutcomes[call.id] && (
                     <OutcomeControl
                       outcome={effectiveOutcome(call)!}
-                      isAuto={!localOutcomes[call.id] && call.outcome_source === "auto"}
+                      isAuto={call.outcome_source === "auto"}
                       onEdit={() => setEditingOutcomes((prev) => ({ ...prev, [call.id]: true }))}
                     />
                   )}

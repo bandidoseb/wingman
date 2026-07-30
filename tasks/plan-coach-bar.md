@@ -125,6 +125,23 @@ things this lift can quietly break.
 
 ---
 
+### ⚠️ Carried forward from PR 3's review — resolve BEFORE building the bar
+
+1. **Transcript rows are in provider `useState`, not the planned `useRef(Map)`.** Harmless
+   today (one tab is mounted, so it matches the old local state exactly), but the bar is an
+   ALWAYS-MOUNTED consumer: a 2-hour call's transcript landing would re-render it while the rep
+   is mid-sentence. Move rows to a ref and keep only the small per-call `{provisional}` in state
+   before PR 4 adds that consumer.
+2. **`applySessionOutcomes` is pure, NOT memoised** — it maps on every call. Wrap the result in
+   `useMemo` at the call site or the fresh array invalidates every effect dep that touches it.
+   (It returns the same array when nothing is confirmed, which is the common case.)
+3. **The overlay must reach every read of a call**, not just the `calls` array. PR 3 shipped a
+   bug here: the detail view's fallback (`calls.find(...) ?? selectedCall`) read a raw synthetic
+   row on the HUD deep-link path, so confirming an outcome there re-rendered as if the click had
+   never happened. Any new surface that resolves a call by id needs the same treatment.
+
+---
+
 ## PR 4 — The bar
 
 ### Target

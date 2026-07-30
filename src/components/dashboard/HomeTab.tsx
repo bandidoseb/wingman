@@ -8,6 +8,7 @@ import { getSalesDnaStatus } from "@/lib/wingman/sales-dna-status";
 import Card from "@/components/ui/wm/Card";
 import OutcomeConfirm from "@/components/dashboard/home/OutcomeConfirm";
 import Coach, { type CoachSession } from "@/components/dashboard/home/Coach";
+import { useCoachContext } from "@/components/dashboard/coach/CoachProvider";
 
 interface Props {
   profile: Profile;
@@ -66,11 +67,10 @@ export default function HomeTab({
     if (callBusy) setCoachOpen(false);
   }, [callBusy, setCoachOpen]);
 
-  // Outcomes confirmed in this session. We deliberately do NOT router.refresh()
-  // after a save: on the dashboard that re-runs the full 20-calls-with-transcripts
-  // query (the ~180MB/2000× regression from PR #54). The server copy is already
-  // correct; this just keeps the UI honest until the next natural load.
-  const [confirmed, setConfirmed] = useState<Record<string, string>>({});
+  // Session outcome confirmations now live in CoachProvider — shared with Flight Log
+  // (each used to keep its own, so a ✓ in one was invisible to the other) and, from
+  // PR 4, with the Coach bar. The no-router.refresh() rationale moved there too.
+  const { setSessionOutcome, applySessionOutcomes } = useCoachContext();
 
   useEffect(() => { setRandomString(generateRandomString(1500)); }, []);
 
@@ -99,15 +99,7 @@ export default function HomeTab({
   // Flight Log hand-off reading `outcome_source: "auto"` for a call the rep just
   // confirmed — so the Coach would answer "what's my close rate" ignoring the
   // click they made two seconds ago, and Flight Log would re-ask them to confirm.
-  const callsWithConfirmed = useMemo(
-    () =>
-      calls.map((c) =>
-        confirmed[c.id]
-          ? { ...c, outcome: confirmed[c.id] as Call["outcome"], outcome_source: "manual" as const }
-          : c
-      ),
-    [calls, confirmed]
-  );
+  const callsWithConfirmed = useMemo(() => applySessionOutcomes(calls), [calls, applySessionOutcomes]);
 
   const today = new Date().toDateString();
   const todayCalls = callsWithConfirmed.filter(
@@ -333,7 +325,7 @@ export default function HomeTab({
               </button>
               <OutcomeConfirm
                 call={c}
-                onSaved={(callId, outcome) => setConfirmed((p) => ({ ...p, [callId]: outcome }))}
+                onSaved={(callId, outcome) => setSessionOutcome(callId, outcome)}
               />
             </div>
           ))}

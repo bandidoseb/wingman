@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import type { Profile, Call, VaultObjection, CallStageLabel } from "@/types";
 import { NO_DEBRIEF_GRACE_MS } from "@/lib/wingman/outcome-stats";
 import Sidebar, { SIDEBAR_WIDTH_COLLAPSED, SIDEBAR_WIDTH_EXPANDED } from "@/components/dashboard/Sidebar";
+import { CoachProvider } from "@/components/dashboard/coach/CoachProvider";
 import HomeTab from "@/components/dashboard/HomeTab";
 import FlightLogTab from "@/components/dashboard/FlightLogTab";
 import ObjectionVaultTab from "@/components/dashboard/ObjectionVaultTab";
@@ -1676,6 +1677,11 @@ export default function DashboardClient({
             transition: "margin-left 0.28s cubic-bezier(0.22,1,0.36,1)",
           }}
         >
+          {/* Holds the state the Coach bar needs but that dies with a tab: the fetched
+              transcript and this session's outcome confirmations. Sits BELOW
+              DashboardClient on purpose — its updates must not re-render the component
+              that owns the live-call handlers and the Live Hub pill state machine. */}
+          <CoachProvider>
           {tab === "home" && (
             <HomeTab
               profile={profile}
@@ -1727,6 +1733,7 @@ export default function DashboardClient({
               userId={userId}
             />
           )}
+          </CoachProvider>
         </div>
       </div>
 
