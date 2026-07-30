@@ -12,7 +12,7 @@ session by the SessionStart hook, because a committed file cannot know today's t
 
 - **App version:** `0.1.29` (package.json)
 - **Releases publish to:** `bandidoseb/wingman-releases` (PUBLIC, separate from the source repo)
-- **Branch at last generate:** `main` · 5e3f8dc chore(context): memory graph — correct 6 stale 'unpushed' claims, fix frontmatter + links
+- **Branch at last generate:** `main` · f604a75 chore(context): phases 4-5 — generated state, SessionStart hook, enforcement gates
 
 ## Orphan modules — zero inbound imports
 
