@@ -12,7 +12,7 @@ session by the SessionStart hook, because a committed file cannot know today's t
 
 - **App version:** `0.1.29` (package.json)
 - **Releases publish to:** `bandidoseb/wingman-releases` (PUBLIC, separate from the source repo)
-- **Branch at last generate:** `main` · f604a75 chore(context): phases 4-5 — generated state, SessionStart hook, enforcement gates
+- **Branch at last generate:** `chore/context-system-cleanup` · cabea34 chore(context): phase 6 — tasks/ archive convention
 
 ## Orphan modules — zero inbound imports
 
@@ -22,10 +22,11 @@ Computed, not remembered. If something here is documented as live anywhere, the 
 - `src/lib/wingman/keyword-triggers.ts`
 - `src/lib/wingman/query-distill.ts`
 
-## Open issues (29)
+## Open issues (30)
 
 Full text + root-cause notes: `Wingman Brain/01 - Build Log/Known Issues.md`
 
+- **#61** — Stale git worktrees under .claude/worktrees/ pollute every search — and can defeat veri…
 - **#56** — Flight Log shows the SAME data three times
 - **#55** — Raw internal pillar keys leak into user-facing text
 - **#51** — ↓ Dig card fires a non-sequitur — probes an open belief while ignoring what the prospec…

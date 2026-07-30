@@ -48,16 +48,21 @@ happens today and is invisible: **"Retrying (2 of 3)"**.
   If yes, leave it. If not, it should move to a gitignored file.
 - **Objection Vault redesign** — rank by DAMAGE not frequency; buckets → instances; kill the red
   NEW badges (red means *lost*, never decoration — Design Language §3d).
+- **Open a PR for `chore/context-system-cleanup`?** 7 commits, the whole context overhaul.
+  `main` is ruleset-protected, so this has to go through a PR either way.
 
 ---
 
 ## In flight
 
-Nothing mid-code. `main` is clean at the context-system cleanup.
+Nothing mid-code. The SessionStart hook reports real branch/PR/release state — read it, not this.
 
-**Live now** (verify with the SessionStart hook, never from this line): `main` carries PR #58
-(dashboard rebuild + dark mode + 3 Coach bug fixes, merged 2026-07-30). Latest desktop release
-**v0.1.29**, published live to `bandidoseb/wingman-releases`, auto-update confirmed working.
+**The context-system cleanup** lives on `chore/context-system-cleanup` and is awaiting Sebastian's
+decision on opening a PR (CLAUDE.md rule #0). Full write-up: `2026-07-30.md` → Session 2.
+
+⚠️ **The enforcement hooks have never run in a genuinely cold session.** Every gate was tested by
+invoking it directly and each fired correctly, but the first real session start is the true test.
+If a hook misbehaves, remove its block from `.claude/settings.json` and say so — don't work around it.
 
 ---
 
@@ -73,6 +78,12 @@ These are the "do this before the next thing" notes. They exist in exactly one p
    The smoke test had no finalized speech, so the gate has never actually been exercised.
 4. **`#57`'s sidebar traffic-light clearance was verified by arithmetic only** — the browser has
    no traffic lights. Needs one Electron eyeball.
+5. **Before overwriting `tasks/todo.md`, archive it first** (`_archive/todo-<date>.md`). Six
+   shipped modules cite that path for invariants; the last overwrite lost them until a lucky
+   recovery on 2026-07-30. Better still: give new plans their own `plan-<thing>.md` name.
+6. **When a context file needs to say a banned status word** (explaining the rule, or quoting a
+   past mistake), append `<!-- context-lint-ok -->` to that line — same escape-hatch convention
+   as `token-lint`.
 
 ---
 
