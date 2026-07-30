@@ -30,23 +30,74 @@ export function chatMessagesUsedToday(
   return lastReset === utcToday ? (profile.chat_messages_today ?? 0) : 0;
 }
 
+/** UTC day key — the same slice the route and `chatMessagesUsedToday` use. */
+export function utcDay(now: Date = new Date()): string {
+  return now.toISOString().slice(0, 10);
+}
+
 /**
- * What every surface should DISPLAY as "used today".
+ * The client's view of the daily quota.
  *
- * `serverCount` only moves when the page re-fetches the profile, so on its own
- * the sidebar sits stale until a reload while the chat box counts live — they
- * visibly disagree. `sentThisSession` covers the gap.
+ * `day` is what makes midnight safe. The previous version anchored `baseline` in a
+ * `useRef` that was captured once and never reset: after UTC midnight the server
+ * reports a fresh low count while `baseline` still holds yesterday's, so
+ * `max(server, baseline + sent)` kept the stale high number and a rep who left the
+ * tab open overnight stayed locked at the cap on a day they hadn't used.
  *
- * Taking the MAX rather than adding is the important part: once a refresh lands,
- * the server has already folded this session's sends into its own count, so
- * adding would double-count and cut the rep off at half their real quota.
- * `baseline` is the server count captured when the session started, so the sum
- * side stays anchored to where we began rather than drifting upward.
+ * Rollover is detected by DATE, never by "the number went down". A value-based
+ * check would misfire constantly: the profile prop lags every send, so a stale-but
+ * -valid count is routinely lower than `baseline + sent`.
  */
-export function coachMessagesUsed(
-  baseline: number,
+export type QuotaState = {
+  /** UTC day this baseline belongs to. */
+  day: string;
+  /** Server count when this day's baseline was captured. */
+  baseline: number;
+  /** Sends the server has ACCEPTED (200) since that baseline. */
+  sent: number;
+  /** Highest count the server itself has reported, live from chat replies. */
+  serverLive: number;
+};
+
+export function initQuota(serverCount: number, day: string = utcDay()): QuotaState {
+  return { day, baseline: serverCount, sent: 0, serverLive: serverCount };
+}
+
+/**
+ * Fold in a server-reported count — from a chat reply (200 **or** 429) or from a
+ * refreshed profile. This is the ONLY way `serverLive` moves.
+ */
+export function quotaReconcile(
+  state: QuotaState,
   serverCount: number,
-  sentThisSession: number
-): number {
-  return Math.max(serverCount, baseline + sentThisSession);
+  day: string = utcDay()
+): QuotaState {
+  if (!Number.isFinite(serverCount) || serverCount < 0) return state;
+  // New day → yesterday's baseline and sends describe a quota that no longer exists.
+  if (day !== state.day) return initQuota(serverCount, day);
+  // Nothing to learn — return the SAME OBJECT so React bails out of the re-render.
+  // This is what makes it free to poll this on a timer (see the rollover ticker in
+  // DashboardClient): same-day ticks cost nothing, and only the midnight one renders.
+  if (serverCount <= state.serverLive) return state;
+  return { ...state, serverLive: serverCount };
+}
+
+/** Record a send the server accepted. Never call this optimistically. */
+export function quotaOnSent(state: QuotaState): QuotaState {
+  return { ...state, sent: state.sent + 1 };
+}
+
+/**
+ * What every surface DISPLAYS as "used today".
+ *
+ * MAX, not sum: once a profile refresh lands, the server has already folded this
+ * session's sends into its own count, so adding would double-count and cut the rep
+ * off at half their quota. `baseline + sent` covers the opposite gap — the server
+ * number is stale between refreshes while the chat box counts live.
+ *
+ * Clamped to the cap: the old code set `sent = CAP` on a 429, and with a non-zero
+ * baseline that rendered "23 of 20 coaching messages used" and "-3 left".
+ */
+export function quotaUsed(state: QuotaState): number {
+  return Math.min(CHAT_DAILY_CAP, Math.max(state.serverLive, state.baseline + state.sent));
 }

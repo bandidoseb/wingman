@@ -268,7 +268,15 @@ export async function POST(req: NextRequest) {
 
     if (usedToday >= DAILY_CAP) {
       return NextResponse.json(
-        { error: `Daily limit reached (${DAILY_CAP} messages/day). Resets at midnight.`, limitReached: true },
+        {
+          error: `Daily limit reached (${DAILY_CAP} messages/day). Resets at midnight.`,
+          limitReached: true,
+          // The REAL number, so the client pins to it instead of guessing the cap.
+          // It used to set its own counter to CAP here, which with a non-zero
+          // baseline rendered "23 of 20 used" and "-3 left" in the sidebar.
+          messagesUsedToday: usedToday,
+          quotaDay: today,
+        },
         { status: 429 }
       );
     }
@@ -446,13 +454,26 @@ export async function POST(req: NextRequest) {
     }
 
     // ── Increment daily counter ────────────────────────────────────────────────
+    // NOTE: read-modify-write, not atomic. Two tabs sending at the same instant can
+    // read the same `usedToday` and one increment is lost. Acceptable for a soft
+    // per-day courtesy cap; it would not be for anything billable per unit.
+    const messagesUsedToday = usedToday + 1;
     await supabase
       .from("profiles")
-      .update({ chat_messages_today: usedToday + 1, chat_reset_date: today })
+      .update({ chat_messages_today: messagesUsedToday, chat_reset_date: today })
       .eq("id", user.id);
 
     return NextResponse.json({
       reply,
+      // The server's own count, so the client never has to infer it. Without this
+      // a reply lost to a timeout or a closed tab left the server one ahead of the
+      // client forever — the surprise-429-with-headroom-showing bug.
+      messagesUsedToday,
+      // ...and the day that count belongs to. The client must NOT use its own clock
+      // here: a reply sent at 23:59:58 and received at 00:00:02 would look like a new
+      // day, re-anchoring the fresh day's baseline to yesterday's total and silently
+      // eating most of the rep's quota until a reload. Clock skew does the same.
+      quotaDay: today,
       ...(callSuggestion ? { callSuggestion } : {}),
       ...(diveReady      ? { diveReady }      : {}),
       ...(diveFailed     ? { diveFailed }     : {}),

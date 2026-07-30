@@ -1,10 +1,17 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { ArrowUp, X, SquarePen } from "lucide-react";
 import type { Call } from "@/types";
-import { CHAT_DAILY_CAP } from "@/lib/wingman/chat-quota";
+import {
+  CHAT_DAILY_CAP,
+  initQuota,
+  quotaOnSent,
+  quotaReconcile,
+  utcDay,
+  type QuotaState,
+} from "@/lib/wingman/chat-quota";
 import { nextSuggestion, type ChatDiveReady } from "@/lib/wingman/dive-suggestion";
 import {
   PromptInput,
@@ -46,8 +53,20 @@ type Msg = { role: "user" | "assistant"; text: string };
 export type CoachSession = {
   messages: Msg[];
   setMessages: React.Dispatch<React.SetStateAction<Msg[]>>;
-  sentCount: number;
-  setSentCount: React.Dispatch<React.SetStateAction<number>>;
+  /**
+   * Daily-quota mirror. Held here rather than in a DashboardClient ref because it
+   * has to survive tab changes AND be re-anchored at midnight — a ref captured
+   * once could do neither.
+   */
+  quota: QuotaState;
+  /** Record a send the server ACCEPTED. Never call optimistically. */
+  markSent: () => void;
+  /**
+   * Fold in a count the server reported — from a 200, a 429, or a fresh profile.
+   * Pass `day` whenever the server told us which day the count belongs to; relying
+   * on the client clock across midnight re-anchors the new day to yesterday's total.
+   */
+  reportServerCount: (n: number, day?: string) => void;
   suggestion: { call_id: string; name: string } | null;
   setSuggestion: React.Dispatch<React.SetStateAction<{ call_id: string; name: string } | null>>;
   open: boolean;
@@ -74,14 +93,23 @@ export type CoachSession = {
  * suggestion and the conversation they were building silently evaporates.
  * Calling this hook in DashboardClient keeps the thread alive across tabs.
  */
-export function useCoachSession(): CoachSession {
+export function useCoachSession(initialServerCount: number): CoachSession {
   const [messages, setMessages] = useState<Msg[]>([]);
-  const [sentCount, setSentCount] = useState(0);
   const [suggestion, setSuggestion] = useState<{ call_id: string; name: string } | null>(null);
   const [open, setOpen] = useState(false);
   const [closing, setClosing] = useState(false);
+
+  // Lazy initialiser: `initialServerCount` is only the SEED. Re-running it on every
+  // render would wipe the session's sends on each parent re-render.
+  const [quota, setQuota] = useState<QuotaState>(() => initQuota(initialServerCount));
+  const markSent = useCallback(() => setQuota((q) => quotaOnSent(q)), []);
+  const reportServerCount = useCallback(
+    (n: number, day?: string) => setQuota((q) => quotaReconcile(q, n, day ?? utcDay())),
+    []
+  );
+
   return {
-    messages, setMessages, sentCount, setSentCount,
+    messages, setMessages, quota, markSent, reportServerCount,
     suggestion, setSuggestion, open, setOpen, closing, setClosing,
   };
 }
@@ -102,7 +130,7 @@ export default function Coach({
   onOpenCall: (callId: string) => boolean;
   session: CoachSession;
 }) {
-  const { messages, setMessages, sentCount, setSentCount, suggestion, setSuggestion } = session;
+  const { messages, setMessages, markSent, reportServerCount, suggestion, setSuggestion } = session;
   const open = session.open;
   const onOpenChange = session.setOpen;
   const { closing, setClosing } = session;
@@ -178,14 +206,18 @@ export default function Coach({
 
       const data = await res.json();
 
+      // Every reply that carries a count folds in — 429 included. This is what keeps
+      // the client honest when a 200 is lost to a timeout or a closed tab: the server
+      // counted it, and the next reply tells us so.
+      if (typeof data.messagesUsedToday === "number") {
+        reportServerCount(data.messagesUsedToday, typeof data.quotaDay === "string" ? data.quotaDay : undefined);
+      }
+
       if (data.limitReached) {
         setMessages((p) => [...p, { role: "assistant", text: "That's today's coaching limit. Resets at midnight." }]);
-        // Lock the client to match. `usedToday` is a page-load snapshot, so a rep
-        // who used Mission Intel first arrives with a stale low count — without
-        // this they keep pressing send and keep collecting identical replies.
-        // The shared `used` is max(serverCount, baseline + sentCount) and the
-        // baseline is never negative, so CAP here always forces atLimit true.
-        setSentCount(CHAT_DAILY_CAP);
+        // No local guess here any more. The 429 now carries the real number, which
+        // the line above already applied; the old `setSentCount(CHAT_DAILY_CAP)`
+        // rendered "23 of 20 used" once the baseline was non-zero.
         return;
       }
 
@@ -233,7 +265,7 @@ export default function Coach({
           ? [{ role: "assistant" as const, text: "Opening it in your Flight Log — ask me there and I'll have the full transcript." }]
           : []),
       ]);
-      setSentCount((n) => n + 1);
+      markSent();
 
       // Suggestion lifecycle lives in `nextSuggestion` so it is unit-testable — the
       // rule it encodes is the one whose failure burned quota on every message.

@@ -30,6 +30,11 @@ interface Props {
   userId: string;
   isActive?: boolean;
   isPendingOutcome?: boolean;
+  /**
+   * Report a server-side coaching-message count back to the shared quota state.
+   * This tab's two chat surfaces spend the SAME daily allowance as the Home Coach.
+   */
+  onQuotaReported?: (count: number, day?: string) => void;
 }
 
 // Outcome options shown in the inline picker
@@ -182,7 +187,7 @@ function awaitingDebrief(call: Call | null | undefined): boolean {
   return Date.now() - started < DEBRIEF_WINDOW_MS;
 }
 
-export default function FlightLogTab({ calls, initialCall, onInitialCallConsumed, initialCallId, onInitialCallIdConsumed, userId, isActive = false, isPendingOutcome = false }: Props) {
+export default function FlightLogTab({ calls, initialCall, onInitialCallConsumed, initialCallId, onInitialCallIdConsumed, userId, isActive = false, isPendingOutcome = false, onQuotaReported }: Props) {
   const router = useRouter();
   const [selectedCall, setSelectedCall] = useState<Call | null>(initialCall);
   const [activeDetailTab, setActiveDetailTab] = useState<"debrief" | "transcript">("debrief");
@@ -491,6 +496,13 @@ export default function FlightLogTab({ calls, initialCall, onInitialCallConsumed
       const res  = await fetchPromise;
       const data = await res.json();
 
+      // These two surfaces burn the SAME daily quota as the Home Coach but never
+      // reported it, so the sidebar showed full headroom while the server counted
+      // down — the rep hit a surprise 429. PR 4 deletes both; until then, report.
+      if (typeof data.messagesUsedToday === "number") {
+        onQuotaReported?.(data.messagesUsedToday, typeof data.quotaDay === "string" ? data.quotaDay : undefined);
+      }
+
       if (data.limitReached) {
         setGlobalMessages((prev) => [...prev, { role: "assistant", text: "You've hit today's coaching limit. Come back tomorrow — or upgrade to Pro for unlimited sessions.", timestamp: Date.now() }]);
         setGlobalLoading(false);
@@ -609,6 +621,14 @@ export default function FlightLogTab({ calls, initialCall, onInitialCallConsumed
     try {
       const res = await fetchPromise;
       const data = await res.json();
+
+      // These two surfaces burn the SAME daily quota as the Home Coach but never
+      // reported it, so the sidebar showed full headroom while the server counted
+      // down — the rep hit a surprise 429. PR 4 deletes both; until then, report.
+      if (typeof data.messagesUsedToday === "number") {
+        onQuotaReported?.(data.messagesUsedToday, typeof data.quotaDay === "string" ? data.quotaDay : undefined);
+      }
+
       if (data.limitReached) {
         setChatMessages((prev) => [...prev, { role: "assistant", text: "You've hit today's coaching limit. Come back tomorrow — or upgrade to Pro for unlimited sessions.", timestamp: Date.now() }]);
       } else {

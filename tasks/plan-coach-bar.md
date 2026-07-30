@@ -242,6 +242,54 @@ ported; reopening a call resumes its thread.
 
 ---
 
+## PR 5 — Chain-of-thought progress (BRIEF — needs finalising before build)
+
+Sebastian, 2026-07-29, on the dive: *"does it show the chain of thought while it's 'pulling up'
+that specific call?"* **Today: no — three bouncing dots (`Loader variant="typing"`,
+Coach.tsx:404) and nothing else.**
+
+### The constraint that decides the whole design
+
+`/api/ai/chat` is **not streamed** — one `NextResponse.json()` after every phase has finished.
+The client therefore has **zero** visibility into server progress. A chain-of-thought added on
+top of that could only be **invented steps on setTimeout** — theatre that says "Reading the
+transcript" 200ms after the server already finished. That is exactly the fake-progress pattern
+Rule #11 exists to keep out of this product.
+
+**So PR 5 is really: make the route stream its phases.** Precedent exists — `kb-signal`
+already streams SSE (`route.ts:385,468`) and there are tested parsers (`lib/wingman/sse-parse.ts`,
+`json-line-stream.ts`).
+
+### Real phases — taken from the code, none invented
+
+| Phase | Source | Worth showing? |
+|---|---|---|
+| Looking across your last 20 calls | context build | marginal — instant |
+| **Searching coaching knowledge** | `searchCoachingKnowledge` (route.ts:304) — real pgvector search | yes |
+| Thinking | the Anthropic call | yes — the long one |
+| **Finding that call** | `fetchCallWithRetry` | dive only |
+| **Reading the transcript** | the Supabase call+transcript read | dive only, genuinely slow |
+| **Retrying (2 of 3)** | the retry loop's 3 attempts × 500ms | **yes — happens today and is completely invisible; a ~1.5s stall currently just looks frozen** |
+| Couldn't find that call | the `notFound` branch added in PR 1 | yes — honest failure |
+| Reading your call with X | `single_call` mode | yes |
+
+### Open questions to settle before building
+
+1. Convert `/api/ai/chat` wholesale to SSE, or add a phase channel only for the dive path?
+   Wholesale touches FlightLogTab too — but PR 4 deletes that consumer, so after PR 4 there is
+   exactly one consumer and the conversion is cheap. **That is the argument for PR 5 landing
+   after PR 4, not before.**
+2. Does streaming change cost or caching? (Expected: no — same model call, same prompt cache.
+   Verify, don't assume.)
+3. Vendor prompt-kit's chain-of-thought component the same way `prompt-input` / `chat-container`
+   / `loader` / `scroll-button` already are (they are vendored into `src/components/ui/`, not an
+   npm dep).
+4. Do phases persist in the transcript after the answer lands, or collapse away?
+
+**Do NOT build this into the current Coach** — PR 4 replaces that UI, so it would be built twice.
+
+---
+
 ## §9. Phasing — four PRs, in this order
 
 | PR | Scope | Why separate |

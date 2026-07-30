@@ -19,7 +19,7 @@ import { parseSSEBuffer } from "@/lib/wingman/sse-parse";
 import { HOT_PARTIAL_MS, SETTLE_WAIT_MS } from "@/lib/wingman/live-tail";
 import { scoreReadiness, BELIEF_DISPLAY } from "@/lib/wingman/close-readiness.mjs";
 import { logDevEvent } from "@/lib/wingman/devlog-client";
-import { chatMessagesUsedToday, coachMessagesUsed } from "@/lib/wingman/chat-quota";
+import { chatMessagesUsedToday, quotaUsed } from "@/lib/wingman/chat-quota";
 import { useCoachSession } from "@/components/dashboard/home/Coach";
 import { useWingmanPoller } from "@/hooks/useWingmanPoller";
 import { useRecallTranscript } from "@/hooks/useRecallTranscript";
@@ -100,17 +100,46 @@ export default function DashboardClient({
   // Coach conversation. Lives HERE, not in HomeTab, because HomeTab unmounts on
   // every tab change — including the Coach's own "Open X in Flight Log →"
   // handoff, which would silently destroy the thread the rep was building.
-  const coachSession = useCoachSession();
+  const coachSession = useCoachSession(chatMessagesUsedToday(profile));
 
-  // ONE number for the whole dashboard. The sidebar used to read the server
-  // count straight off `profile`, which only moves on a page load — so it sat
-  // stale ("1 of 20") while the chat box counted live ("3/20"). Both now read this.
-  const coachBaseline = useRef(chatMessagesUsedToday(profile));
-  const coachUsed = coachMessagesUsed(
-    coachBaseline.current,
-    chatMessagesUsedToday(profile),
-    coachSession.sentCount
-  );
+  // ONE number for the whole dashboard. The sidebar used to read the server count
+  // straight off `profile`, which only moves on a page load — so it sat stale
+  // ("1 of 20") while the chat box counted live ("3/20"). Both now read this.
+  const coachUsed = quotaUsed(coachSession.quota);
+
+  // Fold the refreshed profile count in whenever router.refresh() lands a new one.
+  // This is also the ONLY rollover signal available to a tab that sits open past
+  // midnight without anyone sending a message: `chatMessagesUsedToday` re-checks the
+  // UTC date on every call, so it drops to 0 on its own and `quotaReconcile` sees the
+  // day change and re-anchors. The previous `useRef` baseline could not — it was
+  // captured once, so an overnight tab stayed pinned at yesterday's count.
+  const profileChatCount = chatMessagesUsedToday(profile);
+  const reportServerCount = coachSession.reportServerCount;
+  useEffect(() => {
+    reportServerCount(profileChatCount);
+  }, [profileChatCount, reportServerCount]);
+
+  /*
+    Deliver the rollover. `chatMessagesUsedToday` re-checks the UTC date, but only
+    WHEN CALLED — i.e. during a render — and an idle dashboard renders zero times
+    overnight (every interval here is gated on a live call or a pending outcome).
+    Without this, a rep who hit 20/20 at 4pm and left the window open finds the
+    composer still disabled at 9am with a full day's quota available, and clicking it
+    doesn't help: typing only re-renders Coach, not this component.
+
+    Free on same-day ticks — `quotaReconcile` returns the identical object when there
+    is nothing new, so React bails out and no re-render happens. Exactly one render
+    fires, at midnight. The focus listener covers a laptop that was asleep.
+  */
+  useEffect(() => {
+    const tick = () => reportServerCount(chatMessagesUsedToday(profile));
+    const id = setInterval(tick, 60_000);
+    window.addEventListener("focus", tick);
+    return () => {
+      clearInterval(id);
+      window.removeEventListener("focus", tick);
+    };
+  }, [profile, reportServerCount]);
   const [collapsed, setSidebarCollapsed] = useState(false);
   const [badges, setBadges] = useState({
     objections: initialObjections.filter((o) => o.is_new).length,
@@ -1675,6 +1704,7 @@ export default function DashboardClient({
               userId={userId}
               isActive={isActive}
               isPendingOutcome={pendingOutcome}
+              onQuotaReported={reportServerCount}
             />
           )}
           {tab === "objections" && (
