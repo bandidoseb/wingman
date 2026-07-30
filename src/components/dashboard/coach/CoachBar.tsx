@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { ArrowUp, X, SquarePen } from "lucide-react";
+import { ArrowUp, X, SquarePen, MessageSquare } from "lucide-react";
 import type { Call } from "@/types";
 import { CHAT_DAILY_CAP } from "@/lib/wingman/chat-quota";
 import { nextSuggestion, type CallSuggestion, type ChatDiveReady } from "@/lib/wingman/dive-suggestion";
@@ -94,6 +94,8 @@ export default function CoachBar({
   calls,
   used,
   callPhase,
+  enabled,
+  closeSignal,
   onOpenCall,
   markSent,
   onQuotaReported,
@@ -121,6 +123,19 @@ export default function CoachBar({
    * at `bottom:80px; left:32px` in an always-on-top screen-saver-level window.
    */
   callPhase: "idle" | "live" | "processing";
+  /**
+   * Whether this tab gets a Coach bar at all — see COACH_TABS in DashboardClient.
+   *
+   * The component still MOUNTS on every tab (it wraps them), so threads, scope and
+   * an in-flight request all survive a trip through Settings. Only the chrome goes.
+   */
+  enabled: boolean;
+  /**
+   * A counter DashboardClient bumps on every sidebar nav click; any change closes
+   * the takeover. A counter rather than a boolean so two clicks in a row both land,
+   * and rather than watching `tab` so a dive's own navigation doesn't self-close.
+   */
+  closeSignal: number;
   /** Open a call in Flight Log. Returns false when the id isn't in the loaded list. */
   onOpenCall: (callId: string) => boolean;
   /** Record a send the server accepted. */
@@ -247,6 +262,12 @@ export default function CoachBar({
   useEffect(() => {
     if (busy) setOpen(false);
   }, [busy]);
+
+  // A nav click means "show me that screen" — not "show me that screen with a chat
+  // panel over it". Also covers navigating to a tab that has no bar at all.
+  useEffect(() => {
+    setOpen(false);
+  }, [closeSignal, enabled]);
 
   /*
     Esc closes the takeover. Bound only while open, which is also what makes it safe:
@@ -517,6 +538,8 @@ export default function CoachBar({
 
   const chips = scope === GLOBAL_SCOPE ? GLOBAL_CHIPS : CALL_CHIPS;
   const thinking = pendingScope === scope;
+  /** Preview line for the "Continue →" row — the last thing said, either side. */
+  const lastLine = thread.messages[thread.messages.length - 1]?.text ?? "";
 
   /*
     ONE return, not two.
@@ -534,6 +557,14 @@ export default function CoachBar({
       onSubmit={() => send()}
       // `sending`, not `thinking` — the lock is per-bar. See the note on `sending`.
       isLoading={sending}
+      /*
+        Clicking the composer reopens a conversation that ALREADY has messages — but
+        never opens an empty one. That distinction is the whole rule: opening empty
+        is what made the takeover "flash over to this blank screen" (Sebastian,
+        2026-07-29), while refusing to reopen a real thread meant the only way back
+        to your own messages was to send another one.
+      */
+      onClick={() => { if (thread.messages.length > 0) setOpen(true); }}
       maxHeight={140}
       className="bg-surface border border-line-strong rounded-panel px-3 py-2 shadow-raised transition-[box-shadow,border-color] duration-2 ease-wm focus-within:border-signal focus-within:shadow-float"
     >
@@ -563,6 +594,13 @@ export default function CoachBar({
     </PromptInput>
   );
 
+  /*
+    Tabs that get no bar render their children bare — no wrapper, no height floor,
+    nothing. The component itself stays mounted (it wraps every tab), so threads,
+    scope and any in-flight request survive a trip through Settings untouched.
+  */
+  if (!enabled) return <>{children}</>;
+
   return (
     <div className={`flex flex-col ${layoutOpen ? "h-[calc(100vh-96px)]" : "min-h-[calc(100vh-96px)]"}`}>
       {/* Hidden entirely while the takeover is open — that IS the takeover. When
@@ -574,9 +612,28 @@ export default function CoachBar({
         className={
           layoutOpen
             ? "flex-1 min-h-0 flex flex-col w-full max-w-[640px] mx-auto"
-            // z-10: the Sales DNA banner has z-indexed children in the root stacking
-            // context and would otherwise paint over the bar as it scrolls past.
-            : "sticky bottom-0 z-10 w-full max-w-[640px] mx-auto"
+            /*
+              `bottom-6` + `-mb-6` is what makes the bar sit at the SAME height on
+              every screen. The two states resolve their position differently and
+              used to disagree by 40px:
+
+               · SHORT page (Home) — the column never scrolls, so the bar rests at
+                 its natural place: the end of a `min-h-[calc(100vh-96px)]` column,
+                 i.e. 48px up (the page's own bottom padding).
+               · LONG page (Flight Log) — the page scrolls, so sticky pins it to
+                 `bottom`, i.e. hard against the viewport edge.
+
+              `-mb-6` pulls the natural resting place down 24px (48 → 24) and
+              `bottom-6` lifts the pinned one up 24px (0 → 24). Both land at 24px,
+              which is the midpoint Sebastian asked for — Home's gap felt right,
+              Flight Log's was "way too low".
+
+              Change one, change the other, or the two screens drift apart again.
+
+              z-10: the Sales DNA banner has z-indexed children in the root stacking
+              context and would otherwise paint over the bar as it scrolls past.
+            */
+            : "sticky bottom-6 -mb-6 z-10 w-full max-w-[640px] mx-auto"
         }
       >
         <AnimatePresence initial={false} onExitComplete={() => setClosing(false)}>
@@ -703,6 +760,23 @@ export default function CoachBar({
                 </button>
               ))}
             </div>
+          )}
+
+          {/* The way back INTO a conversation you closed.
+              Without it the thread is invisible once the takeover is dismissed and
+              the only way to see your own messages again is to send another one —
+              which costs a Sonnet call and a quota decrement to re-read something
+              you already have (Sebastian, 2026-07-30). Shows the last reply so the
+              row says WHICH conversation, the way Granola's chat entry does. */}
+          {!layoutOpen && thread.messages.length > 0 && (
+            <button
+              onClick={() => setOpen(true)}
+              className="group/resume flex w-full items-center gap-2 rounded-control bg-surface-sunken border border-line px-2.5 py-1.5 mb-2 text-left hover:border-line-strong transition-colors duration-2 ease-wm"
+            >
+              <MessageSquare className="h-3.5 w-3.5 shrink-0 text-ink-3" />
+              <span className="flex-1 truncate text-[11.5px] text-ink-2">{lastLine}</span>
+              <span className="shrink-0 text-[11px] font-semibold text-signal">Continue →</span>
+            </button>
           )}
 
           {composer}

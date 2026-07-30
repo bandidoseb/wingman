@@ -31,6 +31,19 @@ import { useRecallTranscript } from "@/hooks/useRecallTranscript";
 // compiler find every leftover reference.
 export type DashboardTab = "home" | "library" | "objections" | "intel" | "settings" | "personalize";
 
+/**
+ * Tabs the Coach bar appears on.
+ *
+ * It belongs where the screen is ABOUT CALL DATA — that is the only thing the coach
+ * can answer from. Sales DNA and Settings are configuration: the rep is filling in
+ * their offer or changing their Zoom name, and a "ask about your calls" box there is
+ * just a chat box sitting on an unrelated form (Sebastian, 2026-07-30).
+ *
+ * Objection Vault stays IN: every objection in it came out of a real call, and
+ * "why do I keep hitting this one?" is the coach's core job.
+ */
+const COACH_TABS: ReadonlySet<DashboardTab> = new Set<DashboardTab>(["home", "library", "objections", "intel"]);
+
 interface Props {
   profile: Profile;
   initialCalls: Call[];
@@ -1590,8 +1603,19 @@ export default function DashboardClient({
   }, []);
 
   // ── Navigation helpers ─────────────────────────────────────────────────────
+  /*
+    Bumped on every NAV CLICK, which is what closes the Coach takeover.
+
+    Deliberately not keyed on `tab` itself: a dive also changes the tab, and closing
+    there would hide the very conversation the dive just opened. A nav click is the
+    rep saying "take me to that screen" — the chat panel covering it is not what they
+    asked for (Sebastian, 2026-07-30).
+  */
+  const [coachCloseSignal, setCoachCloseSignal] = useState(0);
+
   const handleTabClick = useCallback((id: DashboardTab) => {
     setTab(id);
+    setCoachCloseSignal((n) => n + 1);
     // Switching tabs swaps the whole page body but React keeps the window's scroll
     // offset, so a tab opened from halfway down the previous one starts mid-page.
     // The dashboard has no inner scroll container — the window itself scrolls.
@@ -1705,6 +1729,8 @@ export default function DashboardClient({
             calls={initialCalls}
             used={coachUsed}
             callPhase={callPhase}
+            enabled={COACH_TABS.has(tab)}
+            closeSignal={coachCloseSignal}
             onOpenCall={openCallById}
             markSent={chatQuota.markSent}
             onQuotaReported={reportServerCount}
