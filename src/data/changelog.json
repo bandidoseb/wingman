@@ -1,5 +1,28 @@
 [
   {
+    "id": "2026-08-03-one-coach-bar",
+    "date": "2026-08-03",
+    "category": "feature",
+    "title": "One place to talk to Wingman, on every screen — and your chats are saved now",
+    "summary": "Wingman's coach used to live in three different boxes that each behaved slightly differently. Now there is one chat bar at the bottom of every screen, and it already knows what you are looking at — open a call and it answers about that call. Your past conversations are kept, so you can pick one back up instead of starting over.",
+    "changes": [
+      "One chat bar at the bottom of Home, Flight Log, Objection Vault and Intel",
+      "Open a call and the bar automatically asks about that call, with the full transcript",
+      "Past conversations are saved and listed under History — click one to carry on where you left off",
+      "\"New chat\" starts a fresh conversation instead of deleting the one you had",
+      "You can reopen a chat you closed without having to send another message",
+      "The chat bar sits at the same height on every screen instead of jumping around",
+      "Clicking a menu item now closes the chat and takes you to that screen",
+      "The chat is hidden on Sales DNA and Settings, where there are no calls to ask about",
+      "The chat pauses during a live call, so nothing you type can interfere with the call"
+    ],
+    "details": [
+      "Pausing the chat during a live call is a safety feature, not a limitation. While a call is running, Wingman listens for the arrow keys anywhere on your Mac so you can summon a card without leaving your meeting. Those key presses reach Wingman before they reach anything you are typing into — so typing a message mid-call and hitting the up arrow could have summoned a card onto your screen in the middle of the conversation. The chat now steps aside until the call is done, and tells you why.",
+      "Two of these were costing you coaching messages. Reopening a closed chat used to be impossible without sending a new message, which spent one of your twenty daily messages just to re-read something already on your screen. And a message sent right at midnight could permanently miscount your daily allowance by one for the rest of the next day.",
+      "Saved conversations live on this Mac only — they are not synced to your account yet, so they will not follow you to another computer. Wingman keeps your last 30 conversations for a week."
+    ]
+  },
+  {
     "id": "2026-07-30-dashboard-dark-mode",
     "date": "2026-07-30",
     "category": "ui",

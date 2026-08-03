@@ -16,7 +16,18 @@
 
 ---
 
-Last updated: 2026-07-30
+Last updated: 2026-08-03
+
+> **✅ 2026-08-03 — THE UNIFIED COACH BAR (PR 4) + individual chats.** Log: `2026-08-03.md`
+> (code written 07-30, session closed 08-03). Branch `feat/coach-bar`. Three chat surfaces
+> replaced by one bar that wraps every tab and goes silent during a live call;
+> `FlightLogTab.tsx` 1,123 → 644 lines. Sebastian's test round fixed four things (nav click
+> closes the takeover · bar off Sales DNA/Settings · one matched 32px height everywhere ·
+> reopen a chat without paying for a message). Then Granola-style **History** — threads became
+> first-class, so "New chat" stops destroying conversations. Gates: typecheck ×2 ·
+> **296/296 vitest** (+49) · `build:verify` · token-lint 58 · `wingman-reviewer` ×3
+> (15 findings, all fixed). ⚠️ Nothing has been seen in the real Electron window yet.
+> For live branch/PR state read the SessionStart hook or `context/STATE.md`, never this line.
 
 > **✅ 2026-07-30 — DARK MODE DONE + dashboard trimmed + THREE LIVE COACH BUGS FIXED.** Log: `2026-07-30.md`. Branch `feat/design-tokens`, **17 commits, STILL NOT PUSHED.** Gates every commit: typecheck ×2 · **247/247 vitest** (+29) · `build:verify` · token-lint · `wingman-reviewer` ×3 (APPROVE WITH FIXES, all landed).
 > **Dark mode fixed at ONE token.** In dark mode elevation is LIGHTNESS and you cannot go DOWN — `--paper` is already at the floor. `--surface-sunken` sat BELOW it (`#100F0D`), which is why every input read as a black hole. Now **`#2C2B25`**, one step above `--surface`; ladder `#171613 → #201F1B → #2C2B25`, step 1.162:1 vs light's 1.158:1. Rules written up as **Design Language §3f**.

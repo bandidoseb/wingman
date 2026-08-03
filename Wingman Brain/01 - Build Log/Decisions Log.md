@@ -2,7 +2,7 @@
 
 A running log of every major architectural or product decision made on Wingman. Append only — never delete. Each entry captures the decision, the date, the reasoning, and any alternatives that were rejected.
 
-Last updated: 2026-07-30
+Last updated: 2026-08-03
 
 > **Reversed decisions are never removed** — they stay in place with a
 > `> ⚠️ **SUPERSEDED <date> → <new truth>**` banner above them. A decision you can't find is a
@@ -12,6 +12,37 @@ Last updated: 2026-07-30
 ---
 
 ## 2026
+
+### 2026-08-03 — The Coach lives in ONE bar that wraps every tab, and it goes silent during a call
+**Decision:** All coaching chat is a single `sticky bottom-0` bar rendered on Home, Flight Log, Objection Vault and Intel. It replaced three surfaces (Home's Coach, Flight Log's Mission Intel card + modal, Flight Log's per-call "Ask Wingman" card), which are deleted and must not be re-added per-screen. The bar **wraps** the tabs rather than sitting beside them. It is **disabled whenever a call is live, starting, or awaiting its disposition**, with distinct copy for "live" and "processing". It does NOT appear on Sales DNA or Settings.
+**Why:** Sebastian, referencing Granola — *"it always just has that bottom chat bar… make the entry point to talking to the wingman chatbot the same everywhere."* Three surfaces meant three sets of state, three bugs and three different ideas of the daily quota. Wrapping (rather than being a sibling) keeps `children` referentially stable so the tab tree does not re-render per keystroke, and is what lets the takeover hide tab content without lifting chat state into the component that owns the live-call handlers. **The live-call gate is a SAFETY decision, not polish:** `electron/main.ts` binds bare arrow keys as global shortcuts during a call and `globalShortcut` fires before a focused textarea, so a rep typing mid-call who pressed ↑ would open the compass and the next arrow would fire a slot — a billed Sonnet stream and a card on the HUD in front of the prospect. Config screens are excluded because the coach can only answer from call data.
+**Rejected:** `position: fixed` for the bar — it would have to duplicate both the sidebar-width constant and its easing curve, the exact desync that broke the sidebar collapse once already. Sticky needs neither.
+**Status:** Active.
+
+---
+
+### 2026-08-03 — Individual chats, kept in localStorage; "New chat" never destroys a conversation
+**Decision:** Coach conversations are first-class threads (`id`, `scope`, `messages`, `updatedAt`) in `src/lib/wingman/coach-threads.ts`, listed in a Granola-style **History** dropdown. A scope can own many over time; `activeByScope` only says which one new messages go into. **"New chat" clears the active pointer, not the thread** — the old conversation moves to History. Persistence is **localStorage only** (key `wingman_coach_threads`, 30 conversations, 7-day TTL, 40 messages each), migrating the old single-thread `wingman_global_chat` on first load. Titles come from data we already have (the call's prospect name, or "All calls"), **never from a model**.
+**Why:** Sebastian — *"does it make sense to have it all in one thread? I think it makes more sense to have individual chats."* Offered three scopes; he chose the localStorage version over a Supabase-backed one, and chose to finish the Coach bar before shipping it. Non-destructive "New chat" is not just politeness: it means **a reply still in flight has somewhere to land**, which let the generation-counter guard added a review earlier be deleted outright. An AI-generated title would be a second model call per thread, for a label, that could be wrong about the rep's own call.
+**Rejected:** Supabase-backed history (survives devices and reinstalls, and is the real end state) — deferred because it needs a schema change and Sebastian's explicit yes, and the cutline does not justify it pre-beta. Also rejected: dropping the dive override on "New chat", as the original plan specified — that changes which conversation is visible, so New chat would have to clear the landing thread too, and "start over on this call" would silently wipe the global thread and its saved history. The scope chip's ✕ is the one visible way out of a call scope.
+**Status:** Active.
+
+---
+
+### 2026-08-03 — A flag a later effect must observe in the SAME commit is state, never a ref
+**Decision:** When one effect restores data and a second effect persists it, the "ready" flag between them must be React **state**, not a `useRef`.
+**Why:** Claude shipped this bug **twice in one session, three hours apart**, both times in a restore-then-save-to-`localStorage` pair. A ref is set synchronously, so it already reads `true` when the save effect runs in the same commit — while the state it guards is still the pre-restore value. The save then writes empty over what the restore just read. The first instance silently reset a 24h TTL on every dashboard load; the second would have wiped every saved conversation. `setHydrated(true)` batches into the same commit as `setStore(restored)`, so the save effect's first effective run already sees the restored data — a ref cannot express "not until React has applied this". **No test here can catch it:** `vitest` runs in `node` with no jsdom, so effect ordering is untestable. Re-reading the diff is what caught both.
+**Status:** Active. Carried in `NOW.md` → Carry-forwards #1.
+
+---
+
+### 2026-08-03 — Claude CAN drive this Mac; the capability was mis-reported once
+**Decision:** Recorded as fact, not yet exercised. Claude can control macOS through Bash: `osascript` + System Events for clicks/keystrokes/menus (**Accessibility permission already granted**) and `screencapture` for seeing (**Screen Recording permission already granted** — verified with a real 2940×1912 frame, deleted unviewed). `Granola.app` is installed. No MCP connector is needed or available — the registry returns nothing for computer use.
+**Why:** Sebastian asked whether Claude could take over his laptop to study Granola directly instead of him describing it in words. Claude first said no — **wrong**. The error was checking which MCP tools were loaded and stopping there, instead of checking what the machine itself could do. Worth logging because the same mistake is easy to repeat: *absence of a named tool is not absence of capability when Bash is available.* Granola has no web version (desktop + iPhone/Watch only), so there is no browser route to it.
+**Open:** Claude asked how to handle Sebastian's real customer-call data while inside Granola (all notes / one throwaway note / don't drive it) and **he stepped away without answering. Nothing was run.** Deferred, not refused — carried in `NOW.md` → Blocked on Sebastian.
+**Status:** Active (capability); decision on use pending.
+
+---
 
 ### 2026-07-30 — Context system: NOW vs ARCHIVE, and status is generated, never typed
 **Decision:** Every context file is now exactly one of two kinds. **NOW files** are small, rewritten each session, and answer "what's true today" (`NOW.md`, `Known Issues.md`). **HISTORY files** are append-only, never read at session start, always searchable (`Sprint Archive.md`, `Known Issues Archive.md`, the dated logs, this file). Nothing is both. Separately: **status is never hand-typed** — version, branch, PR, and release state are generated into `context/STATE.md` by `scripts/context-gen.mjs` and injected live by a SessionStart hook. Four deterministic hooks enforce the shape; the size ratchet starts as a warning, not a block.

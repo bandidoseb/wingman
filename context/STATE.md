@@ -12,7 +12,7 @@ session by the SessionStart hook, because a committed file cannot know today's t
 
 - **App version:** `0.1.29` (package.json)
 - **Releases publish to:** `bandidoseb/wingman-releases` (PUBLIC, separate from the source repo)
-- **Branch at last generate:** `chore/record-decisions-2026-07-30` · f52cff3 Context system: audited, corrected, and gated (#59)
+- **Branch at last generate:** `feat/coach-bar` · 4de565c feat(coach): individual chats with a History list
 
 ## Orphan modules — zero inbound imports
 
@@ -22,10 +22,11 @@ Computed, not remembered. If something here is documented as live anywhere, the 
 - `src/lib/wingman/keyword-triggers.ts`
 - `src/lib/wingman/query-distill.ts`
 
-## Open issues (30)
+## Open issues (31)
 
 Full text + root-cause notes: `Wingman Brain/01 - Build Log/Known Issues.md`
 
+- **#62** — Coach composer renders 2 lines tall when EMPTY (56px vs a natural 28px)
 - **#61** — Stale git worktrees under .claude/worktrees/ pollute every search — and can defeat veri…
 - **#56** — Flight Log shows the SAME data three times
 - **#55** — Raw internal pillar keys leak into user-facing text
@@ -94,11 +95,15 @@ Root-cause write-ups live in `Known Issues Archive.md`. Several are load-bearing
 - #10 — Transcript buffer discarded if call ends before poll timer fires
 - #5 — App is not Apple-notarized
 
-## Decisions (70) — index only
+## Decisions (74) — index only
 
 Full entries: `Wingman Brain/01 - Build Log/Decisions Log.md`. **Read it before**
 **re-opening any architecture question** — that is what it is for. ⚠️ = superseded.
 
+- 2026-08-03 — The Coach lives in ONE bar that wraps every tab, and it goes silent during a call
+- 2026-08-03 — Individual chats, kept in localStorage; "New chat" never destroys a conversation
+- 2026-08-03 — A flag a later effect must observe in the SAME commit is state, never a ref
+- 2026-08-03 — Claude CAN drive this Mac; the capability was mis-reported once
 - 2026-07-30 — Context system: NOW vs ARCHIVE, and status is generated, never typed
 - 2026-07-28 — Card doctrine: the test is "has the prospect revealed anything real?", never minutes-in
 - 2026-07-28 — The launch cutline is law until beta ships
@@ -170,10 +175,11 @@ Full entries: `Wingman Brain/01 - Build Log/Decisions Log.md`. **Read it before*
 - 2026-04-09 — Obsidian brain tracked in GitHub repo
 - 2026-04-09 — /wrap skill for session end automation
 
-## Build logs (42) — index only
+## Build logs (43) — index only
 
 Full narrative per session: `Wingman Brain/01 - Build Log/YYYY-MM-DD.md`
 
+- **2026-08-03** — The unified Coach bar (PR 4), Sebastian's test round, and individual chats
 - **2026-07-30** — Dark mode finished, dashboard trimmed, and three live Coach bugs fixed
 - **2026-07-29** — Dashboard rebuild: token foundation, Tailwind v4, Home + Coach chat, dark mode
 - **2026-07-28** — LAUNCH CUTLINE + v0.1.29 SHIPPED + post-call honesty fixes

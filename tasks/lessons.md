@@ -139,3 +139,49 @@
 ### A synthetic `.click()` cannot test the clipboard
 **What happened:** Spent several rounds thinking the copy button was broken. Both `navigator.clipboard.writeText` and the `execCommand` fallback require a *trusted* user gesture; a scripted `.click()` from the browser tool is not one, so both paths failed and the button showed its error state.
 **Rule:** For clipboard, file pickers, fullscreen, autoplay — anything gated on user activation — drive it with the `computer` tool's real mouse click, and remember that tool takes SCREENSHOT-space coordinates, not viewport coordinates. Confirm by recording the state transition (`Copy → Copied → Copy`), not by reading the clipboard, which needs a separate permission.
+
+---
+
+## Session: 2026-07-30 → wrapped 2026-08-03 (unified Coach bar, PR 4)
+
+### A flag a LATER effect must observe in the same commit has to be state, not a ref
+**What happened:** Shipped this **twice in one session, three hours apart**, both times in a
+localStorage restore-then-save pair in `CoachBar.tsx`. A ref is set synchronously, so it already
+reads `true` when the save effect runs in the same commit — while the state it guards is still the
+pre-restore value. The save then wrote empty over what the restore had just read. First instance:
+the 24h TTL silently reset on every dashboard load, so a stale thread could never expire. Second
+instance (during the History rewrite, *after* a reviewer had approved the round): it would have
+wiped every saved Coach conversation on load.
+**Rule:** When two effects coordinate through a flag, ask which commit each runs in. If the second
+must see state the first just set, the flag is **state** — `setHydrated(true)` batches into the
+same commit as `setStore(restored)`. A ref cannot express "not until React has applied this". Refs
+are still right for latches against double-submits and cached ids, which never need a render.
+**Why it matters more than usual here:** `vitest` runs `environment: "node"` with no jsdom, so
+**no test in this repo can catch it.** Typecheck, 296 tests and `build:verify` all passed both
+times. Re-reading the diff is the only thing that found either one.
+
+### Absence of a named tool is not absence of capability
+**What happened:** Sebastian asked whether I could drive his Mac to explore Granola. I checked
+which MCP tools were loaded, saw no computer-use server, and told him flatly it wasn't possible.
+He pushed back. It *was* possible: `osascript` + System Events and `screencapture` both work
+through Bash, and both macOS permissions were already granted.
+**Rule:** Before answering "I can't", check what the **machine** can do, not just what tools are
+pre-loaded. Bash on the user's own laptop is a capability surface. Probe it (cheaply, without
+touching private data) rather than reasoning from the tool list.
+
+### Force a paint before trusting a post-animation DOM read
+**What happened:** Concluded twice that a working feature was broken. framer-motion's exit
+animation is rAF-driven and **throttles when the browser pane isn't compositing**, so
+`document.querySelector` right after a close still finds the panel. Separately, when the pane is
+collapsed the viewport measures **0×0**, so `elementFromPoint` returns null and synthetic clicks
+land on nothing — which made a correct outside-click handler look dead.
+**Rule:** Take a screenshot (which forces a paint) before reading the DOM for the result of an
+animated transition. And check `innerWidth`/`innerHeight` before trusting any geometry-based test —
+`0` means the pane is hidden and every coordinate result is meaningless.
+
+### Verify "is this a regression?" against `main`, not against memory
+**What happened:** Saw a 2-line-tall empty composer and nearly fixed it inside PR 4. Checked out
+`main` and measured the identical 56px — **pre-existing**, and fixing it there would have widened
+the PR and muddied the diff.
+**Rule:** Before fixing something you noticed while working, measure it on `main`. If it predates
+the branch, spawn it as its own task and say so in the write-up.

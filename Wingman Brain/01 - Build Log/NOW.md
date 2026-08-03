@@ -1,6 +1,6 @@
 # NOW
 
-Last updated: 2026-07-30
+Last updated: 2026-08-03
 
 > **This file answers one question: what is true right now?** It is rewritten each session by
 > `/wrap` — never appended to. Finished work moves down to [[Sprint Archive]]; the full story of
@@ -17,51 +17,61 @@ Last updated: 2026-07-30
 
 ## Next action
 
-**PR 4 of `tasks/plan-coach-bar.md` — the unified Coach bar.** Plan is at v3 (two review rounds;
-4 blockers + 6 issues found and folded).
+**Get `feat/coach-bar` reviewed and landed.** It is the unified Coach bar (PR 4 of
+`tasks/plan-coach-bar.md`) plus Sebastian's test-round fixes plus the chat History list. Three
+`wingman-reviewer` rounds, 15 findings, all fixed. Full write-up: `2026-08-03.md`.
 
-**Two carry-forwards land first — see below.**
+**Two things gate it, in this order:**
 
-⚠️ PR 4 rewrites `FlightLogTab.tsx` and `HomeTab.tsx`, the same files the dark-mode sweep just
-touched. **Don't let it sit unmerged** — PR #53's squash-merge cost a 15-file conflict, and that
-lesson has now been paid for twice.
+1. **Sebastian eyeballs it in the real Electron window** (`npm run electron:dev`). Everything was
+   verified in a browser pane at 1280×720 — nothing has been seen in the app. He specifically asked
+   for the bar to sit "not too high, not too low"; it now measures 32px on every screen, but that is
+   a browser-tab number and the feel is his call. Also worth his eye: the History list, and whether
+   the bar belongs on Objection Vault (Claude's call, easy to flip).
+2. **Then push + open the PR.** Never run unasked — CLAUDE.md rule #0.
 
-Decisions already closed, don't reopen: the Coach replies as **one message** (staggered bubbles
-dropped); "dive into that call" opens the call **and** scopes the chat.
+⚠️ **This branch rewrites `FlightLogTab.tsx` and `HomeTab.tsx`.** `tasks/plan-coach-bar.md` §9 says
+in as many words: don't let PR 4 sit, because the dark-mode sweep touches the same files and PR #53's
+squash-merge already cost a 15-file conflict. It has now sat across a weekend. **Landing it beats
+polishing it.**
 
-**PR 5 is briefed but blocked on a rewrite:** chain-of-thought progress. `/api/ai/chat` is not
-streamed, so a progress display added today could only be **invented steps on timers** — that is
-Product Rule #11. PR 5 is really "make the route stream its phases." The one real phase that
-happens today and is invisible: **"Retrying (2 of 3)"**.
+**After it lands:** PR 5 is briefed but blocked on a rewrite — chain-of-thought progress.
+`/api/ai/chat` is not streamed, so progress added today could only be **invented steps on timers**,
+which is Product Rule #11. PR 5 is really "make the route stream its phases", and it is *cheaper
+after* PR 4 because PR 4 deletes two of its three consumers. The one real phase that happens today
+and is invisible: **"Retrying (2 of 3)"**.
 
 ---
 
 ## Blocked on Sebastian
 
+- **Drive Granola via macOS automation — question asked, not answered.** He asked whether Claude
+  could take over his Mac to study Granola rather than describing it in words. It CAN: `osascript`
+  + System Events and `screencapture` both work and **both permissions are already granted**;
+  `Granola.app` is installed; Granola has no web version so there is no browser route. Claude asked
+  how to handle his real call data while in there (all notes / one throwaway note / don't) and he
+  stepped away without answering. **Nothing was run.** Deferred, not refused.
 - **Dark-mode sweep of every screen** — the instrument is `tasks/dashboard-sweep.md` and it is
   still **completely empty**. Nothing downstream of it can start.
 - **Objection Vault redesign** — rank by DAMAGE not frequency; buckets → instances; kill the red
   NEW badges (red means *lost*, never decoration — Design Language §3d).
 
 **Settled 2026-07-30 — do not re-raise:**
-- **The typeface question is deferred to a dashboard session** (Sebastian: *"that's for a
-  different session. maybe one that involves the dashboard work"*). Geist stays for now. Don't
-  raise it again outside a session that is already touching the dashboard — see the Backlog.
-- **`"defaultMode": "bypassPermissions"` in `.claude/settings.local.json` is deliberate**
-  (Sebastian confirmed). Leave it. Not a finding, not a bug, not a security gap to re-report.
+- **The typeface question is deferred to a dashboard session.** Geist stays for now.
+- **`"defaultMode": "bypassPermissions"` in `.claude/settings.local.json` is deliberate.** Leave it.
 
 ---
 
 ## In flight
 
-Nothing mid-code. The SessionStart hook reports real branch/PR/release state — read it, not this.
+**The composer-height fix** — Sebastian started it as its own background session
+(`task_b168056e`). The Coach composer's empty textarea renders **56px** when its natural one-line
+height is **28px**, exactly 2×. Measured on `main`, so it is **pre-existing, not from the Coach bar
+work** — just far more visible now the bar is on every screen. Suspect `field-sizing-content` on
+shadcn's `Textarea` fighting prompt-kit's autosize in `src/components/ui/prompt-input.tsx`.
+**It touches a file `feat/coach-bar` also renders — check for a conflict when both land.**
 
-**The context-system cleanup shipped** — PR #59, merged 2026-07-30. Full write-up:
-`2026-07-30.md` → Session 2; how the system works: memory `reference-context-system`.
-
-⚠️ **The enforcement hooks have never run in a genuinely cold session.** Every gate was tested by
-invoking it directly and each fired correctly, but the first real session start is the true test.
-If a hook misbehaves, remove its block from `.claude/settings.json` and say so — don't work around it.
+Nothing else mid-code. The SessionStart hook reports real branch/PR/release state — read it, not this.
 
 ---
 
@@ -69,20 +79,27 @@ If a hook misbehaves, remove its block from `.claude/settings.json` and say so �
 
 These are the "do this before the next thing" notes. They exist in exactly one place — here.
 
-1. **Transcript rows → `useRef`** before an always-mounted consumer exists. PR 4 creates that
-   consumer, so this has to land first.
-2. **Any new call-by-id lookup needs the outcome overlay.** PR 3 shipped that exact bug once
-   already — a call fetched by id rendered without its confirmed outcome.
-3. **`#52`'s cold-ladder dig gate still needs one live verification on a real *talking* call.**
-   The smoke test had no finalized speech, so the gate has never actually been exercised.
-4. **`#57`'s sidebar traffic-light clearance was verified by arithmetic only** — the browser has
-   no traffic lights. Needs one Electron eyeball.
-5. **Before overwriting `tasks/todo.md`, archive it first** (`_archive/todo-<date>.md`). Six
-   shipped modules cite that path for invariants; the last overwrite lost them until a lucky
-   recovery on 2026-07-30. Better still: give new plans their own `plan-<thing>.md` name.
-6. **When a context file needs to say a banned status word** (explaining the rule, or quoting a
-   past mistake), append `<!-- context-lint-ok -->` to that line — same escape-hatch convention
-   as `token-lint`.
+1. **A flag a later effect must observe IN THE SAME COMMIT has to be state, not a ref.** Claude
+   shipped this bug twice in one session, three hours apart, both times in a
+   restore-then-save-to-`localStorage` pair: a ref reads `true` immediately while the state it
+   guards is still the pre-restore value, so the save wipes what the restore just read. `vitest`
+   runs in `node` with no jsdom, so **no test here can catch it** — re-reading the diff is the only
+   thing that did.
+2. **Force a paint before trusting a post-animation DOM read.** framer-motion's exit is rAF-driven
+   and throttles when the browser pane isn't compositing, so `querySelector` right after a close
+   says the panel is still open. And a collapsed pane measures **0×0**, so `elementFromPoint`
+   returns null and synthetic clicks hit nothing — that made a working handler look broken. Take a
+   screenshot first.
+3. **Any new call-by-id lookup needs the outcome overlay** (`applySessionOutcomes`). PR 3 shipped
+   that exact bug once: a call fetched by id rendered without its confirmed outcome.
+4. **`#52`'s cold-ladder dig gate still needs one live verification on a real *talking* call.** The
+   smoke test had no finalized speech, so the gate has never actually been exercised.
+5. **`#57`'s sidebar traffic-light clearance was verified by arithmetic only** — the browser has no
+   traffic lights. Needs one Electron eyeball.
+6. **Before overwriting `tasks/todo.md`, archive it first** (`_archive/todo-<date>.md`). Six shipped
+   modules cite that path for invariants. Better still: give new plans their own `plan-<thing>.md`.
+7. **When a context file needs to say a banned status word**, append `<!-- context-lint-ok -->` to
+   that line — same escape-hatch convention as `token-lint`.
 
 ---
 
@@ -102,11 +119,17 @@ Test Pilot from using the 4 arrows?* If no → it stays here, however good it is
 - **Beta onboarding email** — download link is the public `wingman-releases` page. **No quarantine
   command** (notarized since 2026-07-01). Mention it auto-updates after first install.
 
-**Bundle into the next dashboard session** (deferred there by Sebastian, 2026-07-30)
+**Bundle into the next dashboard session**
 - **Typeface decision** — the app ships **Geist** (`src/app/layout.tsx` assigns it to
-  `--font-sans`, shadowing the token) while Design Language §4 says system sans / SF Pro. Whichever
-  wins restyles every screen, so it belongs with dashboard work, not on its own.
+  `--font-sans`, shadowing the token) while Design Language §4 says system sans / SF Pro.
 - Dark-mode sweep · Objection Vault redesign · new icons.
+
+**Coach bar follow-ups** (all deliberately deferred out of PR 4)
+- **PR 5 — stream `/api/ai/chat`'s phases.** See "Next action". Never fake progress on a timer.
+- Chat history is **localStorage only** by Sebastian's call — 30 conversations, 7 days, per device.
+  A Supabase-backed version (survives devices/reinstall) was offered and deferred; it needs a
+  schema change and his explicit yes.
+- The legacy `kb-signal` route name still needs renaming (rides the Phase 5 sweep, #37).
 
 **Queued projects** (each its own fresh session — do not batch)
 - Core card **voice** rework → then un-pin the confrontation dial (built, gated, inert)
@@ -122,11 +145,9 @@ Test Pilot from using the 4 arrows?* If no → it stays here, however good it is
 - **A/V recording (Wingman as notetaker)** — ⚠️ this **reverses Architectural Invariant #6** and
   needs Sebastian's explicit call plus a privacy lawyer before any storage code exists.
 - Stripe billing end-to-end · PostHog analytics · full undetectability buildout
-  (`app.dock.hide()`, CMD+Tab removal, Settings toggle)
 - Calendar detection · voice-AI onboarding · owner cockpit · positioning demo · iMessage funnel
 - Pinecone migration (blocked: Sebastian creates the account + `wingman-kb` index)
 - Vercel migration · Wingman Intelligence graph visualizer · transcript tester tool
-- Signal-card simulation testing · Ask Wingman automated test suite
 - KB re-ingestion (#28 `trigger_type` classification + #29 Pass-2 trigger diversity)
 - **Recall.ai Launch plan** — before signing, ask: (1) overage rate above 6,000 h, (2) the
   3,000 h starter option. Then update the rate in `margin-calculator.html`.
@@ -134,10 +155,12 @@ Test Pilot from using the 4 arrows?* If no → it stays here, however good it is
 **Decided 2026-07-30:** the dead Groq warm-up ping is **not** fixed on its own — it rides the
 **Phase 5 dead-code sweep (#37)**. The finished change is already written and saved as
 `tasks/_archive/groq-warmup-removal-2026-07-30.patch`; apply it during that sweep rather than
-rewriting it. It removes `warmGroq()` from `pipeline-warmup.ts`, which currently pings Groq on
-every call start to warm a code path nothing calls.
+rewriting it.
 
 **Dead — do not resurrect**
 - Pusher push migration (superseded by the hotkey pivot; Phase 5 rips out the leftover path)
 - "Offer Brain" → "Sales DNA" rename sweep — **phantom task.** The term never existed in app
-  code or the schema. Verified: `grep -rn "offer_brain\|offerBrain" src electron supabase` is empty.
+  code or the schema.
+- **Three separate chat surfaces** (Home Coach · Mission Intel card + modal · per-call "Ask
+  Wingman" card). Deleted 2026-07-30, replaced by the one Coach bar. Do not re-add a per-screen
+  chat box.
